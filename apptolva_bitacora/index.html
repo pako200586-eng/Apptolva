@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Capacitación Técnica - Soporte Operadores</title>
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js').then(function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+    
+    <script src="./js/tailwindcss.js"></script>
+    <script src="./js/confetti.min.js"></script>
+    <script src="./js/signature_pad.min.js"></script>
+    <!-- <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet"> -->
+    <link rel="stylesheet" href="./css/fontawesome.min.css">
+    
+    <style>
+        body { font-family: 'Roboto', sans-serif; background-color: #f8fafc; padding-bottom: 40px; }
+        .section-content { display: none; }
+        .section-content.active { display: block; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .check-btn { font-size: 10px; font-weight: bold; padding: 8px 4px; transition: 0.2s; }
+        .check-btn.active-good { background-color: #16a34a; color: white; border-color: #16a34a; }
+        .check-btn.active-bad { background-color: #dc2626; color: white; border-color: #dc2626; }
+        
+        .custom-checkbox input:checked + div { background-color: #ea580c; border-color: #ea580c; }
+        .custom-checkbox input:checked + div:after { content: '✓'; color: white; font-size: 18px; display: block; text-align: center; line-height: 24px; }
+        
+        /* LOGIN */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ea580c; z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        
+        /* CARRUSEL */
+        .carousel { overflow: hidden; position: relative; border-radius: 10px; height: 180px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .carousel-track { display: flex; transition: transform 0.5s ease-in-out; height: 100%; }
+        .carousel-slide { min-width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-size: cover; background-position: center; position: relative; }
+        .carousel-text { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; padding: 10px; font-size: 14px; font-weight: bold; text-align: center; }
+
+        /* FIRMAS */
+        .signature-pad { border: 2px dashed #cbd5e1; border-radius: 8px; background-color: #fff; width: 100%; height: 120px; touch-action: none; }
+        .sig-wrapper { position: relative; margin-bottom: 10px; }
+        .clear-btn { position: absolute; top: 5px; right: 5px; background: #ef4444; color: white; font-size: 9px; padding: 3px 6px; border-radius: 4px; font-weight: bold; z-index: 10; }
+        
+        /* MENU PRINCIPAL BOTONES */
+        .menu-btn { transition: transform 0.1s; }
+        .menu-btn:active { transform: scale(0.95); }
+        
+        /* AUTO-SAVE INDICATOR */
+        #save-indicator { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 20px; font-size: 10px; display: none; z-index: 100; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="save-indicator"><i class="fas fa-save mr-1"></i> Guardado</div>
+
+    <div id="login-overlay">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-80 text-center">
+        <div class="bg-orange-100 text-orange-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-graduation-cap text-3xl"></i>
+        </div>
+        <h2 class="text-xl font-black text-slate-800 mb-1">APPTOLVA 🚛 PA CHAPO</h2>
+        <p class="text-[10px] text-gray-500 mb-4 font-bold uppercase tracking-widest">Capacitacion de Operadores</p>
+        
+        <input type="password" id="passInput" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-2xl tracking-widest mb-4 font-bold outline-none focus:border-orange-500" placeholder="PIN" maxlength="4">
+        
+        <button onclick="checkLogin()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition uppercase">Entrar</button>
+        
+        <div class="mt-6 pt-4 border-t border-gray-100 text-left">
+            <p class="text-[9px] text-gray-400 leading-tight">
+                <strong>AVISO LEGAL:</strong> Este es un sitio de uso interno exclusivo para capacitación. No se solicita información de terceros ni contraseñas de Google.
+            </p>
+        </div>
+    </div>
+</div>
+
+
+    <header class="bg-[#ea580c] text-white p-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <button onclick="nav('menu')" class="text-white hover:text-orange-200 transition active:scale-90">
+                <i class="fas fa-home text-2xl"></i>
+            </button>
+            <div>
+            <h1 class="text-xl font-black tracking-wide italic leading-none">FLOTA <span class="text-[10px] bg-white text-[#ea580c] px-1 rounded not-italic ml-1 align-top">PROPIA</span></h1>
+<p class="text-[9px] font-bold uppercase text-orange-100 leading-none mt-1">BACHOCO</p>
+
+                <p class="text-[9px] font-bold uppercase text-orange-100 leading-none mt-1">PA Chapo</p>
+            </div>
+        </div>
+        
+        <div id="progContainer" class="hidden">
+            <div class="w-20 h-2 bg-orange-800 rounded-full overflow-hidden border border-orange-600">
+                <div id="progBar" class="h-full bg-yellow-300 transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <main id="view-menu" class="section-content p-6 max-w-lg mx-auto">
+        <div class="text-center mb-6 mt-4">
+            <h2 class="text-2xl font-bold text-gray-700"> Operador</h2>
+            <p class="text-sm text-gray-500">Selecciona una actividad:</p>
+            <div id="draft-notice" class="hidden mt-2 bg-blue-100 text-blue-800 text-xs p-2 rounded border border-blue-200">
+                <i class="fas fa-info-circle"></i> Tienes una revisión guardada pendiente.
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">            
+    
+    <!-- ============================================================== -->
+    <!-- 1. CHECK LIST DIARIO (ANCHO COMPLETO - PRIORIDAD ALTA) -->
+    <!-- ============================================================== -->
+    <button onclick="nav('rev')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-500 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
+        <div class="flex items-center gap-3 mb-1">
+            <i class="fas fa-clipboard-check text-4xl text-orange-500"></i>
+        </div>
+        <span class="font-bold text-gray-700 text-sm text-center mt-2">CHECK LIST DIARIO</span>            
+        <span class="text-[10px] text-gray-400">Revisión 360°</span>
+    </button>
+
+    <!-- ============================================================== -->
+    <!-- 2. BITÁCORA NOM-087 (ANCHO COMPLETO - PRIORIDAD ALTA) -->
+    <!-- ============================================================== -->
+    <button onclick="window.location.href='bitacora_master.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-600 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
+        <div class="flex items-center gap-3 mb-2">
+            <!-- Icono de Reloj y Camión -->
+            <i class="fas fa-clock text-3xl text-orange-600"></i>
+            <i class="fas fa-truck-moving text-2xl text-orange-400"></i>
+        </div>
+        <span class="font-bold text-gray-700 text-sm text-center">BITÁCORA DE HORAS</span>            
+        <span class="text-[10px] text-orange-600 font-bold bg-orange-100 px-2 rounded-full mt-1">NOM-087-SCT-2-2017</span>
+    </button>
+
+    <!-- ============================================================== -->
+    <!-- SECUNDARIOS (FILA 1) -->
+    <!-- ============================================================== -->
+    
+    <!-- 3. Procedimiento de Descarga (Antes Guía) -->
+    <button onclick="nav('guia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-blue-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+        <i class="fas fa-tasks text-3xl text-blue-500 mb-2"></i>                
+        <span class="font-bold text-gray-700 text-xs text-center leading-tight">PROCEDIMIENTO DE DESCARGA</span>            
+    </button>
+
+    <!-- 4. Asistente IA -->
+    <button onclick="nav('ia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-purple-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+        <i class="fas fa-robot text-3xl text-purple-500 mb-2"></i>                
+        <span class="font-bold text-gray-700 text-xs text-center">ASISTENTE IA</span>            
+    </button>
+
+    <!-- ============================================================== -->
+    <!-- SECUNDARIOS (FILA 2) -->
+    <!-- ============================================================== -->
+
+    <!-- 5. Reporte de Fallas -->
+    <button onclick="nav('falla')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-red-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+        <i class="fas fa-exclamation-triangle text-3xl text-red-500 mb-2"></i>                
+        <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
+    </button>
+
+    <!-- 6. Certificación -->
+    <button onclick="nav('quiz')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+        <i class="fas fa-graduation-cap text-3xl text-green-500 mb-2"></i>                
+        <span class="font-bold text-gray-700 text-xs text-center">CERTIFICACIÓN</span>            
+    </button>                        
+    
+    <!-- Botón de Reset (Al final) -->
+    <button onclick="borrarDatosLocales()" class="menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">                
+        <i class="fas fa-trash mr-2"></i> Iniciar Check List Nuevo (Borrar Guardado)            
+    </button>        
+</div>
+</main>
+
+    <main id="view-guia" class="section-content p-4 max-w-lg mx-auto">
+        <div class="carousel">
+            <div class="carousel-track" id="track">
+                <div class="carousel-slide" style="background-image:url('atasco.jpg');"> <div class="carousel-text">🚛 REVISA EL TERRENO</div> </div>
+                <div class="carousel-slide" style="background-image: url('cable1.jpg');"> <div class="carousel-text">⚠️ CUIDADO CON CABLES</div> </div>
+                <div class="carousel-slide" style="background-image: url('aceite2.jpg');"> <div class="carousel-text">🔧 REVISA NIVELES</div> </div>
+            </div>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-yellow-500 mb-4">
+            <h2 class="font-bold text-lg">🚛 Guía de Operación</h2>
+            <p class="text-xs text-gray-500">Sigue el orden para evitar accidentes.</p>
+        </div>
+        <div id="checklistContainer" class="space-y-3"></div>
+        <button id="btnFinishGuide" onclick="finishGuide()" class="hidden w-full mt-6 bg-green-600 text-white font-bold py-4 rounded-lg shadow-lg text-lg active:scale-95 transition-transform">✅ FINALIZAR DESCARGA</button>
+    </main>
+
+    <main id="view-rev" class="section-content p-4 max-w-lg mx-auto">
+        <div id="pdf-content" class="bg-white p-4 rounded-xl shadow-sm border border-slate-300">
+            <h2 class="font-bold text-lg text-slate-800 border-b pb-2 mb-4 text-center">
+                <i class="fas fa-clipboard-check mr-2 text-orange-600"></i>CHECK LIST DIARIO
+            </h2>
+            
+            <div class="bg-slate-50 p-3 rounded mb-4 border border-slate-200">
+                <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Identificación de Equipo</label>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="text" id="revUnidad" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="NO. TRACTO">
+                    <input type="text" id="revDolly" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="NO. DOLLY">
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="text" id="revTolva1" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me" placeholder="NO. 1ra TOLVA">
+                    <input type="text" id="revTolva2" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me" placeholder="NO. 2da TOLVA">
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="text" id="revOperador" class="p-2 border rounded text-xs save-me" placeholder="Nombre Operador">
+                    <input type="datetime-local" id="revHora" class="p-2 border rounded text-xs save-me">
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="text" id="revOrigen" class="p-2 border rounded text-xs save-me" placeholder="Origen">
+                    <input type="text" id="revDestino" class="p-2 border rounded text-xs save-me" placeholder="Destino">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2 items-center">
+                    <input type="number" id="revKm" class="p-2 border rounded text-xs font-bold save-me" placeholder="Kilometraje">
+                    <input type="text" id="revFolio" class="p-2 border rounded text-xs bg-gray-100 font-bold text-gray-500 text-center" placeholder="SE ASIGNA AL FINAL" readonly>
+                </div>
+            </div>
+
+            <div class="flex bg-slate-200 p-1 rounded-lg mb-4 sticky top-[70px] z-40 shadow-sm pdf-hide overflow-x-auto">
+                <button onclick="setRevTab('tracto')" id="rt-tracto" class="flex-1 py-3 px-2 text-[10px] font-black rounded shadow bg-white text-orange-700 whitespace-nowrap">TRACTO</button>
+                <button onclick="setRevTab('tolva1')" id="rt-tolva1" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">1ra. TOLVA</button>
+                <button onclick="setRevTab('dolly')" id="rt-dolly" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">DOLLY</button>
+                <button onclick="setRevTab('tolva2')" id="rt-tolva2" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">2da. TOLVA</button>
+            </div>
+
+            <div id="revListContainer" class="space-y-6 mb-6"></div>
+
+            <div class="border-t pt-4 mt-4">
+                <label class="text-[10px] font-bold text-gray-500 uppercase mt-4 block mb-2">Firmas Digitales (Obligatorias):</label>
+                <div class="grid grid-cols-1 gap-6 mb-4">
+                    <div class="sig-wrapper">
+                        <label class="text-[10px] font-bold text-orange-600 block mb-1">1. FIRMA OPERADOR:</label>
+                        <button onclick="limpiarFirma('op')" class="clear-btn">BORRAR</button>
+                        <canvas id="sig-canvas-op" class="signature-pad"></canvas>
+                        <input type="text" id="nombreOpTexto" class="w-full mt-1 p-2 border rounded text-xs text-center font-bold bg-slate-50 save-me" placeholder="Nombre Operador">
+                    </div>
+                    <div class="sig-wrapper">
+                        <label class="text-[10px] font-bold text-orange-600 block mb-1">2. FIRMA OPERADOR 2 (Opcional):</label>
+                        <button onclick="limpiarFirma('op2')" class="clear-btn">BORRAR</button>
+                        <canvas id="sig-canvas-op2" class="signature-pad"></canvas>
+                        <input type="text" id="nombreOp2Texto" class="w-full mt-1 p-2 border rounded text-xs text-center font-bold bg-slate-50 save-me" placeholder="Nombre Operador 2">
+                    </div>
+                    <div class="sig-wrapper">
+                        <label class="text-[10px] font-bold text-orange-600 block mb-1">3. FIRMA SUPERVISOR:</label>
+                        <button onclick="limpiarFirma('sup')" class="clear-btn">BORRAR</button>
+                        <canvas id="sig-canvas-sup" class="signature-pad"></canvas>
+                        <input type="text" id="nombreSupTexto" class="w-full mt-1 p-2 border rounded text-xs text-center font-bold bg-slate-50 save-me" placeholder="Nombre Supervisor">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <button onclick="procesarFinal()" id="btnFinal" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-4 rounded-xl shadow-xl hover:scale-[1.02] transition-transform flex flex-col justify-center items-center">
+                <div class="flex items-center gap-3 text-xl">
+                    <i class="fas fa-file-code"></i>
+                    <span>+</span>
+                    <i class="fab fa-whatsapp"></i>
+                </div>
+                <span class="text-sm mt-1">GENERAR REPORTE Y FINALIZAR</span>
+            </button>
+            <p id="statusMsg" class="text-center text-xs font-bold text-gray-400 mt-2 hidden">Contactando a la nube para asignar folio...</p>
+        </div>
+        <div class="h-10"></div>
+    </main>
+
+    <main id="view-falla" class="section-content p-4 max-w-lg mx-auto">
+        <div class="bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm">
+            <h2 class="font-bold text-xl text-red-700 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Reportar Falla</h2>
+            <select id="fallaContact" class="w-full p-3 border border-gray-300 rounded mb-4 bg-white font-bold text-sm">
+                <option value="5219211098696">📡 LOGÍSTICA / MONITOREO (24H)</option>
+                <option value="5219212683079">🔧 MANTENIMIENTO</option>
+                <option value="5219212682626">👷 TURNO A: F. Ambrosio</option>
+                <option value="5219212405675">👷 TURNO A: J.M. Pérez</option>
+                <option value="5219241472462">👷 TURNO B: Salas</option>
+                <option value="5219212656411">👷 TURNO B: Omar</option>
+                <option value="5219211230242">🚨 JEFE TRANSPORTE (Ing. B)</option>
+            </select>
+            <textarea id="fallaDesc" class="w-full p-4 border border-gray-300 rounded mb-4 text-sm" rows="4" placeholder="Describe la falla..."></textarea>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="sendWhatsappFalla()" class="bg-green-600 text-white font-bold py-3 rounded shadow active:scale-95">ENVIAR</button>
+                <button onclick="copyFallaText()" class="bg-blue-600 text-white font-bold py-3 rounded shadow active:scale-95">COPIAR (GRUPO)</button>
+            </div>
+            <p id="copyOk" class="text-center text-xs font-bold text-green-700 mt-2 hidden">¡Copiado! Pégalo en el grupo.</p>
+        </div>
+    </main>
+
+    <main id="view-ia" class="section-content p-4 max-w-lg mx-auto">
+        <div class="flex flex-col h-[75vh] bg-white rounded-xl shadow border border-gray-300 overflow-hidden">
+            <div class="bg-gray-100 p-3 border-b flex items-center justify-between">
+                <span class="font-bold text-sm text-gray-700"><i class="fas fa-robot text-orange-600 mr-2"></i>Soporte Técnico</span>
+                <button onclick="clearChat()" class="text-xs text-red-500 font-bold">BORRAR</button>
+            </div>
+            <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 text-sm">
+                <div class="bg-orange-600 text-white p-3 rounded-lg rounded-tl-none self-start max-w-[90%] shadow text-xs">Soy el Asistente. Pregúntame sobre coples, presiones o fallas.</div>
+            </div>
+            <div class="p-3 bg-white border-t flex gap-2">
+                <input type="text" id="aiInput" class="flex-1 p-3 bg-gray-100 border rounded-full text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="Escribe tu duda...">
+                <button onclick="sendAI()" class="bg-orange-600 text-white w-10 h-10 rounded-full shadow flex items-center justify-center active:scale-90"><i class="fas fa-microphone"></i></button>
+            </div>
+        </div>
+    </main>
+
+    <main id="view-quiz" class="section-content p-4 max-w-lg mx-auto">
+        <div id="quizStart" class="text-center mt-10">
+            <i class="fas fa-shield-alt text-6xl text-orange-600 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Certificación Operativa</h2>
+            <button onclick="startQuiz()" class="bg-orange-600 text-white font-bold py-4 px-10 rounded-full shadow-lg active:scale-95">INICIAR EXAMEN</button>
+        </div>
+        <div id="quizBox" class="hidden space-y-4"></div>
+        <div id="quizEnd" class="hidden text-center bg-white p-8 rounded-xl shadow border border-gray-200 mt-10">
+            <h3 class="text-xl font-bold text-gray-800">Calificación Final</h3>
+            <div id="quizScore" class="text-6xl font-black text-orange-600 my-4"></div>
+            <p id="quizMsg" class="text-sm font-bold text-gray-500 mb-6"></p>
+            <button onclick="location.reload()" class="text-blue-600 font-bold underline">Volver al Inicio</button>
+        </div>
+    </main>
+
+    <script>
+        // --- VARIABLES GLOBALES Y CLAVES ---
+        const aiApiKey = "__GOOGLE_AI_API_KEY__"; // Llave SOLO para la IA
+        const STORAGE_KEY = 'bachoco_tolva_draft_v9';
+        
+        // --- 1. INICIALIZACIÓN ---
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                initSignaturePads();
+            } catch(e) { console.warn("Canvas error: ", e); }
+            
+            try {
+                cargarDatosGuardados();
+                
+                // Asignar auto-guardado
+                const inputs = document.querySelectorAll('.save-me, textarea');
+                inputs.forEach(input => {
+                    input.addEventListener('input', autoGuardar);
+                });
+            } catch(e) { console.warn("Init error: ", e); }
+        });
+
+        // --- 2. SISTEMA DE AUTO-GUARDADO ---
+        function autoGuardar() {
+            try {
+                const data = {
+                    inputs: {},
+                    checklist: revResults,
+                    obs: obsData
+                };
+                document.querySelectorAll('.save-me').forEach(el => {
+                    data.inputs[el.id] = el.value;
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                const ind = document.getElementById('save-indicator');
+                if(ind) {
+                    ind.style.display = 'block';
+                    setTimeout(() => { ind.style.display = 'none'; }, 1000);
+                }
+            } catch(e) { console.error("AutoSave error"); }
+        }
+
+        function cargarDatosGuardados() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    for (const [id, value] of Object.entries(data.inputs)) {
+                        const el = document.getElementById(id);
+                        if (el) el.value = value;
+                    }
+                    if (data.checklist) revResults = data.checklist;
+                    if (data.obs) obsData = data.obs;
+                    const notice = document.getElementById('draft-notice');
+                    if(notice) notice.classList.remove('hidden');
+                }
+            } catch(e) { console.error("LoadSave error"); }
+        }
+
+        function borrarDatosLocales() {
+            if(confirm("¿Seguro que quieres borrar todos los datos guardados y empezar de cero?")) {
+                localStorage.removeItem(STORAGE_KEY);
+                location.reload();
+            }
+        }
+
+        // --- 3. LOGIN SYSTEM ---
+        function checkLogin() {
+            try {
+                const pass = document.getElementById('passInput').value;
+                if(pass === '2020') {
+                    document.getElementById('login-overlay').style.display = 'none';
+                    nav('menu'); 
+                } else {
+                    document.getElementById('errorMsg').classList.remove('hidden');
+                }
+            } catch(e) {
+                alert("Error al iniciar: " + e.message);
+            }
+        }
+
+        // --- 4. CARRUSEL ---
+        let slideIndex = 0;
+        const track = document.getElementById('track');
+        function showSlides() {
+            slideIndex++;
+            if (slideIndex > 2) { slideIndex = 0; }
+            if(track) track.style.transform = `translateX(-${slideIndex * 100}%)`;
+            setTimeout(showSlides, 4000); 
+        }
+        setTimeout(showSlides, 500);
+
+        // --- CONFIGURACIÓN DE IA ---
+        const systemPrompt = `
+        Eres Asistente Experto en Tolvas Bachoco. Ayuda concisa y técnica. Propósito Central:
+Actuar como un experto en mecánica de tolvas de descarga para diagnosticar, prevenir y solucionar fallas operacionales, asistiendo a los usuarios con guías técnicas precisas y seguras.
+
+Metas Operativas:
+Identificar con precisión fallas comunes durante el proceso de descarga.
+Proporcionar instrucciones detalladas (paso a paso) para reparaciones mecánicas y planes de mantenimiento preventivo.
+Protocolo de Interacción (Comportamientos y Reglas):
+
+1. Inicio y Diagnóstico:
+Saludo: Preséntese como el "Asistente de Descarga" especializado en mecánica.
+Recolección de Datos:
+Pregunte al usuario por los síntomas específicos (ruidos, vibraciones) durante la descarga.
+Solicite el tipo de material que se está descargando para evaluar posibles obstrucciones (mecánicas o de flujo).
+2. Solución y Reparación Técnica:
+Análisis de Fallas: Ofrecer un listado de posibles causas técnicas (ej. fallos en el sistema hidráulico, desgaste de compuertas, problemas en el vibrador).
+Procedimiento de Reparación:
+Indicar las herramientas requeridas.
+Explicar el procedimiento de reparación de forma concisa, priorizando en todo momento la Seguridad Industrial.
+Prevención: Sugerir rutinas de mantenimiento preventivo para evitar la recurrencia de la falla.
+3. Estilo y Tono de Comunicación:
+Tono General: Profesional, técnico, serio y enfocado en la solución inmediata. (Simulando la interacción de un jefe de taller con un técnico de campo).
+Lenguaje: Utilizar terminología mecánica precisa (ej. Coples, chumaseras, válvulas de alivio). Mantener el lenguaje técnico, pero accesible para un operador de maquinaria.
+Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos.
+        
+
+        BASE DE CONOCIMIENTO TÉCNICO:(VERDADES ABSOLUTAS)
+        A) DATOS CLAVE:
+        - Presión Hidráulica Normal: 1500 a 2000 PSI.(MAS DE 2500 PSI ES PELIGROSO)
+        - Secuencia Arranque: PTO -> 1000 RPM -> Sinfín (4) -> Arrastre (3).
+        - Secuencia Apagado: Inversa (3 -> 4 -> PTO).
+        - El Cople: Fusible mecánico. Si zumba y no gira, es el cople.
+        - Seguridad: 10m lejos de cables alta tensión.
+        - Nunca te apartes del banco de controles para reaccionar rapido al asolvamiento.
+        - Asegura que no este lleno el silo para evitar asolvamientos.
+        - Las chumaseras en mal estado son causa de asolvamiento por falta de grasa o tiempo de vida.
+        
+    
+
+        B) DOCUMENTACIÓN OFICIAL (RESUMEN): (MEMORIZA ESTO)
+        [FICHA DE OPERACIÓN: DESCARGA DE CARRO TOLVA]
+        1. REGLAS DE ORO: ¡MIRA ARRIBA! Mantén 10 metros de cables. Terreno firme. Freno puesto. NUNCA apoyes pluma en silo.
+        2. PANEL: Palanca 1 (Elevación), 2 (Giro), 3 (Arrastre), 4 (Sinfín).
+        3. SECUENCIA: (NO FALLES)
+           - PTO: Clutch a fondo -> Botón PTO -> Soltar (900-1000 RPM).
+           - Posicionar pluma.
+           - Activar: 1º Palanca 4 (Sinfín), 2º Palanca 3 (Arrastre).
+           - Compuertas: Abrir de ATRÁS hacia ADELANTE.
+           - Presión: 1500-2000 PSI.
+        4. APAGADO: Cerrar compuertas -> Apagar Palanca 3 -> Apagar Palanca 4 -> Guardar pluma -> Desactivar PTO.
+
+        [MANUAL DE PROCEDIMIENTOS 06-PA-PR-1.44]
+        - Normas: Colocarse a un costado de silos. Inspeccionar terreno. Conducir en línea recta. Validar líneas eléctricas (10m).
+        - No colocar en superficie blanda (riesgo volcamiento).
+        - Velocidad motor: 900-1000 RPM.
+        - Ajustar velocidad transportador hasta que material retroceda en mirillas, luego reducir.
+        - Responsables: Superintendente, Jefe de flota, Supervisor Mantto.
+        - DIAGRAMA DE FLUJO (RESUMEN): Inicio -> Inspeccionar área -> Posicionar unidad -> Validar cables (10m) -> Frenos y aire -> Activar PTO (1000 RPM) -> Elevar pluma -> Posicionar (sin tocar) -> Establecer RPM (1050-1100) -> Arrancar Sinfín (4) y Arrastre (3) -> Abrir compuerta -> Monitorear presión (1500-2000 PSI) -> Al vaciar, cerrar compuertas -> Apagar Arrastre luego Sinfín -> Guardar pluma -> Fin.
+        - RESPONSABILIDADES:
+        - Superintendente: Asegurar la correcta operación y solicitar evidencias.
+        - Operador Master: Capacitar operadores nuevos y retroalimenta. Evitar daños en silos.
+        - Operador Master: Impartir procedimiento a nuevos ingresos y realizar viajes de reconocimiento. 
+
+        CONTACTOS:
+        - Logística: 9211098696
+        - Mantenimiento: 9212683079
+        - OP.MASTER HARRY 9212682626
+
+        GUARDRAILS:
+        - Solo temas de mecánica/operación tolvas.
+        `;
+        // (Resumido para ahorrar espacio, funciona igual)
+
+        // GUÍA
+        const guideSteps = [
+            {t:"Llegada: Entregar docs y pasar Arco de Lavado.", img:"arco1.jpg"},
+            {t:"Terreno firme, nivelado y unidad recta.", img:"suelo.jpg"},
+            {t:"SEGURIDAD: 10m lejos de cables luz.", img:"cable1.jpg"},
+            {t:"Colocar mangueras del sistema hidraulico.", img:"mangue.jpg"},
+            {t:"Bajar suspension al desacoplar.", img:"suelo.jpg"},
+            {t:"PTO Activado (900-1000 RPM).", img:"pto.jpg"},
+            {t:"Pluma posicionada (SIN tocar silo).", img:"silo.jpg"},
+            {t:"(1) pluma⬆️⬇️,(2) pluma⬅️➡️, (3) arrastre, (4) sinfin.", img:"palancas.jpg"},
+            {t:"Descarga: Compuertas Atrás -> Adelante.", img:"atras.jpg"},
+            {t:"Presión: 1500-2000 PSI (Regular flujo).", img:"reg.jpg"},
+            {t:"Regular flujo.", img:"reg1.jpg"},
+            {t:"Final: Cerrar todo, pernos, pluma abajo.", img:"descfin.jpg"}
+        ];
+
+        // --- CHECKLIST DATA ---
+        const commonTolvaItems = [
+            {cat:"MOTOR (TOLVA)", i:["Nivel de aceite", "Fugas", "Filtros"]},
+            {cat:"DOCUMENTOS", i:["Permiso Federal", "Permiso doble art", "Placas Fisicas", "Certificación Fis-Mec", "Tarjeta Circulación", "Engomado Fis-Mec"]},
+            {cat:"ESTRUCTURA", i:["Tapas", "Tolva", "Pluma", "Línea de vida", "Pasamanos", "Compartimentos", "Banco de válvulas"]},
+            {cat:"ELÉCTRICO", i:["Luces", "Estado de los cables", "Enchufes 7 vias", "Conectores"]},
+            {cat:"SUSPENSIÓN", i:["Bolsa de aire", "Válvulas de suspensión", "Amortiguadores"]},
+            {cat:"ACCESORIOS", i:["Banderolas", "Etiquetas de seguridad", "Logotipo", "Sistema Iluminación", "Matraca dolly"]},
+            {cat:"FRENOS", i:["Mangueras", "Balatas", "Rotochambers", "Matracas", "Levas", "ABS"]},
+            {cat:"SISTEMA HIDRÁULICO", i:["Mangueras", "Manometros", "Válvulas"]}
+        ];
+
+        const revData = {
+            tracto: [
+                {cat:"MOTOR", i:["Nivel de aceite", "Nivel de refrigerante", "Bandas", "Poleas", "Fugas", "Fugas en dirección", "Filtros", "Mangueras", "Turbocargador"]},
+                {cat:"ELÉCTRICO", i:["Luces en general", "Luces de navegación", "Estado de los cables", "Baterías", "Alarmas y reverceros", "A/C", "Sin Espías (testigos)", "Conectores"]},
+                {cat:"FRENOS", i:["Mangueras", "Balatas", "Rotochamber", "Chambers", "Matracas", "Sin fuga de aire", "Compresor", "ABS"]},
+                {cat:"SUSPENSIÓN", i:["Bolsas de aire", "Amortiguadores", "Muelles", "Birlos de rueda", "Llantas"]},
+                {cat:"ACCESORIOS", i:["Gato Hidráulicos", "Matraca Dolly", "Reflejantes", "Extintor", "Tumbaburro", "Colchoneta", "Estereo", "Cámaras", "Logotipo", "Torreta"]},
+                {cat:"CARROCERÍA", i:["Retrovisores", "Parabrisas", "Chasis", "Plumillas (tricos)", "Yugo de flecha"]},
+                {cat:"INTERIOR", i:["Limpieza", "Tablero", "Asientos", "Cristales"]},
+                {cat:"DOCUMENTOS", i:["Tarjeta de Circulación F", "Tarjeta de Circulación E", "Póliza de Seguro", "Permiso Federal", "Permiso doble art.", "Certificación Fis-Mec", "Engomado Fis-Mec", "Placa Física", "Licencia Federal", "Licencia Estatal", "Certificado Médico"]}
+            ],
+            tolva1: commonTolvaItems,
+            dolly: [
+                {cat:"ELÉCTRICO", i:["Luces en general", "Estado de los cables", "Conectores"]},
+                {cat:"SUSPENSIÓN", i:["Amortiguadores", "Cámara de Suspensión", "Birlos de rueda", "Llantas"]},
+                {cat:"FRENOS", i:["Mangueras", "Balatas", "Chambers", "Matracas autoajuste", "Sin fugas de aire", "ABS"]},
+                {cat:"ACCESORIOS", i:["Matraca Dolly", "Reflejantes", "Logotipo", "Cadena", "Engrasado", "Bujes"]},
+                {cat:"DOCUMENTOS", i:["Verificación fis-mec", "Engomado fis-mec"]}
+            ],
+            tolva2: commonTolvaItems
+        };
+
+        const quizData = [
+            {q:"¿Límite máximo de velocidad permitido (Full)?", o:["80 km/h","95 km/h","110 km/h"], a:0},
+            {q:"Manejo Defensivo: Distancia con vehículo delantero", o:["Pegado a la defensa","Regla de 4 segundos","10 metros"], a:1},
+            {q:"¿Qué palanca accionas PRIMERO al descargar?", o:["Palanca 3 (Arrastre)","Palanca 4 (Sinfín)","Cualquiera"], a:1},
+            {q:"Señales de Tránsito AMARILLAS indican:", o:["Alto total","Información","Prevención / Advertencia"], a:2},
+            {q:"Distancia mínima con cables de luz:", o:["3 metros","10 metros","15 metros"], a:1}
+        ];
+
+        // LÓGICA
+        let currentRevTab = 'tracto';
+        let revResults = {};
+        let obsData = { tracto: "", tolva1: "", dolly: "", tolva2: "" };
+
+        function nav(id) {
+            document.querySelectorAll('.section-content').forEach(e => e.classList.remove('active'));
+            const view = document.getElementById('view-'+id);
+            if(view) {
+                view.classList.add('active');
+            } else {
+                console.error("View not found: " + id);
+            }
+            
+            const prog = document.getElementById('progContainer');
+            if(prog) prog.style.display = id === 'guia' ? 'block' : 'none';
+            
+            if(id === 'rev') setTimeout(resizeCanvas, 200); 
+            if(id === 'guia') renderGuide(); 
+        }
+
+        // GUÍA
+        function renderGuide() {
+            const c = document.getElementById('checklistContainer');
+            if(c.innerHTML !== "") return; 
+            c.innerHTML = guideSteps.map(s => `
+                <div class="bg-white p-3 rounded shadow-sm border border-gray-200 flex items-start">
+                    <label class="custom-checkbox flex items-start w-full cursor-pointer">
+                        <input type="checkbox" class="hidden" onchange="upGuide()">
+                        <div class="w-8 h-8 border-2 border-gray-300 rounded mr-3 flex-shrink-0 mt-1"></div>
+                        <div class="flex-1">
+                            <span class="text-sm font-bold text-gray-700 block">${s.t}</span>
+                            ${s.img ? `<img src="${s.img}" class="step-image" alt="foto" onerror="this.style.display='none'">` : ''}
+                        </div>
+                    </label>
+                </div>`).join('');
+        }
+        function upGuide() {
+            const chk = document.querySelectorAll('#checklistContainer input:checked').length;
+            const tot = guideSteps.length;
+            const bar = document.getElementById('progBar');
+            const btn = document.getElementById('btnFinishGuide');
+            
+            if(bar) bar.style.width = (chk/tot*100)+'%';
+            if(btn) btn.classList.toggle('hidden', chk < tot);
+        }
+        function finishGuide() { confetti(); alert("¡Descarga Exitosa!"); nav('rev'); }
+
+        // REVISIÓN
+        function setRevTab(mode) {
+            currentRevTab = mode;
+            ['tracto','tolva1','dolly','tolva2'].forEach(m => {
+                const btn = document.getElementById('rt-'+m);
+                if(btn) {
+                    if(m===mode) { btn.classList.add('bg-white','shadow','text-orange-700'); btn.classList.remove('text-gray-500'); }
+                    else { btn.classList.remove('bg-white','shadow','text-orange-700'); btn.classList.add('text-gray-500'); }
+                }
+            });
+            renderRevList();
+        }
+        
+        function renderRevList() {
+            const c = document.getElementById('revListContainer');
+            c.innerHTML = '';
+            
+            let label = "";
+            if(currentRevTab === 'tolva1') label = "CHECK LIST: 1ra TOLVA";
+            if(currentRevTab === 'tolva2') label = "CHECK LIST: 2da TOLVA";
+            if(currentRevTab === 'dolly') label = "CHECK LIST: DOLLY";
+            if(currentRevTab === 'tracto') label = "CHECK LIST: TRACTO";
+            
+            c.innerHTML += `<div class="bg-blue-50 p-2 text-center text-xs font-bold text-blue-800 mb-3 rounded border border-blue-200">${label}</div>`;
+
+            // BOTÓN MARCAR TODO BIEN
+            c.innerHTML += `
+                <div class="flex justify-between items-center mb-4 bg-orange-50 p-2 rounded border border-orange-100">
+                    <span class="text-xs font-bold text-orange-800">¿Todo en orden?</span>
+                    <button onclick="markAllOk()" class="bg-green-600 text-white text-[10px] font-bold py-2 px-4 rounded shadow hover:bg-green-700 active:scale-95 transition">
+                        <i class="fas fa-check-double mr-1"></i> MARCAR TODO BIEN
+                    </button>
+                </div>
+            `;
+
+            if(revData[currentRevTab]) {
+                revData[currentRevTab].forEach(cat => {
+                    let html = `<div class="mb-4 bg-white p-3 rounded border border-gray-200 shadow-sm"><h3 class="text-xs font-black text-slate-500 mb-3 border-b pb-1">${cat.cat}</h3><div class="space-y-3">`;
+                    cat.i.forEach(item => {
+                        const k = `${currentRevTab}-${item}`;
+                        const v = revResults[k];
+                        html += `
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold w-1/2">${item}</span>
+                            <div class="flex gap-1">
+                                <button onclick="setR('${k}','OK',this)" class="check-btn flex-1 rounded border border-gray-300 ${v==='OK'?'active-good':''}">BIEN</button>
+                                <button onclick="setR('${k}','MAL',this)" class="check-btn flex-1 rounded border border-gray-300 ${v==='MAL'?'active-bad':''}">MAL</button>
+                            </div>
+                        </div>`;
+                    });
+                    c.innerHTML += html + '</div></div>';
+                });
+            }
+
+            // OBSERVACIONES
+            c.innerHTML += `
+                <div class="mt-4 p-3 bg-orange-50 border border-orange-200 rounded">
+                    <label class="text-[10px] font-bold text-orange-800 block mb-1">OBSERVACIONES ${label}:</label>
+                    <textarea 
+                        class="w-full p-2 border rounded text-xs" 
+                        rows="2" 
+                        placeholder="Escribe observaciones..."
+                        oninput="saveObs('${currentRevTab}', this.value)"
+                    >${obsData[currentRevTab] || ''}</textarea>
+                </div>
+            `;
+        }
+        
+        function setR(k,val,btn) {
+            revResults[k] = val;
+            btn.parentElement.querySelectorAll('button').forEach(b => b.className = "check-btn flex-1 rounded border border-gray-300");
+            btn.className = `check-btn flex-1 rounded border ${val==='OK'?'active-good':'active-bad'}`;
+            autoGuardar(); 
+        }
+
+        function markAllOk() {
+            if(!revData[currentRevTab]) return;
+            revData[currentRevTab].forEach(cat => {
+                cat.i.forEach(item => {
+                    const k = `${currentRevTab}-${item}`;
+                    revResults[k] = 'OK';
+                });
+            });
+            autoGuardar();
+            renderRevList();
+            confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
+        }
+
+        function saveObs(key, val) {
+            obsData[key] = val;
+        }
+
+        // --- FIRMAS ---
+        let signaturePadOp, signaturePadOp2, signaturePadSup;
+        
+        function initSignaturePads() {
+            const canvasOp = document.getElementById('sig-canvas-op');
+            if(canvasOp) signaturePadOp = new SignaturePad(canvasOp, { backgroundColor: 'rgb(255, 255, 255)' });
+            
+            const canvasOp2 = document.getElementById('sig-canvas-op2');
+            if(canvasOp2) signaturePadOp2 = new SignaturePad(canvasOp2, { backgroundColor: 'rgb(255, 255, 255)' });
+
+            const canvasSup = document.getElementById('sig-canvas-sup');
+            if(canvasSup) signaturePadSup = new SignaturePad(canvasSup, { backgroundColor: 'rgb(255, 255, 255)' });
+        }
+        
+        function resizeCanvas() {
+            if(!signaturePadOp) return;
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            
+            [
+                {pad: signaturePadOp, el: 'sig-canvas-op'},
+                {pad: signaturePadOp2, el: 'sig-canvas-op2'},
+                {pad: signaturePadSup, el: 'sig-canvas-sup'}
+            ].forEach(item => {
+                const canvas = document.getElementById(item.el);
+                if(canvas && item.pad) {
+                    const data = item.pad.toData();
+                    canvas.width = canvas.offsetWidth * ratio;
+                    canvas.height = canvas.offsetHeight * ratio;
+                    canvas.getContext("2d").scale(ratio, ratio);
+                    item.pad.clear();
+                    item.pad.fromData(data);
+                }
+            });
+        }
+        
+        window.addEventListener("resize", resizeCanvas);
+        document.addEventListener('DOMContentLoaded', initSignaturePads);
+
+        function limpiarFirma(quien) {
+            if(quien === 'op' && signaturePadOp) signaturePadOp.clear();
+            if(quien === 'op2' && signaturePadOp2) signaturePadOp2.clear();
+            if(quien === 'sup' && signaturePadSup) signaturePadSup.clear();
+        }
+
+        // --- REPORTE GENERADOR (V9.2 - FOLIO AUTOMÁTICO AL FINAL) ---
+        async function procesarFinal() {
+            const u = document.getElementById('revUnidad').value;
+            const opNombre = document.getElementById('nombreOpTexto').value;
+            
+            if (!u || !opNombre) return alert("⚠️ Error: Falta Unidad o Nombre del Operador.");
+
+            const btn = document.getElementById('btnFinal');
+            const msg = document.getElementById('statusMsg');
+            const originalText = btn.innerHTML;
+            
+            // 1. ESTADO DE CARGA Y BLOQUEO
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> ASIGNANDO FOLIO...';
+            btn.classList.add('opacity-75');
+            msg.classList.remove('hidden');
+
+            try {
+                // 2. PEDIMOS EL FOLIO A LA NUBE (O generamos offline)
+                let folio = "PENDIENTE";
+                if (navigator.onLine && typeof window.reservarFolioCloud === 'function') {
+                    try {
+                        const nuevoNumero = await window.reservarFolioCloud();
+                        folio = "F-" + nuevoNumero;
+                        msg.innerText = `✅ Folio ${folio} asignado. Generando PDF...`;
+                    } catch(e) { 
+                        console.warn("Fallo nube, usando offline");
+                        folio = "ERR-" + Math.floor(Date.now() / 1000).toString().slice(-6);
+                    }
+                } else {
+                    folio = "OFF-" + Math.floor(Date.now() / 1000).toString().slice(-6);
+                    msg.innerText = `⚠️ Modo Offline. Folio temporal: ${folio}`;
+                    await new Promise(r => setTimeout(r, 1500));
+                }
+                
+                // Actualizamos visualmente el input (aunque ya nos vamos)
+                document.getElementById('revFolio').value = folio;
+
+                // 3. GENERAMOS EL DOCUMENTO
+                const emptyImg = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+                const firmaOpImg = signaturePadOp && !signaturePadOp.isEmpty() ? signaturePadOp.toDataURL() : emptyImg;
+                const firmaOp2Img = signaturePadOp2 && !signaturePadOp2.isEmpty() ? signaturePadOp2.toDataURL() : emptyImg;
+                const firmaSupImg = signaturePadSup && !signaturePadSup.isEmpty() ? signaturePadSup.toDataURL() : emptyImg;
+                
+                const nombreOp2 = document.getElementById('nombreOp2Texto').value || "";
+                const nombreSup = document.getElementById('nombreSupTexto').value || "";
+
+                const t1 = document.getElementById('revTolva1').value || 'S/N';
+                const t2 = document.getElementById('revTolva2').value || 'S/N';
+                const dolly = document.getElementById('revDolly').value || 'S/N';
+
+                // HTML DEL REPORTE
+                let contenidoReporte = `
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Reporte ${u}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f4; }
+                        .hoja { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                        .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #ea580c; padding-bottom: 15px; margin-bottom: 20px; }
+                        .header-left { display: flex; align-items: center; }
+                        .titulo-principal { color: #ea580c; font-size: 24px; margin: 0; font-weight: bold; }
+                        .subtitulo { margin: 0; color: #666; font-size: 12px; font-weight: bold; }
+                        .meta-fecha { font-size: 11px; color: #888; text-align: right; }
+                        .box-data { background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 12px; border: 1px solid #e2e8f0; }
+                        table { width: 100%; border-collapse: collapse; }
+                        td { padding: 6px 4px; vertical-align: top; border-bottom: 1px solid #e0e0e0; color: #333; }
+                        .sec-title { background: #334155; color: white; padding: 8px; font-weight: bold; font-size: 13px; margin-top: 20px; border-radius: 4px; }
+                        .cat-title { background: #f1f5f9; font-weight: bold; padding: 5px 8px; font-size: 11px; margin-top: 8px; border-left: 4px solid #ea580c; }
+                        .row-item { border-bottom: 1px dotted #eee; padding: 6px 8px; display: flex; justify-content: space-between; font-size: 11px; }
+                        .status-ok { color: #16a34a; font-weight: bold; }
+                        .status-mal { color: white; background: #dc2626; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+                        
+                        /* ESTILO PARA OBSERVACIONES SEPARADAS */
+                        .obs-sec { background: #fff7ed; border: 1px dashed #fdba74; padding: 8px; font-size: 11px; margin-bottom: 10px; color: #9a3412; margin-top:5px;}
+
+                        .firmas-container { display: flex; justify-content: space-between; margin-top: 40px; }
+                        .firma-box { width: 32%; text-align: center; } 
+                        .firma-img { width: 100%; height: 60px; object-fit: contain; border-bottom: 2px solid #333; margin-bottom: 5px; }
+                        .firma-nombre { font-weight: bold; font-size: 11px; display: block; }
+                        .firma-cargo { color: #666; font-size: 9px; display: block; }
+                    </style>
+                </head>
+                <body>
+                    <div class="hoja">
+                        <div class="header-container">
+                            <div class="header-left">
+                                <div>
+                                    <h1 class="titulo-principal">REPORTE DE INSPECCIÓN</h1>
+                                    <p class="subtitulo">BACHOCO - PLANTA DE ALIMENTOS</p>
+                                </div>
+                            </div>
+                            <div class="meta-fecha">
+                                FECHA: ${new Date().toLocaleDateString()}<br>
+                                HORA: ${new Date().toLocaleTimeString()}
+                            </div>
+                        </div>
+
+                        <div class="box-data">
+                            <table>
+                                <tr>
+                                    <td width="50%"><strong>UNIDAD:</strong> ${u}</td>
+                                    <td width="50%"><strong>OPERADOR:</strong> ${opNombre}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>TOLVA 1:</strong> ${t1}</td>
+                                    <td><strong>TOLVA 2:</strong> ${t2}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>DOLLY:</strong> ${dolly}</td>
+                                    <td><strong>KM:</strong> ${document.getElementById('revKm').value || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>ORIGEN:</strong> ${document.getElementById('revOrigen').value || '-'}</td>
+                                    <td><strong>DESTINO:</strong> ${document.getElementById('revDestino').value || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>FOLIO:</strong> ${folio}</td>
+                                    <td><strong>VERSIÓN:</strong> 9.2</td>
+                                </tr>
+                            </table>
+                        </div>
+                `;
+
+                const secciones = [
+                    {id: 'tracto', titulo: 'TRACTO CAMIÓN'},
+                    {id: 'tolva1', titulo: '1ra TOLVA'},
+                    {id: 'dolly', titulo: 'DOLLY'},
+                    {id: 'tolva2', titulo: '2da TOLVA'}
+                ];
+
+                secciones.forEach(sec => {
+                    contenidoReporte += `<div class="sec-title">${sec.titulo}</div>`;
+                    
+                    revData[sec.id].forEach(cat => {
+                        contenidoReporte += `<div class="cat-title">${cat.cat}</div>`;
+                        cat.i.forEach(item => {
+                            const k = `${sec.id}-${item}`;
+                            const v = revResults[k];
+                            let st = '<span style="color:#ccc">-</span>';
+                            if(v === 'OK') st = '<span class="status-ok">✓ OK</span>';
+                            if(v === 'MAL') st = '<span class="status-mal">✕ MAL</span>';
+                            contenidoReporte += `
+                                <div class="row-item">
+                                    <span>${item}</span>
+                                    <span>${st}</span>
+                                </div>`;
+                        });
+                    });
+
+                    const obsTexto = obsData[sec.id] || "Sin observaciones";
+                    contenidoReporte += `
+                        <div class="obs-sec">
+                            <strong>NOTAS ${sec.titulo}:</strong> ${obsTexto}
+                        </div>
+                    `;
+                });
+
+                // 3 FIRMAS
+                contenidoReporte += `
+                        <div class="firmas-container">
+                            <div class="firma-box">
+                                <img src="${firmaOpImg}" class="firma-img">
+                                <span class="firma-nombre">${opNombre}</span>
+                                <span class="firma-cargo">FIRMA OPERADOR</span>
+                            </div>
+                            <div class="firma-box">
+                                <img src="${firmaOp2Img}" class="firma-img">
+                                <span class="firma-nombre">${nombreOp2}</span>
+                                <span class="firma-cargo">FIRMA OPERADOR 2</span>
+                            </div>
+                            <div class="firma-box">
+                                <img src="${firmaSupImg}" class="firma-img">
+                                <span class="firma-nombre">${nombreSup}</span>
+                                <span class="firma-cargo">FIRMA SUPERVISOR</span>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>`;
+
+                const blob = new Blob([contenidoReporte], { type: 'text/html' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `REPORTE_${u}_${opNombre}.html`;
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // LIMPIEZA POST-REPORTE
+                localStorage.removeItem(STORAGE_KEY); 
+                
+                setTimeout(() => {
+                    restaurarBoton(btn, originalText, msg);
+                    const whatsAppLink = construirLinkWhatsapp(folio); // Pasamos el folio nuevo
+                    const ir = confirm("✅ REPORTE GENERADO.\n\nFolio asignado: " + folio + "\n\n¿Abrir WhatsApp para enviarlo?");
+                    if(ir) window.location.href = whatsAppLink;
+                    else location.reload();
+                }, 1000);
+
+            } catch (error) {
+                console.error(error);
+                alert("❌ ERROR DE CONEXIÓN: No se pudo asignar folio. Revisa tu internet.");
+                restaurarBoton(btn, originalText, msg);
+            }
+        }
+
+        function restaurarBoton(btn, html, msg) {
+            btn.disabled = false;
+            btn.innerHTML = html;
+            btn.classList.remove('opacity-75');
+            msg.classList.add('hidden');
+        }
+
+        function construirLinkWhatsapp(folioYaAsignado) {
+    // Obtenemos los valores o ponemos "N/A" si están vacíos
+    const u = document.getElementById('revUnidad')?.value || "N/A";
+    const op = document.getElementById('revOperador')?.value || "N/A";
+    const fecha = new Date().toLocaleString('es-MX', { hour12: true });
+
+    let msg = `🚛 *REPORTE DE CAPACITACIÓN - TOLVA APP*\n`;
+    msg += `--------------------------------\n`;
+    msg += `📄 *FOLIO:* ${folioYaAsignado || 'S/F'}\n`;
+    msg += `📅 *FECHA:* ${fecha}\n`;
+    msg += `🚛 *UNIDAD:* ${u}\n`;
+    msg += `👤 *OPERADOR:* ${op}\n`;
+    msg += `--------------------------------\n`;
+
+    // Verificamos que revResults exista para evitar errores
+    const resultados = typeof revResults !== 'undefined' ? revResults : {};
+    const bads = Object.keys(resultados).filter(k => resultados[k] === 'MAL');
+    
+    if (bads.length > 0) {
+        msg += `⚠️ *FALLAS DETECTADAS (${bads.length}):*\n`;
+        bads.forEach(b => {
+            const textoLimpio = b.toUpperCase().replace(/-/g, ' ').replace(/_/g, ' ');
+            msg += `❌ ${textoLimpio}\n`;
+        });
+    } else {
+        msg += `✅ *ESTADO:* UNIDAD SIN FALLAS\n`;
+    }
+    
+    msg += `--------------------------------\n`;
+    msg += `\n_Generado automáticamente desde apptolva.com_`;
+
+    const telefono = "529211171145"; 
+    return `https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`;
+}
+
+        // FALLAS
+        function sendWhatsappFalla() {
+            const ph = document.getElementById('fallaContact').value;
+            const tx = document.getElementById('fallaDesc').value;
+            if(!tx) return alert("Escribe la falla");
+            window.open(`https://wa.me/${ph}?text=${encodeURIComponent("🚨 FALLA URGENTE: " + tx)}`, '_blank');
+        }
+        function copyFallaText() {
+            navigator.clipboard.writeText("🚨 FALLA URGENTE: " + document.getElementById('fallaDesc').value);
+            document.getElementById('copyOk').classList.remove('hidden');
+        }
+
+        // --- IA CON VOZ ---
+        async function sendAI() {
+            const inp = document.getElementById('aiInput');
+            const box = document.getElementById('chatBox');
+            const q = inp.value.trim();
+            if(!q) return;
+            
+            box.innerHTML += `
+                <div class="flex justify-end mb-2">
+                    <div class="bg-gray-200 text-gray-800 p-3 rounded-lg rounded-tr-none text-xs max-w-[80%] shadow-sm">
+                        ${q}
+                    </div>
+                </div>`;
+            
+            inp.value = ''; 
+            box.scrollTop = box.scrollHeight;
+
+            const loadingId = 'loading-' + Date.now();
+            box.innerHTML += `
+                <div id="${loadingId}" class="flex justify-start mb-2">
+                    <div class="bg-orange-100 text-orange-800 p-2 rounded-lg rounded-tl-none text-xs shadow-sm italic">
+                        <i class="fas fa-cog fa-spin mr-1"></i> Consultando manual...
+                    </div>
+                </div>`;
+            box.scrollTop = box.scrollHeight;
+
+            try {
+                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${aiApiKey}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{parts: [{text: q}]}], systemInstruction: {parts: [{text: systemPrompt}]} })
+                });
+
+                if (!r.ok) throw new Error("Error de API");
+                const d = await r.json();
+                if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+
+                const txt = d.candidates?.[0]?.content?.parts?.[0]?.text || "Falla en comunicación.";
+                box.innerHTML += `<div class="flex justify-start mb-2"><div class="bg-orange-600 text-white p-3 rounded-lg rounded-tl-none max-w-[95%] text-sm shadow-md leading-relaxed"><i class="fas fa-tools text-orange-200 mr-1"></i> ${formatText(txt)}</div></div>`;
+                speak(txt);
+
+            } catch(e) {
+                if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+                box.innerHTML += `<div class="text-red-500 text-xs text-center my-2">⚠️ Error: ${e.message}</div>`;
+            }
+            box.scrollTop = box.scrollHeight;
+        }
+        
+        function formatText(text) { return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-200">$1</strong>').replace(/\n/g, '<br>').replace(/\* /g, '• '); }
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const cleanText = text.replace(/\*/g, '').replace(/#/g, '').replace(/-/g, ''); 
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.lang = 'es-MX';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+        
+        function clearChat() { document.getElementById('chatBox').innerHTML = ''; }
+
+        // QUIZ
+        function startQuiz() {
+            document.getElementById('quizStart').classList.add('hidden');
+            const box = document.getElementById('quizBox');
+            box.classList.remove('hidden');
+            box.innerHTML = quizData.map((q, i) => `
+                <div class="bg-white p-4 rounded shadow mb-3 border border-gray-200">
+                    <p class="font-bold text-sm text-blue-900 mb-3">${i+1}. ${q.q}</p>
+                    ${q.o.map((opt, j) => `<button onclick="ans(this,${i},${j})" class="w-full text-left p-3 border rounded mb-2 text-xs font-bold hover:bg-gray-100">${opt}</button>`).join('')}
+                </div>`).join('');
+        }
+        let score = 0;
+        function ans(btn, qIdx, oIdx) {
+            const p = btn.parentElement;
+            p.querySelectorAll('button').forEach(b => b.disabled = true);
+            if(oIdx === quizData[qIdx].a) { btn.classList.add('bg-green-100','border-green-500','text-green-800'); score++; }
+            else { btn.classList.add('bg-red-100','border-red-500'); }
+            
+            if(document.querySelectorAll('#quizBox button:disabled').length >= quizData.length * 3) {
+                document.getElementById('quizBox').classList.add('hidden');
+                document.getElementById('quizEnd').classList.remove('hidden');
+                document.getElementById('quizScore').innerText = `${score}/${quizData.length}`;
+                document.getElementById('quizMsg').innerText = score === quizData.length ? "¡PERFECTO! Eres un Máster. 🏆" : "Hay que repasar el manual.";
+                if(score === quizData.length) confetti();
+            }
+        }
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+        import { getFirestore, doc, updateDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+
+        // CONFIGURACIÓN OFICIAL
+        const firebaseConfig = {
+            apiKey: "__FIREBASE_API_KEY__",
+            authDomain: "gen-lang-client-0015118308.firebaseapp.com",
+            projectId: "gen-lang-client-0015118308",
+            storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
+            messagingSenderId: "228375512926",
+            appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
+            measurementId: "G-SK8TYXT3JD"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // FUNCIÓN INTERNA PARA RESERVAR FOLIO AL MOMENTO DE GUARDAR
+        window.reservarFolioCloud = async function() {
+            try {
+                const referenciaContador = doc(db, "sistema", "contadores");
+                // 1. Pedir turno (+1)
+                await updateDoc(referenciaContador, { folio_actual: increment(1) });
+                // 2. Leer turno
+                const snapshot = await getDoc(referenciaContador);
+                if (snapshot.exists()) {
+                    return snapshot.data().folio_actual;
+                } else {
+                    throw new Error("No existe el contador");
+                }
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        console.log("Sistema Nube: Listo para asignar folios bajo demanda.");
+    </script>
+
+<script async id="netlify-rum-container" src="/.netlify/scripts/rum" data-netlify-rum-site-id="17d00618-daad-4a9a-89c9-4aa1bf9d3205" data-netlify-deploy-branch="" data-netlify-deploy-context="production" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiMTdkMDA2MTgtZGFhZC00YTlhLTg5YzktNGFhMWJmOWQzMjA1IiwiYWNjb3VudF9pZCI6IjY5MmQxNzE5Y2IyZmNjMzdkOWZlNzcxYyIsImRlcGxveV9pZCI6IjY5ODUzNTdiZmIwNzVkY2MzMzYyZmExYSIsImlzc3VlciI6Im5mc2VydmVyIn0.KtYuVCzwJDo_fpzyLvRAzjIc-vluSl1J70vAEsLeLdg"></script>
+<script async id="netlify-rum-container" src="/.netlify/scripts/rum" data-netlify-rum-site-id="17d00618-daad-4a9a-89c9-4aa1bf9d3205" data-netlify-deploy-branch="" data-netlify-deploy-context="production" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiMTdkMDA2MTgtZGFhZC00YTlhLTg5YzktNGFhMWJmOWQzMjA1IiwiYWNjb3VudF9pZCI6IjY5MmQxNzE5Y2IyZmNjMzdkOWZlNzcxYyIsImRlcGxveV9pZCI6IjY5ODgyMjQ2MThlMDYzNDBlNjliY2Y1MCIsImlzc3VlciI6Im5mc2VydmVyIn0.5xXgjOQYYnh7HUWasgORFtXyYZtkT_OK7EB1jKH7GXU"></script></body>
+</html>

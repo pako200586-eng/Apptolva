@@ -1,0 +1,20 @@
+{
+  "name": "AppTolva Bachoco",
+  "short_name": "AppTolva",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ea580c",
+  "theme_color": "#ea580c",
+  "icons": [
+    {
+      "src": "silo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "silo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
