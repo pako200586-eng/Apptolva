@@ -37,11 +37,11 @@ if [ $MISSING_VARS -eq 1 ]; then
   exit 1
 fi
 
-# Replace placeholders with environment variables in index.html
-echo "Injecting environment variables into index.html..."
+# Replace placeholders with environment variables in HTML files
+echo "Injecting GOOGLE_AI_API_KEY into index.html..."
 sed -i "s|__GOOGLE_AI_API_KEY__|$GOOGLE_AI_API_KEY|g" index.html
 
-echo "Injecting environment variables into bitacora_master.html..."
+echo "Injecting FIREBASE_API_KEY into index.html and bitacora_master.html..."
 sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" index.html
 sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" bitacora_master.html
 
