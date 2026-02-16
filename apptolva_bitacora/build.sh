@@ -1,17 +1,58 @@
 #!/bin/bash
 
+# AppTolva Build Script for Netlify Deployment
+# This script injects environment variables into HTML files
+# Environment variables should be configured in Netlify Dashboard
+
+set -e  # Exit on error
+
+echo "Starting AppTolva build process..."
+
+# Change to the directory where the script is located
+cd "$(dirname "$0")"
+
+# Verify required environment variables
+MISSING_VARS=0
+
+if [ -z "$GOOGLE_AI_API_KEY" ]; then
+  echo "❌ ERROR: GOOGLE_AI_API_KEY is not set."
+  MISSING_VARS=1
+else
+  echo "✅ GOOGLE_AI_API_KEY is configured."
+fi
+
+if [ -z "$FIREBASE_API_KEY" ]; then
+  echo "❌ ERROR: FIREBASE_API_KEY is not set."
+  MISSING_VARS=1
+else
+  echo "✅ FIREBASE_API_KEY is configured."
+fi
+
+# Exit if any required variable is missing
+if [ $MISSING_VARS -eq 1 ]; then
+  echo ""
+  echo "❌ Build failed: Missing required environment variables."
+  echo "Please configure the environment variables in Netlify Dashboard."
+  echo "See DEPLOY_GUIDE.md for detailed instructions."
+  exit 1
+fi
+
 # Replace placeholders with environment variables in index.html
-if [ -n "$GOOGLE_AI_API_KEY" ]; then
-  sed -i "s|__GOOGLE_AI_API_KEY__|$GOOGLE_AI_API_KEY|g" index.html
-else
-  echo "Warning: GOOGLE_AI_API_KEY is not set."
+echo "Injecting environment variables into index.html..."
+sed -i "s|__GOOGLE_AI_API_KEY__|$GOOGLE_AI_API_KEY|g" index.html
+
+echo "Injecting environment variables into bitacora_master.html..."
+sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" index.html
+sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" bitacora_master.html
+
+# Verify replacements were made
+if grep -q "__GOOGLE_AI_API_KEY__" index.html; then
+  echo "⚠️  Warning: GOOGLE_AI_API_KEY placeholder still present in index.html"
 fi
 
-if [ -n "$FIREBASE_API_KEY" ]; then
-  sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" index.html
-  sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" bitacora_master.html
-else
-  echo "Warning: FIREBASE_API_KEY is not set."
+if grep -q "__FIREBASE_API_KEY__" index.html || grep -q "__FIREBASE_API_KEY__" bitacora_master.html; then
+  echo "⚠️  Warning: FIREBASE_API_KEY placeholder still present in HTML files"
 fi
 
-echo "Build script completed."
+echo "✅ Build completed successfully!"
+echo "Ready for deployment to Netlify."

@@ -1,0 +1,43 @@
+# Netlify Configuration for AppTolva Bitácora
+# This file configures the deployment settings for Netlify
+
+[build]
+  # Directory that contains the deployable files
+  publish = "apptolva_bitacora/"
+  
+  # Command to run during build process
+  # This script injects environment variables into HTML files
+  command = "bash apptolva_bitacora/build.sh"
+
+# SPA (Single Page Application) redirect rules
+# Redirects all routes to index.html for proper client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# Security headers for better application security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Cache static assets for better performance
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
