@@ -178,6 +178,11 @@
             <button onclick="window.changeStatus(4)" id="btn-4" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center group-active:bg-yellow-500 group-active:text-white transition"><i class="fas fa-dolly text-lg"></i></div>
                 <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Servicio</span><span class="text-[10px] text-gray-400">Carga/Descarga/combustible</span></div>
+                <!-- NUEVO BOTÓN EXCEPCIÓN -->
+<button onclick="changeStatus(5)" id="btn-5" class="status-btn bg-white rounded-xl p-3 shadow-sm flex flex-col items-center justify-center gap-1 col-span-2 md:col-span-1 border-2 border-dashed border-purple-200">
+    <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><i class="fas fa-exclamation-triangle text-lg"></i></div>
+    <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-xs">Excepción</span></div>
+</button>
             </button>
         </div>
         <!-- Alerta de Fatiga -->
@@ -329,8 +334,8 @@
 
             [...logs].reverse().forEach(l => {
                 const s = new Date(l.startTime);
-                const stName = ["","Descanso","Comida","Manejo","Servicio"][l.status];
-                const cls = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500"][l.status];
+                const stName = ["","Descanso","Pausa","Manejo","Servicio","Excepción"][l.status];
+const cls = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-purple-500"][l.status];
                 
                 // Calc duracion si tiene fin
                 let dur = "";
@@ -384,11 +389,10 @@
             const ctx = cvs.getContext('2d');
             const w = ctx.canvas.width; const h = ctx.canvas.height; const p=30;
             ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
-            const rowH = (h-p*2)/4;
-            const lbl = ["Fuera","Comida","Manejo","Servicio"];
-            ctx.font="12px Arial";
-            for(let i=0;i<4;i++) {
-                let y = p + (i*rowH) + (rowH/2);
+            const rowH = (h-p*2)/5;
+const lbl = ["Descanso","Pausa","Manejo","Servicio", "Excep."];
+for(let i=0;i<5;i++) {    
+           let y = p + (i*rowH) + (rowH/2);
                 if(i%2==0) { ctx.fillStyle="#fafafa"; ctx.fillRect(p,p+(i*rowH),w-p,rowH); }
                 ctx.fillStyle="#666"; ctx.fillText(lbl[i],5,y+4);
                 ctx.beginPath(); ctx.moveTo(p,p+(i*rowH)+rowH); ctx.lineTo(w,p+(i*rowH)+rowH); ctx.strokeStyle="#eee"; ctx.stroke();
@@ -806,4 +810,5 @@
     </script>
 
 <script async id="netlify-rum-container" src="/.netlify/scripts/rum" data-netlify-rum-site-id="17d00618-daad-4a9a-89c9-4aa1bf9d3205" data-netlify-deploy-branch="agent-698e523660cddd1bd94a" data-netlify-deploy-context="deploy-preview" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiMTdkMDA2MTgtZGFhZC00YTlhLTg5YzktNGFhMWJmOWQzMjA1IiwiYWNjb3VudF9pZCI6IjY5MmQxNzE5Y2IyZmNjMzdkOWZlNzcxYyIsImRlcGxveV9pZCI6IjY5OGU1MzBjMDc1MGI2YmE3MjExOTg3YiIsImlzc3VlciI6Im5mc2VydmVyIn0.Ux_UPd9zV1uet1ujiP06gI4qQZqz1pSz0RK3yTwJa5c"></script></body>
+
 </html>
