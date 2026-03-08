@@ -516,7 +516,10 @@
                             let prevR = mapSt[prev.status] !== undefined ? mapSt[prev.status] : 4;
                             let prevY = gy + (prevR * rowH) + (rowH/2);
                             // Solo conectar si es continuo en tiempo
-                            if(Math.abs(x1 - (gx+(gw/24)*(new Date(prev.endTime).getHours()))) < 2) {
+                            let prevEnd = new Date(prev.endTime);
+                            let hPrevEnd = prevEnd.getHours() + prevEnd.getMinutes()/60;
+                            let xPrevEnd = gx + (gw/24) * hPrevEnd;
+                            if(Math.abs(x1 - xPrevEnd) < 2) {
                                 doc.line(x1, prevY, x1, yLine);
                             }
                         }
