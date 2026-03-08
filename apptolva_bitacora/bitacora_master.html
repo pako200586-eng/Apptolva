@@ -409,30 +409,231 @@
 
         // --- GENERADOR PDF ---
         window.generarPDFSeguro = async function() {
-            if (!window.jspdf) { alert("⚠️ Librería PDF no cargada."); return; }
+            // 1. Verificar librerías
+            if (!window.jspdf) { 
+                alert("⚠️ Error: Librería PDF no cargada. Abre la app con internet una vez."); return; 
+            }
+            
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const naranja = [242, 139, 0]; 
-            const azulOficial = [0, 51, 153];
+            const azulOficial = [0, 51, 153]; // Azul para trazos legales
+            
             const folio = document.getElementById('folio').value || "SF";
 
+            // --- LÓGICA DE CORTE 48 HORAS ---
+            // Tomamos el primer registro como "Hora 0" del viaje
+            const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
+            const limit24 = startTrip + (24 * 60 * 60 * 1000); // Corte día 1
+            
+            // Filtramos qué pasó el Día 1 y qué pasó el Día 2
+            const logsD1 = logs.filter(l => l.startTime < limit24);
+            const logsD2 = logs.filter(l => l.startTime >= limit24);
+
+            // --- PÁGINA 1: DATOS Y GRÁFICAS ---
+            
+            // Encabezado
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 20, 'F');
             doc.setTextColor(255); doc.setFontSize(14); doc.setFont("helvetica","bold");
             doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 13, {align:"center"});
+            doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(0);
             
-            let y = 30;
-            doc.setTextColor(0); doc.setFontSize(8);
-            doc.text(`FOLIO: ${folio}`, 14, y);
-            doc.text(`UNIDAD: ${document.getElementById('unitId').value}`, 60, y);
-            doc.text(`OPERADOR: ${document.getElementById('driverName').value}`, 110, y);
+            let y = 25;
+
+            // Datos Generales (Tabla Compacta)
+            const row = (lbl, val, x, w) => {
+                doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 7, 'FD');
+                doc.setFont("helvetica","bold"); doc.text(lbl, x+2, y+4.5);
+                doc.setFont("helvetica","normal"); doc.text(val||"", x+w-2, y+4.5, {align:"right"});
+            };
+
+            doc.setFontSize(7);
+            doc.text("PERMISIONARIO: GRUPO BACHOCO", 14, y); y+=4;
+            row("FOLIO:", folio, 14, 45); row("FECHA:", new Date().toLocaleDateString(), 61, 45);
+            row("UNIDAD:", document.getElementById('unitId').value, 108, 40); row("PLACAS:", document.getElementById('plates').value, 150, 45);
+            y += 9;
+            row("OPERADOR:", document.getElementById('driverName').value, 14, 92); row("LICENCIA:", document.getElementById('license').value, 108, 87);
+            y += 9;
+            row("ORIGEN:", document.getElementById('origin').value, 14, 92); row("DESTINO:", document.getElementById('destination').value, 108, 87);
+            y += 12;
+
+            // --- FUNCIÓN DIBUJAR REJILLA ---
+            const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
+                // Título Gráfica
+                doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
+                doc.setTextColor(0); doc.setFont("helvetica","bold"); doc.text(label, 105, startY+3.5, {align:"center"});
+                
+                const gx = 20; const gy = startY + 8; const gw = 175; const gh = 30; const rowH = gh / 5;
+                const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
+                
+                // Líneas horizontales y etiquetas
+                doc.setFontSize(5); doc.setDrawColor(150); doc.setLineWidth(0.1);
+                statusLabels.forEach((s, i) => {
+                    doc.text(s, 19, gy + (i*rowH) + (rowH/2), {align:"right"});
+                    doc.line(gx, gy+(i*rowH), gx+gw, gy+(i*rowH));
+                });
+                doc.line(gx, gy+gh, gx+gw, gy+gh);
+
+                // Líneas verticales (24h)
+                for(let i=0; i<=24; i++) {
+                    let x = gx + (gw/24)*i;
+                    doc.line(x, gy, x, gy+gh);
+                    if(i%2===0) doc.text(i.toString(), x, gy-2, {align:"center"});
+                }
+                doc.rect(gx, gy, gw, gh); // Marco
+
+                // TRAZAR LÍNEA DE TIEMPO
+                if(dayLogs && dayLogs.length > 0) {
+                    doc.setDrawColor(...azulOficial); doc.setLineWidth(0.7);
+                    // Mapeo App -> Gráfica Legal
+                    // App: 1=Descanso, 2=Pausa, 3=Manejo, 4=Servicio(Aux), 5=Excepción
+                    // Gráfica: 0=Manejo, 1=Pausa, 2=Aux, 3=Excep, 4=Descanso
+                    const mapSt = { 3:0, 2:1, 4:2, 5:3, 1:4 }; 
+
+                    dayLogs.forEach((l, i) => {
+                        let ds = new Date(l.startTime); 
+                        let de = l.endTime ? new Date(l.endTime) : new Date();
+                        
+                        // Ajuste simple: tomamos la hora del día (0-24)
+                        let h1 = ds.getHours() + ds.getMinutes()/60;
+                        let h2 = de.getHours() + de.getMinutes()/60;
+                        
+                        // Coordenadas X
+                        let x1 = gx + (gw/24) * h1;
+                        let x2 = gx + (gw/24) * h2;
+                        
+                        // Detectar si el tramo cruza medianoche (endTime del día siguiente)
+                        const cruzaMedianoche = (de > ds) && (x2 < x1);
+
+                        let rIdx = mapSt[l.status] !== undefined ? mapSt[l.status] : 4;
+                        let yLine = gy + (rIdx * rowH) + (rowH/2);
+
+                        if (cruzaMedianoche) {
+                            // Parte 1: desde startTime hasta las 24:00 del día actual
+                            const xMidnight = gx + gw;
+                            doc.line(x1, yLine, xMidnight, yLine);
+
+                            // Parte 2: continuación desde 00:00 hasta endTime (día siguiente)
+                            const xAfterMidnight = gx + (gw/24) * h2;
+                            doc.line(gx, yLine, xAfterMidnight, yLine);
+                        } else {
+                            doc.line(x1, yLine, x2, yLine); // Horizontal normal
+                        }
+                        
+                        // Vertical (conectar con anterior) - se mantiene para el inicio del tramo actual
+                        if(i > 0) {
+                            let prev = dayLogs[i-1];
+                            let prevR = mapSt[prev.status] !== undefined ? mapSt[prev.status] : 4;
+                            let prevY = gy + (prevR * rowH) + (rowH/2);
+                            // Solo conectar si es continuo en tiempo
+                            let prevEnd = new Date(prev.endTime);
+                            let hPrevEnd = prevEnd.getHours() + prevEnd.getMinutes()/60;
+                            let xPrevEnd = gx + (gw/24) * hPrevEnd;
+                            if(Math.abs(x1 - xPrevEnd) < 2) {
+                                doc.line(x1, prevY, x1, yLine);
+                            }
+                        }
+                    });
+                }
+            };
+
+            // DIBUJAR GRÁFICAS
+            drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS)", logsD1, false);
+            y += 45;
+            drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE)", logsD2, true);
+            y += 45;
+
+            // --- TABLA DE DESGLOSE (TEXTO) ---
+            doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica","bold");
+            doc.text("DESGLOSE DE ACTIVIDADES", 14, y);
+            y += 4;
+
+            // Header Tabla
+            doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
+            doc.setTextColor(0); doc.setFontSize(6);
+            doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 45, y+3.5);
+            doc.text("ACTIVIDAD", 75, y+3.5); doc.text("DURACIÓN", 110, y+3.5);
+            doc.text("OBSERVACIONES / LUGAR", 140, y+3.5);
+            y += 5;
+
+            // Filas
+            doc.setFont("helvetica","normal");
+            logs.forEach((l, idx) => {
+                if (y > 250) {
+                    // Salto de página si se llena
+                    doc.addPage();
+                    y = 20;
+
+                    // Reimprimir encabezado de la tabla en la nueva página
+                    doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
+                    doc.setTextColor(0); doc.setFontSize(6);
+                    doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 45, y+3.5);
+                    doc.text("ACTIVIDAD", 75, y+3.5); doc.text("DURACIÓN", 110, y+3.5);
+                    doc.text("OBSERVACIONES / LUGAR", 140, y+3.5);
+                    y += 5;
+
+                    // Restaurar fuente para las filas
+                    doc.setFont("helvetica","normal");
+                }
+                
+                const stName = ["","DESCANSO","PAUSA","MANEJANDO","SERVICIO","EXCEPCIÓN"][l.status] || "OTRO";
+                const s = new Date(l.startTime);
+                const e = l.endTime ? new Date(l.endTime) : new Date();
+                const dur = Math.floor((e-s)/60000);
+                const durStr = `${Math.floor(dur/60)}h ${dur%60}m`;
+                
+                // Fondo alternado
+                if(idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
+                
+                doc.text(s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 16, y+3);
+                doc.text(e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 45, y+3);
+                doc.text(stName, 75, y+3);
+                doc.text(durStr, 110, y+3);
+                doc.text((l.observation || "-").substring(0,35), 140, y+3);
+                
+                y += 4;
+            });
+
+            // --- FIRMAS ---
+            if(y > 230) { doc.addPage(); y=30; }
             y += 10;
             
-            // Simplified grid for PDF
-            doc.setDrawColor(200);
-            doc.rect(14, y, 180, 40);
-            for(let i=1; i<5; i++) doc.line(14, y+i*8, 194, y+i*8);
-            for(let i=0; i<=24; i++) doc.line(14 + (180/24)*i, y, 14 + (180/24)*i, y+40);
+            doc.setDrawColor(0);
+            const opSig = document.getElementById('signaturePad').toDataURL("image/png");
+            const supSig = document.getElementById('supervisorPad').toDataURL("image/png");
+
+            doc.line(30, y+20, 80, y+20);
+            doc.addImage(opSig, 'PNG', 35, y, 40, 18);
+            doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y+23, {align:"center"});
+
+            doc.line(120, y+20, 170, y+20);
+            doc.addImage(supSig, 'PNG', 125, y, 40, 18);
+            doc.text("FIRMA SUPERVISOR", 145, y+23, {align:"center"});
+
+            doc.setFontSize(5); doc.setTextColor(100);
+            doc.text("HAGO CONSTAR QUE LOS DATOS SON VERÍDICOS Y REFLEJAN FIELMENTE MIS ACTIVIDADES.", 105, y+30, {align:"center"});
+
+            // --- PÁGINA 2: REGLAMENTO (Reverso) ---
+            doc.addPage();
+            doc.setFillColor(...naranja); doc.rect(0,0,210,15,'F');
+            doc.setTextColor(255); doc.setFontSize(12); doc.setFont("helvetica","bold");
+            doc.text("REGLAMENTO NOM-087-SCT-2-2017", 105, 10, {align:"center"});
             
+            doc.setTextColor(0); doc.setFontSize(8);
+            let ry = 25;
+            const rules = [
+                "4.1 TIEMPOS: Todo conductor debe realizar una pausa de 30 minutos cuando ha conducido hasta 5 horas continuas.",
+                "4.2 PAUSAS: Los periodos de pausa no son acumulables.",
+                "4.6 RUTAS LARGAS: En rutas de max 14 horas, el conductor debe tener una pausa no menor a 8 horas continuas.",
+                "4.7 MÁXIMO 24H: El tiempo máximo de conducción en 24 horas nunca podrá exceder las 14 horas.",
+                "3.4 EXCEPCIONES: El tiempo puede prolongarse por avería o perturbación del servicio, debiendo evidenciarse."
+            ];
+            rules.forEach(r => {
+                const split = doc.splitTextToSize(r, 180);
+                doc.text(split, 14, ry);
+                ry += (split.length * 4) + 4;
+            });
+
             doc.save(`Bitacora_${folio}.pdf`);
         };
 
