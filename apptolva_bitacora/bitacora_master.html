@@ -502,15 +502,25 @@
                         let x1 = gx + (gw/24) * h1;
                         let x2 = gx + (gw/24) * h2;
                         
-                        // Si cruzó la medianoche en la misma gráfica, cortamos en 24 (simplificación visual)
-                        if(x2 < x1) x2 = gx + gw; 
+                        // Detectar si el tramo cruza medianoche (endTime del día siguiente)
+                        const cruzaMedianoche = (de > ds) && (x2 < x1);
 
                         let rIdx = mapSt[l.status] !== undefined ? mapSt[l.status] : 4;
                         let yLine = gy + (rIdx * rowH) + (rowH/2);
 
-                        doc.line(x1, yLine, x2, yLine); // Horizontal
+                        if (cruzaMedianoche) {
+                            // Parte 1: desde startTime hasta las 24:00 del día actual
+                            const xMidnight = gx + gw;
+                            doc.line(x1, yLine, xMidnight, yLine);
+
+                            // Parte 2: continuación desde 00:00 hasta endTime (día siguiente)
+                            const xAfterMidnight = gx + (gw/24) * h2;
+                            doc.line(gx, yLine, xAfterMidnight, yLine);
+                        } else {
+                            doc.line(x1, yLine, x2, yLine); // Horizontal normal
+                        }
                         
-                        // Vertical (conectar con anterior)
+                        // Vertical (conectar con anterior) - se mantiene para el inicio del tramo actual
                         if(i > 0) {
                             let prev = dayLogs[i-1];
                             let prevR = mapSt[prev.status] !== undefined ? mapSt[prev.status] : 4;
