@@ -1023,13 +1023,15 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 </div>`;
             box.scrollTop = box.scrollHeight;
 
-            try {
-           const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-latest:generateContent?key=${aiApiKey}`, {
+            Try {
 
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{parts: [{text: q}]}], systemInstruction: {parts: [{text: systemPrompt}]} })
-                });
+                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${aiApiKey}`, {
 
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+
+                    body: JSON.stringify({ contents: [{parts: [{text: q}]}], systemInstruction: {parts: [{text: systemPrompt}]} })
+
+                });
                 if (!r.ok) throw new Error("Error de API");
                 const d = await r.json();
                 if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
@@ -1129,4 +1131,5 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 <script async id="netlify-rum-container" src="/.netlify/scripts/rum" data-netlify-rum-site-id="17d00618-daad-4a9a-89c9-4aa1bf9d3205" data-netlify-deploy-branch="" data-netlify-deploy-context="production" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiMTdkMDA2MTgtZGFhZC00YTlhLTg5YzktNGFhMWJmOWQzMjA1IiwiYWNjb3VudF9pZCI6IjY5MmQxNzE5Y2IyZmNjMzdkOWZlNzcxYyIsImRlcGxveV9pZCI6IjY5ODgyMjQ2MThlMDYzNDBlNjliY2Y1MCIsImlzc3VlciI6Im5mc2VydmVyIn0.5xXgjOQYYnh7HUWasgORFtXyYZtkT_OK7EB1jKH7GXU"></script></body>
 
 </html>
+
 
