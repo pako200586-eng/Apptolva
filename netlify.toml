@@ -1,0 +1,3 @@
+[build]
+  command = "cd apptolva_bitacora && bash build.sh"
+  publish = "apptolva_bitacora"

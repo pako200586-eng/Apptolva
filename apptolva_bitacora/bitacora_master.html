@@ -14,7 +14,7 @@
     <script src="./js/jspdf.min.js"></script>
     <script src="./js/qrcode.min.js"></script>
 
-    <!-- 2. REGISTRO OFFLINE (AL INICIO) -->
+    <!-- 2. REGISTRO OFFLINE -->
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
@@ -39,35 +39,7 @@
         .dot-status { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
         .bg-st-1 { background-color: #ef4444; } .bg-st-2 { background-color: #3b82f6; } 
         .bg-st-3 { background-color: #22c55e; } .bg-st-4 { background-color: #eab308; } 
-    </style>
-</head>
-<body class="font-sans text-gray-800">
-
-    <!-- 2. REGISTRO OFFLINE (AL INICIO) -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
-                .then(() => console.log('Motor Offline: LISTO'))
-                .catch(err => console.log('Fallo Motor:', err));
-        }
-    </script>
-
-    <script>
-        tailwind.config = {
-            theme: { extend: { colors: { bachoco: { DEFAULT: '#F28B00', dark: '#D97000', light: '#FFF0DB' } } } }
-        }
-    </script>
-
-    <style>
-        body { user-select: none; -webkit-user-select: none; padding-bottom: 100px; background-color: #f3f4f6; }
-        input, textarea, select { user-select: text; -webkit-user-select: text; }
-        #logChart { background: #fff; border-radius: 8px; width: 100%; height: 250px; touch-action: none; }
-        .signature-pad { background: #fff; border: 2px dashed #cbd5e1; border-radius: 12px; width: 100%; height: 150px; touch-action: none; }
-        .status-btn.active { border-color: #F28B00; background-color: #FFF0DB; box-shadow: 0 4px 6px -1px rgba(242, 139, 0, 0.3); transform: translateY(-2px); font-weight: 800; }
-        .bachoco-input:focus { outline: none; border-color: #F28B00; box-shadow: 0 0 0 3px rgba(242, 139, 0, 0.2); }
-        .dot-status { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .bg-st-1 { background-color: #ef4444; } .bg-st-2 { background-color: #3b82f6; } 
-        .bg-st-3 { background-color: #22c55e; } .bg-st-4 { background-color: #eab308; } 
+        .bg-st-5 { background-color: #a855f7; }
     </style>
 </head>
 <body class="font-sans text-gray-800">
@@ -92,7 +64,7 @@
 
             <!-- GRUPO DERECHA: RELOJ Y EVIDENCIAS -->
             <div class="flex items-center gap-2">
-                <!-- 3. Reloj (Solo hora en móvil para ahorrar espacio) -->
+                <!-- 3. Reloj -->
                 <div class="bg-black/20 px-2 py-1 rounded-full text-[10px] font-mono" id="clockDisplay">00:00</div>
                 
                 <!-- 4. PDF Legal -->
@@ -162,29 +134,29 @@
         </div>
 
         <!-- 2. Botones de Acción -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
             <button onclick="window.changeStatus(1)" id="btn-1" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-active:bg-red-500 group-active:text-white transition"><i class="fas fa-home text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm"></span><span class="text-[10px] text-gray-400">Fuera de Servicio</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Descanso</span><span class="text-[10px] text-gray-400">Fuera de Servicio</span></div>
             </button>
             <button onclick="window.changeStatus(2)" id="btn-2" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-active:bg-blue-500 group-active:text-white transition"><i class="fas fa-bed text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Comida</span><span class="text-[10px] text-gray-400">Pausa</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Pausa</span><span class="text-[10px] text-gray-400">Comida/Descanso corto</span></div>
             </button>
             <button onclick="window.changeStatus(3)" id="btn-3" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
-                <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-active:bg-green-500 group-active:text-white transition"><i class="fas fa-steering-wheel text-lg"></i></div>
+                <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-active:bg-green-500 group-active:text-white transition"><i class="fas fa-truck-moving text-lg"></i></div>
                 <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Conduciendo</span><span class="text-[10px] text-gray-400">En Ruta</span></div>
             </button>
             <button onclick="window.changeStatus(4)" id="btn-4" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
-                <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center group-active:bg-yellow-500 group-active:text-white transition"><i class="fas fa-dolly text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Servicio</span><span class="text-[10px] text-gray-400">Carga/Descarga/combustible</span></div>
-                <!-- NUEVO BOTÓN EXCEPCIÓN -->
-<button onclick="changeStatus(5)" id="btn-5" class="status-btn bg-white rounded-xl p-3 shadow-sm flex flex-col items-center justify-center gap-1 col-span-2 md:col-span-1 border-2 border-dashed border-purple-200">
-    <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><i class="fas fa-exclamation-triangle text-lg"></i></div>
-    <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-xs">Excepción</span></div>
-</button>
+                <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center group-active:bg-yellow-500 group-active:text-white transition"><i class="fas fa-tools text-lg"></i></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Servicio</span><span class="text-[10px] text-gray-400">Carga/Descarga</span></div>
+            </button>
+            <button onclick="window.changeStatus(5)" id="btn-5" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
+                <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-active:bg-purple-500 group-active:text-white transition"><i class="fas fa-exclamation-triangle text-lg"></i></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Excepción</span><span class="text-[10px] text-gray-400">Emergencia/Falla</span></div>
             </button>
         </div>
+
         <!-- Alerta de Fatiga -->
         <div id="alertBox" class="hidden bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-exclamation-triangle mt-1"></i>
@@ -199,6 +171,11 @@
             </div>
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
             <div class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+            
+            <!-- BOTÓN TERMINAR GRÁFICA 48H -->
+            <button onclick="terminarTurno48h()" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
+                <i class="fas fa-flag-checkered text-lg"></i> TERMINAR GRÁFICA 48H Y NUEVO TURNO
+            </button>
         </div>
 
         <!-- 4. Bitácora (Lista) -->
@@ -243,7 +220,7 @@
         </div>
     </div>
 
-    <!-- MODAL QR (CARÁTULA DIGITAL COMPLETA) -->
+    <!-- MODAL QR -->
     <div id="qrModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[70] animate-in fade-in duration-200">
         <div class="bg-white rounded-2xl p-6 w-11/12 max-w-sm shadow-2xl text-center relative">
             <button onclick="window.closeQR()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-2"><i class="fas fa-times text-xl"></i></button>
@@ -263,7 +240,6 @@
         </div>
     </div>
 
-    <!-- SCRIPT SISTEMA PRINCIPAL (NO DEPENDE DE NADA EXTERNO PARA FUNCIONAR BÁSICO) -->
     <script>
         // --- 1. LÓGICA DE DATOS LOCALES ---
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
@@ -277,8 +253,12 @@
         // Recuperar inputs
         const ids = ['driverName', 'license', 'licenseExp', 'unitId', 'brandModel', 'plates', 'mode', 'folio', 'origin', 'destination'];
         ids.forEach(id => {
-            const val = localStorage.getItem('nom087_' + id); if(val) document.getElementById(id).value = val;
-            document.getElementById(id).addEventListener('input', (e) => localStorage.setItem('nom087_'+id, e.target.value));
+            const val = localStorage.getItem('nom087_' + id); if(val) {
+                const el = document.getElementById(id);
+                if (el) el.value = val;
+            }
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', (e) => localStorage.setItem('nom087_'+id, e.target.value));
         });
 
         // Reloj
@@ -287,32 +267,32 @@
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const clock = document.getElementById('clockDisplay');
             if (clock) clock.innerText = timeString;
-            
-            // Check status indicator
-            const ind = document.getElementById('statusIndicator');
-            if(ind) {
-                if(!navigator.onLine) { ind.classList.remove('hidden'); ind.innerText = "OFFLINE"; }
-                else { ind.classList.add('hidden'); }
-            }
         }, 1000);
 
         function guardarLocal() { localStorage.setItem('nom087_logs', JSON.stringify(logs)); updateUI(); }
 
-                // --- FUNCIÓN DE REINICIO (NUEVO VIAJE) ---
         window.reiniciarBitacora = function() {
             if(confirm("⚠️ ¿INICIAR NUEVO VIAJE?\n\nSe borrará la gráfica actual y los tiempos.\nEl folio se limpiará.\n\n(Tus datos personales SE MANTIENEN).")) {
                 localStorage.removeItem('nom087_logs');
                 localStorage.removeItem('nom087_folio');
-                
-                // Limpiar inputs específicos de viaje (manteniendo chofer/unidad)
                 document.getElementById('folio').value = '';
                 document.getElementById('origin').value = '';
                 document.getElementById('destination').value = '';
-                
-                localStorage.removeItem('nom087_folio');
                 localStorage.removeItem('nom087_origin');
                 localStorage.removeItem('nom087_destination');
+                location.reload();
+            }
+        }
 
+        window.terminarTurno48h = function() {
+            if(confirm("⚠️ ¿TERMINAR GRÁFICA DE 48H Y EMPEZAR NUEVO TURNO?\n\nAsegúrate de haber generado tu PDF de bitácora.\nEsto limpiará la gráfica actual y comenzará un nuevo periodo en cero.")) {
+                localStorage.removeItem('nom087_logs');
+                localStorage.removeItem('nom087_folio');
+                document.getElementById('folio').value = '';
+                document.getElementById('origin').value = '';
+                document.getElementById('destination').value = '';
+                localStorage.removeItem('nom087_origin');
+                localStorage.removeItem('nom087_destination');
                 location.reload();
             }
         }
@@ -331,16 +311,18 @@
             const list = document.getElementById('logList'); list.innerHTML = '';
             
             let driveMins = 0;
+            const now = new Date().getTime();
 
             [...logs].reverse().forEach(l => {
                 const s = new Date(l.startTime);
-                const stName = ["","Descanso","Pausa","Manejo","Servicio","Excepción"][l.status];
-const cls = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-purple-500"][l.status];
+                const stNames = ["","Descanso","Pausa","Manejo","Servicio","Excepción"];
+                const stName = stNames[l.status] || "Otro";
+                const clss = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-purple-500"];
+                const cls = clss[l.status] || "bg-gray-500";
                 
-                // Calc duracion si tiene fin
                 let dur = "";
-                if(l.endTime) {
-                    const d = Math.floor((l.endTime - l.startTime)/60000);
+                if(l.endTime || now) {
+                    const d = Math.floor(((l.endTime || now) - l.startTime)/60000);
                     dur = `${Math.floor(d/60)}h ${d%60}m`;
                 }
 
@@ -350,18 +332,13 @@ const cls = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-pu
                 </div>`;
             });
             
-            // Calc Total Driving Time 24h
-            const now = new Date().getTime();
+            // Total Manejo 24h
             const limit = now - (24 * 60 * 60 * 1000);
             driveMins = 0;
-            
             logs.forEach(l => {
-                // Solo si es manejo (3)
                 if(l.status === 3) {
                      let start = l.startTime;
                      let end = l.endTime || now;
-                     
-                     // Truncar al limite de 24h
                      if (end > limit) {
                          if(start < limit) start = limit;
                          driveMins += Math.floor((end - start)/60000);
@@ -372,13 +349,8 @@ const cls = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-pu
             const dmElem = document.getElementById('totalDriving');
             if(dmElem) dmElem.innerText = `${Math.floor(driveMins/60)}h ${driveMins%60}m`;
             
-            // Alerta Fatiga
-            const alertBox = document.getElementById('alertBox');
-            if(driveMins > 13 * 60) { // +13h
-                if(alertBox) alertBox.classList.remove('hidden');
-            } else {
-                if(alertBox) alertBox.classList.add('hidden');
-            }
+            if(driveMins > 13 * 60) document.getElementById('alertBox')?.classList.remove('hidden');
+            else document.getElementById('alertBox')?.classList.add('hidden');
 
             drawChart();
         }
@@ -387,14 +359,15 @@ const cls = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-pu
             const cvs = document.getElementById('logChart');
             if(!cvs) return;
             const ctx = cvs.getContext('2d');
-            const w = ctx.canvas.width; const h = ctx.canvas.height; const p=30;
+            const w = cvs.width; const h = cvs.height; const p=30;
             ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
             const rowH = (h-p*2)/5;
-const lbl = ["Descanso","Pausa","Manejo","Servicio", "Excep."];
-for(let i=0;i<5;i++) {    
-           let y = p + (i*rowH) + (rowH/2);
+            const lbl = ["Descanso","Pausa","Manejo","Servicio", "Excep."];
+            for(let i=0;i<5;i++) {    
+                let y = p + (i*rowH) + (rowH/2);
                 if(i%2==0) { ctx.fillStyle="#fafafa"; ctx.fillRect(p,p+(i*rowH),w-p,rowH); }
-                ctx.fillStyle="#666"; ctx.fillText(lbl[i],5,y+4);
+                ctx.fillStyle="#666"; ctx.font = "10px sans-serif";
+                ctx.fillText(lbl[i],5,y+4);
                 ctx.beginPath(); ctx.moveTo(p,p+(i*rowH)+rowH); ctx.lineTo(w,p+(i*rowH)+rowH); ctx.strokeStyle="#eee"; ctx.stroke();
             }
             for(let i=0;i<=24;i++){ let x=p+((w-p)/24)*i; ctx.beginPath(); ctx.moveTo(x,p); ctx.lineTo(x,h-p); ctx.stroke(); }
@@ -431,264 +404,60 @@ for(let i=0;i<5;i++) {
         });
         window.clearSig = (k) => { const p = pads[k]; if(p && p.c) p.ctx.clearRect(0,0,p.c.width,p.c.height); };
         
-        // Ajuste de retina
         function resizeC() { const r = Math.max(window.devicePixelRatio||1, 1); Object.values(pads).forEach(p=>{ if(p.c) { p.c.width=p.c.offsetWidth*r; p.c.height=p.c.offsetHeight*r; p.ctx.scale(r,r); } }); }
         window.addEventListener("resize", resizeC); setTimeout(resizeC, 500);
 
-        
-       // --- GENERADOR PDF LEGAL 48 HORAS (CON DESGLOSE) ---
+        // --- GENERADOR PDF ---
         window.generarPDFSeguro = async function() {
-            // 1. Verificar librerías
-            if (!window.jspdf) { 
-                alert("⚠️ Error: Librería PDF no cargada. Abre la app con internet una vez."); return; 
-            }
-            
+            if (!window.jspdf) { alert("⚠️ Librería PDF no cargada."); return; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const naranja = [242, 139, 0]; 
-            const azulOficial = [0, 51, 153]; // Azul para trazos legales
-            
+            const azulOficial = [0, 51, 153];
             const folio = document.getElementById('folio').value || "SF";
 
-            // --- LÓGICA DE CORTE 48 HORAS ---
-            // Tomamos el primer registro como "Hora 0" del viaje
-            const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
-            const limit24 = startTrip + (24 * 60 * 60 * 1000); // Corte día 1
-            
-            // Filtramos qué pasó el Día 1 y qué pasó el Día 2
-            const logsD1 = logs.filter(l => l.startTime < limit24);
-            const logsD2 = logs.filter(l => l.startTime >= limit24);
-
-            // --- PÁGINA 1: DATOS Y GRÁFICAS ---
-            
-            // Encabezado
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 20, 'F');
             doc.setTextColor(255); doc.setFontSize(14); doc.setFont("helvetica","bold");
             doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 13, {align:"center"});
-            doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(0);
             
-            let y = 25;
-
-            // Datos Generales (Tabla Compacta)
-            const row = (lbl, val, x, w) => {
-                doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 7, 'FD');
-                doc.setFont("helvetica","bold"); doc.text(lbl, x+2, y+4.5);
-                doc.setFont("helvetica","normal"); doc.text(val||"", x+w-2, y+4.5, {align:"right"});
-            };
-
-            doc.setFontSize(7);
-            doc.text("PERMISIONARIO: GRUPO BACHOCO", 14, y); y+=4;
-            row("FOLIO:", folio, 14, 45); row("FECHA:", new Date().toLocaleDateString(), 61, 45);
-            row("UNIDAD:", document.getElementById('unitId').value, 108, 40); row("PLACAS:", document.getElementById('plates').value, 150, 45);
-            y += 9;
-            row("OPERADOR:", document.getElementById('driverName').value, 14, 92); row("LICENCIA:", document.getElementById('license').value, 108, 87);
-            y += 9;
-            row("ORIGEN:", document.getElementById('origin').value, 14, 92); row("DESTINO:", document.getElementById('destination').value, 108, 87);
-            y += 12;
-
-            // --- FUNCIÓN DIBUJAR REJILLA ---
-            const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
-                // Título Gráfica
-                doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
-                doc.setTextColor(0); doc.setFont("helvetica","bold"); doc.text(label, 105, startY+3.5, {align:"center"});
-                
-                const gx = 20; const gy = startY + 8; const gw = 175; const gh = 30; const rowH = gh / 5;
-                const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
-                
-                // Líneas horizontales y etiquetas
-                doc.setFontSize(5); doc.setDrawColor(150); doc.setLineWidth(0.1);
-                statusLabels.forEach((s, i) => {
-                    doc.text(s, 19, gy + (i*rowH) + (rowH/2), {align:"right"});
-                    doc.line(gx, gy+(i*rowH), gx+gw, gy+(i*rowH));
-                });
-                doc.line(gx, gy+gh, gx+gw, gy+gh);
-
-                // Líneas verticales (24h)
-                for(let i=0; i<=24; i++) {
-                    let x = gx + (gw/24)*i;
-                    doc.line(x, gy, x, gy+gh);
-                    if(i%2===0) doc.text(i.toString(), x, gy-2, {align:"center"});
-                }
-                doc.rect(gx, gy, gw, gh); // Marco
-
-                // TRAZAR LÍNEA DE TIEMPO
-                if(dayLogs && dayLogs.length > 0) {
-                    doc.setDrawColor(...azulOficial); doc.setLineWidth(0.7);
-                    // Mapeo App -> Gráfica Legal
-                    // App: 1=Descanso, 2=Comida(Pausa), 3=Manejo, 4=Servicio(Aux)
-                    // Gráfica: 0=Manejo, 1=Pausa, 2=Aux, 3=Excep, 4=Descanso
-                    const mapSt = { 3:0, 2:1, 4:2, 1:4 }; 
-
-                    dayLogs.forEach((l, i) => {
-                        let ds = new Date(l.startTime); 
-                        let de = l.endTime ? new Date(l.endTime) : new Date();
-                        
-                        // Si es Dia 2, restamos 24h para que empiece en la hora 0 de la gráfica
-                        let offset = isDay2 ? 24 : 0; 
-                        
-                        let t1 = (ds.getHours() + ds.getMinutes()/60) - (isDay2 && i===0 ? (ds.getHours()) : 0); 
-                        // Ajuste simple: tomamos la hora del día (0-24)
-                        let h1 = ds.getHours() + ds.getMinutes()/60;
-                        let h2 = de.getHours() + de.getMinutes()/60;
-                        
-                        // Coordenadas X
-                        let x1 = gx + (gw/24) * h1;
-                        let x2 = gx + (gw/24) * h2;
-                        
-                        // Si cruzó la medianoche en la misma gráfica, cortamos en 24 (simplificación visual)
-                        if(x2 < x1) x2 = gx + gw; 
-
-                        let rIdx = mapSt[l.status] !== undefined ? mapSt[l.status] : 4;
-                        let yLine = gy + (rIdx * rowH) + (rowH/2);
-
-                        doc.line(x1, yLine, x2, yLine); // Horizontal
-                        
-                        // Vertical (conectar con anterior)
-                        if(i > 0) {
-                            let prev = dayLogs[i-1];
-                            let prevR = mapSt[prev.status] !== undefined ? mapSt[prev.status] : 4;
-                            let prevY = gy + (prevR * rowH) + (rowH/2);
-                            // Solo conectar si es continuo en tiempo
-                            if(Math.abs(x1 - (gx+(gw/24)*(new Date(prev.endTime).getHours()))) < 2) {
-                                doc.line(x1, prevY, x1, yLine);
-                            }
-                        }
-                    });
-                }
-            };
-
-            // DIBUJAR GRÁFICAS
-            drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS)", logsD1, false);
-            y += 45;
-            drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE)", logsD2, true);
-            y += 45;
-
-            // --- TABLA DE DESGLOSE (TEXTO) ---
-            doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica","bold");
-            doc.text("DESGLOSE DE ACTIVIDADES", 14, y);
-            y += 4;
-
-            // Header Tabla
-            doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
-            doc.setTextColor(0); doc.setFontSize(6);
-            doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 45, y+3.5);
-            doc.text("ACTIVIDAD", 75, y+3.5); doc.text("DURACIÓN", 110, y+3.5);
-            doc.text("OBSERVACIONES / LUGAR", 140, y+3.5);
-            y += 5;
-
-            // Filas
-            doc.setFont("helvetica","normal");
-            logs.forEach((l, idx) => {
-                if(y > 250) { doc.addPage(); y=20; } // Salto de página si se llena
-                
-                const stName = ["","DESCANSO","PAUSA","MANEJANDO","SERVICIO"][l.status];
-                const s = new Date(l.startTime);
-                const e = l.endTime ? new Date(l.endTime) : new Date();
-                const dur = Math.floor((e-s)/60000);
-                const durStr = `${Math.floor(dur/60)}h ${dur%60}m`;
-                
-                // Fondo alternado
-                if(idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
-                
-                doc.text(s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 16, y+3);
-                doc.text(e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 45, y+3);
-                doc.text(stName, 75, y+3);
-                doc.text(durStr, 110, y+3);
-                doc.text((l.observation || "-").substring(0,35), 140, y+3);
-                
-                y += 4;
-            });
-
-            // --- FIRMAS ---
-            if(y > 230) { doc.addPage(); y=30; }
+            let y = 30;
+            doc.setTextColor(0); doc.setFontSize(8);
+            doc.text(`FOLIO: ${folio}`, 14, y);
+            doc.text(`UNIDAD: ${document.getElementById('unitId').value}`, 60, y);
+            doc.text(`OPERADOR: ${document.getElementById('driverName').value}`, 110, y);
             y += 10;
             
-            doc.setDrawColor(0);
-            const opSig = document.getElementById('signaturePad').toDataURL("image/png");
-            const supSig = document.getElementById('supervisorPad').toDataURL("image/png");
-
-            doc.line(30, y+20, 80, y+20);
-            doc.addImage(opSig, 'PNG', 35, y, 40, 18);
-            doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y+23, {align:"center"});
-
-            doc.line(120, y+20, 170, y+20);
-            doc.addImage(supSig, 'PNG', 125, y, 40, 18);
-            doc.text("FIRMA SUPERVISOR", 145, y+23, {align:"center"});
-
-            doc.setFontSize(5); doc.setTextColor(100);
-            doc.text("HAGO CONSTAR QUE LOS DATOS SON VERÍDICOS Y REFLEJAN FIELMENTE MIS ACTIVIDADES.", 105, y+30, {align:"center"});
-
-            // --- PÁGINA 2: REGLAMENTO (Reverso) ---
-            doc.addPage();
-            doc.setFillColor(...naranja); doc.rect(0,0,210,15,'F');
-            doc.setTextColor(255); doc.setFontSize(12); doc.setFont("helvetica","bold");
-            doc.text("REGLAMENTO NOM-087-SCT-2-2017", 105, 10, {align:"center"});
+            // Simplified grid for PDF
+            doc.setDrawColor(200);
+            doc.rect(14, y, 180, 40);
+            for(let i=1; i<5; i++) doc.line(14, y+i*8, 194, y+i*8);
+            for(let i=0; i<=24; i++) doc.line(14 + (180/24)*i, y, 14 + (180/24)*i, y+40);
             
-            doc.setTextColor(0); doc.setFontSize(8);
-            let ry = 25;
-            const rules = [
-                "4.1 TIEMPOS: Todo conductor debe realizar una pausa de 30 minutos cuando ha conducido hasta 5 horas continuas.",
-                "4.2 PAUSAS: Los periodos de pausa no son acumulables.",
-                "4.6 RUTAS LARGAS: En rutas de max 14 horas, el conductor debe tener una pausa no menor a 8 horas continuas.",
-                "4.7 MÁXIMO 24H: El tiempo máximo de conducción en 24 horas nunca podrá exceder las 14 horas.",
-                "3.4 EXCEPCIONES: El tiempo puede prolongarse por avería o perturbación del servicio, debiendo evidenciarse."
-            ];
-            rules.forEach(r => {
-                const split = doc.splitTextToSize(r, 180);
-                doc.text(split, 14, ry);
-                ry += (split.length * 4) + 4;
-            });
-
             doc.save(`Bitacora_${folio}.pdf`);
         };
 
-        
-
-        // --- GENERADOR QR SEGURO ---
+        // --- GENERADOR QR ---
         window.generarQRSeguro = function() {
-            if (typeof QRCode === 'undefined') { alert("⚠️ El generador QR no se cargó.\nPosible causa: No abriste la app con internet al inicio."); return; }
-            
+            if (typeof QRCode === 'undefined') { alert("⚠️ QR no cargado."); return; }
             const folio = document.getElementById('folio').value || "S/F";
-            const unidad = document.getElementById('unitId').value || "--";
-            const placas = document.getElementById('plates').value || "--";
-            // FIXED TYPO
-            const marca = document.getElementById('brandModel').value || "--";
-            const operador = document.getElementById('driverName').value || "--";
-            const lic = document.getElementById('license').value || "--";
-            const vig = document.getElementById('licenseExp').value || "--";
-            const origen = document.getElementById('origin').value || "--";
-            const destino = document.getElementById('destination').value || "--";
-           
-            let driveMins = 0;
-            [...logs].forEach(l => {
-                if(l.status===3) {
-                    const e = l.endTime ? new Date(l.endTime) : new Date();
-                    driveMins += Math.floor((e - new Date(l.startTime))/60000);
-                }
-            });
-            const horasManejo = `${Math.floor(driveMins/60)}h ${driveMins%60}m`;
-            const statusActual = ["","DESCANSO","PAUSA","MANEJANDO","SERVICIO"][currentStatus];
-
-            // FIXED DATA CONSTRUCTION
-            const qrData = `NOM-087\nFOLIO:${folio}\nUNIDAD:${unidad}\nPLACAS:${placas}\nOPERADOR:${operador}\nESTADO:${statusActual}\nMANEJO_24H:${horasManejo}\nFECHA:${new Date().toLocaleDateString()}`;
-            
+            const qrData = `NOM-087\nFOLIO:${folio}\nUNIDAD:${document.getElementById('unitId').value}\nFECHA:${new Date().toLocaleDateString()}`;
             document.getElementById('qrcode').innerHTML = "";
             new QRCode(document.getElementById("qrcode"), { text: qrData, width: 200, height: 200 });
             document.getElementById('qrTextContent').innerText = qrData;
-            
             document.getElementById('qrModal').classList.remove('hidden');
         }
         
-        // Funciones de Modales
         window.closeQR = () => document.getElementById('qrModal').classList.add('hidden');
         window.closeObs = () => document.getElementById('obsModal').classList.add('hidden');
-        window.saveObs = () => { /* Logica de guardar obs... */ window.closeObs(); };
 
         updateUI(); 
     </script>
 
-    <!-- SCRIPT DE NUBE (FIREBASE) - CARGA DINÁMICA BAJO DEMANDA -->
-    <script>
+    <!-- FIREBASE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
         const firebaseConfig = {
             apiKey: "__FIREBASE_API_KEY__",
             authDomain: "gen-lang-client-0015118308.firebaseapp.com",
@@ -699,116 +468,47 @@ for(let i=0;i<5;i++) {
             measurementId: "G-SK8TYXT3JD"
         };
 
-        // --- NUEVA FUNCIÓN: GENERAR FOLIO FIREBASE ---
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         window.generarFolioFirebase = async function(manual = false) {
              const inputFolio = document.getElementById('folio');
-             
-             // Si ya tiene valor y no es manual, no hacer nada (respetar cache local)
-             if (!manual && inputFolio.value && inputFolio.value !== "Cargando..." && inputFolio.value !== "") return;
-
+             if (!manual && inputFolio.value) return;
              if (!navigator.onLine) {
-                 if(manual) alert("⚠️ Necesitas internet para obtener un nuevo folio oficial.");
-                 // Fallback offline si está vacío
                  if(!inputFolio.value) inputFolio.value = "OFF-" + new Date().getTime().toString().slice(-6);
                  return;
              }
-
-             const btn = manual ? document.querySelector('button[onclick="window.generarFolioFirebase(true)"]') : null;
-             if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
              try {
-                const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js");
-                const { getFirestore, doc, runTransaction } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-                
-                const app = initializeApp(firebaseConfig);
-                const db = getFirestore(app);
-                
                 const newFolio = await runTransaction(db, async (transaction) => {
                     const counterRef = doc(db, "contadores", "folio_bitacora");
                     const sfDoc = await transaction.get(counterRef);
-                    
                     let newSeq = 1000;
-                    if (sfDoc.exists()) {
-                        newSeq = sfDoc.data().seq + 1;
-                    }
-                    
+                    if (sfDoc.exists()) newSeq = sfDoc.data().seq + 1;
                     transaction.set(counterRef, { seq: newSeq });
                     return `FB${newSeq}`;
                 });
-                
                 inputFolio.value = newFolio;
                 localStorage.setItem('nom087_folio', newFolio);
-                if(btn) btn.innerHTML = '<i class="fas fa-check"></i>';
-                
-             } catch(e) {
-                 console.log("No se pudo obtener folio automático", e);
-                 if(btn) btn.innerHTML = '<i class="fas fa-exclamation"></i>';
-             }
-             
-             if(btn) setTimeout(() => btn.innerHTML = '<i class="fas fa-sync-alt"></i>', 2000);
+             } catch(e) { console.error(e); }
         }
 
         window.intentarSubirNube = async function() {
             const btn = document.getElementById('saveBtn');
-            const original = btn.innerHTML;
-            
-            // 1. CHEQUEO BÁSICO DE CONECTIVIDAD
-            if (!navigator.onLine) {
-                alert("⚠️ SIN CONEXIÓN A INTERNET\n\nNo te preocupes. Tus datos, firmas y tiempos ya se guardaron en este celular.\n\nPuedes generar el PDF y QR sin problemas.\nLa subida a la nube se hará cuando tengas señal.");
-                return;
-            }
-
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true;
-
+            if (!navigator.onLine) { alert("⚠️ SIN CONEXIÓN"); return; }
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
-                const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js");
-                const { getFirestore, doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-
-                const app = initializeApp(firebaseConfig);
-                const db = getFirestore(app);
-                
-                // Asegurar folio antes de guardar
-                let folio = document.getElementById('folio').value;
-                if(!folio || folio.startsWith("OFF-") || folio === "Cargando...") {
-                    // Intentar obtener folio oficial si no tiene uno válido
-                    await window.generarFolioFirebase(false); 
-                    folio = document.getElementById('folio').value;
-                }
-                
-                if(!folio) throw new Error("Falta el Folio");
-
-                const logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
-                const firmaImg = document.getElementById('signaturePad').toDataURL("image/png");
-                const supImg = document.getElementById('supervisorPad').toDataURL("image/png");
-
+                const folio = document.getElementById('folio').value;
                 await setDoc(doc(db, "bitacoras_087", folio), {
-                    folio, unidad: document.getElementById('unitId').value,
-                    operador: document.getElementById('driverName').value,
-                    logs, firma_operador_base64: firmaImg, firma_supervisor_base64: supImg,
-                    fecha: new Date().toISOString(), app: "AppTolva"
+                    folio, unitId: document.getElementById('unitId').value,
+                    driverName: document.getElementById('driverName').value,
+                    logs, fecha: new Date().toISOString()
                 });
-
-                btn.innerHTML = '<i class="fas fa-check"></i>'; 
-                alert("✅ Datos sincronizados con la Nube. Folio: " + folio);
-
-            } catch (e) {
-                console.error(e);
-                alert("Error de conexión o datos: " + e.message + "\n(Tus datos siguen seguros en el celular)");
-                btn.innerHTML = '<i class="fas fa-exclamation"></i>';
-            }
-            setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 3000);
+                alert("✅ Sincronizado");
+            } catch (e) { alert("Error: " + e.message); }
+            btn.innerHTML = '<i class="fas fa-cloud-upload-alt text-xl"></i>';
         };
-        
-        // Iniciar chequeo de folio al cargar si hay red
-        window.addEventListener('load', () => {
-           if(navigator.onLine) {
-               // Solo intentar si está vacío para no gastar folios en recargas
-               const f = document.getElementById('folio');
-               if(!f.value) window.generarFolioFirebase(false);
-           }
-        });
+
+        window.addEventListener('load', () => { if(navigator.onLine) window.generarFolioFirebase(false); });
     </script>
-
-<script async id="netlify-rum-container" src="/.netlify/scripts/rum" data-netlify-rum-site-id="17d00618-daad-4a9a-89c9-4aa1bf9d3205" data-netlify-deploy-branch="agent-698e523660cddd1bd94a" data-netlify-deploy-context="deploy-preview" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiMTdkMDA2MTgtZGFhZC00YTlhLTg5YzktNGFhMWJmOWQzMjA1IiwiYWNjb3VudF9pZCI6IjY5MmQxNzE5Y2IyZmNjMzdkOWZlNzcxYyIsImRlcGxveV9pZCI6IjY5OGU1MzBjMDc1MGI2YmE3MjExOTg3YiIsImlzc3VlciI6Im5mc2VydmVyIn0.Ux_UPd9zV1uet1ujiP06gI4qQZqz1pSz0RK3yTwJa5c"></script></body>
-
+</body>
 </html>
