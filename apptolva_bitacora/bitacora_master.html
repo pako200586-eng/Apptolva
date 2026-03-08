@@ -549,7 +549,22 @@
             // Filas
             doc.setFont("helvetica","normal");
             logs.forEach((l, idx) => {
-                if(y > 250) { doc.addPage(); y=20; } // Salto de página si se llena
+                if (y > 250) {
+                    // Salto de página si se llena
+                    doc.addPage();
+                    y = 20;
+
+                    // Reimprimir encabezado de la tabla en la nueva página
+                    doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
+                    doc.setTextColor(0); doc.setFontSize(6);
+                    doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 45, y+3.5);
+                    doc.text("ACTIVIDAD", 75, y+3.5); doc.text("DURACIÓN", 110, y+3.5);
+                    doc.text("OBSERVACIONES / LUGAR", 140, y+3.5);
+                    y += 5;
+
+                    // Restaurar fuente para las filas
+                    doc.setFont("helvetica","normal");
+                }
                 
                 const stName = ["","DESCANSO","PAUSA","MANEJANDO","SERVICIO","EXCEPCIÓN"][l.status] || "OTRO";
                 const s = new Date(l.startTime);
