@@ -724,8 +724,14 @@
 
         window.intentarSubirNube = async function() {
             const btn = document.getElementById('saveBtn');
-            const folio = document.getElementById('folio').value;
-            if (!folio) { alert("⚠️ Genera un folio antes de guardar en la nube."); return; }
+            const rawFolio = document.getElementById('folio').value || "";
+            const folio = rawFolio.trim();
+            // Validar que el folio no esté vacío y que solo contenga caracteres permitidos para IDs de Firestore
+            const folioValido = /^[A-Za-z0-9_-]+$/.test(folio);
+            if (!folio || !folioValido) {
+                alert("⚠️ Genera un folio válido antes de guardar en la nube.");
+                return;
+            }
             if (!navigator.onLine) { alert("⚠️ SIN CONEXIÓN"); return; }
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
