@@ -167,7 +167,7 @@
         <div class="bg-white p-3 rounded-xl shadow-md border border-gray-100">
             <div class="flex justify-between items-center mb-2 px-1">
                 <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2"><i class="fas fa-chart-line text-orange-500"></i> Gráfica 24h</h3>
-                <div class="text-xs bg-gray-100 px-2 py-1 rounded">Manejo: <span id="totalDriving" class="font-bold text-gray-800">0h 0m</span> / 14h</div>
+                <div class="text-xs bg-gray-100 px-2 py-1 rounded">Conduciendo: <span id="totalDriving" class="font-bold text-gray-800">0h 0m</span> / 14h</div>
             </div>
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
             <div class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
@@ -334,7 +334,7 @@
                 </div>`;
             });
             
-            // Total Manejo 24h
+            // Total Conduciendo 24h
             const limit = now - (24 * 60 * 60 * 1000);
             driveMins = 0;
             logs.forEach(l => {
@@ -364,7 +364,7 @@
             const w = cvs.width; const h = cvs.height; const p=30;
             ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
             const rowH = (h-p*2)/5;
-            const lbl = ["Descanso","Pausa","Manejo","Servicio", "Excep."];
+            const lbl = ["Descanso","Pausa","Conduciendo","Servicio", "Excep."];
             for(let i=0;i<5;i++) {    
                 let y = p + (i*rowH) + (rowH/2);
                 if(i%2==0) { ctx.fillStyle="#fafafa"; ctx.fillRect(p,p+(i*rowH),w-p,rowH); }
@@ -488,8 +488,8 @@
                 if(dayLogs && dayLogs.length > 0) {
                     doc.setDrawColor(...azulOficial); doc.setLineWidth(0.7);
                     // Mapeo App -> Gráfica Legal
-                    // App: 1=Descanso, 2=Pausa, 3=Manejo, 4=Servicio(Aux), 5=Excepción
-                    // Gráfica: 0=Manejo, 1=Pausa, 2=Aux, 3=Excep, 4=Descanso
+                    // App: 1=Descanso, 2=Pausa, 3=Conduciendo, 4=Servicio(Aux), 5=Excepción
+                    // Gráfica: 0=Conduciendo, 1=Pausa, 2=Aux, 3=Excep, 4=Descanso
                     const mapSt = { 3:0, 2:1, 4:2, 5:3, 1:4 }; 
 
                     dayLogs.forEach((l, i) => {
@@ -578,7 +578,7 @@
                     doc.setFont("helvetica","normal");
                 }
                 
-                const stName = ["","DESCANSO","PAUSA","MANEJANDO","SERVICIO","EXCEPCIÓN"][l.status] || "OTRO";
+                const stName = ["","DESCANSO","PAUSA","CONDUCIENDO","SERVICIO","EXCEPCIÓN"][l.status] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
                 const dur = Math.floor((e-s)/60000);
