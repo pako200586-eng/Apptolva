@@ -180,7 +180,10 @@
 
         <!-- 4. Bitácora (Lista) -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
-            <div class="bg-gray-50 px-4 py-2 border-b border-gray-100"><h3 class="font-bold text-gray-600 text-xs uppercase">Registros</h3></div>
+            <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-gray-600 text-xs uppercase">Registros</h3>
+                <button onclick="window.openObs()" aria-label="Agregar nota al registro actual" class="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded flex items-center gap-1 hover:bg-orange-200 active:scale-95 transition"><i class="fas fa-sticky-note"></i> Agregar Nota</button>
+            </div>
             <div id="logList" class="divide-y divide-gray-100 max-h-60 overflow-y-auto"></div>
         </div>
 
@@ -253,12 +256,11 @@
         // Recuperar inputs
         const ids = ['driverName', 'license', 'licenseExp', 'unitId', 'brandModel', 'plates', 'mode', 'folio', 'origin', 'destination'];
         ids.forEach(id => {
-            const val = localStorage.getItem('nom087_' + id); if(val) {
-                const el = document.getElementById(id);
-                if (el) el.value = val;
-            }
             const el = document.getElementById(id);
-            if (el) el.addEventListener('input', (e) => localStorage.setItem('nom087_'+id, e.target.value));
+            if (!el) return;
+            const val = localStorage.getItem('nom087_' + id);
+            if (val) el.value = val;
+            el.addEventListener('input', (e) => localStorage.setItem('nom087_' + id, e.target.value));
         });
 
         // Reloj
@@ -315,7 +317,7 @@
 
             [...logs].reverse().forEach(l => {
                 const s = new Date(l.startTime);
-                const stNames = ["","Descanso","Pausa","Manejo","Servicio","Excepción"];
+                const stNames = ["","Descanso","Pausa","Conduciendo","Servicio","Excepción"];
                 const stName = stNames[l.status] || "Otro";
                 const clss = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-purple-500"];
                 const cls = clss[l.status] || "bg-gray-500";
@@ -650,6 +652,23 @@
         
         window.closeQR = () => document.getElementById('qrModal').classList.add('hidden');
         window.closeObs = () => document.getElementById('obsModal').classList.add('hidden');
+        window.openObs = function() {
+            const obsText = document.getElementById('obsText');
+            if (!obsText) return;
+            const current = logs.length > 0 ? (logs[logs.length - 1].observation || '') : '';
+            obsText.value = current;
+            document.getElementById('obsModal').classList.remove('hidden');
+        };
+        window.saveObs = function() {
+            const obsText = document.getElementById('obsText');
+            if (!obsText) { window.closeObs(); return; }
+            const text = obsText.value.trim();
+            if (logs.length > 0) {
+                logs[logs.length - 1].observation = text;
+                guardarLocal();
+            }
+            window.closeObs();
+        };
 
         updateUI(); 
     </script>
@@ -668,6 +687,16 @@
             appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
             measurementId: "G-SK8TYXT3JD"
         };
+
+        if (firebaseConfig.apiKey === "__FIREBASE_API_KEY__") {
+            console.warn("Firebase: API key no configurada. Funciones de nube deshabilitadas.");
+            window.generarFolioFirebase = function() {
+                const inputFolio = document.getElementById('folio');
+                if (inputFolio && !inputFolio.value) inputFolio.value = "OFF-" + new Date().getTime().toString().slice(-6);
+            };
+            window.intentarSubirNube = function() { alert("⚠️ Función de nube no disponible. Configura Firebase."); };
+            window.addEventListener('load', () => window.generarFolioFirebase());
+        } else {
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -695,21 +724,29 @@
 
         window.intentarSubirNube = async function() {
             const btn = document.getElementById('saveBtn');
+            const rawFolio = document.getElementById('folio').value || "";
+            const folio = rawFolio.trim();
+            // Validar que el folio no esté vacío y que solo contenga caracteres permitidos para IDs de Firestore
+            const folioValido = /^[A-Za-z0-9_-]+$/.test(folio);
+            if (!folio || !folioValido) {
+                alert("⚠️ Genera un folio válido antes de guardar en la nube.");
+                return;
+            }
             if (!navigator.onLine) { alert("⚠️ SIN CONEXIÓN"); return; }
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
-                const folio = document.getElementById('folio').value;
                 await setDoc(doc(db, "bitacoras_087", folio), {
                     folio, unitId: document.getElementById('unitId').value,
                     driverName: document.getElementById('driverName').value,
                     logs, fecha: new Date().toISOString()
                 });
                 alert("✅ Sincronizado");
-            } catch (e) { alert("Error: " + e.message); }
+            } catch (e) { alert("Error al guardar: " + e.message); }
             btn.innerHTML = '<i class="fas fa-cloud-upload-alt text-xl"></i>';
         };
 
         window.addEventListener('load', () => { if(navigator.onLine) window.generarFolioFirebase(false); });
+        } // end else (Firebase configurado)
     </script>
 </body>
 </html>
