@@ -1100,7 +1100,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             measurementId: "G-SK8TYXT3JD"
         };
 
-        if (firebaseConfig.apiKey === "__FIREBASE_API_KEY__") {
+        if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
             console.warn("Firebase: API key no configurada. Funciones de nube deshabilitadas.");
             // Deja la función de nube sin configurar para que el flujo existente use el modo offline.
             window.reservarFolioCloud = null;
