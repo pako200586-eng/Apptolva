@@ -808,6 +808,19 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     {id: 'tolva2', titulo: '2da TOLVA'}
                 ];
 
+                // Helper: dibuja un banner de continuación al inicio de páginas de desbordamiento
+                const addContinuationPage = (secTitulo) => {
+                    doc.addPage();
+                    let cy = 13;
+                    doc.setFillColor(51, 65, 85);
+                    doc.rect(margin, cy, contentW, 8, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(9);
+                    doc.text(secTitulo + ' (continuación)', margin + 3, cy + 5.5);
+                    return cy + 12;
+                };
+
                 secciones.forEach((sec, pageIndex) => {
                     if (pageIndex > 0) doc.addPage();
 
@@ -849,7 +862,8 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 11);
                     doc.text('DOLLY: ' + dolly, margin + 3, y + 17);
                     doc.text('KM: ' + km, margin + half + 3, y + 17);
-                    doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + 3, y + 21);
+                    doc.text('ORIGEN: ' + origen, margin + 3, y + 21);
+                    doc.text('DESTINO: ' + destino, margin + half + 3, y + 21);
 
                     y += 26;
 
@@ -870,8 +884,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                             // quepan en la misma página antes de dibujar la cabecera.
                             const neededForHeaderAndOneItem = 7.5 + 6.5;
                             if (y > PAGE_BREAK_CAT || (y + neededForHeaderAndOneItem) > PAGE_BREAK_ITEM) {
-                                doc.addPage();
-                                y = 13;
+                                y = addContinuationPage(sec.titulo);
                             }
 
                             // Título de categoría
@@ -889,7 +902,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                             y += 7.5;
 
                             cat.i.forEach(item => {
-                                if (y > PAGE_BREAK_ITEM) { doc.addPage(); y = 13; }
+                                if (y > PAGE_BREAK_ITEM) { y = addContinuationPage(sec.titulo); }
 
                                 doc.setFillColor(255, 255, 255);
                                 doc.setDrawColor(238, 238, 238);
@@ -928,11 +941,11 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                     // --- OBSERVACIONES ---
                     const obsTexto = obsData[sec.id] || 'Sin observaciones';
-                    const obsLines = doc.splitTextToSize(obsTexto, contentW - 35);
-                    const obsH = Math.max(12, 8 + obsLines.length * 4);
+                    const obsLines = doc.splitTextToSize(obsTexto, contentW - 6);
+                    const obsLineHeight = 4.5; // mm por línea a fontSize 8
+                    const obsH = Math.max(20, 10 + obsLines.length * obsLineHeight + 5); // 10=pad sup, 5=pad inf
                     if (y + obsH > PAGE_BREAK_OBS) { 
-                        doc.addPage(); 
-                        y = 13; 
+                        y = addContinuationPage(sec.titulo);
                     }
                     doc.setFillColor(255, 247, 237);
                     doc.setDrawColor(253, 186, 116);
@@ -949,7 +962,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                     // --- FIRMAS (solo en la última página) ---
                     if (pageIndex === secciones.length - 1) {
-                        if (y > PAGE_BREAK_SIG) { doc.addPage(); y = 13; }
+                        if (y > PAGE_BREAK_SIG) { y = addContinuationPage(sec.titulo); }
                         y += 8;
                         const sigW = (contentW - 8) / 3;
                         const sigBoxes = [
