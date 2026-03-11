@@ -20,6 +20,7 @@
     <script src="./js/tailwindcss.js"></script>
     <script src="./js/confetti.min.js"></script>
     <script src="./js/signature_pad.min.js"></script>
+    <script src="./js/jspdf.min.js"></script>
     <!-- <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet"> -->
     <link rel="stylesheet" href="./css/fontawesome.min.css">
     
@@ -782,81 +783,23 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 const t2 = document.getElementById('revTolva2').value || 'S/N';
                 const dolly = document.getElementById('revDolly').value || 'S/N';
 
-                // HTML DEL REPORTE
-                let contenidoReporte = `
-                <!DOCTYPE html>
-                <html lang="es">
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Reporte ${u}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f4; }
-                        .hoja { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-                        .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #ea580c; padding-bottom: 15px; margin-bottom: 20px; }
-                        .header-left { display: flex; align-items: center; }
-                        .titulo-principal { color: #ea580c; font-size: 24px; margin: 0; font-weight: bold; }
-                        .subtitulo { margin: 0; color: #666; font-size: 12px; font-weight: bold; }
-                        .meta-fecha { font-size: 11px; color: #888; text-align: right; }
-                        .box-data { background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 12px; border: 1px solid #e2e8f0; }
-                        table { width: 100%; border-collapse: collapse; }
-                        td { padding: 6px 4px; vertical-align: top; border-bottom: 1px solid #e0e0e0; color: #333; }
-                        .sec-title { background: #334155; color: white; padding: 8px; font-weight: bold; font-size: 13px; margin-top: 20px; border-radius: 4px; }
-                        .cat-title { background: #f1f5f9; font-weight: bold; padding: 5px 8px; font-size: 11px; margin-top: 8px; border-left: 4px solid #ea580c; }
-                        .row-item { border-bottom: 1px dotted #eee; padding: 6px 8px; display: flex; justify-content: space-between; font-size: 11px; }
-                        .status-ok { color: #16a34a; font-weight: bold; }
-                        .status-mal { color: white; background: #dc2626; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-                        
-                        /* ESTILO PARA OBSERVACIONES SEPARADAS */
-                        .obs-sec { background: #fff7ed; border: 1px dashed #fdba74; padding: 8px; font-size: 11px; margin-bottom: 10px; color: #9a3412; margin-top:5px;}
+                // GENERACIÓN DE PDF (4 páginas, una por componente)
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-                        .firmas-container { display: flex; justify-content: space-between; margin-top: 40px; }
-                        .firma-box { width: 32%; text-align: center; } 
-                        .firma-img { width: 100%; height: 60px; object-fit: contain; border-bottom: 2px solid #333; margin-bottom: 5px; }
-                        .firma-nombre { font-weight: bold; font-size: 11px; display: block; }
-                        .firma-cargo { color: #666; font-size: 9px; display: block; }
-                    </style>
-                </head>
-                <body>
-                    <div class="hoja">
-                        <div class="header-container">
-                            <div class="header-left">
-                                <div>
-                                    <h1 class="titulo-principal">REPORTE DE INSPECCIÓN</h1>
-                                    <p class="subtitulo">BACHOCO - PLANTA DE ALIMENTOS</p>
-                                </div>
-                            </div>
-                            <div class="meta-fecha">
-                                FECHA: ${new Date().toLocaleDateString()}<br>
-                                HORA: ${new Date().toLocaleTimeString()}
-                            </div>
-                        </div>
+                const km = document.getElementById('revKm').value || '-';
+                const origen = document.getElementById('revOrigen').value || '-';
+                const destino = document.getElementById('revDestino').value || '-';
+                const fecha = new Date().toLocaleDateString('es-MX');
+                const hora = new Date().toLocaleTimeString('es-MX');
 
-                        <div class="box-data">
-                            <table>
-                                <tr>
-                                    <td width="50%"><strong>UNIDAD:</strong> ${u}</td>
-                                    <td width="50%"><strong>OPERADOR:</strong> ${opNombre}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>TOLVA 1:</strong> ${t1}</td>
-                                    <td><strong>TOLVA 2:</strong> ${t2}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>DOLLY:</strong> ${dolly}</td>
-                                    <td><strong>KM:</strong> ${document.getElementById('revKm').value || '-'}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>ORIGEN:</strong> ${document.getElementById('revOrigen').value || '-'}</td>
-                                    <td><strong>DESTINO:</strong> ${document.getElementById('revDestino').value || '-'}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>FOLIO:</strong> ${folio}</td>
-                                    <td><strong>VERSIÓN:</strong> 9.2</td>
-                                </tr>
-                            </table>
-                        </div>
-                `;
+                const pageW = 210;
+                const margin = 14;
+                const contentW = pageW - margin * 2;
+                const PAGE_BREAK_CAT = 267;
+                const PAGE_BREAK_ITEM = 272;
+                const PAGE_BREAK_OBS = 257;
+                const PAGE_BREAK_SIG = 242;
 
                 const secciones = [
                     {id: 'tracto', titulo: 'TRACTO CAMIÓN'},
@@ -865,72 +808,172 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     {id: 'tolva2', titulo: '2da TOLVA'}
                 ];
 
-                secciones.forEach(sec => {
-                    contenidoReporte += `<div class="sec-title">${sec.titulo}</div>`;
-                    
-                    revData[sec.id].forEach(cat => {
-                        contenidoReporte += `<div class="cat-title">${cat.cat}</div>`;
-                        cat.i.forEach(item => {
-                            const k = `${sec.id}-${item}`;
-                            const v = revResults[k];
-                            let st = '<span style="color:#ccc">-</span>';
-                            if(v === 'OK') st = '<span class="status-ok">✓ OK</span>';
-                            if(v === 'MAL') st = '<span class="status-mal">✕ MAL</span>';
-                            contenidoReporte += `
-                                <div class="row-item">
-                                    <span>${item}</span>
-                                    <span>${st}</span>
-                                </div>`;
-                        });
-                    });
+                secciones.forEach((sec, pageIndex) => {
+                    if (pageIndex > 0) doc.addPage();
 
-                    const obsTexto = obsData[sec.id] || "Sin observaciones";
-                    contenidoReporte += `
-                        <div class="obs-sec">
-                            <strong>NOTAS ${sec.titulo}:</strong> ${obsTexto}
-                        </div>
-                    `;
+                    let y = 13;
+
+                    // --- ENCABEZADO ---
+                    doc.setFillColor(234, 88, 12);
+                    doc.rect(margin, y, contentW, 11, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(13);
+                    doc.text('REPORTE DE INSPECCIÓN', margin + 3, y + 7.5);
+                    doc.setFontSize(7.5);
+                    doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 4.5, {align: 'right'});
+                    doc.text('FOLIO: ' + folio + '   VERSION: 9.2', pageW - margin - 2, y + 9, {align: 'right'});
+
+                    y += 14;
+
+                    // Subtítulo empresa
+                    doc.setTextColor(100, 100, 100);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(8);
+                    doc.text('BACHOCO - PLANTA DE ALIMENTOS', margin, y);
+
+                    y += 5;
+
+                    // --- DATOS DE UNIDAD ---
+                    doc.setFillColor(248, 250, 252);
+                    doc.setDrawColor(226, 232, 240);
+                    doc.setLineWidth(0.3);
+                    doc.rect(margin, y, contentW, 22, 'FD');
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(8);
+                    const half = contentW / 2;
+                    doc.text('UNIDAD: ' + u, margin + 3, y + 5);
+                    doc.text('OPERADOR: ' + opNombre, margin + half + 3, y + 5);
+                    doc.text('TOLVA 1: ' + t1, margin + 3, y + 11);
+                    doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 11);
+                    doc.text('DOLLY: ' + dolly, margin + 3, y + 17);
+                    doc.text('KM: ' + km, margin + half + 3, y + 17);
+                    doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + 3, y + 21);
+
+                    y += 26;
+
+                    // --- TÍTULO DE SECCIÓN ---
+                    doc.setFillColor(51, 65, 85);
+                    doc.rect(margin, y, contentW, 8, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(11);
+                    doc.text(sec.titulo, margin + 3, y + 5.5);
+
+                    y += 12;
+
+                    // --- ÍTEMS DEL CHECKLIST ---
+                    if (revData[sec.id]) {
+                        revData[sec.id].forEach(cat => {
+                            if (y > PAGE_BREAK_CAT) { doc.addPage(); y = 13; }
+
+                            // Título de categoría
+                            doc.setFillColor(241, 245, 249);
+                            doc.setDrawColor(234, 88, 12);
+                            doc.setLineWidth(0.4);
+                            doc.rect(margin, y, contentW, 6, 'FD');
+                            doc.setFillColor(234, 88, 12);
+                            doc.rect(margin, y, 1.5, 6, 'F');
+                            doc.setTextColor(51, 65, 85);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(8);
+                            doc.text(cat.cat, margin + 5, y + 4.2);
+
+                            y += 7.5;
+
+                            cat.i.forEach(item => {
+                                if (y > PAGE_BREAK_ITEM) { doc.addPage(); y = 13; }
+
+                                doc.setFillColor(255, 255, 255);
+                                doc.setDrawColor(238, 238, 238);
+                                doc.setLineWidth(0.15);
+                                doc.rect(margin, y - 3, contentW, 6, 'FD');
+
+                                doc.setFont('helvetica', 'normal');
+                                doc.setTextColor(50, 50, 50);
+                                doc.setFontSize(7.5);
+                                doc.text(item, margin + 3, y + 0.5);
+
+                                const k = sec.id + '-' + item;
+                                const v = revResults[k];
+                                if (v === 'OK') {
+                                    doc.setTextColor(22, 163, 74);
+                                    doc.setFont('helvetica', 'bold');
+                                    doc.text('OK', pageW - margin - 3, y + 0.5, {align: 'right'});
+                                } else if (v === 'MAL') {
+                                    doc.setFillColor(220, 38, 38);
+                                    doc.roundedRect(pageW - margin - 12, y - 2.5, 10, 5, 1, 1, 'F');
+                                    doc.setTextColor(255, 255, 255);
+                                    doc.setFont('helvetica', 'bold');
+                                    doc.text('MAL', pageW - margin - 7, y + 0.5, {align: 'center'});
+                                } else {
+                                    doc.setTextColor(180, 180, 180);
+                                    doc.setFont('helvetica', 'normal');
+                                    doc.text('-', pageW - margin - 3, y + 0.5, {align: 'right'});
+                                }
+
+                                y += 6.5;
+                            });
+
+                            y += 2;
+                        });
+                    }
+
+                    // --- OBSERVACIONES ---
+                    if (y > PAGE_BREAK_OBS) { doc.addPage(); y = 13; }
+                    const obsTexto = obsData[sec.id] || 'Sin observaciones';
+                    const obsLines = doc.splitTextToSize(obsTexto, contentW - 35);
+                    const obsH = Math.max(12, 8 + obsLines.length * 4);
+                    doc.setFillColor(255, 247, 237);
+                    doc.setDrawColor(253, 186, 116);
+                    doc.setLineWidth(0.3);
+                    doc.rect(margin, y, contentW, obsH, 'FD');
+                    doc.setTextColor(154, 52, 18);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(8);
+                    doc.text('NOTAS ' + sec.titulo + ':', margin + 3, y + 5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(obsLines, margin + 3, y + 10);
+
+                    y += obsH + 5;
+
+                    // --- FIRMAS (solo en la última página) ---
+                    if (pageIndex === secciones.length - 1) {
+                        if (y > PAGE_BREAK_SIG) { doc.addPage(); y = 13; }
+                        y += 8;
+                        const sigW = (contentW - 8) / 3;
+                        const sigBoxes = [
+                            {img: firmaOpImg, nombre: opNombre, cargo: 'FIRMA OPERADOR', x: margin},
+                            {img: firmaOp2Img, nombre: nombreOp2 || 'N/A', cargo: 'FIRMA OPERADOR 2', x: margin + sigW + 4},
+                            {img: firmaSupImg, nombre: nombreSup || 'N/A', cargo: 'FIRMA SUPERVISOR', x: margin + (sigW + 4) * 2}
+                        ];
+                        sigBoxes.forEach(sig => {
+                            try { doc.addImage(sig.img, 'PNG', sig.x, y, sigW, 18, undefined, 'FAST'); } catch(e) { console.warn('Error al agregar firma ' + sig.cargo + ':', e); }
+                            doc.setDrawColor(100, 100, 100);
+                            doc.setLineWidth(0.5);
+                            doc.line(sig.x, y + 20, sig.x + sigW, y + 20);
+                            doc.setTextColor(0, 0, 0);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(7.5);
+                            doc.text(sig.nombre, sig.x + sigW / 2, y + 25, {align: 'center'});
+                            doc.setTextColor(100, 100, 100);
+                            doc.setFont('helvetica', 'normal');
+                            doc.setFontSize(7);
+                            doc.text(sig.cargo, sig.x + sigW / 2, y + 29, {align: 'center'});
+                        });
+                    }
                 });
 
-                // 3 FIRMAS
-                contenidoReporte += `
-                        <div class="firmas-container">
-                            <div class="firma-box">
-                                <img src="${firmaOpImg}" class="firma-img">
-                                <span class="firma-nombre">${opNombre}</span>
-                                <span class="firma-cargo">FIRMA OPERADOR</span>
-                            </div>
-                            <div class="firma-box">
-                                <img src="${firmaOp2Img}" class="firma-img">
-                                <span class="firma-nombre">${nombreOp2}</span>
-                                <span class="firma-cargo">FIRMA OPERADOR 2</span>
-                            </div>
-                            <div class="firma-box">
-                                <img src="${firmaSupImg}" class="firma-img">
-                                <span class="firma-nombre">${nombreSup}</span>
-                                <span class="firma-cargo">FIRMA SUPERVISOR</span>
-                            </div>
-                        </div>
-                    </div>
-                </body>
-                </html>`;
-
-                const blob = new Blob([contenidoReporte], { type: 'text/html' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `REPORTE_${u}_${opNombre}.html`;
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                doc.save('REPORTE_' + u + '_' + opNombre + '.pdf');
 
                 // LIMPIEZA POST-REPORTE
-                localStorage.removeItem(STORAGE_KEY); 
-                
+                localStorage.removeItem(STORAGE_KEY);
+
                 setTimeout(() => {
                     restaurarBoton(btn, originalText, msg);
-                    const whatsAppLink = construirLinkWhatsapp(folio); // Pasamos el folio nuevo
-                    const ir = confirm("✅ REPORTE GENERADO.\n\nFolio asignado: " + folio + "\n\n¿Abrir WhatsApp para enviarlo?");
+                    const whatsAppLink = construirLinkWhatsapp(folio);
+                    const ir = confirm("✅ REPORTE PDF GENERADO.\n\nFolio asignado: " + folio + "\n\n¿Abrir WhatsApp para enviarlo?");
                     if(ir) window.location.href = whatsAppLink;
                     else location.reload();
                 }, 1000);
