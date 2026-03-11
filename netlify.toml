@@ -1,6 +1,3 @@
 [build]
   command = "cd apptolva_bitacora && bash build.sh"
   publish = "apptolva_bitacora"
-
-[build.environment]
-  FIREBASE_API_KEY = "AIzaSyB-zX1PF3_Ei567UgYoYozOCttCN75PwO4"
