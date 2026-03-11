@@ -955,7 +955,10 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                             {img: firmaSupImg, nombre: nombreSup || 'N/A', cargo: 'FIRMA SUPERVISOR', x: margin + (sigW + 4) * 2}
                         ];
                         sigBoxes.forEach(sig => {
-                            try { doc.addImage(sig.img, 'PNG', sig.x, y, sigW, 18, undefined, 'FAST'); } catch(e) { console.warn('Error al agregar firma ' + sig.cargo + ':', e); }
+                            const hasPngImage = typeof sig.img === 'string' && sig.img.startsWith('data:image/png');
+                            if (hasPngImage) {
+                                try { doc.addImage(sig.img, 'PNG', sig.x, y, sigW, 18, undefined, 'FAST'); } catch(e) { console.warn('Error al agregar firma ' + sig.cargo + ':', e); }
+                            }
                             doc.setDrawColor(100, 100, 100);
                             doc.setLineWidth(0.5);
                             doc.line(sig.x, y + 20, sig.x + sigW, y + 20);
