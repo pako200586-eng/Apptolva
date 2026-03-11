@@ -796,10 +796,9 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 const pageW = 210;
                 const margin = 14;
                 const contentW = pageW - margin * 2;
-                const PAGE_BREAK_CAT = 267;
-                const PAGE_BREAK_ITEM = 272;
-                const PAGE_BREAK_OBS = 257;
-                const PAGE_BREAK_SIG = 242;
+                const NUM_COLS = 3;
+                const COL_GAP = 4;
+                const colW = (contentW - COL_GAP * (NUM_COLS - 1)) / NUM_COLS;
 
                 const secciones = [
                     {id: 'tracto', titulo: 'TRACTO CAMIÓN'},
@@ -863,94 +862,112 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                     y += 12;
 
-                    // --- ÍTEMS DEL CHECKLIST ---
+                    // --- ÍTEMS DEL CHECKLIST (distribución en 3 columnas) ---
+                    const COL_HEIGHT = 170;              // altura útil de cada columna en mm
+                    const CAT_BOX_H = 5.5;               // altura del recuadro de categoría
+                    const CAT_INCREMENT = 6.5;           // avance de Y tras dibujar cabecera de categoría
+                    const ITEM_INCREMENT = 6;            // avance de Y tras dibujar cada ítem
+                    const MIN_OBS_H = 12;                // altura mínima del bloque de observaciones
+                    const OBS_TOP_PADDING = 8;           // margen superior dentro del bloque de observaciones
+                    const OBS_LINE_HEIGHT = 4;           // altura de cada línea de texto en observaciones
+
+                    const COL_START_Y = y;               // y ≈ 70 después del encabezado
+                    const COL_BOTTOM = COL_START_Y + COL_HEIGHT;
+                    const OBS_Y = COL_BOTTOM + 3;        // posición fija para observaciones
+                    const MAX_OBS_H = 18;                // altura máxima del bloque de observaciones
+                    const SIG_Y = OBS_Y + MAX_OBS_H + 2; // posición fija para firmas
+                    const colXStart = [
+                        margin,
+                        margin + colW + COL_GAP,
+                        margin + (colW + COL_GAP) * 2
+                    ];
+
+                    let col = 0;
+
                     if (revData[sec.id]) {
                         revData[sec.id].forEach(cat => {
-                            // Asegurar que la cabecera de categoría y al menos un ítem
-                            // quepan en la misma página antes de dibujar la cabecera.
-                            const neededForHeaderAndOneItem = 7.5 + 6.5;
-                            if (y > PAGE_BREAK_CAT || (y + neededForHeaderAndOneItem) > PAGE_BREAK_ITEM) {
-                                doc.addPage();
-                                y = 13;
+                            // Mover a la siguiente columna si la cabecera + al menos un ítem no caben
+                            if (col < NUM_COLS - 1 && y + CAT_INCREMENT + ITEM_INCREMENT > COL_BOTTOM) {
+                                col++;
+                                y = COL_START_Y;
                             }
+                            const cx = colXStart[col];
 
                             // Título de categoría
                             doc.setFillColor(241, 245, 249);
                             doc.setDrawColor(234, 88, 12);
                             doc.setLineWidth(0.4);
-                            doc.rect(margin, y, contentW, 6, 'FD');
+                            doc.rect(cx, y, colW, CAT_BOX_H, 'FD');
                             doc.setFillColor(234, 88, 12);
-                            doc.rect(margin, y, 1.5, 6, 'F');
+                            doc.rect(cx, y, 1.5, CAT_BOX_H, 'F');
                             doc.setTextColor(51, 65, 85);
                             doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(8);
-                            doc.text(cat.cat, margin + 5, y + 4.2);
+                            doc.setFontSize(7);
+                            doc.text(cat.cat, cx + 5, y + 3.8);
 
-                            y += 7.5;
+                            y += CAT_INCREMENT;
 
                             cat.i.forEach(item => {
-                                if (y > PAGE_BREAK_ITEM) { doc.addPage(); y = 13; }
+                                // Mover a la siguiente columna si el ítem no cabe
+                                if (col < NUM_COLS - 1 && y + ITEM_INCREMENT > COL_BOTTOM) {
+                                    col++;
+                                    y = COL_START_Y;
+                                }
+                                const cxItem = colXStart[col];
+                                const cxRight = cxItem + colW;
 
                                 doc.setFillColor(255, 255, 255);
                                 doc.setDrawColor(238, 238, 238);
                                 doc.setLineWidth(0.15);
-                                doc.rect(margin, y - 3, contentW, 6, 'FD');
+                                doc.rect(cxItem, y - 3, colW, 5.5, 'FD');
 
                                 doc.setFont('helvetica', 'normal');
                                 doc.setTextColor(50, 50, 50);
-                                doc.setFontSize(7.5);
-                                doc.text(item, margin + 3, y + 0.5);
+                                doc.setFontSize(7);
+                                doc.text(item, cxItem + 3, y + 0.5);
 
                                 const k = sec.id + '-' + item;
                                 const v = revResults[k];
                                 if (v === 'OK') {
                                     doc.setTextColor(22, 163, 74);
                                     doc.setFont('helvetica', 'bold');
-                                    doc.text('OK', pageW - margin - 3, y + 0.5, {align: 'right'});
+                                    doc.text('OK', cxRight - 2, y + 0.5, {align: 'right'});
                                 } else if (v === 'MAL') {
                                     doc.setFillColor(220, 38, 38);
-                                    doc.roundedRect(pageW - margin - 12, y - 2.5, 10, 5, 1, 1, 'F');
+                                    doc.roundedRect(cxRight - 11, y - 2.5, 9, 5, 1, 1, 'F');
                                     doc.setTextColor(255, 255, 255);
                                     doc.setFont('helvetica', 'bold');
-                                    doc.text('MAL', pageW - margin - 7, y + 0.5, {align: 'center'});
+                                    doc.text('MAL', cxRight - 6.5, y + 0.5, {align: 'center'});
                                 } else {
                                     doc.setTextColor(180, 180, 180);
                                     doc.setFont('helvetica', 'normal');
-                                    doc.text('-', pageW - margin - 3, y + 0.5, {align: 'right'});
+                                    doc.text('-', cxRight - 2, y + 0.5, {align: 'right'});
                                 }
 
-                                y += 6.5;
+                                y += ITEM_INCREMENT;
                             });
 
                             y += 2;
                         });
                     }
 
-                    // --- OBSERVACIONES ---
+                    // --- OBSERVACIONES (posición fija en la parte inferior de la página) ---
                     const obsTexto = obsData[sec.id] || 'Sin observaciones';
-                    const obsLines = doc.splitTextToSize(obsTexto, contentW - 35);
-                    const obsH = Math.max(12, 8 + obsLines.length * 4);
-                    if (y + obsH > PAGE_BREAK_OBS) { 
-                        doc.addPage(); 
-                        y = 13; 
-                    }
+                    const obsLines = doc.splitTextToSize(obsTexto, contentW - 10);
+                    const obsH = Math.min(MAX_OBS_H, Math.max(MIN_OBS_H, OBS_TOP_PADDING + obsLines.length * OBS_LINE_HEIGHT));
                     doc.setFillColor(255, 247, 237);
                     doc.setDrawColor(253, 186, 116);
                     doc.setLineWidth(0.3);
-                    doc.rect(margin, y, contentW, obsH, 'FD');
+                    doc.rect(margin, OBS_Y, contentW, obsH, 'FD');
                     doc.setTextColor(154, 52, 18);
                     doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(8);
-                    doc.text('NOTAS ' + sec.titulo + ':', margin + 3, y + 5);
+                    doc.setFontSize(7.5);
+                    doc.text('NOTAS ' + sec.titulo + ':', margin + 3, OBS_Y + 5);
                     doc.setFont('helvetica', 'normal');
-                    doc.text(obsLines, margin + 3, y + 10);
+                    doc.text(obsLines, margin + 3, OBS_Y + 10);
 
-                    y += obsH + 5;
-
-                    // --- FIRMAS (solo en la última página) ---
+                    // --- FIRMAS (solo en la última página, posición fija) ---
                     if (pageIndex === secciones.length - 1) {
-                        if (y > PAGE_BREAK_SIG) { doc.addPage(); y = 13; }
-                        y += 8;
                         const sigW = (contentW - 8) / 3;
                         const sigBoxes = [
                             {img: firmaOpImg, nombre: opNombre, cargo: 'FIRMA OPERADOR', x: margin},
@@ -960,19 +977,19 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                         sigBoxes.forEach(sig => {
                             const hasPngImage = typeof sig.img === 'string' && sig.img.startsWith('data:image/png');
                             if (hasPngImage) {
-                                try { doc.addImage(sig.img, 'PNG', sig.x, y, sigW, 18, undefined, 'FAST'); } catch(e) { console.warn('Error al agregar firma ' + sig.cargo + ':', e); }
+                                try { doc.addImage(sig.img, 'PNG', sig.x, SIG_Y, sigW, 18, undefined, 'FAST'); } catch(e) { console.warn('Error al agregar firma ' + sig.cargo + ':', e); }
                             }
                             doc.setDrawColor(100, 100, 100);
                             doc.setLineWidth(0.5);
-                            doc.line(sig.x, y + 20, sig.x + sigW, y + 20);
+                            doc.line(sig.x, SIG_Y + 20, sig.x + sigW, SIG_Y + 20);
                             doc.setTextColor(0, 0, 0);
                             doc.setFont('helvetica', 'bold');
                             doc.setFontSize(7.5);
-                            doc.text(sig.nombre, sig.x + sigW / 2, y + 25, {align: 'center'});
+                            doc.text(sig.nombre, sig.x + sigW / 2, SIG_Y + 25, {align: 'center'});
                             doc.setTextColor(100, 100, 100);
                             doc.setFont('helvetica', 'normal');
                             doc.setFontSize(7);
-                            doc.text(sig.cargo, sig.x + sigW / 2, y + 29, {align: 'center'});
+                            doc.text(sig.cargo, sig.x + sigW / 2, SIG_Y + 29, {align: 'center'});
                         });
                     }
                 });
