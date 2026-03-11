@@ -866,7 +866,13 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     // --- ÍTEMS DEL CHECKLIST ---
                     if (revData[sec.id]) {
                         revData[sec.id].forEach(cat => {
-                            if (y > PAGE_BREAK_CAT) { doc.addPage(); y = 13; }
+                            // Asegurar que la cabecera de categoría y al menos un ítem
+                            // quepan en la misma página antes de dibujar la cabecera.
+                            const neededForHeaderAndOneItem = 7.5 + 6.5;
+                            if (y > PAGE_BREAK_CAT || (y + neededForHeaderAndOneItem) > PAGE_BREAK_ITEM) {
+                                doc.addPage();
+                                y = 13;
+                            }
 
                             // Título de categoría
                             doc.setFillColor(241, 245, 249);
