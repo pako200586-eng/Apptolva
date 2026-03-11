@@ -1102,9 +1102,8 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
         if (firebaseConfig.apiKey === "__FIREBASE_API_KEY__") {
             console.warn("Firebase: API key no configurada. Funciones de nube deshabilitadas.");
-            window.reservarFolioCloud = async function() {
-                throw new Error("Firebase no configurado");
-            };
+            // Deja la función de nube sin configurar para que el flujo existente use el modo offline.
+            window.reservarFolioCloud = null;
         } else {
 
         const app = initializeApp(firebaseConfig);
