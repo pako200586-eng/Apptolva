@@ -679,8 +679,8 @@
 
     <!-- FIREBASE -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "__FIREBASE_API_KEY__",
@@ -714,11 +714,11 @@
              }
              try {
                 const newFolio = await runTransaction(db, async (transaction) => {
-                    const counterRef = doc(db, "contadores", "folio_bitacora");
+                    const counterRef = doc(db, "sistema", "contadores");
                     const sfDoc = await transaction.get(counterRef);
                     let newSeq = 1000;
-                    if (sfDoc.exists()) newSeq = sfDoc.data().seq + 1;
-                    transaction.set(counterRef, { seq: newSeq });
+                    if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
+                    transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
                     return `FB${newSeq}`;
                 });
                 inputFolio.value = newFolio;
