@@ -429,10 +429,12 @@
             const limit24 = startTrip + (24 * 60 * 60 * 1000); // Corte día 1
             
             // Filtramos qué pasó el Día 1 y qué pasó el Día 2
+            const nowMs = Date.now();
             // logsD1: registros que empezaron en el Día 1
             const logsD1 = logs.filter(l => l.startTime < limit24);
             // logsD2: registros que empezaron en el Día 2 O que cruzan la medianoche (endTime en Día 2)
-            const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
+            // Se usa nowMs como fallback cuando endTime es null (registro en curso)
+            const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime || nowMs) > limit24);
 
             // --- PÁGINA 1: DATOS Y GRÁFICAS ---
             
@@ -506,8 +508,9 @@
                         let x1 = gx + (gw/24) * h1;
                         let x2 = gx + (gw/24) * h2;
                         
-                        // Detectar si el tramo cruza medianoche (endTime del día siguiente)
-                        const cruzaMedianoche = (de > ds) && (x2 < x1);
+                        // Detectar si el tramo cruza medianoche comparando fechas calendario
+                        // (cubre casos como 08:00 Día1 → 12:00 Día2 donde x2 >= x1)
+                        const cruzaMedianoche = ds.toDateString() !== de.toDateString();
 
                         let rIdx = mapSt[l.status] !== undefined ? mapSt[l.status] : 4;
                         let yLine = gy + (rIdx * rowH) + (rowH/2);
