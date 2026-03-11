@@ -1087,7 +1087,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-        import { getFirestore, doc, updateDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+        import { getFirestore, doc, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
         // CONFIGURACIÓN OFICIAL
         const firebaseConfig = {
@@ -1113,15 +1113,13 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
         window.reservarFolioCloud = async function() {
             try {
                 const referenciaContador = doc(db, "sistema", "contadores");
-                // 1. Pedir turno (+1)
-                await updateDoc(referenciaContador, { folio_actual: increment(1) });
-                // 2. Leer turno
-                const snapshot = await getDoc(referenciaContador);
-                if (snapshot.exists()) {
-                    return snapshot.data().folio_actual;
-                } else {
-                    throw new Error("No existe el contador");
-                }
+                const nuevoNumero = await runTransaction(db, async (transaction) => {
+                    const snapshot = await transaction.get(referenciaContador);
+                    const nuevoFolio = snapshot.exists() ? (snapshot.data().folio_actual || 1000) + 1 : 1001;
+                    transaction.set(referenciaContador, { folio_actual: nuevoFolio }, { merge: true });
+                    return nuevoFolio;
+                });
+                return nuevoNumero;
             } catch (error) {
                 throw error;
             }
