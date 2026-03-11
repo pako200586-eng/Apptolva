@@ -326,7 +326,6 @@
 
     <script>
         // --- VARIABLES GLOBALES Y CLAVES ---
-        const aiApiKey = "__GOOGLE_AI_API_KEY__"; // Llave SOLO para la IA
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
         
         // --- 1. INICIALIZACIÓN ---
@@ -1024,7 +1023,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             box.scrollTop = box.scrollHeight;
 
             try {
-                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${aiApiKey}`, {
+                const r = await fetch(`/.netlify/functions/gemini`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{parts: [{text: q}]}], systemInstruction: {parts: [{text: systemPrompt}]} })
                 });
