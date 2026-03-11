@@ -429,8 +429,10 @@
             const limit24 = startTrip + (24 * 60 * 60 * 1000); // Corte día 1
             
             // Filtramos qué pasó el Día 1 y qué pasó el Día 2
+            // logsD1: registros que empezaron en el Día 1
             const logsD1 = logs.filter(l => l.startTime < limit24);
-            const logsD2 = logs.filter(l => l.startTime >= limit24);
+            // logsD2: registros que empezaron en el Día 2 O que cruzan la medianoche (endTime en Día 2)
+            const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
 
             // --- PÁGINA 1: DATOS Y GRÁFICAS ---
             
@@ -511,13 +513,15 @@
                         let yLine = gy + (rIdx * rowH) + (rowH/2);
 
                         if (cruzaMedianoche) {
-                            // Parte 1: desde startTime hasta las 24:00 del día actual
-                            const xMidnight = gx + gw;
-                            doc.line(x1, yLine, xMidnight, yLine);
-
-                            // Parte 2: continuación desde 00:00 hasta endTime (día siguiente)
-                            const xAfterMidnight = gx + (gw/24) * h2;
-                            doc.line(gx, yLine, xAfterMidnight, yLine);
+                            if (!isDay2) {
+                                // Día 1: dibujar solo desde startTime hasta las 24:00
+                                const xMidnight = gx + gw;
+                                doc.line(x1, yLine, xMidnight, yLine);
+                            } else {
+                                // Día 2: dibujar solo desde 00:00 hasta endTime
+                                const xAfterMidnight = gx + (gw/24) * h2;
+                                doc.line(gx, yLine, xAfterMidnight, yLine);
+                            }
                         } else {
                             doc.line(x1, yLine, x2, yLine); // Horizontal normal
                         }
@@ -591,7 +595,7 @@
                 doc.text(e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 45, y+3);
                 doc.text(stName, 75, y+3);
                 doc.text(durStr, 110, y+3);
-                doc.text((l.observation || "-").substring(0,35), 140, y+3);
+                doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0,35), 140, y+3);
                 
                 y += 4;
             });
