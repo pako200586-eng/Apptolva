@@ -927,10 +927,13 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     }
 
                     // --- OBSERVACIONES ---
-                    if (y > PAGE_BREAK_OBS) { doc.addPage(); y = 13; }
                     const obsTexto = obsData[sec.id] || 'Sin observaciones';
                     const obsLines = doc.splitTextToSize(obsTexto, contentW - 35);
                     const obsH = Math.max(12, 8 + obsLines.length * 4);
+                    if (y + obsH > PAGE_BREAK_OBS) { 
+                        doc.addPage(); 
+                        y = 13; 
+                    }
                     doc.setFillColor(255, 247, 237);
                     doc.setDrawColor(253, 186, 116);
                     doc.setLineWidth(0.3);
