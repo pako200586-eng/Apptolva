@@ -164,7 +164,7 @@
                 <div class="text-xs bg-gray-100 px-2 py-1 rounded">Manejo: <span id="totalDriving" class="font-bold text-gray-800">0h 0m</span> / 14h</div>
             </div>
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
-            <div class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+            <div class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"><span>08:00</span><span>14:00</span><span>20:00</span><span>02:00</span><span>08:00</span></div>
             
             <!-- BOTÓN TERMINAR GRÁFICA 48H -->
             <button onclick="terminarTurno48h()" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
@@ -238,6 +238,9 @@
     </div>
 
     <script>
+        // --- CONSTANTE GLOBAL DE TURNO ---
+        const SHIFT_START_HOUR = 8; // Los turnos inician a las 08:00 a.m.
+
         // --- 1. LÓGICA DE DATOS LOCALES ---
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
         let currentStatus = logs.length > 0 ? logs[logs.length-1].status : 1;
@@ -358,8 +361,10 @@
             ctx.lineWidth=3; ctx.strokeStyle='#F28B00'; ctx.lineJoin='round'; ctx.beginPath();
             logs.forEach((l,i) => {
                 let ds=new Date(l.startTime); let de=l.endTime?new Date(l.endTime):new Date();
-                let x1=p+((w-p)/24)*(ds.getHours()+ds.getMinutes()/60);
-                let x2=p+((w-p)/24)*(de.getHours()+de.getMinutes()/60);
+                let h1=(ds.getHours()+ds.getMinutes()/60-SHIFT_START_HOUR+24)%24;
+                let h2=(de.getHours()+de.getMinutes()/60-SHIFT_START_HOUR+24)%24;
+                let x1=p+((w-p)/24)*h1;
+                let x2=p+((w-p)/24)*h2;
                 let y=p+((l.status-1)*rowH)+(rowH/2);
                 if(i===0) ctx.moveTo(x1,y); else ctx.lineTo(x1,y); ctx.lineTo(x2,y);
             });
@@ -404,9 +409,15 @@
             const folio = document.getElementById('folio').value || "SF";
 
             // --- LÓGICA DE CORTE 48 HORAS ---
-            // Tomamos el primer registro como "Hora 0" del viaje
+            // El turno inicia a las 08:00 a.m. El Día 2 comienza a las 08:00 a.m. del siguiente día calendario.
             const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
-            const limit24 = startTrip + (24 * 60 * 60 * 1000); // Corte día 1
+            const limit24Date = new Date(startTrip);
+            limit24Date.setHours(8, 0, 0, 0);
+            // Si las 08:00 del mismo día ya pasaron (o es exactamente la hora de inicio), avanzar al día siguiente
+            if (limit24Date.getTime() <= startTrip) {
+                limit24Date.setDate(limit24Date.getDate() + 1);
+            }
+            const limit24 = limit24Date.getTime(); // Corte día 1 → 08:00 a.m. del día siguiente
             
             // Filtramos qué pasó el Día 1 y qué pasó el Día 2
             // logsD1: registros que empezaron en el Día 1
@@ -458,11 +469,15 @@
                 });
                 doc.line(gx, gy+gh, gx+gw, gy+gh);
 
-                // Líneas verticales (24h)
+                // Líneas verticales (24h) con etiquetas del turno (empieza en SHIFT_START_HOUR)
                 for(let i=0; i<=24; i++) {
                     let x = gx + (gw/24)*i;
                     doc.line(x, gy, x, gy+gh);
-                    if(i%2===0) doc.text(i.toString(), x, gy-2, {align:"center"});
+                    if(i%2===0) {
+                        const rawHour = (SHIFT_START_HOUR + i) % 24;
+                        const labelHour = rawHour === 0 ? 24 : rawHour;
+                        doc.text(labelHour.toString(), x, gy-2, {align:"center"});
+                    }
                 }
                 doc.rect(gx, gy, gw, gh); // Marco
 
@@ -478,29 +493,28 @@
                         let ds = new Date(l.startTime); 
                         let de = l.endTime ? new Date(l.endTime) : new Date();
                         
-                        // Ajuste simple: tomamos la hora del día (0-24)
-                        let h1 = ds.getHours() + ds.getMinutes()/60;
-                        let h2 = de.getHours() + de.getMinutes()/60;
+                        // Aplicar desfase de turno: (hora_real - SHIFT_START_HOUR + 24) % 24
+                        let h1 = (ds.getHours() + ds.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
+                        let h2 = (de.getHours() + de.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
                         
                         // Coordenadas X
                         let x1 = gx + (gw/24) * h1;
                         let x2 = gx + (gw/24) * h2;
                         
-                        // Detectar si el tramo cruza medianoche (endTime del día siguiente)
-                        const cruzaMedianoche = (de > ds) && (x2 < x1);
+                        // Detectar si el tramo cruza el límite del turno (08:00 a.m.)
+                        const cruzaLimiteTurno = (de > ds) && (x2 < x1);
 
                         let rIdx = mapSt[l.status] !== undefined ? mapSt[l.status] : 4;
                         let yLine = gy + (rIdx * rowH) + (rowH/2);
 
-                        if (cruzaMedianoche) {
+                        if (cruzaLimiteTurno) {
                             if (!isDay2) {
-                                // Día 1: dibujar solo desde startTime hasta las 24:00
-                                const xMidnight = gx + gw;
-                                doc.line(x1, yLine, xMidnight, yLine);
+                                // Día 1: dibujar solo desde startTime hasta el borde derecho (08:00 a.m.)
+                                const xShiftEnd = gx + gw;
+                                doc.line(x1, yLine, xShiftEnd, yLine);
                             } else {
-                                // Día 2: dibujar solo desde 00:00 hasta endTime
-                                const xAfterMidnight = gx + (gw/24) * h2;
-                                doc.line(gx, yLine, xAfterMidnight, yLine);
+                                // Día 2: dibujar solo desde el borde izquierdo (08:00 a.m.) hasta endTime
+                                doc.line(gx, yLine, x2, yLine);
                             }
                         } else {
                             doc.line(x1, yLine, x2, yLine); // Horizontal normal
@@ -511,9 +525,9 @@
                             let prev = dayLogs[i-1];
                             let prevR = mapSt[prev.status] !== undefined ? mapSt[prev.status] : 4;
                             let prevY = gy + (prevR * rowH) + (rowH/2);
-                            // Solo conectar si es continuo en tiempo
+                            // Solo conectar si es continuo en tiempo (usando desfase de turno)
                             let prevEnd = new Date(prev.endTime);
-                            let hPrevEnd = prevEnd.getHours() + prevEnd.getMinutes()/60;
+                            let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
                             let xPrevEnd = gx + (gw/24) * hPrevEnd;
                             if(Math.abs(x1 - xPrevEnd) < 2) {
                                 doc.line(x1, prevY, x1, yLine);
