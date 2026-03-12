@@ -449,12 +449,12 @@
 
             // --- LÓGICA DE CORTE 48 HORAS ---
             // El turno inicia a las 08:00 a.m. El Día 2 comienza a las 08:00 a.m. del siguiente día calendario.
-            const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
-            // Día 2: siempre 08:00 a.m. del siguiente día calendario respecto a la fecha de inicio
-            const limit24Date = new Date(startTrip);
-            limit24Date.setDate(limit24Date.getDate() + 1);
-            limit24Date.setHours(8, 0, 0, 0);
-            const limit24 = limit24Date.getTime(); // Corte día 1 → 08:00 a.m. del día siguiente
+            limit24Date.setHours(SHIFT_START_HOUR, 0, 0, 0);
+            // Si la hora de inicio de turno del mismo día ya pasó (o es exactamente la hora de inicio), avanzar al día siguiente
+            if (limit24Date.getTime() <= startTrip) {
+                limit24Date.setDate(limit24Date.getDate() + 1);
+            }
+            const limit24 = limit24Date.getTime(); // Corte día 1 → inicio de turno del día siguiente
             
             // Filtramos qué pasó el Día 1 y qué pasó el Día 2
             // logsD1: registros que empezaron en el Día 1
