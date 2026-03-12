@@ -164,7 +164,35 @@
                 <div class="text-xs bg-gray-100 px-2 py-1 rounded">Manejo: <span id="totalDriving" class="font-bold text-gray-800">0h 0m</span> / 14h</div>
             </div>
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
-            <div class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"><span>08:00</span><span>14:00</span><span>20:00</span><span>02:00</span><span>08:00</span></div>
+            <div id="chartXAxisLabels" class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"></div>
+            <script>
+                window.addEventListener('DOMContentLoaded', function () {
+                    var container = document.getElementById('chartXAxisLabels');
+                    if (!container) return;
+
+                    // Fallback to legacy hardcoded labels if SHIFT_START_HOUR is not available
+                    var labels;
+                    if (typeof SHIFT_START_HOUR === 'number') {
+                        labels = [];
+                        var stepHours = 6;
+                        var totalLabels = 5;
+                        for (var i = 0; i < totalLabels; i++) {
+                            var hour = (SHIFT_START_HOUR + i * stepHours) % 24;
+                            var hourStr = (hour < 10 ? '0' : '') + hour + ':00';
+                            labels.push(hourStr);
+                        }
+                    } else {
+                        labels = ['08:00', '14:00', '20:00', '02:00', '08:00'];
+                    }
+
+                    container.innerHTML = '';
+                    labels.forEach(function (label) {
+                        var span = document.createElement('span');
+                        span.textContent = label;
+                        container.appendChild(span);
+                    });
+                });
+            </script>
             
             <!-- BOTÓN TERMINAR GRÁFICA 48H -->
             <button onclick="terminarTurno48h()" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
