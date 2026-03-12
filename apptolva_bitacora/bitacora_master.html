@@ -366,7 +366,18 @@
                 let x1=p+((w-p)/24)*h1;
                 let x2=p+((w-p)/24)*h2;
                 let y=p+((l.status-1)*rowH)+(rowH/2);
-                if(i===0) ctx.moveTo(x1,y); else ctx.lineTo(x1,y); ctx.lineTo(x2,y);
+                if (h2 >= h1) {
+                    if (i === 0) ctx.moveTo(x1, y); else ctx.lineTo(x1, y);
+                    ctx.lineTo(x2, y);
+                } else {
+                    // Interval crosses shift boundary: draw x1→end-of-chart and start-of-chart→x2
+                    let xEnd = w;
+                    let xStart = p;
+                    if (i === 0) ctx.moveTo(x1, y); else ctx.lineTo(x1, y);
+                    ctx.lineTo(xEnd, y);
+                    ctx.moveTo(xStart, y);
+                    ctx.lineTo(x2, y);
+                }
             });
             ctx.stroke();
         }
