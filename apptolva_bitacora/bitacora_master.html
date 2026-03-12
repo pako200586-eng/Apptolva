@@ -48,17 +48,11 @@
     <nav class="bg-gradient-to-r from-orange-600 to-[#F28B00] text-white p-2 shadow-lg sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
             
-            <!-- GRUPO IZQUIERDA: SALIR Y REINICIAR -->
+            <!-- GRUPO IZQUIERDA: SALIR -->
             <div class="flex items-center gap-2">
                 <!-- 1. Casita (Regresar al Menú) -->
                 <button onclick="window.history.back()" class="bg-white/20 hover:bg-white/30 p-2 rounded-lg text-white border border-white/10 active:scale-95 transition" title="Volver al Menú">
                     <i class="fas fa-home text-lg"></i>
-                </button>
-                
-                <!-- 2. Nuevo Viaje (Reset) -->
-                <button onclick="reiniciarBitacora()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg font-bold text-[10px] shadow border border-red-400 flex flex-col items-center leading-none active:scale-95 transition">
-                    <i class="fas fa-sync-alt text-xs mb-0.5"></i>
-                    <span>NUEVO</span>
                 </button>
             </div>
 
@@ -273,19 +267,6 @@
 
         function guardarLocal() { localStorage.setItem('nom087_logs', JSON.stringify(logs)); updateUI(); }
 
-        window.reiniciarBitacora = function() {
-            if(confirm("⚠️ ¿INICIAR NUEVO VIAJE?\n\nSe borrará la gráfica actual y los tiempos.\nEl folio se limpiará.\n\n(Tus datos personales SE MANTIENEN).")) {
-                localStorage.removeItem('nom087_logs');
-                localStorage.removeItem('nom087_folio');
-                document.getElementById('folio').value = '';
-                document.getElementById('origin').value = '';
-                document.getElementById('destination').value = '';
-                localStorage.removeItem('nom087_origin');
-                localStorage.removeItem('nom087_destination');
-                location.reload();
-            }
-        }
-
         window.terminarTurno48h = function() {
             if(confirm("⚠️ ¿TERMINAR GRÁFICA DE 48H Y EMPEZAR NUEVO TURNO?\n\nAsegúrate de haber generado tu PDF de bitácora.\nEsto limpiará la gráfica actual y comenzará un nuevo periodo en cero.")) {
                 localStorage.removeItem('nom087_logs');
@@ -312,7 +293,6 @@
             document.querySelectorAll('.status-btn').forEach(b => { b.classList.remove('active'); if(b.id === `btn-${currentStatus}`) b.classList.add('active'); });
             const list = document.getElementById('logList'); list.innerHTML = '';
             
-            let driveMins = 0;
             const now = new Date().getTime();
 
             [...logs].reverse().forEach(l => {
@@ -336,7 +316,7 @@
             
             // Total Manejo 24h
             const limit = now - (24 * 60 * 60 * 1000);
-            driveMins = 0;
+            let driveMins = 0;
             logs.forEach(l => {
                 if(l.status === 3) {
                      let start = l.startTime;
