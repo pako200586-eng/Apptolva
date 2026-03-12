@@ -513,8 +513,8 @@
                     doc.line(x, gy, x, gy+gh);
                     if(i%2===0) {
                         const rawHour = (SHIFT_START_HOUR + i) % 24;
-                        const labelHour = rawHour === 0 ? 24 : rawHour;
-                        doc.text(labelHour.toString(), x, gy-2, {align:"center"});
+                        const label = rawHour.toString().padStart(2, "0");
+                        doc.text(label, x, gy-2, {align:"center"});
                     }
                 }
                 doc.rect(gx, gy, gw, gh); // Marco
