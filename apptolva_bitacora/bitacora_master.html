@@ -274,8 +274,8 @@
         let currentStatus = logs.length > 0 ? logs[logs.length-1].status : 1;
 
         if(logs.length === 0) {
-            const d = new Date(); d.setHours(0,0,0,0);
-            logs.push({ status: 1, startTime: d.getTime(), endTime: new Date().getTime(), place: "Inicio", observation: "" });
+            const now = new Date().getTime();
+            logs.push({ status: 1, startTime: now, endTime: null, place: "Inicio", observation: "" });
         }
 
         // Recuperar inputs
