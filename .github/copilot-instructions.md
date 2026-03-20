@@ -47,7 +47,7 @@ netlify.toml         # Netlify deployment configuration
 
 ## Development & Deployment
 
-- **Local development**: Open `apptolva_bitacora/index.html` directly in a browser or use a simple static server (e.g., `npx serve apptolva_bitacora`). Set `FIREBASE_API_KEY` manually for local testing.
+- **Local development**: Run a simple local static server (for example, `npx serve apptolva_bitacora`) and open the app via `http://localhost/...`. Avoid opening `index.html` directly via `file://`, since service workers and some browsers' module/CORS restrictions will prevent the app from working correctly. Set `FIREBASE_API_KEY` manually for local testing.
 - **Deployment**: Netlify automatically runs `cd apptolva_bitacora && bash build.sh` on push to the main branch. The `FIREBASE_API_KEY` secret must be configured in the Netlify environment.
 - **Security scanning**: CodeQL runs on every push/pull request via `.github/workflows/codeql.yml`.
 - There are no automated tests currently in this repository.
