@@ -28,7 +28,7 @@ netlify.toml         # Netlify deployment configuration
 
 - **Frontend**: Vanilla HTML, CSS, and JavaScript (no framework)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) (loaded from local `js/tailwindcss.js`)
-- **Backend/Database**: [Firebase](https://firebase.google.com/) (Firestore / Realtime Database)
+- **Backend/Database**: [Firebase Firestore](https://firebase.google.com/docs/firestore) (Realtime Database is not currently used in this repo)
 - **Deployment**: [Netlify](https://netlify.com/) — build command runs `build.sh` which substitutes the `FIREBASE_API_KEY` environment variable into the HTML files
 - **PWA**: Includes `manifest.json` and `sw.js` service worker for offline-capable mobile use
 - **Libraries**:
