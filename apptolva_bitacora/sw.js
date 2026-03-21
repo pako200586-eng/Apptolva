@@ -1,8 +1,9 @@
-const CACHE_NAME = 'apptolva-v4-offline';
+const CACHE_NAME = 'apptolva-v5-offline';
 const ASSETS = [
   './',
   './index.html',
   './bitacora_master.html',
+  './viewer.html',
   './manifest.json',
   './js/tailwindcss.js',
   './js/confetti.min.js',
