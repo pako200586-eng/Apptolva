@@ -251,19 +251,21 @@
             <button onclick="window.closeQR()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-2"><i class="fas fa-times text-xl"></i></button>
             
             <h3 class="font-bold text-gray-800 text-lg mb-1"><i class="fas fa-shield-alt text-orange-500 mr-1"></i> Bitácora Digital</h3>
-            <p class="text-[10px] text-gray-400 mb-4 uppercase tracking-widest">Exhibición en Dispositivo Electrónico (NOM-087)</p>
+            <p class="text-[10px] text-gray-400 mb-3 uppercase tracking-widest">Escanea para ver el PDF completo (NOM-087)</p>
             
-            <div class="bg-white p-2 rounded-lg inline-block border-2 border-gray-100 shadow-inner mb-4">
-                <div id="qrcode" class="flex justify-center"></div>
+            <div class="bg-white p-2 rounded-lg inline-block border-2 border-gray-100 shadow-inner mb-3">
+                <div id="qrcode" class="flex justify-center items-center" style="min-height:200px;min-width:200px;"></div>
             </div>
             
-            <div class="text-left text-xs bg-gray-50 p-3 rounded border border-gray-200 h-32 overflow-y-auto font-mono">
-                <p class="font-bold border-b pb-1 mb-1">RESUMEN DE CARÁTULA:</p>
-                <div id="qrTextContent"></div>
+            <div class="text-left text-xs bg-gray-50 p-3 rounded border border-gray-200 max-h-28 overflow-y-auto font-mono">
+                <div id="qrTextContent"><span style="color:#F28B00;font-weight:bold">⏳ Subiendo bitácora…</span></div>
             </div>
-            <p class="text-[9px] text-gray-400 mt-2">Este código contiene la carátula completa del viaje.</p>
+            <p class="text-[9px] text-gray-400 mt-2">Al escanear se abre el PDF completo en el navegador del inspector.</p>
         </div>
     </div>
+    <style>
+        @keyframes qr-spin { to { transform: rotate(360deg); } }
+    </style>
 
     <script>
         // --- CONSTANTE GLOBAL DE TURNO ---
@@ -677,14 +679,83 @@
         };
 
         // --- GENERADOR QR ---
-        window.generarQRSeguro = function() {
+        window.generarQRSeguro = async function() {
             if (typeof QRCode === 'undefined') { alert("⚠️ QR no cargado."); return; }
+
             const folio = document.getElementById('folio').value || "S/F";
-            const qrData = `NOM-087\nFOLIO:${folio}\nUNIDAD:${document.getElementById('unitId').value}\nFECHA:${new Date().toLocaleDateString()}`;
-            document.getElementById('qrcode').innerHTML = "";
-            new QRCode(document.getElementById("qrcode"), { text: qrData, width: 200, height: 200 });
-            document.getElementById('qrTextContent').innerText = qrData;
+
+            // Show modal with loading state
+            document.getElementById('qrcode').innerHTML =
+                '<div style="width:36px;height:36px;border:4px solid #FFF0DB;border-top-color:#F28B00;border-radius:50%;animation:qr-spin .8s linear infinite"></div>';
+            document.getElementById('qrTextContent').innerHTML =
+                '<span style="color:#F28B00;font-weight:bold">⏳ Subiendo bitácora al servidor…</span>';
             document.getElementById('qrModal').classList.remove('hidden');
+
+            // Collect all bitácora data including signatures
+            let signatureOp = "", signatureSup = "";
+            try {
+                const opPad = document.getElementById('signaturePad');
+                if (opPad) signatureOp = opPad.toDataURL("image/png");
+                const supPad = document.getElementById('supervisorPad');
+                if (supPad) signatureSup = supPad.toDataURL("image/png");
+            } catch (e) { /* ignore if pads not ready */ }
+
+            const payload = {
+                folio,
+                fecha: new Date().toLocaleDateString(),
+                unitId: document.getElementById('unitId').value || "",
+                plates: document.getElementById('plates').value || "",
+                driverName: document.getElementById('driverName').value || "",
+                license: document.getElementById('license').value || "",
+                licenseExp: document.getElementById('licenseExp') ? document.getElementById('licenseExp').value : "",
+                brandModel: document.getElementById('brandModel') ? document.getElementById('brandModel').value : "",
+                mode: document.getElementById('mode') ? document.getElementById('mode').value : "",
+                origin: document.getElementById('origin').value || "",
+                destination: document.getElementById('destination').value || "",
+                shiftStartHour: SHIFT_START_HOUR,
+                logs: structuredClone(logs),
+                signatureOp,
+                signatureSup,
+            };
+
+            try {
+                const resp = await fetch('/api/store-bitacora', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!resp.ok) throw new Error('Error del servidor: ' + resp.status);
+                const result = await resp.json();
+                const viewerUrl = result.url;
+
+                // Generate QR with the viewer URL
+                document.getElementById('qrcode').innerHTML = "";
+                new QRCode(document.getElementById("qrcode"), {
+                    text: viewerUrl,
+                    width: 200,
+                    height: 200,
+                    correctLevel: QRCode.CorrectLevel.M,
+                });
+                document.getElementById('qrTextContent').innerHTML =
+                    `<span style="color:#16a34a;font-weight:bold">✅ Listo — escanea para ver el PDF</span><br>` +
+                    `<span style="word-break:break-all;font-size:10px;color:#6b7280">${viewerUrl}</span><br>` +
+                    `<span style="color:#9ca3af;font-size:10px">⏱ Válido por 24 horas · FOLIO: ${folio}</span>`;
+
+            } catch (err) {
+                // Fallback: encode text summary in QR
+                const qrData = `NOM-087\nFOLIO:${folio}\nUNIDAD:${document.getElementById('unitId').value}\nFECHA:${new Date().toLocaleDateString()}`;
+                document.getElementById('qrcode').innerHTML = "";
+                new QRCode(document.getElementById("qrcode"), { text: qrData, width: 200, height: 200 });
+                // Static HTML via innerHTML; untrusted qrData is set via textContent to avoid HTML interpretation
+                document.getElementById('qrTextContent').innerHTML =
+                    `<span style="color:#dc2626;font-weight:bold">⚠️ Sin conexión — QR básico</span><br>` +
+                    `<span id="qrDataText" style="white-space:pre;font-size:11px"></span>`;
+                const qrDataTextEl = document.getElementById('qrDataText');
+                if (qrDataTextEl) {
+                    qrDataTextEl.textContent = qrData;
+                }
+            }
         }
         
         window.closeQR = () => document.getElementById('qrModal').classList.add('hidden');
