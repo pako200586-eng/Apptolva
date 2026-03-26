@@ -747,9 +747,14 @@
                 const qrData = `NOM-087\nFOLIO:${folio}\nUNIDAD:${document.getElementById('unitId').value}\nFECHA:${new Date().toLocaleDateString()}`;
                 document.getElementById('qrcode').innerHTML = "";
                 new QRCode(document.getElementById("qrcode"), { text: qrData, width: 200, height: 200 });
+                // Static HTML via innerHTML; untrusted qrData is set via textContent to avoid HTML interpretation
                 document.getElementById('qrTextContent').innerHTML =
                     `<span style="color:#dc2626;font-weight:bold">⚠️ Sin conexión — QR básico</span><br>` +
-                    `<span style="white-space:pre;font-size:11px">${qrData}</span>`;
+                    `<span id="qrDataText" style="white-space:pre;font-size:11px"></span>`;
+                const qrDataTextEl = document.getElementById('qrDataText');
+                if (qrDataTextEl) {
+                    qrDataTextEl.textContent = qrData;
+                }
             }
         }
         
