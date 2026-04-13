@@ -14,7 +14,7 @@ export default async (req) => {
       });
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=\${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -24,7 +24,7 @@ export default async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API Error: \${response.status} - \${errorText}`);
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
     }
 
     const responseData = await response.json();

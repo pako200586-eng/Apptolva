@@ -67,7 +67,7 @@
                 </button>
                 
                 <!-- 5. QR Rápido -->
-                <button onclick="generarQRSeguro()" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center ml-1 active:scale-95 transition border border-gray-600">
+                <button onclick="generarQRSeguro()" id="qrBtn" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center ml-1 active:scale-95 transition border border-gray-600">
                     <i class="fas fa-qrcode text-lg"></i>
                 </button>
             </div>
@@ -819,63 +819,108 @@
         };
 
         // --- GENERADOR QR ---
+        let qrGenerationInProgress = false;
+
+        function setQrButtonBusy(isBusy) {
+            const qrBtn = document.getElementById('qrBtn');
+            if (!qrBtn) return;
+            qrBtn.disabled = isBusy;
+            qrBtn.classList.toggle('opacity-60', isBusy);
+            qrBtn.classList.toggle('cursor-not-allowed', isBusy);
+        }
+
+        function buildBasicQrData(folio) {
+            return `NOM-087\nFOLIO:${folio}\nUNIDAD:${document.getElementById('unitId').value}\nFECHA:${new Date().toLocaleDateString()}`;
+        }
+
+        function showOfflineQrFallback(folio, titleText, detailText) {
+            const qrData = buildBasicQrData(folio);
+            document.getElementById('qrcode').innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), { text: qrData, width: 200, height: 200 });
+            document.getElementById('qrTextContent').innerHTML =
+                `<span style="color:#dc2626;font-weight:bold">${titleText}</span><br>` +
+                `<span id="qrFallbackDetail" style="font-size:11px;color:#6b7280"></span><br>` +
+                `<span id="qrDataText" style="white-space:pre;font-size:11px"></span>`;
+            const qrDataTextEl = document.getElementById('qrDataText');
+            if (qrDataTextEl) qrDataTextEl.textContent = qrData;
+            const qrFallbackDetailEl = document.getElementById('qrFallbackDetail');
+            if (qrFallbackDetailEl) qrFallbackDetailEl.textContent = detailText;
+        }
+
         window.generarQRSeguro = async function() {
             if (typeof QRCode === 'undefined') { alert("⚠️ QR no cargado."); return; }
+            if (qrGenerationInProgress) return;
 
+            qrGenerationInProgress = true;
+            setQrButtonBusy(true);
             const folio = document.getElementById('folio').value || "S/F";
 
-            // Show modal with loading state
-            document.getElementById('qrcode').innerHTML =
-                '<div style="width:36px;height:36px;border:4px solid #FFF0DB;border-top-color:#F28B00;border-radius:50%;animation:qr-spin .8s linear infinite"></div>';
-            document.getElementById('qrTextContent').innerHTML =
-                '<span style="color:#F28B00;font-weight:bold">⏳ Subiendo bitácora al servidor…</span>';
-            document.getElementById('qrModal').classList.remove('hidden');
-
-            // Collect all bitácora data including signatures
-            let signatureOp = "", signatureSup = "";
             try {
-                const opPad = document.getElementById('signaturePad');
-                if (opPad) signatureOp = opPad.toDataURL("image/png");
-                const supPad = document.getElementById('supervisorPad');
-                if (supPad) signatureSup = supPad.toDataURL("image/png");
-            } catch (e) { /* ignore if pads not ready */ }
+                // Show modal with loading state
+                document.getElementById('qrcode').innerHTML =
+                    '<div style="width:36px;height:36px;border:4px solid #FFF0DB;border-top-color:#F28B00;border-radius:50%;animation:qr-spin .8s linear infinite"></div>';
+                document.getElementById('qrTextContent').innerHTML =
+                    '<span style="color:#F28B00;font-weight:bold">⏳ Subiendo bitácora al servidor…</span>';
+                document.getElementById('qrModal').classList.remove('hidden');
 
-            const payload = {
-                folio,
-                fecha: new Date().toLocaleDateString(),
-                unitId: document.getElementById('unitId').value || "",
-                plates: document.getElementById('plates').value || "",
-                driverName: document.getElementById('driverName').value || "",
-                license: document.getElementById('license').value || "",
-                licenseExp: document.getElementById('licenseExp') ? document.getElementById('licenseExp').value : "",
-                brandModel: document.getElementById('brandModel') ? document.getElementById('brandModel').value : "",
-                mode: document.getElementById('mode') ? document.getElementById('mode').value : "",
-                origin: document.getElementById('origin').value || "",
-                destination: document.getElementById('destination').value || "",
-                permisoSCT: document.getElementById('permisoSCT') ? document.getElementById('permisoSCT').value : "",
-                tipoPermiso: document.getElementById('tipoPermiso') ? document.getElementById('tipoPermiso').value : "",
-                vin: document.getElementById('vin') ? document.getElementById('vin').value : "",
-                tipoCarga: document.getElementById('tipoCarga') ? document.getElementById('tipoCarga').value : "",
-                kmInicio: document.getElementById('kmInicio') ? document.getElementById('kmInicio').value : "",
-                kmFin: document.getElementById('kmFin') ? document.getElementById('kmFin').value : "",
-                coConductor: document.getElementById('coConductor') ? document.getElementById('coConductor').value : "",
-                coLicencia: document.getElementById('coLicencia') ? document.getElementById('coLicencia').value : "",
-                shiftStartHour: SHIFT_START_HOUR,
-                logs: structuredClone(logs),
-                signatureOp,
-                signatureSup,
-            };
+                const unitId = document.getElementById('unitId').value.trim();
+                const driverName = document.getElementById('driverName').value.trim();
+                const license = document.getElementById('license').value.trim();
+                const missing = [];
+                if (!folio || folio === "S/F") missing.push("folio");
+                if (!unitId) missing.push("económico");
+                if (!driverName) missing.push("operador");
+                if (!license) missing.push("licencia");
+                if (!Array.isArray(logs) || logs.length === 0) missing.push("registros");
 
-            try {
+                if (missing.length > 0) {
+                    showOfflineQrFallback(
+                        folio,
+                        "⚠️ Datos incompletos — QR local",
+                        `Completa: ${missing.join(", ")} para generar QR verificable en servidor.`
+                    );
+                    return;
+                }
+
+                // Collect all bitácora data including signatures
+                let signatureOp = "", signatureSup = "";
+                try {
+                    const opPad = document.getElementById('signaturePad');
+                    if (opPad) signatureOp = opPad.toDataURL("image/png");
+                    const supPad = document.getElementById('supervisorPad');
+                    if (supPad) signatureSup = supPad.toDataURL("image/png");
+                } catch (e) { /* ignore if pads not ready */ }
+
+                const payload = {
+                    folio,
+                    fecha: new Date().toLocaleDateString(),
+                    unitId,
+                    plates: document.getElementById('plates').value || "",
+                    driverName,
+                    license,
+                    licenseExp: document.getElementById('licenseExp') ? document.getElementById('licenseExp').value : "",
+                    brandModel: document.getElementById('brandModel') ? document.getElementById('brandModel').value : "",
+                    mode: document.getElementById('mode') ? document.getElementById('mode').value : "",
+                    origin: document.getElementById('origin').value || "",
+                    destination: document.getElementById('destination').value || "",
+                    shiftStartHour: SHIFT_START_HOUR,
+                    logs: structuredClone(logs),
+                    signatureOp,
+                    signatureSup,
+                };
+
                 const resp = await fetch('/api/store-bitacora', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
 
-                if (!resp.ok) throw new Error('Error del servidor: ' + resp.status);
                 const result = await resp.json();
+                if (!resp.ok) throw new Error(result.error || ('Error del servidor: ' + resp.status));
                 const viewerUrl = result.url;
+                const expiryText = result.expiresAt
+                    ? new Date(result.expiresAt).toLocaleString()
+                    : "24 horas";
 
                 // Generate QR with the viewer URL
                 document.getElementById('qrcode').innerHTML = "";
@@ -887,22 +932,18 @@
                 });
                 document.getElementById('qrTextContent').innerHTML =
                     `<span style="color:#16a34a;font-weight:bold">✅ Listo — escanea para ver el PDF</span><br>` +
-                    `<span style="word-break:break-all;font-size:10px;color:#6b7280">${viewerUrl}</span><br>` +
-                    `<span style="color:#9ca3af;font-size:10px">⏱ Válido por 24 horas · FOLIO: ${folio}</span>`;
+                    `<span id="qrViewerUrl" style="word-break:break-all;font-size:10px;color:#6b7280"></span><br>` +
+                    `<span style="color:#9ca3af;font-size:10px">⏱ Expira: ${expiryText} · FOLIO: <span id="qrFolio"></span></span>`;
+                const qrViewerUrlEl = document.getElementById('qrViewerUrl');
+                if (qrViewerUrlEl) qrViewerUrlEl.textContent = viewerUrl;
+                const qrFolioEl = document.getElementById('qrFolio');
+                if (qrFolioEl) qrFolioEl.textContent = folio;
 
             } catch (err) {
-                // Fallback: encode text summary in QR
-                const qrData = `NOM-087\nFOLIO:${folio}\nUNIDAD:${document.getElementById('unitId').value}\nFECHA:${new Date().toLocaleDateString()}`;
-                document.getElementById('qrcode').innerHTML = "";
-                new QRCode(document.getElementById("qrcode"), { text: qrData, width: 200, height: 200 });
-                // Static HTML via innerHTML; untrusted qrData is set via textContent to avoid HTML interpretation
-                document.getElementById('qrTextContent').innerHTML =
-                    `<span style="color:#dc2626;font-weight:bold">⚠️ Sin conexión — QR básico</span><br>` +
-                    `<span id="qrDataText" style="white-space:pre;font-size:11px"></span>`;
-                const qrDataTextEl = document.getElementById('qrDataText');
-                if (qrDataTextEl) {
-                    qrDataTextEl.textContent = qrData;
-                }
+                showOfflineQrFallback(folio, "⚠️ Sin conexión — QR básico", err.message || "No se pudo sincronizar.");
+            } finally {
+                qrGenerationInProgress = false;
+                setQrButtonBusy(false);
             }
         }
         
@@ -982,27 +1023,25 @@
             const btn = document.getElementById('saveBtn');
             const rawFolio = document.getElementById('folio').value || "";
             const folio = rawFolio.trim();
+            const unitId = document.getElementById('unitId').value.trim();
+            const driverName = document.getElementById('driverName').value.trim();
+            const license = document.getElementById('license').value.trim();
             // Validar que el folio no esté vacío y que solo contenga caracteres permitidos para IDs de Firestore
             const folioValido = /^[A-Za-z0-9_-]+$/.test(folio);
             if (!folio || !folioValido) {
                 alert("⚠️ Genera un folio válido antes de guardar en la nube.");
                 return;
             }
+            if (!unitId || !driverName || !license || !Array.isArray(logs) || logs.length === 0) {
+                alert("⚠️ Completa económico, operador, licencia y al menos un registro antes de sincronizar.");
+                return;
+            }
             if (!navigator.onLine) { alert("⚠️ SIN CONEXIÓN"); return; }
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
                 await setDoc(doc(db, "bitacoras_087", folio), {
-                    folio, unitId: document.getElementById('unitId').value,
-                    driverName: document.getElementById('driverName').value,
-                    license: document.getElementById('license').value,
-                    plates: document.getElementById('plates').value,
-                    permisoSCT: document.getElementById('permisoSCT').value,
-                    vin: document.getElementById('vin').value,
-                    tipoCarga: document.getElementById('tipoCarga').value,
-                    kmInicio: document.getElementById('kmInicio').value,
-                    kmFin: document.getElementById('kmFin').value,
-                    origin: document.getElementById('origin').value,
-                    destination: document.getElementById('destination').value,
+                    folio, unitId,
+                    driverName,
                     logs, fecha: new Date().toISOString()
                 });
                 alert("✅ Sincronizado");
