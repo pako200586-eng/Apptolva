@@ -85,10 +85,21 @@
             <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 
                 <!-- Permisionario -->
-                <div class="col-span-2 md:col-span-4 bg-orange-50 p-2 rounded border border-orange-100 mb-2">
-                    <p class="text-[10px] text-orange-500 font-bold uppercase">Permisionario</p>
-                    <p class="font-bold text-gray-800">GRUPO BACHOCO</p>
+                <div class="col-span-2 md:col-span-4 bg-orange-50 p-3 rounded border border-orange-100 mb-2">
+                    <p class="text-[10px] text-orange-500 font-bold uppercase">Permisionario / Empresa</p>
+                    <p class="font-bold text-gray-800">GRUPO BACHOCO, S.A.B. DE C.V.</p>
                     <p class="text-[10px] text-gray-500">Av. Tecnológico 401, Celaya, Gto. CP 38010</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                        <div><span class="text-[10px] text-gray-400">RFC:</span> <span class="text-[11px] font-bold text-gray-700">GBA940707AH4</span></div>
+                        <div><span class="text-[10px] text-gray-400">Permiso SCT:</span> <input type="text" id="permisoSCT" class="bachoco-input inline-block w-28 rounded px-1 py-0.5 text-[11px] font-bold border border-gray-300 uppercase" placeholder="No. Permiso"></div>
+                        <div><span class="text-[10px] text-gray-400">Tipo Permiso:</span>
+                            <select id="tipoPermiso" class="bachoco-input inline-block w-32 rounded px-1 py-0.5 text-[11px] border border-gray-300">
+                                <option value="Carga General">Carga General</option>
+                                <option value="Carga Especializada">Carga Especializada</option>
+                                <option value="Carga Refrigerada">Carga Refrigerada</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-span-2 md:col-span-1">
@@ -122,8 +133,30 @@
                 <!-- CAMPO VIGENCIA -->
                 <div><label class="text-xs text-gray-400 block mb-1">Vigencia Lic.</label><input type="date" id="licenseExp" class="bachoco-input w-full rounded-lg p-2 text-xs border border-gray-300"></div>
 
+                <!-- Número de Serie Vehicular (VIN) -->
+                <div class="col-span-2"><label class="text-xs font-bold text-gray-500 block mb-1">No. Serie Vehicular (VIN)</label><input type="text" id="vin" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300 font-mono text-xs" placeholder="1FUJA6CG57LW86529" maxlength="17"></div>
+
+                <!-- Tipo de Carga -->
+                <div><label class="text-xs font-bold text-gray-500 block mb-1">Tipo de Carga</label>
+                    <select id="tipoCarga" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
+                        <option value="Alimento Perecedero">Alimento Perecedero</option>
+                        <option value="Alimento No Perecedero">Alimento No Perecedero</option>
+                        <option value="Producto Terminado">Producto Terminado</option>
+                        <option value="Insumos">Insumos</option>
+                        <option value="Vacío">Vacío</option>
+                    </select>
+                </div>
+
+                <!-- Odómetro -->
+                <div><label class="text-xs font-bold text-gray-500 block mb-1">Km Inicio</label><input type="number" id="kmInicio" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="0"></div>
+                <div><label class="text-xs font-bold text-gray-500 block mb-1">Km Fin</label><input type="number" id="kmFin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="0"></div>
+
                 <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Origen</label><input type="text" id="origin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="PA CHAPO"></div>
                 <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Destino</label><input type="text" id="destination" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Cliente..."></div>
+
+                <!-- Co-conductor -->
+                <div class="col-span-2"><label class="text-xs text-gray-400 block mb-1">Co-conductor (si aplica relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre del co-conductor (opcional)"></div>
+                <div><label class="text-xs text-gray-400 block mb-1">Licencia Co-conductor</label><input type="text" id="coLicencia" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="(opcional)"></div>
             </div>
         </div>
 
@@ -151,10 +184,16 @@
             </button>
         </div>
 
-        <!-- Alerta de Fatiga -->
+        <!-- Alerta de Fatiga (14h en 24h) -->
         <div id="alertBox" class="hidden bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-exclamation-triangle mt-1"></i>
-            <div><p class="font-bold text-sm">¡Alerta de Fatiga!</p><p id="alertMsg" class="text-xs">Te acercas al límite permitido. Busca un lugar seguro.</p></div>
+            <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h/24h</p><p id="alertMsg" class="text-xs">Te acercas al límite de 14 horas de conducción en 24 horas. Busca un lugar seguro para descanso obligatorio de 8 horas.</p></div>
+        </div>
+
+        <!-- Alerta de 5h continuas -->
+        <div id="alertBox5h" class="hidden bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r shadow-sm flex items-start gap-3">
+            <i class="fas fa-clock mt-1"></i>
+            <div><p class="font-bold text-sm">¡Pausa Obligatoria! (NOM-087 Art. 4.1)</p><p class="text-xs">Llevas más de 4.5 horas de conducción continua. Debes realizar una pausa mínima de 30 minutos antes de completar 5 horas.</p></div>
         </div>
 
         <!-- 3. Gráfica Visual (App) -->
@@ -281,7 +320,7 @@
         }
 
         // Recuperar inputs
-        const ids = ['driverName', 'license', 'licenseExp', 'unitId', 'brandModel', 'plates', 'mode', 'folio', 'origin', 'destination'];
+        const ids = ['driverName', 'license', 'licenseExp', 'unitId', 'brandModel', 'plates', 'mode', 'folio', 'origin', 'destination', 'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 'kmInicio', 'kmFin', 'coConductor', 'coLicencia'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -366,6 +405,25 @@
             
             if(driveMins > 13 * 60) document.getElementById('alertBox')?.classList.remove('hidden');
             else document.getElementById('alertBox')?.classList.add('hidden');
+
+            // Alerta 5h conducción continua (NOM-087 Art. 4.1)
+            let continuousDrive = 0;
+            if (logs.length > 0) {
+                // Count backwards from the last log to find continuous driving
+                for (let i = logs.length - 1; i >= 0; i--) {
+                    if (logs[i].status === 3) {
+                        const end = logs[i].endTime || now;
+                        continuousDrive += Math.floor((end - logs[i].startTime) / 60000);
+                    } else {
+                        // Check if the break was >= 30 min (valid pause)
+                        const breakEnd = logs[i].endTime || now;
+                        const breakDur = Math.floor((breakEnd - logs[i].startTime) / 60000);
+                        if (breakDur >= 30) break; // Valid pause, reset count
+                    }
+                }
+            }
+            if (continuousDrive > 270) document.getElementById('alertBox5h')?.classList.remove('hidden'); // 4h30m warning
+            else document.getElementById('alertBox5h')?.classList.add('hidden');
 
             drawChart();
         }
@@ -467,14 +525,16 @@
             const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
 
             // --- PÁGINA 1: DATOS Y GRÁFICAS ---
-            
+
             // Encabezado
-            doc.setFillColor(...naranja); doc.rect(0, 0, 210, 20, 'F');
-            doc.setTextColor(255); doc.setFontSize(14); doc.setFont("helvetica","bold");
-            doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 13, {align:"center"});
+            doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
+            doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica","bold");
+            doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 10, {align:"center"});
+            doc.setFontSize(7); doc.setFont("helvetica","normal");
+            doc.text("NOM-087-SCT-2-2017 | Norma Oficial Mexicana de Tiempos de Conducción y Descanso", 105, 16, {align:"center"});
             doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(0);
-            
-            let y = 25;
+
+            let y = 26;
 
             // Datos Generales (Tabla Compacta)
             const row = (lbl, val, x, w) => {
@@ -484,14 +544,40 @@
             };
 
             doc.setFontSize(7);
-            doc.text("PERMISIONARIO: GRUPO BACHOCO", 14, y); y+=4;
-            row("FOLIO:", folio, 14, 45); row("FECHA:", new Date().toLocaleDateString(), 61, 45);
-            row("UNIDAD:", document.getElementById('unitId').value, 108, 40); row("PLACAS:", document.getElementById('plates').value, 150, 45);
+            // Datos del Permisionario
+            doc.setFont("helvetica","bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A.B. DE C.V. — RFC: GBA940707AH4", 14, y);
+            y+=4;
+            doc.setFont("helvetica","normal"); doc.text("Domicilio: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
+            y+=5;
+            row("FOLIO:", folio, 14, 35);
+            row("FECHA:", new Date().toLocaleDateString(), 51, 35);
+            row("PERMISO SCT:", document.getElementById('permisoSCT').value, 88, 45);
+            row("TIPO PERMISO:", document.getElementById('tipoPermiso').value, 135, 60);
             y += 9;
-            row("OPERADOR:", document.getElementById('driverName').value, 14, 92); row("LICENCIA:", document.getElementById('license').value, 108, 87);
+            row("UNIDAD:", document.getElementById('unitId').value, 14, 32);
+            row("MARCA/MOD:", document.getElementById('brandModel').value, 48, 38);
+            row("PLACAS:", document.getElementById('plates').value, 88, 32);
+            row("CONFIG:", document.getElementById('mode').value, 122, 25);
+            row("VIN:", document.getElementById('vin').value, 149, 46);
             y += 9;
-            row("ORIGEN:", document.getElementById('origin').value, 14, 92); row("DESTINO:", document.getElementById('destination').value, 108, 87);
-            y += 12;
+            row("OPERADOR:", document.getElementById('driverName').value, 14, 60);
+            row("LICENCIA:", document.getElementById('license').value, 76, 40);
+            row("VIG. LIC:", document.getElementById('licenseExp').value, 118, 35);
+            row("TIPO CARGA:", document.getElementById('tipoCarga').value, 155, 40);
+            y += 9;
+            row("ORIGEN:", document.getElementById('origin').value, 14, 60);
+            row("DESTINO:", document.getElementById('destination').value, 76, 60);
+            row("KM INICIO:", document.getElementById('kmInicio').value, 138, 28);
+            row("KM FIN:", document.getElementById('kmFin').value, 168, 27);
+            y += 9;
+            // Co-conductor (si aplica)
+            const coCond = document.getElementById('coConductor').value;
+            if (coCond && coCond.trim()) {
+                row("CO-CONDUCTOR:", coCond, 14, 92);
+                row("LIC. CO-COND:", document.getElementById('coLicencia').value, 108, 87);
+                y += 9;
+            }
+            y += 3;
 
             // --- FUNCIÓN DIBUJAR REJILLA ---
             const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
@@ -646,34 +732,88 @@
             doc.line(30, y+20, 80, y+20);
             doc.addImage(opSig, 'PNG', 35, y, 40, 18);
             doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y+23, {align:"center"});
+            doc.setFontSize(5); doc.text(document.getElementById('driverName').value || "", 55, y+26, {align:"center"});
+            doc.text("Lic. Fed.: " + (document.getElementById('license').value || ""), 55, y+29, {align:"center"});
 
             doc.line(120, y+20, 170, y+20);
             doc.addImage(supSig, 'PNG', 125, y, 40, 18);
-            doc.text("FIRMA SUPERVISOR", 145, y+23, {align:"center"});
+            doc.setFontSize(7); doc.text("FIRMA SUPERVISOR / DESPACHADOR", 145, y+23, {align:"center"});
 
-            doc.setFontSize(5); doc.setTextColor(100);
-            doc.text("HAGO CONSTAR QUE LOS DATOS SON VERÍDICOS Y REFLEJAN FIELMENTE MIS ACTIVIDADES.", 105, y+30, {align:"center"});
+            // Declaratoria bajo protesta de decir verdad
+            y += 34;
+            doc.setFontSize(5); doc.setTextColor(0);
+            doc.setFont("helvetica","bold");
+            doc.text("DECLARATORIA BAJO PROTESTA DE DECIR VERDAD", 105, y, {align:"center"});
+            doc.setFont("helvetica","normal");
+            y += 4;
+            const declaratoria = doc.splitTextToSize(
+                "El conductor que suscribe la presente bitácora DECLARA BAJO PROTESTA DE DECIR VERDAD que los datos, tiempos de conducción, " +
+                "descansos y demás información aquí contenida son verídicos y reflejan fielmente sus actividades durante el periodo registrado, " +
+                "en cumplimiento con la NOM-087-SCT-2-2017 y demás disposiciones aplicables en materia de autotransporte federal. " +
+                "Esta bitácora deberá conservarse por un periodo mínimo de 30 días naturales conforme a lo establecido por la norma.", 180);
+            doc.text(declaratoria, 105, y, {align:"center"});
+            y += declaratoria.length * 3 + 3;
+
+            // Pie de página legal
+            doc.setFontSize(4); doc.setTextColor(120);
+            doc.text("Documento generado digitalmente conforme a NOM-087-SCT-2-2017 — Válido como bitácora de horas de servicio.", 105, y, {align:"center"});
+            doc.text("GRUPO BACHOCO, S.A.B. DE C.V. — Permisionario de Autotransporte Federal de Carga — Folio: " + folio + " — " + new Date().toISOString(), 105, y+3, {align:"center"});
 
             // --- PÁGINA 2: REGLAMENTO (Reverso) ---
             doc.addPage();
             doc.setFillColor(...naranja); doc.rect(0,0,210,15,'F');
-            doc.setTextColor(255); doc.setFontSize(12); doc.setFont("helvetica","bold");
-            doc.text("REGLAMENTO NOM-087-SCT-2-2017", 105, 10, {align:"center"});
-            
-            doc.setTextColor(0); doc.setFontSize(8);
-            let ry = 25;
+            doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica","bold");
+            doc.text("RESUMEN DE OBLIGACIONES — NOM-087-SCT-2-2017", 105, 10, {align:"center"});
+
+            doc.setTextColor(0); doc.setFontSize(7);
+            let ry = 22;
+
+            // Título de sección
+            doc.setFont("helvetica","bold"); doc.setFontSize(8);
+            doc.text("TIEMPOS DE CONDUCCIÓN Y DESCANSO OBLIGATORIOS", 14, ry);
+            ry += 5;
+
+            doc.setFontSize(7); doc.setFont("helvetica","normal");
             const rules = [
-                "4.1 TIEMPOS: Todo conductor debe realizar una pausa de 30 minutos cuando ha conducido hasta 5 horas continuas.",
-                "4.2 PAUSAS: Los periodos de pausa no son acumulables.",
-                "4.6 RUTAS LARGAS: En rutas de max 14 horas, el conductor debe tener una pausa no menor a 8 horas continuas.",
-                "4.7 MÁXIMO 24H: El tiempo máximo de conducción en 24 horas nunca podrá exceder las 14 horas.",
-                "3.4 EXCEPCIONES: El tiempo puede prolongarse por avería o perturbación del servicio, debiendo evidenciarse."
+                "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: El conductor no podrá conducir más de 5 horas continuas sin realizar una pausa obligatoria de al menos 30 minutos.",
+                "4.2 PAUSAS NO ACUMULABLES: Los periodos de pausa no son acumulables. No se puede fraccionar la pausa de 30 minutos en periodos menores.",
+                "4.3 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo total de conducción en un periodo de 24 horas no podrá exceder las 14 horas.",
+                "4.4 DESCANSO OBLIGATORIO: Después de un periodo máximo de 14 horas de conducción, el conductor deberá tomar un descanso mínimo de 8 horas continuas antes de reanudar la conducción.",
+                "4.5 PERIODO DE 24 HORAS: El periodo de 24 horas se contará a partir del momento en que el conductor inicie la conducción después de un descanso de al menos 8 horas.",
+                "4.6 CO-CONDUCTOR (RELEVO): En caso de contar con co-conductor, cada conductor deberá llevar su propia bitácora. El tiempo como copiloto no cuenta como tiempo de descanso.",
+                "4.7 EXCEPCIONES: El tiempo de conducción podrá prolongarse únicamente por avería mecánica, condiciones climatológicas adversas, perturbación del tránsito u otras causas de fuerza mayor, debiendo anotarse como excepción justificada con observación detallada.",
+                "4.8 BITÁCORA OBLIGATORIA: Todo conductor de autotransporte federal deberá portar la bitácora de horas de servicio durante el viaje. La bitácora deberá estar disponible para inspección por parte de la autoridad en todo momento.",
+                "4.9 CONSERVACIÓN: La empresa y el conductor deberán conservar las bitácoras por un periodo mínimo de 30 días naturales contados a partir de la fecha de registro.",
+                "4.10 RESPONSABILIDAD: El permisionario es corresponsable del cumplimiento de los tiempos de conducción y descanso de sus operadores."
             ];
             rules.forEach(r => {
                 const split = doc.splitTextToSize(r, 180);
                 doc.text(split, 14, ry);
-                ry += (split.length * 4) + 4;
+                ry += (split.length * 3.5) + 3;
             });
+
+            // Sección de sanciones
+            ry += 3;
+            doc.setFont("helvetica","bold"); doc.setFontSize(8);
+            doc.text("FUNDAMENTO LEGAL Y SANCIONES", 14, ry);
+            ry += 5;
+            doc.setFont("helvetica","normal"); doc.setFontSize(6);
+            const sanciones = [
+                "• Ley de Caminos, Puentes y Autotransporte Federal — Art. 36, 74 BIS.",
+                "• Reglamento de Autotransporte Federal y Servicios Auxiliares — Art. 46.",
+                "• NOM-087-SCT-2-2017: Tiempos de conducción y descanso para conductores de autotransporte federal.",
+                "• El incumplimiento de esta norma es motivo de sanción administrativa, retención de unidad y responsabilidad civil/penal en caso de siniestro.",
+                "• La falsificación o alteración de datos en la bitácora constituye una infracción grave conforme a la legislación vigente."
+            ];
+            sanciones.forEach(s => {
+                const split = doc.splitTextToSize(s, 180);
+                doc.text(split, 14, ry);
+                ry += (split.length * 3) + 2;
+            });
+
+            // Pie de página
+            doc.setFontSize(4); doc.setTextColor(120);
+            doc.text("Este documento es un resumen informativo. Consulte la NOM-087-SCT-2-2017 completa publicada en el DOF para el texto íntegro de la norma.", 105, 280, {align:"center"});
 
             doc.save(`Bitacora_${folio}.pdf`);
         };
@@ -712,6 +852,14 @@
                 mode: document.getElementById('mode') ? document.getElementById('mode').value : "",
                 origin: document.getElementById('origin').value || "",
                 destination: document.getElementById('destination').value || "",
+                permisoSCT: document.getElementById('permisoSCT') ? document.getElementById('permisoSCT').value : "",
+                tipoPermiso: document.getElementById('tipoPermiso') ? document.getElementById('tipoPermiso').value : "",
+                vin: document.getElementById('vin') ? document.getElementById('vin').value : "",
+                tipoCarga: document.getElementById('tipoCarga') ? document.getElementById('tipoCarga').value : "",
+                kmInicio: document.getElementById('kmInicio') ? document.getElementById('kmInicio').value : "",
+                kmFin: document.getElementById('kmFin') ? document.getElementById('kmFin').value : "",
+                coConductor: document.getElementById('coConductor') ? document.getElementById('coConductor').value : "",
+                coLicencia: document.getElementById('coLicencia') ? document.getElementById('coLicencia').value : "",
                 shiftStartHour: SHIFT_START_HOUR,
                 logs: structuredClone(logs),
                 signatureOp,
@@ -846,6 +994,15 @@
                 await setDoc(doc(db, "bitacoras_087", folio), {
                     folio, unitId: document.getElementById('unitId').value,
                     driverName: document.getElementById('driverName').value,
+                    license: document.getElementById('license').value,
+                    plates: document.getElementById('plates').value,
+                    permisoSCT: document.getElementById('permisoSCT').value,
+                    vin: document.getElementById('vin').value,
+                    tipoCarga: document.getElementById('tipoCarga').value,
+                    kmInicio: document.getElementById('kmInicio').value,
+                    kmFin: document.getElementById('kmFin').value,
+                    origin: document.getElementById('origin').value,
+                    destination: document.getElementById('destination').value,
                     logs, fecha: new Date().toISOString()
                 });
                 alert("✅ Sincronizado");
