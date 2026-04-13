@@ -793,9 +793,11 @@
                 document.getElementById('qrTextContent').innerHTML =
                     `<span style="color:#16a34a;font-weight:bold">✅ Listo — escanea para ver el PDF</span><br>` +
                     `<span id="qrViewerUrl" style="word-break:break-all;font-size:10px;color:#6b7280"></span><br>` +
-                    `<span style="color:#9ca3af;font-size:10px">⏱ Expira: ${expiryText} · FOLIO: ${folio}</span>`;
+                    `<span style="color:#9ca3af;font-size:10px">⏱ Expira: ${expiryText} · FOLIO: <span id="qrFolio"></span></span>`;
                 const qrViewerUrlEl = document.getElementById('qrViewerUrl');
                 if (qrViewerUrlEl) qrViewerUrlEl.textContent = viewerUrl;
+                const qrFolioEl = document.getElementById('qrFolio');
+                if (qrFolioEl) qrFolioEl.textContent = folio;
 
             } catch (err) {
                 showOfflineQrFallback(folio, "⚠️ Sin conexión — QR básico", err.message || "No se pudo sincronizar.");
