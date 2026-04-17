@@ -973,7 +973,7 @@
     <!-- FIREBASE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
       
         const firebaseConfig = {
@@ -995,15 +995,19 @@
             window.intentarSubirNube = function() { alert("⚠️ Función de nube no disponible. Configura Firebase."); };
             window.addEventListener('load', () => window.generarFolioFirebase());
         } else {
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
         const auth = getAuth(app);
 
        // Aquí le decimos: "Espera a que la sesión esté lista"
        signInAnonymously(auth).then(() => {
       console.log("¡Permiso concedido! Ahora sí, cargando folios...");
-    
-    // MOVER AQUÍ ADENTRO LAS FUNCIONES QUE FALLAN:
-    obtenerSiguienteFolio(); // Esta es la que genera el F1524
-    
+
+    // Al estar autenticado, generamos el folio inicial
+    if (typeof window.generarFolioFirebase === "function" && navigator.onLine) {
+        window.generarFolioFirebase();
+    }
+
 }).catch((error) => {
     console.error("Error al entrar a la nube:", error);
 });
