@@ -1159,8 +1159,10 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
         import { getFirestore, doc, updateDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-
-        // CONFIGURACIÓN OFICIAL
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+       
+       
+       // CONFIGURACIÓN OFICIAL
         const firebaseConfig = {
             apiKey: "__FIREBASE_API_KEY__",
             authDomain: "gen-lang-client-0015118308.firebaseapp.com",
@@ -1179,6 +1181,17 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
+// --- BLOQUE DE SEGURIDAD NUEVO ---
+const auth = getAuth(app);
+signInAnonymously(auth)
+  .then(() => {
+    console.log("Conexión segura con Firebase establecida");
+  })
+  .catch((error) => {
+    console.error("Error al validar acceso:", error.message);
+  });
+// --------------------------------
 
         // FUNCIÓN INTERNA PARA RESERVAR FOLIO AL MOMENTO DE GUARDAR
         window.reservarFolioCloud = async function() {
