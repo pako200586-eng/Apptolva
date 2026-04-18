@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apptolva-v5-offline';
+const CACHE_NAME = 'apptolva-v6-offline';
 const ASSETS = [
   './',
   './index.html',
