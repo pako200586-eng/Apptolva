@@ -975,6 +975,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
         import { getFirestore, doc, getDoc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
       
         const firebaseConfig = {
             apiKey: "__FIREBASE_API_KEY__",
@@ -999,17 +1000,28 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
-       // Aquí le decimos: "Espera a que la sesión esté lista"
-       signInAnonymously(auth).then(() => {
-      console.log("¡Permiso concedido! Ahora sí, cargando folios...");
 
-    // Al estar autenticado, generamos el folio inicial
-    if (typeof window.generarFolioFirebase === "function" && navigator.onLine) {
-        window.generarFolioFirebase();
+// EL ESCÁNER PERMANENTE: Revisa si ya hay pase o si necesita uno nuevo
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // SI TIENE PASE (Usuario detectado)
+        console.log("¡Vigilante autoriza! Gafete activo:", user.uid);
+        
+        // AQUÍ VAN TUS FOLIOS, AHORA SÍ 100% SEGUROS
+        try {
+             obtenerFolioChecklist(); 
+             obtenerSiguienteFolio(); 
+        } catch(e) {
+             console.log("Cargando folios..."); 
+        }
+        
+    } else {
+        // SI NO TIENE PASE, LO CREAMOS INMEDIATAMENTE
+        console.log("Sin gafete. Solicitando uno nuevo...");
+        signInAnonymously(auth).catch((error) => {
+            console.error("Error crítico al dar gafete:", error);
+        });
     }
-
-}).catch((error) => {
-    console.error("Error al entrar a la nube:", error);
 });
 
         window.generarFolioFirebase = async function(manual = false) {
