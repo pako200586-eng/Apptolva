@@ -1160,6 +1160,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
         import { getFirestore, doc, updateDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
        
        
        // CONFIGURACIÓN OFICIAL
@@ -1183,15 +1184,31 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
         const db = getFirestore(app);
 
 // --- BLOQUE DE SEGURIDAD NUEVO ---
-const auth = getAuth(app);
-signInAnonymously(auth)
-  .then(() => {
-    console.log("Conexión segura con Firebase establecida");
-  })
-  .catch((error) => {
-    console.error("Error al validar acceso:", error.message);
-  });
-// --------------------------------
+            
+            const auth = getAuth(app);
+
+// EL ESCÁNER PERMANENTE: Revisa si ya hay pase o si necesita uno nuevo
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // SI TIENE PASE (Usuario detectado)
+        console.log("¡Vigilante autoriza! Gafete activo:", user.uid);
+        
+        // AQUÍ VAN TUS FOLIOS, AHORA SÍ 100% SEGUROS
+        try {
+             obtenerFolioChecklist(); 
+             obtenerSiguienteFolio(); 
+        } catch(e) {
+             console.log("Cargando folios..."); 
+        }
+        
+    } else {
+        // SI NO TIENE PASE, LO CREAMOS INMEDIATAMENTE
+        console.log("Sin gafete. Solicitando uno nuevo...");
+        signInAnonymously(auth).catch((error) => {
+            console.error("Error crítico al dar gafete:", error);
+        });
+    }
+});
 
         // FUNCIÓN INTERNA PARA RESERVAR FOLIO AL MOMENTO DE GUARDAR
         window.reservarFolioCloud = async function() {
