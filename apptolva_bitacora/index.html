@@ -1158,8 +1158,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-        import { getFirestore, doc, updateDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        import { getFirestore, doc, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
        
        
@@ -1212,20 +1211,16 @@ onAuthStateChanged(auth, (user) => {
 
         // FUNCIÓN INTERNA PARA RESERVAR FOLIO AL MOMENTO DE GUARDAR
         window.reservarFolioCloud = async function() {
-            try {
+            return await runTransaction(db, async (transaction) => {
                 const referenciaContador = doc(db, "sistema", "contadores");
-                // 1. Pedir turno (+1)
-                await updateDoc(referenciaContador, { folio_actual: increment(1) });
-                // 2. Leer turno
-                const snapshot = await getDoc(referenciaContador);
+                const snapshot = await transaction.get(referenciaContador);
+                let siguiente = 1000;
                 if (snapshot.exists()) {
-                    return snapshot.data().folio_actual;
-                } else {
-                    throw new Error("No existe el contador");
+                    siguiente = (snapshot.data().folio_actual || 1000) + 1;
                 }
-            } catch (error) {
-                throw error;
-            }
+                transaction.set(referenciaContador, { folio_actual: siguiente }, { merge: true });
+                return siguiente;
+            });
         }
         
         console.log("Sistema Nube: Listo para asignar folios bajo demanda.");
