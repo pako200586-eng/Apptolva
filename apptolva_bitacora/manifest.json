@@ -1,20 +1,26 @@
 {
-  "name": "AppTolva Bachoco",
+  "name": "App Tolva Bitácora Bachoco",
   "short_name": "AppTolva",
+  "description": "Aplicación interna para operadores de tractocamiones de Grupo Bachoco con bitácoras, checklist y reportes offline.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ea580c",
+  "background_color": "#ffffff",
   "theme_color": "#ea580c",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "silo.jpg",
+      "src": "./icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "silo.jpg",
+      "src": "./icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
