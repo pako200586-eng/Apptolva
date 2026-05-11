@@ -137,6 +137,12 @@
             const logs = data.logs || [];
             const shiftStart = data.shiftStartHour !== undefined ? data.shiftStartHour : SHIFT_START_HOUR;
 
+            function formatGps(gps) {
+                if (!gps || typeof gps.lat !== "number" || typeof gps.lng !== "number") return "GPS no capturado";
+                const precision = typeof gps.accuracy === "number" ? ` ±${Math.round(gps.accuracy)}m` : "";
+                return `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}${precision}`;
+            }
+
             // --- LÓGICA DE CORTE 48 HORAS ---
             const startTrip = logs.length > 0 ? logs[0].startTime : Date.now();
             const limit24Date = new Date(startTrip);
@@ -233,9 +239,9 @@
             y += 4;
             doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
             doc.setTextColor(0); doc.setFontSize(6);
-            doc.text("HORA INICIO", 16, y + 3.5); doc.text("HORA FIN", 45, y + 3.5);
-            doc.text("ACTIVIDAD", 75, y + 3.5); doc.text("DURACIÓN", 110, y + 3.5);
-            doc.text("OBSERVACIONES / LUGAR", 140, y + 3.5);
+            doc.text("HORA INICIO", 16, y + 3.5); doc.text("HORA FIN", 42, y + 3.5);
+            doc.text("ACTIVIDAD", 66, y + 3.5); doc.text("DURACIÓN", 96, y + 3.5);
+            doc.text("GPS", 121, y + 3.5); doc.text("OBSERVACIONES / LUGAR", 151, y + 3.5);
             y += 5;
             doc.setFont("helvetica", "normal");
             logs.forEach((l, idx) => {
@@ -243,9 +249,9 @@
                     doc.addPage(); y = 20;
                     doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
                     doc.setTextColor(0); doc.setFontSize(6);
-                    doc.text("HORA INICIO", 16, y + 3.5); doc.text("HORA FIN", 45, y + 3.5);
-                    doc.text("ACTIVIDAD", 75, y + 3.5); doc.text("DURACIÓN", 110, y + 3.5);
-                    doc.text("OBSERVACIONES / LUGAR", 140, y + 3.5);
+                    doc.text("HORA INICIO", 16, y + 3.5); doc.text("HORA FIN", 42, y + 3.5);
+                    doc.text("ACTIVIDAD", 66, y + 3.5); doc.text("DURACIÓN", 96, y + 3.5);
+                    doc.text("GPS", 121, y + 3.5); doc.text("OBSERVACIONES / LUGAR", 151, y + 3.5);
                     y += 5; doc.setFont("helvetica", "normal");
                 }
                 const stName = ["", "DESCANSO", "PAUSA", "MANEJANDO", "SERVICIO", "EXCEPCIÓN"][l.status] || "OTRO";
@@ -253,10 +259,11 @@
                 const dur = Math.floor((e - s) / 60000);
                 if (idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
                 doc.text(s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 16, y + 3);
-                doc.text(e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 45, y + 3);
-                doc.text(stName, 75, y + 3);
-                doc.text(`${Math.floor(dur / 60)}h ${dur % 60}m`, 110, y + 3);
-                doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0, 35), 140, y + 3);
+                doc.text(e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 42, y + 3);
+                doc.text(stName, 66, y + 3);
+                doc.text(`${Math.floor(dur / 60)}h ${dur % 60}m`, 96, y + 3);
+                doc.text(formatGps(l.gps).substring(0, 26), 121, y + 3);
+                doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0, 28), 151, y + 3);
                 y += 4;
             });
 

@@ -1,5 +1,5 @@
-const CACHE_NAME = "apptolva-cache-v8";
-const RUNTIME_CACHE = "apptolva-runtime-v8";
+const CACHE_NAME = "apptolva-cache-v9";
+const RUNTIME_CACHE = "apptolva-runtime-v9";
 const DB_NAME = "apptolva-offline-db";
 const DB_VERSION = 1;
 const PENDING_STORE = "pending-reportes";

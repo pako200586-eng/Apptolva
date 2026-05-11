@@ -42,6 +42,7 @@
         .bg-st-1 { background-color: #ef4444; } .bg-st-2 { background-color: #3b82f6; } 
         .bg-st-3 { background-color: #22c55e; } .bg-st-4 { background-color: #eab308; } 
         .bg-st-5 { background-color: #a855f7; }
+        .gps-pill { font-size: 10px; border-radius: 999px; padding: 2px 7px; display: inline-flex; align-items: center; gap: 4px; }
     </style>
 </head>
 <body class="font-sans text-gray-800">
@@ -202,6 +203,20 @@
             <div><p class="font-bold text-sm">¡Pausa Obligatoria! (NOM-087 Art. 4.1)</p><p class="text-xs">Llevas más de 4.5 horas de conducción continua. Debes realizar una pausa mínima de 30 minutos antes de completar 5 horas.</p></div>
         </div>
 
+        <!-- Evidencia GPS -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-100 p-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                    <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2"><i class="fas fa-map-marker-alt text-orange-500"></i> Evidencia GPS</h3>
+                    <p id="gpsStatusText" class="text-xs text-gray-500 mt-1">GPS opcional: se adjunta al cambio de estado cuando el dispositivo lo permita.</p>
+                </div>
+                <button onclick="window.capturarGPSManual()" id="gpsBtn" class="bg-orange-600 text-white px-3 py-2 rounded-lg font-bold text-xs shadow flex items-center justify-center gap-2 active:scale-95 transition">
+                    <i class="fas fa-location-arrow"></i> Capturar ubicación
+                </button>
+            </div>
+            <div id="gpsEvidenceBox" class="mt-3 hidden text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono text-gray-700"></div>
+        </div>
+
         <!-- 3. Gráfica Visual (App) -->
         <div class="bg-white p-3 rounded-xl shadow-md border border-gray-100">
             <div class="flex justify-between items-center mb-2 px-1">
@@ -316,6 +331,7 @@
         // --- CONSTANTE GLOBAL DE TURNO ---
         const SHIFT_START_HOUR = 8; // Los turnos inician a las 08:00 a.m.
         const OFFLINE_SYNC_TAG = "sync-reportes";
+        const GPS_TIMEOUT_MS = 8000;
 
         // --- 1. LÓGICA DE DATOS LOCALES ---
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
@@ -323,7 +339,7 @@
 
         if(logs.length === 0) {
             const now = new Date().getTime();
-            logs.push({ status: 1, startTime: now, endTime: null, place: "Inicio", observation: "" });
+            logs.push({ status: 1, startTime: now, endTime: null, place: "Inicio", observation: "", gps: null });
         }
 
         // Recuperar inputs
@@ -346,6 +362,92 @@
 
         function guardarLocal() { localStorage.setItem('nom087_logs', JSON.stringify(logs)); updateUI(); }
 
+        function formatGps(gps) {
+            if (!gps || typeof gps.lat !== "number" || typeof gps.lng !== "number") return "GPS no capturado";
+            const precision = typeof gps.accuracy === "number" ? ` ±${Math.round(gps.accuracy)}m` : "";
+            return `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}${precision}`;
+        }
+
+        function updateGpsStatus(gps, message) {
+            const status = document.getElementById('gpsStatusText');
+            const box = document.getElementById('gpsEvidenceBox');
+            if (status && message) status.textContent = message;
+            if (!box) return;
+            if (gps) {
+                const fecha = gps.capturedAt ? new Date(gps.capturedAt).toLocaleString() : new Date().toLocaleString();
+                box.classList.remove('hidden');
+                box.textContent = `${formatGps(gps)} | ${fecha}`;
+            } else if (message) {
+                box.classList.remove('hidden');
+                box.textContent = message;
+            }
+        }
+
+        function getGpsEvidence() {
+            return new Promise((resolve) => {
+                if (!navigator.geolocation) {
+                    resolve({ gps: null, message: "GPS no disponible en este dispositivo." });
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        resolve({
+                            gps: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude,
+                                accuracy: position.coords.accuracy,
+                                altitude: position.coords.altitude,
+                                heading: position.coords.heading,
+                                speed: position.coords.speed,
+                                capturedAt: new Date().toISOString(),
+                                source: "device-geolocation"
+                            },
+                            message: "Ubicación GPS capturada y guardada como evidencia."
+                        });
+                    },
+                    (error) => {
+                        const reasons = {
+                            1: "Permiso de GPS denegado. La bitácora sigue funcionando sin ubicación.",
+                            2: "GPS sin señal suficiente. Se guardará el registro sin coordenadas.",
+                            3: "GPS tardó demasiado. Se guardará el registro sin coordenadas."
+                        };
+                        resolve({ gps: null, message: reasons[error.code] || "No se pudo capturar GPS." });
+                    },
+                    { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 60000 }
+                );
+            });
+        }
+
+        async function attachGpsToLog(log, showStatus) {
+            if (!log) return null;
+            if (showStatus) updateGpsStatus(null, "Solicitando GPS del dispositivo...");
+            const result = await getGpsEvidence();
+            if (result.gps) {
+                log.gps = result.gps;
+                localStorage.setItem('nom087_logs', JSON.stringify(logs));
+            }
+            if (showStatus) updateGpsStatus(result.gps, result.message);
+            return result.gps;
+        }
+
+        window.capturarGPSManual = async function() {
+            const btn = document.getElementById('gpsBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Capturando';
+            }
+            try {
+                await attachGpsToLog(logs[logs.length - 1], true);
+                updateUI();
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-location-arrow"></i> Capturar ubicación';
+                }
+            }
+        };
+
         window.terminarTurno48h = function() {
             if(confirm("⚠️ ¿TERMINAR GRÁFICA DE 48H Y EMPEZAR NUEVO TURNO?\n\nAsegúrate de haber generado tu PDF de bitácora.\nEsto limpiará la gráfica actual y comenzará un nuevo periodo en cero.")) {
                 localStorage.removeItem('nom087_logs');
@@ -359,13 +461,16 @@
             }
         }
 
-        window.changeStatus = (st) => {
+        window.changeStatus = async (st) => {
             if(currentStatus === st) return;
             const now = new Date().getTime();
             if(logs.length > 0) logs[logs.length-1].endTime = now;
-            logs.push({ status: st, startTime: now, endTime: null, place: "En Ruta", observation: "" });
+            const newLog = { status: st, startTime: now, endTime: null, place: "En Ruta", observation: "", gps: null };
+            logs.push(newLog);
             currentStatus = st;
             guardarLocal();
+            await attachGpsToLog(newLog, true);
+            updateUI();
         };
 
         function updateUI() {
@@ -387,9 +492,13 @@
                     dur = `${Math.floor(d/60)}h ${d%60}m`;
                 }
 
-                list.innerHTML += `<div class="p-3 border-b flex justify-between items-center">
-                    <div><span class="dot-status ${cls}"></span><b>${stName}</b> <span class="text-xs text-gray-400">${s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div>
-                    <div class="text-xs font-mono text-gray-500">${dur}</div>
+                const gpsBadge = l.gps
+                    ? `<div class="gps-pill bg-green-50 text-green-700 border border-green-200 mt-1"><i class="fas fa-map-marker-alt"></i>${formatGps(l.gps)}</div>`
+                    : `<div class="gps-pill bg-gray-50 text-gray-400 border border-gray-200 mt-1"><i class="fas fa-map-marker-alt"></i>Sin GPS</div>`;
+
+                list.innerHTML += `<div class="p-3 border-b flex justify-between items-start gap-3">
+                    <div><span class="dot-status ${cls}"></span><b>${stName}</b> <span class="text-xs text-gray-400">${s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>${gpsBadge}</div>
+                    <div class="text-xs font-mono text-gray-500 whitespace-nowrap">${dur}</div>
                 </div>`;
             });
             
@@ -685,9 +794,9 @@
             // Header Tabla
             doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
             doc.setTextColor(0); doc.setFontSize(6);
-            doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 45, y+3.5);
-            doc.text("ACTIVIDAD", 75, y+3.5); doc.text("DURACIÓN", 110, y+3.5);
-            doc.text("OBSERVACIONES / LUGAR", 140, y+3.5);
+            doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 42, y+3.5);
+            doc.text("ACTIVIDAD", 66, y+3.5); doc.text("DURACIÓN", 96, y+3.5);
+            doc.text("GPS", 121, y+3.5); doc.text("OBSERVACIONES / LUGAR", 151, y+3.5);
             y += 5;
 
             // Filas
@@ -701,9 +810,9 @@
                     // Reimprimir encabezado de la tabla en la nueva página
                     doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
                     doc.setTextColor(0); doc.setFontSize(6);
-                    doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 45, y+3.5);
-                    doc.text("ACTIVIDAD", 75, y+3.5); doc.text("DURACIÓN", 110, y+3.5);
-                    doc.text("OBSERVACIONES / LUGAR", 140, y+3.5);
+                    doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 42, y+3.5);
+                    doc.text("ACTIVIDAD", 66, y+3.5); doc.text("DURACIÓN", 96, y+3.5);
+                    doc.text("GPS", 121, y+3.5); doc.text("OBSERVACIONES / LUGAR", 151, y+3.5);
                     y += 5;
 
                     // Restaurar fuente para las filas
@@ -720,10 +829,11 @@
                 if(idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
                 
                 doc.text(s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 16, y+3);
-                doc.text(e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 45, y+3);
-                doc.text(stName, 75, y+3);
-                doc.text(durStr, 110, y+3);
-                doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0,35), 140, y+3);
+                doc.text(e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 42, y+3);
+                doc.text(stName, 66, y+3);
+                doc.text(durStr, 96, y+3);
+                doc.text(formatGps(l.gps).substring(0,26), 121, y+3);
+                doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0,28), 151, y+3);
                 
                 y += 4;
             });
@@ -891,6 +1001,7 @@
                 destination: document.getElementById('destination').value || "",
                 shiftStartHour: SHIFT_START_HOUR,
                 logs: structuredClone(logs),
+                gpsEvidenceVersion: 1,
                 signatureOp,
                 signatureSup,
             };
