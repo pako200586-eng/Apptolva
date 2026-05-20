@@ -205,14 +205,19 @@
             </h2>
             
             <div class="bg-slate-50 p-3 rounded mb-4 border border-slate-200">
+                <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Modalidad de Revisión</label>
+                <div class="flex bg-slate-200 p-1 rounded-lg mb-3">
+                    <button onclick="setModalidad('full')" id="btn-mod-full" class="flex-1 py-2 px-3 text-xs font-black rounded shadow bg-orange-600 text-white transition-all">FULL (Tracto+Dolly+2 Tolvas)</button>
+                    <button onclick="setModalidad('sencillo')" id="btn-mod-sencillo" class="flex-1 py-2 px-3 text-xs font-black rounded text-gray-500 transition-all">SENCILLO (Tracto+Tolva)</button>
+                </div>
                 <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Identificación de Equipo</label>
                 <div class="grid grid-cols-2 gap-2 mb-2">
                     <input type="text" id="revUnidad" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="NO. TRACTO">
-                    <input type="text" id="revDolly" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="NO. DOLLY">
+                    <input type="text" id="revDolly" class="p-2 border rounded text-xs font-bold uppercase save-me campo-full" placeholder="NO. DOLLY">
                 </div>
-                <div class="grid grid-cols-2 gap-2 mb-2">
+                <div class="grid grid-cols-2 gap-2 mb-2" id="row-tolvas-full">
                     <input type="text" id="revTolva1" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me" placeholder="NO. 1ra TOLVA">
-                    <input type="text" id="revTolva2" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me" placeholder="NO. 2da TOLVA">
+                    <input type="text" id="revTolva2" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me campo-full" placeholder="NO. 2da TOLVA">
                 </div>
                 <div class="grid grid-cols-2 gap-2 mb-2">
                     <input type="text" id="revOperador" class="p-2 border rounded text-xs save-me" placeholder="Nombre Operador">
@@ -356,7 +361,8 @@
                 const data = {
                     inputs: {},
                     checklist: revResults,
-                    obs: obsData
+                    obs: obsData,
+                    modalidad: modalidadActual
                 };
                 document.querySelectorAll('.save-me').forEach(el => {
                     data.inputs[el.id] = el.value;
@@ -381,6 +387,10 @@
                     }
                     if (data.checklist) revResults = data.checklist;
                     if (data.obs) obsData = data.obs;
+                    if (data.modalidad) {
+                        modalidadActual = data.modalidad;
+                        setModalidad(modalidadActual);
+                    }
                     const notice = document.getElementById('draft-notice');
                     if(notice) notice.classList.remove('hidden');
                 }
@@ -556,6 +566,41 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
         let currentRevTab = 'tracto';
         let revResults = {};
         let obsData = { tracto: "", tolva1: "", dolly: "", tolva2: "" };
+        let modalidadActual = 'full';
+
+        function setModalidad(modo) {
+            modalidadActual = modo;
+            const btnFull = document.getElementById('btn-mod-full');
+            const btnSencillo = document.getElementById('btn-mod-sencillo');
+            const camposFull = document.querySelectorAll('.campo-full');
+            const tabDolly = document.getElementById('rt-dolly');
+            const tabTolva2 = document.getElementById('rt-tolva2');
+            const tabTolva1 = document.getElementById('rt-tolva1');
+
+            if (modo === 'full') {
+                btnFull.classList.add('bg-orange-600', 'text-white', 'shadow');
+                btnFull.classList.remove('text-gray-500');
+                btnSencillo.classList.remove('bg-orange-600', 'text-white', 'shadow');
+                btnSencillo.classList.add('text-gray-500');
+                camposFull.forEach(el => el.style.display = '');
+                if (tabDolly) tabDolly.style.display = '';
+                if (tabTolva2) tabTolva2.style.display = '';
+                if (tabTolva1) tabTolva1.textContent = '1ra. TOLVA';
+            } else {
+                btnSencillo.classList.add('bg-orange-600', 'text-white', 'shadow');
+                btnSencillo.classList.remove('text-gray-500');
+                btnFull.classList.remove('bg-orange-600', 'text-white', 'shadow');
+                btnFull.classList.add('text-gray-500');
+                camposFull.forEach(el => { el.style.display = 'none'; el.value = ''; });
+                if (tabDolly) tabDolly.style.display = 'none';
+                if (tabTolva2) tabTolva2.style.display = 'none';
+                if (tabTolva1) tabTolva1.textContent = 'TOLVA';
+                if (currentRevTab === 'dolly' || currentRevTab === 'tolva2') {
+                    setRevTab('tracto');
+                }
+            }
+            autoGuardar();
+        }
 
         function nav(id) {
             document.querySelectorAll('.section-content').forEach(e => e.classList.remove('active'));
@@ -618,7 +663,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             c.innerHTML = '';
             
             let label = "";
-            if(currentRevTab === 'tolva1') label = "CHECK LIST: 1ra TOLVA";
+            if(currentRevTab === 'tolva1') label = modalidadActual === 'sencillo' ? "CHECK LIST: TOLVA" : "CHECK LIST: 1ra TOLVA";
             if(currentRevTab === 'tolva2') label = "CHECK LIST: 2da TOLVA";
             if(currentRevTab === 'dolly') label = "CHECK LIST: DOLLY";
             if(currentRevTab === 'tracto') label = "CHECK LIST: TRACTO";
@@ -804,12 +849,17 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 const COL_GAP = 4;
                 const colW = (contentW - COL_GAP * (NUM_COLS - 1)) / NUM_COLS;
 
-                const secciones = [
+                const seccionesFull = [
                     {id: 'tracto', titulo: 'TRACTO CAMIÓN'},
                     {id: 'tolva1', titulo: '1ra TOLVA'},
                     {id: 'dolly', titulo: 'DOLLY'},
                     {id: 'tolva2', titulo: '2da TOLVA'}
                 ];
+                const seccionesSencillo = [
+                    {id: 'tracto', titulo: 'TRACTO CAMIÓN'},
+                    {id: 'tolva1', titulo: 'TOLVA'}
+                ];
+                const secciones = modalidadActual === 'sencillo' ? seccionesSencillo : seccionesFull;
 
                 secciones.forEach((sec, pageIndex) => {
                     if (pageIndex > 0) doc.addPage();
@@ -970,8 +1020,8 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     doc.setFont('helvetica', 'normal');
                     doc.text(obsLines, margin + 3, OBS_Y + 10);
 
-                    // --- FIRMAS (solo en la última página, posición fija) ---
-                    if (pageIndex === secciones.length - 1) {
+                    // --- FIRMAS (en todas las páginas, posición fija) ---
+                    {
                         const sigW = (contentW - 8) / 3;
                         const sigBoxes = [
                             {img: firmaOpImg, nombre: opNombre, cargo: 'FIRMA OPERADOR', x: margin},
@@ -1037,6 +1087,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
     msg += `📅 *FECHA:* ${fecha}\n`;
     msg += `🚛 *UNIDAD:* ${u}\n`;
     msg += `👤 *OPERADOR:* ${op}\n`;
+    msg += `📋 *MODALIDAD:* ${modalidadActual === 'sencillo' ? 'SENCILLO' : 'FULL'}\n`;
     msg += `--------------------------------\n`;
 
     // Verificamos que revResults exista para evitar errores
