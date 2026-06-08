@@ -1,7 +1,6 @@
-import { getStore } from "@netlify/blobs";
+import { getDatabase } from "@netlify/database";
 
 const MAX_PAYLOAD_BYTES = 1_500_000;
-const TTL_SECONDS = 86400;
 const ALLOWED_METHODS = "GET, POST, OPTIONS";
 const ALLOWED_HEADERS = "Content-Type, X-Bitacora-Token, Authorization";
 const TOKEN_HEADER = "x-bitacora-token";
@@ -56,12 +55,30 @@ function hasValidToken(req) {
   return tokenFromHeader === requiredToken || bearerToken === requiredToken;
 }
 
+function inferReportType(data) {
+  if (Array.isArray(data.checklist)) return "checklist";
+  if (Array.isArray(data.logs)) return "bitacora";
+  if (data.falla || data.incident || data.priority) return "falla";
+  return "reporte";
+}
+
+function inferPriority(data) {
+  const raw = String(data.priority || data.prioridad || "").toLowerCase();
+  if (["alta", "media", "baja"].includes(raw)) return raw;
+
+  const text = JSON.stringify(data).toLowerCase();
+  if (/(freno|frenos|llanta|llantas|luces|direccion|dirección|fuga|emergencia)/.test(text)) {
+    return "alta";
+  }
+  return inferReportType(data) === "falla" ? "media" : "baja";
+}
+
 function validateBitacoraPayload(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     return "Payload inválido";
   }
 
-  const requiredTextFields = ["folio", "unitId", "driverName", "license"];
+  const requiredTextFields = ["folio", "unitId", "driverName"];
   for (const field of requiredTextFields) {
     const value = data[field];
     if (typeof value !== "string" || value.trim().length === 0) {
@@ -69,12 +86,12 @@ function validateBitacoraPayload(data) {
     }
   }
 
-  if (!Array.isArray(data.logs) || data.logs.length === 0) {
-    return "Se requiere al menos un registro en logs";
+  if (data.logs && (!Array.isArray(data.logs) || data.logs.length > 300)) {
+    return "Registros de bitácora inválidos";
   }
 
-  if (data.logs.length > 300) {
-    return "Demasiados registros en logs";
+  if (data.checklist && !Array.isArray(data.checklist)) {
+    return "Checklist inválido";
   }
 
   return null;
@@ -90,7 +107,7 @@ export default async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const store = getStore({ name: "bitacoras", consistency: "strong" });
+  const database = getDatabase();
 
   if (req.method === "POST") {
     try {
@@ -110,18 +127,33 @@ export default async (req) => {
       }
 
       const id = generateId();
-      const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000).toISOString();
-      const record = {
-        payload: data,
-        createdAt: new Date().toISOString(),
-        expiresAt,
-      };
-      await store.setJSON(id, record);
+      const reportType = inferReportType(data);
+      const priority = inferPriority(data);
+      const license = typeof data.license === "string" ? data.license : "";
+
+      await database.pool.query(
+        `
+          INSERT INTO bitacora_reports (
+            id, folio, report_type, unit_id, driver_name, license, priority, sync_status, payload
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, 'sincronizado', $8::jsonb)
+        `,
+        [
+          id,
+          data.folio.trim(),
+          reportType,
+          data.unitId.trim(),
+          data.driverName.trim(),
+          license.trim(),
+          priority,
+          JSON.stringify(data),
+        ],
+      );
 
       const origin = new URL(req.url).origin;
       const viewerUrl = `${origin}/viewer.html?id=${id}`;
 
-      return jsonResponse(200, { id, url: viewerUrl, expiresAt }, corsHeaders);
+      return jsonResponse(200, { id, url: viewerUrl, synced: true }, corsHeaders);
     } catch (error) {
       return jsonResponse(500, { error: error.message }, corsHeaders);
     }
@@ -136,21 +168,17 @@ export default async (req) => {
     }
 
     try {
-      const storedData = await store.get(id, { type: "json" });
+      const result = await database.pool.query(
+        "SELECT payload FROM bitacora_reports WHERE id = $1 LIMIT 1",
+        [id],
+      );
+      const [storedData] = result.rows;
 
       if (!storedData) {
-        return jsonResponse(404, { error: "Not found or expired" }, corsHeaders);
+        return jsonResponse(404, { error: "Not found" }, corsHeaders);
       }
 
-      const payload = storedData.payload || storedData;
-      const expiresAt =
-        typeof storedData.expiresAt === "string" ? Date.parse(storedData.expiresAt) : NaN;
-      if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
-        await store.delete(id);
-        return jsonResponse(404, { error: "Not found or expired" }, corsHeaders);
-      }
-
-      return jsonResponse(200, payload, corsHeaders);
+      return jsonResponse(200, storedData.payload, corsHeaders);
     } catch (error) {
       return jsonResponse(500, { error: error.message }, corsHeaders);
     }

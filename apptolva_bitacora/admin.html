@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#7c2d12">
+  <title>Panel Administrativo | AppTolva</title>
+  <script src="./js/tailwindcss.js"></script>
+  <script src="./js/jspdf.min.js"></script>
+  <link rel="stylesheet" href="./css/fontawesome.min.css">
+  <style>
+    body { background: #f4f1ec; color: #1f2933; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .panel-card { background: rgba(255,255,255,.92); border: 1px solid rgba(124,45,18,.14); box-shadow: 0 12px 34px rgba(68, 36, 18, .08); }
+    .status-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
+    .toast { transform: translateY(-12px); opacity: 0; pointer-events: none; transition: .25s ease; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast fixed right-4 top-4 z-50 rounded-lg bg-[#294936] px-4 py-3 text-sm font-bold text-white shadow-xl">
+    Nuevo reporte recibido
+  </div>
+
+  <header class="bg-[#7c2d12] text-white">
+    <div class="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[.28em] text-orange-100">Grupo Bachoco | Flota propia</p>
+        <h1 class="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Panel Administrativo AppTolva</h1>
+        <p class="mt-1 max-w-2xl text-sm text-orange-50">Visibilidad operativa para supervisores: checklist, bitácoras, sincronización y fallas reportadas.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="refreshBtn" class="rounded-md bg-white px-4 py-2 text-sm font-black text-[#7c2d12] shadow-sm hover:bg-orange-50">
+          <i class="fas fa-sync-alt mr-2"></i>Actualizar
+        </button>
+        <a href="./index.html" class="rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
+          <i class="fas fa-mobile-screen mr-2"></i>App operador
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+    <section id="loginPanel" class="panel-card mx-auto max-w-md rounded-lg p-5">
+      <h2 class="text-lg font-black text-[#7c2d12]">Acceso de supervisor</h2>
+      <p class="mt-1 text-sm text-slate-600">Usa el token administrativo configurado en Netlify. Si no hay token configurado, el panel entra en modo abierto interno.</p>
+      <input id="adminToken" type="password" class="mt-4 w-full rounded-md border border-slate-300 px-3 py-3 text-sm outline-none focus:border-[#7c2d12]" placeholder="Token administrativo">
+      <button id="loginBtn" class="mt-3 w-full rounded-md bg-[#294936] px-4 py-3 text-sm font-black text-white hover:bg-[#203b2b]">Entrar al panel</button>
+      <p id="loginMsg" class="mt-3 hidden text-sm font-bold text-red-700"></p>
+    </section>
+
+    <section id="dashboard" class="hidden space-y-5">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Reportes</p><strong id="statTotal" class="text-3xl text-[#7c2d12]">0</strong></div>
+        <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Checklist</p><strong id="statChecklist" class="text-3xl text-[#294936]">0</strong></div>
+        <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Bitácoras</p><strong id="statBitacoras" class="text-3xl text-[#294936]">0</strong></div>
+        <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Alertas altas</p><strong id="statAltas" class="text-3xl text-red-700">0</strong></div>
+        <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Operadores</p><strong id="statOperadores" class="text-3xl text-slate-800">0</strong></div>
+        <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Unidades</p><strong id="statUnidades" class="text-3xl text-slate-800">0</strong></div>
+      </div>
+
+      <div class="panel-card rounded-lg p-4">
+        <div class="grid gap-3 md:grid-cols-6">
+          <input id="fromFilter" type="date" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <input id="toFilter" type="date" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <input id="unitFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Unidad">
+          <input id="operatorFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Operador">
+          <select id="typeFilter" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <option value="todos">Todos</option>
+            <option value="checklist">Checklist</option>
+            <option value="bitacora">Bitácora</option>
+            <option value="falla">Fallas</option>
+          </select>
+          <button id="applyFilters" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white">Filtrar</button>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv mr-2"></i>Excel CSV</button>
+          <button id="exportPdf" class="rounded-md border border-[#7c2d12] px-3 py-2 text-sm font-bold text-[#7c2d12]"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+          <span id="syncState" class="ml-auto text-xs font-bold uppercase tracking-wide text-slate-500">Esperando datos</span>
+        </div>
+      </div>
+
+      <div class="grid gap-5 lg:grid-cols-[1.6fr_.9fr]">
+        <section class="panel-card overflow-hidden rounded-lg">
+          <div class="border-b border-orange-100 px-4 py-3">
+            <h2 class="font-black text-[#7c2d12]">Checklist y bitácoras recibidas</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-orange-100 text-sm">
+              <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
+                <tr>
+                  <th class="px-4 py-3">Folio</th>
+                  <th class="px-4 py-3">Tipo</th>
+                  <th class="px-4 py-3">Unidad</th>
+                  <th class="px-4 py-3">Operador</th>
+                  <th class="px-4 py-3">Estado</th>
+                  <th class="px-4 py-3">Fecha</th>
+                </tr>
+              </thead>
+              <tbody id="reportsTable" class="divide-y divide-orange-50"></tbody>
+            </table>
+          </div>
+          <div id="emptyState" class="hidden px-4 py-10 text-center text-sm font-bold text-slate-500">No hay reportes para los filtros seleccionados.</div>
+        </section>
+
+        <aside class="space-y-5">
+          <section class="panel-card rounded-lg p-4">
+            <div class="flex items-center justify-between">
+              <h2 class="font-black text-[#7c2d12]">Pendientes offline</h2>
+              <span id="pendingCount" class="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-[#7c2d12]">0</span>
+            </div>
+            <div id="pendingList" class="mt-3 space-y-2 text-sm text-slate-700"></div>
+          </section>
+
+          <section class="panel-card rounded-lg p-4">
+            <h2 class="font-black text-[#7c2d12]">Alertas y fallas</h2>
+            <div id="alertsList" class="mt-3 space-y-3"></div>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = { token: sessionStorage.getItem('apptolvaAdminToken') || '', reports: [], lastTotal: 0 };
+    const $ = (id) => document.getElementById(id);
+
+    function authHeaders() {
+      return state.token ? { 'X-Admin-Token': state.token } : {};
+    }
+
+    function filters() {
+      const params = new URLSearchParams();
+      [['from', 'fromFilter'], ['to', 'toFilter'], ['unit', 'unitFilter'], ['operator', 'operatorFilter'], ['type', 'typeFilter']]
+        .forEach(([key, id]) => {
+          const value = $(id).value.trim();
+          if (value) params.set(key, value);
+        });
+      return params;
+    }
+
+    function formatDate(value) {
+      return new Intl.DateTimeFormat('es-MX', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+    }
+
+    function showToast(text) {
+      $('toast').textContent = text;
+      $('toast').classList.add('show');
+      setTimeout(() => $('toast').classList.remove('show'), 2800);
+    }
+
+    function render(data) {
+      const summary = data.summary || {};
+      $('statTotal').textContent = summary.total || 0;
+      $('statChecklist').textContent = summary.checklist || 0;
+      $('statBitacoras').textContent = summary.bitacoras || 0;
+      $('statAltas').textContent = summary.altas || 0;
+      $('statOperadores').textContent = summary.operadores || 0;
+      $('statUnidades').textContent = summary.unidades || 0;
+      $('syncState').textContent = `Actualizado ${formatDate(data.generatedAt)}`;
+
+      const total = Number(summary.total || 0);
+      if (state.lastTotal && total > state.lastTotal) showToast(`${total - state.lastTotal} reporte(s) nuevo(s) sincronizado(s)`);
+      state.lastTotal = total;
+      state.reports = data.reports || [];
+
+      $('reportsTable').innerHTML = state.reports.map((report) => `
+        <tr class="hover:bg-orange-50/70">
+          <td class="px-4 py-3 font-black text-[#7c2d12]">${report.folio}</td>
+          <td class="px-4 py-3 capitalize">${report.type}</td>
+          <td class="px-4 py-3">${report.unitId}</td>
+          <td class="px-4 py-3">${report.driverName}</td>
+          <td class="px-4 py-3"><span class="status-dot bg-green-600"></span> ${report.syncStatus}</td>
+          <td class="px-4 py-3 whitespace-nowrap">${formatDate(report.createdAt)}</td>
+        </tr>
+      `).join('');
+      $('emptyState').classList.toggle('hidden', state.reports.length > 0);
+
+      const pending = JSON.parse(localStorage.getItem('apptolvaPendingNotices') || '[]');
+      $('pendingCount').textContent = pending.length;
+      $('pendingList').innerHTML = pending.length
+        ? pending.slice(-6).reverse().map((item) => `<div class="rounded-md bg-orange-50 p-3 font-bold">Reporte pendiente del operador ${item.operator || 'sin nombre'}<br><span class="text-xs text-slate-500">${item.folio || item.id}</span></div>`).join('')
+        : '<p class="text-sm text-slate-500">Sin pendientes detectados en este navegador.</p>';
+
+      $('alertsList').innerHTML = (data.alerts || []).length
+        ? data.alerts.map((alert) => `
+            <div class="rounded-md border border-red-100 bg-red-50 p-3">
+              <div class="flex items-center justify-between gap-2">
+                <strong class="text-sm text-red-800">${alert.unitId}</strong>
+                <span class="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-red-700">${alert.priority}</span>
+              </div>
+              <p class="mt-1 text-sm font-bold text-slate-700">${alert.summary}</p>
+              <p class="text-xs text-slate-500">${alert.driverName} | ${formatDate(alert.createdAt)}</p>
+            </div>
+          `).join('')
+        : '<p class="text-sm text-slate-500">Sin alertas con los filtros actuales.</p>';
+    }
+
+    async function loadReports() {
+      $('syncState').textContent = 'Consultando base central...';
+      const response = await fetch(`/api/admin-reports?${filters()}`, { headers: authHeaders() });
+      if (response.status === 401) throw new Error('Token administrativo inválido');
+      if (!response.ok) throw new Error('No se pudo consultar el panel');
+      render(await response.json());
+    }
+
+    $('loginBtn').addEventListener('click', async () => {
+      state.token = $('adminToken').value.trim();
+      sessionStorage.setItem('apptolvaAdminToken', state.token);
+      try {
+        await loadReports();
+        $('loginPanel').classList.add('hidden');
+        $('dashboard').classList.remove('hidden');
+      } catch (error) {
+        $('loginMsg').textContent = error.message;
+        $('loginMsg').classList.remove('hidden');
+      }
+    });
+
+    $('refreshBtn').addEventListener('click', loadReports);
+    $('applyFilters').addEventListener('click', loadReports);
+    $('exportCsv').addEventListener('click', async () => {
+      const response = await fetch(`/api/admin-reports?${filters()}&export=csv`, { headers: authHeaders() });
+      if (!response.ok) return showToast('No se pudo exportar CSV');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'apptolva-reportes.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+    $('exportPdf').addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(14);
+      doc.text('Panel Administrativo AppTolva', 14, 18);
+      doc.setFontSize(9);
+      state.reports.slice(0, 45).forEach((report, index) => {
+        doc.text(`${report.folio} | ${report.type} | ${report.unitId} | ${report.driverName} | ${formatDate(report.createdAt)}`, 14, 30 + index * 5);
+      });
+      doc.save('apptolva-reportes.pdf');
+    });
+
+    if (state.token) $('adminToken').value = state.token;
+    setInterval(() => {
+      if (!$('dashboard').classList.contains('hidden')) loadReports().catch(() => {});
+    }, 30000);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'REPORT_QUEUED') {
+          const pending = JSON.parse(localStorage.getItem('apptolvaPendingNotices') || '[]');
+          pending.push({ id: event.data.id, folio: event.data.folio, operator: event.data.operator });
+          localStorage.setItem('apptolvaPendingNotices', JSON.stringify(pending.slice(-20)));
+          showToast('Reporte guardado offline pendiente de sincronizar');
+        }
+        if (event.data?.type === 'REPORT_SYNCED') {
+          loadReports().catch(() => {});
+          showToast('Service worker sincronizó un reporte');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
