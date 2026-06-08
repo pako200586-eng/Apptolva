@@ -9,6 +9,7 @@ const OFFLINE_URLS = [
   "./",
   "./index.html",
   "./bitacora_master.html",
+  "./admin.html",
   "./viewer.html",
   "./manifest.json",
   "./icon-192x192.png",
@@ -141,7 +142,13 @@ async function queueBitacoraRequest(request) {
   } catch (error) {
     const payload = await request.clone().json();
     const record = await savePendingReport(payload);
-    await notifyClients({ type: "REPORT_QUEUED", id: record.id });
+    await notifyClients({
+      type: "REPORT_QUEUED",
+      id: record.id,
+      folio: payload.folio || "",
+      operator: payload.driverName || "",
+      unitId: payload.unitId || ""
+    });
     return new Response(JSON.stringify({
       offline: true,
       queued: true,
@@ -176,6 +183,8 @@ async function enviarReportesPendientes() {
           type: "REPORT_SYNCED",
           id: reporte.id,
           folio: payload.folio,
+          operator: payload.driverName || "",
+          unitId: payload.unitId || "",
           url: result.url || "",
           expiresAt: result.expiresAt || ""
         });
