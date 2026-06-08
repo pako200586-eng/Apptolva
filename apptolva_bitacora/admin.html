@@ -96,7 +96,7 @@
                   <th class="px-4 py-3">Fecha</th>
                 </tr>
               </thead>
-              <tbody id="reportsTable" class="divide-y divide-orange-50"></tbody>
+              <tbody id="tabla-datos" class="divide-y divide-orange-50"></tbody>
             </table>
           </div>
           <div id="emptyState" class="hidden px-4 py-10 text-center text-sm font-bold text-slate-500">No hay reportes para los filtros seleccionados.</div>
@@ -121,7 +121,7 @@
   </main>
 
   <script>
-    const state = { token: sessionStorage.getItem('apptolvaAdminToken') || '', reports: [], lastTotal: 0 };
+    const state = { token: sessionStorage.getItem('apptolvaAdminToken') || '', reports: [], allReports: [], lastTotal: 0 };
     const $ = (id) => document.getElementById(id);
 
     function authHeaders() {
@@ -139,13 +139,69 @@
     }
 
     function formatDate(value) {
-      return new Intl.DateTimeFormat('es-MX', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Sin fecha';
+      return new Intl.DateTimeFormat('es-MX', { dateStyle: 'short', timeStyle: 'short' }).format(date);
     }
 
     function showToast(text) {
       $('toast').textContent = text;
       $('toast').classList.add('show');
       setTimeout(() => $('toast').classList.remove('show'), 2800);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function normalizeBitacora(bitacora, index) {
+      return {
+        id: bitacora.id || bitacora.folio || `bitacora-${index + 1}`,
+        folio: bitacora.folio || bitacora.id || `B-${String(index + 1).padStart(4, '0')}`,
+        type: bitacora.type || bitacora.tipo || 'bitacora',
+        unitId: bitacora.unitId || bitacora.unidad || bitacora.unidadId || 'Sin unidad',
+        driverName: bitacora.driverName || bitacora.operador || bitacora.conductor || 'Sin operador',
+        priority: bitacora.priority || bitacora.prioridad || 'baja',
+        syncStatus: bitacora.syncStatus || bitacora.estado || 'sincronizado',
+        createdAt: bitacora.createdAt || bitacora.fecha || new Date().toISOString(),
+        payload: bitacora,
+      };
+    }
+
+    function buildDashboardData(bitacoras) {
+      const reports = bitacoras.map(normalizeBitacora);
+      const operadores = new Set(reports.map((report) => report.driverName).filter(Boolean));
+      const unidades = new Set(reports.map((report) => report.unitId).filter(Boolean));
+      const alerts = reports
+        .filter((report) => report.type === 'falla' || report.priority === 'alta')
+        .map((report) => ({
+          id: report.id,
+          folio: report.folio,
+          unitId: report.unitId,
+          driverName: report.driverName,
+          priority: report.priority,
+          createdAt: report.createdAt,
+          summary: report.payload.falla || report.payload.incident || report.payload.failureType || 'Revisión con posible incidencia',
+        }));
+
+      return {
+        summary: {
+          total: reports.length,
+          checklist: reports.filter((report) => report.type === 'checklist').length,
+          bitacoras: reports.filter((report) => report.type === 'bitacora').length,
+          altas: reports.filter((report) => report.priority === 'alta').length,
+          operadores: operadores.size,
+          unidades: unidades.size,
+        },
+        reports,
+        alerts,
+        generatedAt: new Date().toISOString(),
+      };
     }
 
     function render(data) {
@@ -162,14 +218,15 @@
       if (state.lastTotal && total > state.lastTotal) showToast(`${total - state.lastTotal} reporte(s) nuevo(s) sincronizado(s)`);
       state.lastTotal = total;
       state.reports = data.reports || [];
+      if (!data.filtered) state.allReports = state.reports;
 
-      $('reportsTable').innerHTML = state.reports.map((report) => `
+      $('tabla-datos').innerHTML = state.reports.map((report) => `
         <tr class="hover:bg-orange-50/70">
-          <td class="px-4 py-3 font-black text-[#7c2d12]">${report.folio}</td>
-          <td class="px-4 py-3 capitalize">${report.type}</td>
-          <td class="px-4 py-3">${report.unitId}</td>
-          <td class="px-4 py-3">${report.driverName}</td>
-          <td class="px-4 py-3"><span class="status-dot bg-green-600"></span> ${report.syncStatus}</td>
+          <td class="px-4 py-3 font-black text-[#7c2d12]">${escapeHtml(report.folio)}</td>
+          <td class="px-4 py-3 capitalize">${escapeHtml(report.type)}</td>
+          <td class="px-4 py-3">${escapeHtml(report.unitId)}</td>
+          <td class="px-4 py-3">${escapeHtml(report.driverName)}</td>
+          <td class="px-4 py-3"><span class="status-dot bg-green-600"></span> ${escapeHtml(report.syncStatus)}</td>
           <td class="px-4 py-3 whitespace-nowrap">${formatDate(report.createdAt)}</td>
         </tr>
       `).join('');
@@ -195,33 +252,64 @@
         : '<p class="text-sm text-slate-500">Sin alertas con los filtros actuales.</p>';
     }
 
-    async function loadReports() {
-      $('syncState').textContent = 'Consultando base central...';
-      const response = await fetch(`/api/admin-reports?${filters()}`, { headers: authHeaders() });
+    async function cargarDatos() {
+      $('syncState').textContent = 'Consultando bitácoras...';
+      $('tabla-datos').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center font-bold text-slate-500">Cargando bitácoras...</td></tr>';
+
+      const response = await fetch('/.netlify/functions/get-bitacoras', { headers: authHeaders() });
       if (response.status === 401) throw new Error('Token administrativo inválido');
-      if (!response.ok) throw new Error('No se pudo consultar el panel');
-      render(await response.json());
+      if (!response.ok) throw new Error('No se pudieron cargar las bitácoras');
+
+      const bitacoras = await response.json();
+      render(buildDashboardData(Array.isArray(bitacoras) ? bitacoras : []));
     }
 
     $('loginBtn').addEventListener('click', async () => {
       state.token = $('adminToken').value.trim();
       sessionStorage.setItem('apptolvaAdminToken', state.token);
       try {
-        await loadReports();
+        await cargarDatos();
         $('loginPanel').classList.add('hidden');
         $('dashboard').classList.remove('hidden');
       } catch (error) {
         $('loginMsg').textContent = error.message;
         $('loginMsg').classList.remove('hidden');
+        $('tabla-datos').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
       }
     });
 
-    $('refreshBtn').addEventListener('click', loadReports);
-    $('applyFilters').addEventListener('click', loadReports);
+    $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));
+    $('applyFilters').addEventListener('click', () => {
+      const params = filters();
+      const filtered = state.allReports.filter((report) => {
+        const created = new Date(report.createdAt);
+        const from = params.get('from') ? new Date(params.get('from')) : null;
+        const to = params.get('to') ? new Date(`${params.get('to')}T23:59:59.999`) : null;
+        const unit = (params.get('unit') || '').toLowerCase();
+        const operator = (params.get('operator') || '').toLowerCase();
+        const type = params.get('type');
+
+        return (!from || created >= from)
+          && (!to || created <= to)
+          && (!unit || report.unitId.toLowerCase().includes(unit))
+          && (!operator || report.driverName.toLowerCase().includes(operator))
+          && (!type || type === 'todos' || report.type === type);
+      });
+
+      render({ ...buildDashboardData(filtered.map((report) => report.payload || report)), filtered: true });
+    });
     $('exportCsv').addEventListener('click', async () => {
-      const response = await fetch(`/api/admin-reports?${filters()}&export=csv`, { headers: authHeaders() });
-      if (!response.ok) return showToast('No se pudo exportar CSV');
-      const blob = await response.blob();
+      if (!state.reports.length) return showToast('No hay datos para exportar');
+      const header = ['folio', 'tipo', 'unidad', 'operador', 'estado', 'fecha'];
+      const lines = state.reports.map((report) => [
+        report.folio,
+        report.type,
+        report.unitId,
+        report.driverName,
+        report.syncStatus,
+        report.createdAt,
+      ].map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','));
+      const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -243,7 +331,7 @@
 
     if (state.token) $('adminToken').value = state.token;
     setInterval(() => {
-      if (!$('dashboard').classList.contains('hidden')) loadReports().catch(() => {});
+      if (!$('dashboard').classList.contains('hidden')) cargarDatos().catch(() => {});
     }, 30000);
 
     if ('serviceWorker' in navigator) {
@@ -255,7 +343,7 @@
           showToast('Reporte guardado offline pendiente de sincronizar');
         }
         if (event.data?.type === 'REPORT_SYNCED') {
-          loadReports().catch(() => {});
+          cargarDatos().catch(() => {});
           showToast('Service worker sincronizó un reporte');
         }
       });
