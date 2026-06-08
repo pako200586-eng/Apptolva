@@ -3,6 +3,8 @@
   "name": "App Tolva Bitácora Bachoco",
   "short_name": "AppTolva",
   "description": "Aplicación interna para operadores de tractocamiones de Grupo Bachoco con bitácoras, checklist y reportes offline.",
+  "lang": "es-MX",
+  "version": "10.0",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
