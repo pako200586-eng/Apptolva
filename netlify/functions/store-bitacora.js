@@ -73,6 +73,26 @@ function inferPriority(data) {
   return inferReportType(data) === "falla" ? "media" : "baja";
 }
 
+function normalizePayload(data) {
+  const folio = String(data.folio || data.id || "").trim();
+  const unitId = String(data.unitId || data.unidad || data.unidadId || data.economico || "").trim();
+  const driverName = String(data.driverName || data.operador || data.conductor || data.operator || "").trim();
+  const license = String(data.license || data.licencia || "").trim();
+  const dateValue = data.fecha || data.date || data.createdAt || new Date().toISOString();
+  const fecha = Number.isNaN(new Date(dateValue).getTime())
+    ? new Date().toISOString()
+    : new Date(dateValue).toISOString();
+
+  return {
+    ...data,
+    folio,
+    unitId,
+    driverName,
+    license,
+    fecha,
+  };
+}
+
 function validateBitacoraPayload(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     return "Payload inválido";
@@ -120,7 +140,7 @@ export default async (req) => {
         return jsonResponse(413, { error: "Payload demasiado grande" }, corsHeaders);
       }
 
-      const data = await req.json();
+      const data = normalizePayload(await req.json());
       const validationError = validateBitacoraPayload(data);
       if (validationError) {
         return jsonResponse(400, { error: validationError }, corsHeaders);
@@ -129,7 +149,6 @@ export default async (req) => {
       const id = generateId();
       const reportType = inferReportType(data);
       const priority = inferPriority(data);
-      const license = typeof data.license === "string" ? data.license : "";
 
       await database.pool.query(
         `
@@ -144,7 +163,7 @@ export default async (req) => {
           reportType,
           data.unitId.trim(),
           data.driverName.trim(),
-          license.trim(),
+          data.license.trim(),
           priority,
           JSON.stringify(data),
         ],
@@ -153,7 +172,20 @@ export default async (req) => {
       const origin = new URL(req.url).origin;
       const viewerUrl = `${origin}/viewer.html?id=${id}`;
 
-      return jsonResponse(200, { id, url: viewerUrl, synced: true }, corsHeaders);
+      return jsonResponse(
+        200,
+        {
+          id,
+          folio: data.folio,
+          operador: data.driverName,
+          unidad: data.unitId,
+          fecha: data.fecha,
+          status: "sincronizado",
+          url: viewerUrl,
+          synced: true,
+        },
+        corsHeaders,
+      );
     } catch (error) {
       return jsonResponse(500, { error: error.message }, corsHeaders);
     }

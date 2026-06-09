@@ -22,15 +22,44 @@ function createCorsHeaders(req) {
 
 function hasAdminAccess(req) {
   const requiredToken = process.env.ADMIN_DASHBOARD_TOKEN;
-  if (!requiredToken) return true;
+  const adminUser = process.env.ADMIN_SUPERVISOR_USER;
+  const adminPassword = process.env.ADMIN_SUPERVISOR_PASSWORD;
 
   const tokenFromHeader = req.headers.get("x-admin-token");
   const authHeader = req.headers.get("authorization") || "";
   const bearerToken = authHeader.startsWith("Bearer ")
     ? authHeader.slice(7).trim()
     : "";
+  const basicCredentials = parseBasicAuth(authHeader);
 
-  return tokenFromHeader === requiredToken || bearerToken === requiredToken;
+  if (requiredToken && (tokenFromHeader === requiredToken || bearerToken === requiredToken)) {
+    return true;
+  }
+
+  return Boolean(
+    adminUser &&
+      adminPassword &&
+      basicCredentials &&
+      basicCredentials.username === adminUser &&
+      basicCredentials.password === adminPassword,
+  );
+}
+
+function parseBasicAuth(authHeader) {
+  if (!authHeader.startsWith("Basic ")) return null;
+
+  try {
+    const decoded = atob(authHeader.slice(6));
+    const separatorIndex = decoded.indexOf(":");
+    if (separatorIndex === -1) return null;
+
+    return {
+      username: decoded.slice(0, separatorIndex),
+      password: decoded.slice(separatorIndex + 1),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function buildWhere(searchParams) {
@@ -125,7 +154,10 @@ export default async (req) => {
   }
 
   if (!hasAdminAccess(req)) {
-    return jsonResponse(401, { error: "Unauthorized" }, corsHeaders);
+    return jsonResponse(401, { error: "Unauthorized" }, {
+      ...corsHeaders,
+      "WWW-Authenticate": 'Basic realm="AppTolva Supervisores"',
+    });
   }
 
   const url = new URL(req.url);
