@@ -271,11 +271,11 @@
         <div class="mt-4">
             <button onclick="procesarFinal()" id="btnFinal" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-4 rounded-xl shadow-xl hover:scale-[1.02] transition-transform flex flex-col justify-center items-center">
                 <div class="flex items-center gap-3 text-xl">
-                    <i class="fas fa-file-code"></i>
+                    <i class="fas fa-file-pdf"></i>
                     <span>+</span>
-                    <i class="fab fa-whatsapp"></i>
+                    <i class="fas fa-cloud-arrow-up"></i>
                 </div>
-                <span class="text-sm mt-1">GENERAR REPORTE Y FINALIZAR</span>
+                <span class="text-sm mt-1">GENERAR Y ENVIAR REPORTE</span>
             </button>
             <p id="statusMsg" class="text-center text-xs font-bold text-gray-400 mt-2 hidden">Contactando a la nube para asignar folio...</p>
         </div>
@@ -1050,16 +1050,63 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                 doc.save('REPORTE_' + u + '_' + opNombre + '.pdf');
 
+                // 4. ENVÍO AUTOMÁTICO AL SERVIDOR CENTRAL (sin WhatsApp)
+                msg.classList.remove('hidden');
+                msg.innerText = '📡 Enviando reporte al servidor central...';
+
+                const checklistArr = Object.entries(revResults).map(([item, estado]) => ({ item, estado }));
+                const fallasDetectadas = Object.keys(revResults).filter((k) => revResults[k] === 'MAL');
+                const reportePayload = {
+                    folio: folio,
+                    unitId: u,
+                    driverName: opNombre,
+                    license: "",
+                    reportType: "checklist",
+                    modalidad: modalidadActual,
+                    fecha: fecha,
+                    hora: hora,
+                    km: km,
+                    origen: origen,
+                    destino: destino,
+                    operador2: nombreOp2,
+                    supervisor: nombreSup,
+                    tolva1: t1,
+                    tolva2: t2,
+                    dolly: dolly,
+                    checklist: checklistArr,
+                    fallas: fallasDetectadas,
+                    observaciones: obsData,
+                    priority: fallasDetectadas.length ? "alta" : "baja"
+                };
+
+                let envioOk = false;
+                let envioOffline = false;
+                try {
+                    const resp = await fetch('/api/store-bitacora', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(reportePayload)
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    envioOk = resp.ok;
+                    envioOffline = resp.status === 202 || data.queued === true || data.offline === true;
+                } catch (error) {
+                    // El service worker encola el reporte cuando no hay conexión.
+                    envioOffline = true;
+                }
+
                 // LIMPIEZA POST-REPORTE
                 localStorage.removeItem(STORAGE_KEY);
+                restaurarBoton(btn, originalText, msg);
 
-                setTimeout(() => {
-                    restaurarBoton(btn, originalText, msg);
-                    const whatsAppLink = construirLinkWhatsapp(folio);
-                    const ir = confirm("✅ REPORTE PDF GENERADO.\n\nFolio asignado: " + folio + "\n\n¿Abrir WhatsApp para enviarlo?");
-                    if(ir) window.location.href = whatsAppLink;
-                    else location.reload();
-                }, 1000);
+                if (envioOffline) {
+                    alert("📴 REPORTE GUARDADO SIN SEÑAL\n\nFolio: " + folio + "\n\nSe enviará automáticamente al panel de supervisión cuando vuelva la conexión. El PDF ya quedó descargado en tu dispositivo.");
+                } else if (envioOk) {
+                    alert("✅ REPORTE ENVIADO AUTOMÁTICAMENTE\n\nFolio: " + folio + "\n\nEl reporte llegó al panel de supervisión y el PDF se descargó en tu dispositivo.");
+                } else {
+                    alert("⚠️ El PDF se descargó (Folio " + folio + ") pero el envío al servidor falló. Vuelve a intentarlo cuando tengas mejor señal.");
+                }
+                location.reload();
 
             } catch (error) {
                 console.error(error);
@@ -1074,42 +1121,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             btn.classList.remove('opacity-75');
             msg.classList.add('hidden');
         }
-
-        function construirLinkWhatsapp(folioYaAsignado) {
-    // Obtenemos los valores o ponemos "N/A" si están vacíos
-    const u = document.getElementById('revUnidad')?.value || "N/A";
-    const op = document.getElementById('revOperador')?.value || "N/A";
-    const fecha = new Date().toLocaleString('es-MX', { hour12: true });
-
-    let msg = `🚛 *REPORTE DE CAPACITACIÓN - TOLVA APP*\n`;
-    msg += `--------------------------------\n`;
-    msg += `📄 *FOLIO:* ${folioYaAsignado || 'S/F'}\n`;
-    msg += `📅 *FECHA:* ${fecha}\n`;
-    msg += `🚛 *UNIDAD:* ${u}\n`;
-    msg += `👤 *OPERADOR:* ${op}\n`;
-    msg += `📋 *MODALIDAD:* ${modalidadActual === 'sencillo' ? 'SENCILLO' : 'FULL'}\n`;
-    msg += `--------------------------------\n`;
-
-    // Verificamos que revResults exista para evitar errores
-    const resultados = typeof revResults !== 'undefined' ? revResults : {};
-    const bads = Object.keys(resultados).filter(k => resultados[k] === 'MAL');
-    
-    if (bads.length > 0) {
-        msg += `⚠️ *FALLAS DETECTADAS (${bads.length}):*\n`;
-        bads.forEach(b => {
-            const textoLimpio = b.toUpperCase().replace(/-/g, ' ').replace(/_/g, ' ');
-            msg += `❌ ${textoLimpio}\n`;
-        });
-    } else {
-        msg += `✅ *ESTADO:* UNIDAD SIN FALLAS\n`;
-    }
-    
-    msg += `--------------------------------\n`;
-    msg += `\n_Generado automáticamente desde apptolva.com_`;
-
-    const telefono = "529211171145"; 
-    return `https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`;
-}
 
         // FALLAS
         function sendWhatsappFalla() {

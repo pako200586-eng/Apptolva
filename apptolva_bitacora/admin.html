@@ -94,6 +94,7 @@
                   <th class="px-4 py-3">Operador</th>
                   <th class="px-4 py-3">Estado</th>
                   <th class="px-4 py-3">Fecha</th>
+                  <th class="px-4 py-3">PDF</th>
                 </tr>
               </thead>
               <tbody id="tabla-datos" class="divide-y divide-orange-50"></tbody>
@@ -159,51 +160,6 @@
         .replaceAll("'", '&#039;');
     }
 
-    function normalizeBitacora(bitacora, index) {
-      return {
-        id: bitacora.id || bitacora.folio || `bitacora-${index + 1}`,
-        folio: bitacora.folio || bitacora.id || `B-${String(index + 1).padStart(4, '0')}`,
-        type: bitacora.type || bitacora.tipo || 'bitacora',
-        unitId: bitacora.unitId || bitacora.unidad || bitacora.unidadId || 'Sin unidad',
-        driverName: bitacora.driverName || bitacora.operador || bitacora.conductor || 'Sin operador',
-        priority: bitacora.priority || bitacora.prioridad || 'baja',
-        syncStatus: bitacora.syncStatus || bitacora.estado || 'sincronizado',
-        createdAt: bitacora.createdAt || bitacora.fecha || new Date().toISOString(),
-        payload: bitacora,
-      };
-    }
-
-    function buildDashboardData(bitacoras) {
-      const reports = bitacoras.map(normalizeBitacora);
-      const operadores = new Set(reports.map((report) => report.driverName).filter(Boolean));
-      const unidades = new Set(reports.map((report) => report.unitId).filter(Boolean));
-      const alerts = reports
-        .filter((report) => report.type === 'falla' || report.priority === 'alta')
-        .map((report) => ({
-          id: report.id,
-          folio: report.folio,
-          unitId: report.unitId,
-          driverName: report.driverName,
-          priority: report.priority,
-          createdAt: report.createdAt,
-          summary: report.payload.falla || report.payload.incident || report.payload.failureType || 'Revisión con posible incidencia',
-        }));
-
-      return {
-        summary: {
-          total: reports.length,
-          checklist: reports.filter((report) => report.type === 'checklist').length,
-          bitacoras: reports.filter((report) => report.type === 'bitacora').length,
-          altas: reports.filter((report) => report.priority === 'alta').length,
-          operadores: operadores.size,
-          unidades: unidades.size,
-        },
-        reports,
-        alerts,
-        generatedAt: new Date().toISOString(),
-      };
-    }
-
     function render(data) {
       const summary = data.summary || {};
       $('statTotal').textContent = summary.total || 0;
@@ -228,6 +184,12 @@
           <td class="px-4 py-3">${escapeHtml(report.driverName)}</td>
           <td class="px-4 py-3"><span class="status-dot bg-green-600"></span> ${escapeHtml(report.syncStatus)}</td>
           <td class="px-4 py-3 whitespace-nowrap">${formatDate(report.createdAt)}</td>
+          <td class="px-4 py-3">
+            <a href="./viewer.html?id=${encodeURIComponent(report.id)}" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-1 rounded-md bg-[#7c2d12] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#5f220e]">
+              <i class="fas fa-file-pdf"></i> Ver PDF
+            </a>
+          </td>
         </tr>
       `).join('');
       $('emptyState').classList.toggle('hidden', state.reports.length > 0);
@@ -252,16 +214,17 @@
         : '<p class="text-sm text-slate-500">Sin alertas con los filtros actuales.</p>';
     }
 
-    async function cargarDatos() {
-      $('syncState').textContent = 'Consultando bitácoras...';
-      $('tabla-datos').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center font-bold text-slate-500">Cargando bitácoras...</td></tr>';
+    async function cargarDatos(params) {
+      const query = (params || filters()).toString();
+      $('syncState').textContent = 'Consultando reportes...';
+      $('tabla-datos').innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
 
-      const response = await fetch('/.netlify/functions/get-bitacoras', { headers: authHeaders() });
+      const response = await fetch(`/api/admin-reports${query ? `?${query}` : ''}`, { headers: authHeaders() });
       if (response.status === 401) throw new Error('Token administrativo inválido');
-      if (!response.ok) throw new Error('No se pudieron cargar las bitácoras');
+      if (!response.ok) throw new Error('No se pudieron cargar los reportes');
 
-      const bitacoras = await response.json();
-      render(buildDashboardData(Array.isArray(bitacoras) ? bitacoras : []));
+      const data = await response.json();
+      render({ ...data, filtered: Boolean(query) });
     }
 
     $('loginBtn').addEventListener('click', async () => {
@@ -274,30 +237,12 @@
       } catch (error) {
         $('loginMsg').textContent = error.message;
         $('loginMsg').classList.remove('hidden');
-        $('tabla-datos').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
+        $('tabla-datos').innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
       }
     });
 
     $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));
-    $('applyFilters').addEventListener('click', () => {
-      const params = filters();
-      const filtered = state.allReports.filter((report) => {
-        const created = new Date(report.createdAt);
-        const from = params.get('from') ? new Date(params.get('from')) : null;
-        const to = params.get('to') ? new Date(`${params.get('to')}T23:59:59.999`) : null;
-        const unit = (params.get('unit') || '').toLowerCase();
-        const operator = (params.get('operator') || '').toLowerCase();
-        const type = params.get('type');
-
-        return (!from || created >= from)
-          && (!to || created <= to)
-          && (!unit || report.unitId.toLowerCase().includes(unit))
-          && (!operator || report.driverName.toLowerCase().includes(operator))
-          && (!type || type === 'todos' || report.type === type);
-      });
-
-      render({ ...buildDashboardData(filtered.map((report) => report.payload || report)), filtered: true });
-    });
+    $('applyFilters').addEventListener('click', () => cargarDatos(filters()).catch((error) => showToast(error.message)));
     $('exportCsv').addEventListener('click', async () => {
       if (!state.reports.length) return showToast('No hay datos para exportar');
       const header = ['folio', 'tipo', 'unidad', 'operador', 'estado', 'fecha'];
