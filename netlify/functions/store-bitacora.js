@@ -55,8 +55,24 @@ function hasValidToken(req) {
   return tokenFromHeader === requiredToken || bearerToken === requiredToken;
 }
 
+function normalizeReportType(value) {
+  const raw = String(value || "").toLowerCase().trim();
+  if (["checklist", "revision", "revisión", "inspeccion", "inspección"].includes(raw)) {
+    return "checklist";
+  }
+  if (["bitacora", "bitácora", "horas", "nom087", "nom-087"].includes(raw)) {
+    return "bitacora";
+  }
+  if (["falla", "incidente", "incident"].includes(raw)) return "falla";
+  return null;
+}
+
 function inferReportType(data) {
-  if (Array.isArray(data.checklist)) return "checklist";
+  // Honor the explicit type the operator app sends before guessing from payload.
+  const explicit = normalizeReportType(data.tipo) || normalizeReportType(data.reportType);
+  if (explicit) return explicit;
+
+  if (Array.isArray(data.checklistData) || Array.isArray(data.checklist)) return "checklist";
   if (Array.isArray(data.logs)) return "bitacora";
   if (data.falla || data.incident || data.priority) return "falla";
   return "reporte";
@@ -159,6 +175,7 @@ export default async (req) => {
           id,
           folio: data.folio.trim(),
           fecha: new Date().toISOString(),
+          tipo: reportType,
           status: "sincronizado",
           url: viewerUrl,
           synced: true,

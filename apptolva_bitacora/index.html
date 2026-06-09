@@ -1056,6 +1056,16 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                 const checklistArr = Object.entries(revResults).map(([item, estado]) => ({ item, estado }));
                 const fallasDetectadas = Object.keys(revResults).filter((k) => revResults[k] === 'MAL');
+                // Estructura autocontenida para que el panel /admin reproduzca el PDF idéntico al del operador.
+                const checklistData = secciones.map((sec) => ({
+                    id: sec.id,
+                    titulo: sec.titulo,
+                    observacion: obsData[sec.id] || '',
+                    categorias: (revData[sec.id] || []).map((cat) => ({
+                        cat: cat.cat,
+                        items: cat.i.map((item) => ({ item, estado: revResults[sec.id + '-' + item] || '' }))
+                    }))
+                }));
                 const reportePayload = {
                     folio: folio,
                     unitId: u,
@@ -1074,6 +1084,10 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     tolva2: t2,
                     dolly: dolly,
                     checklist: checklistArr,
+                    checklistData: checklistData,
+                    firmaOp: firmaOpImg,
+                    firmaOp2: firmaOp2Img,
+                    firmaSup: firmaSupImg,
                     fallas: fallasDetectadas,
                     observaciones: obsData,
                     priority: fallasDetectadas.length ? "alta" : "baja"
