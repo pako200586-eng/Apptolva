@@ -21,7 +21,7 @@ function createCorsHeaders(req) {
 }
 
 function hasAdminAccess(req) {
-  const requiredToken = process.env.ADMIN_DASHBOARD_TOKEN;
+  const requiredToken = process.env.ADMIN_TOKEN || process.env.ADMIN_DASHBOARD_TOKEN;
   if (!requiredToken) return true;
 
   const tokenFromHeader = req.headers.get("x-admin-token");

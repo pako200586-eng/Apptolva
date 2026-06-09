@@ -153,7 +153,18 @@ export default async (req) => {
       const origin = new URL(req.url).origin;
       const viewerUrl = `${origin}/viewer.html?id=${id}`;
 
-      return jsonResponse(200, { id, url: viewerUrl, synced: true }, corsHeaders);
+      return jsonResponse(
+        200,
+        {
+          id,
+          folio: data.folio.trim(),
+          fecha: new Date().toISOString(),
+          status: "sincronizado",
+          url: viewerUrl,
+          synced: true,
+        },
+        corsHeaders,
+      );
     } catch (error) {
       return jsonResponse(500, { error: error.message }, corsHeaders);
     }
