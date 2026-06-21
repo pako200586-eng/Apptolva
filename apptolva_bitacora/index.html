@@ -61,9 +61,53 @@
         
         /* AUTO-SAVE INDICATOR */
         #save-indicator { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 20px; font-size: 10px; display: none; z-index: 100; }
+
+        /* EVALUACIÓN: botones SÍ / NO / N/A */
+        .eval-rad { transition: 0.15s; }
+        .eval-si { background-color: #16a34a; color: #fff; border-color: #16a34a; }
+        .eval-no { background-color: #dc2626; color: #fff; border-color: #dc2626; }
+        .eval-na { background-color: #6b7280; color: #fff; border-color: #6b7280; }
+
+        /* IMPRESIÓN: solo la evaluación, formato documento limpio */
+        @media print {
+            body { padding: 0; background: #fff; }
+            header, #login-overlay, #save-indicator, #progContainer, .no-print { display: none !important; }
+            .section-content:not(.active) { display: none !important; }
+            #view-eval { padding: 0 !important; max-width: 100% !important; }
+            #eval-doc .shadow-sm, #eval-doc .shadow, #eval-doc .shadow-md { box-shadow: none !important; }
+            .eval-rad { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .eval-si, .eval-no, .eval-na, #evalBadge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
     </style>
 </head>
 <body class="text-slate-800">
+
+    <!-- Compuerta de acceso al módulo de Evaluación -->
+    <div id="evalTokenOverlay" class="hidden fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div class="bg-[#ea580c] text-white p-5 flex items-center gap-3">
+                <i class="fas fa-lock text-2xl"></i>
+                <div>
+                    <h3 class="font-black text-lg leading-tight">Acceso restringido</h3>
+                    <p class="text-xs text-orange-100">Módulo de Evaluación de Operadores</p>
+                </div>
+            </div>
+            <div class="p-5">
+                <label class="block text-sm font-bold text-gray-700 mb-2">Ingresa el token de acceso</label>
+                <input id="evalTokenInput" type="password" autocomplete="off"
+                       class="w-full border-2 border-gray-300 rounded-lg p-3 text-center tracking-widest focus:border-[#ea580c] focus:outline-none"
+                       placeholder="••••••••"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();validarTokenEval();}">
+                <p id="evalTokenError" class="hidden text-red-600 text-xs font-bold mt-2 text-center">
+                    <i class="fas fa-times-circle mr-1"></i> Token incorrecto. Intenta de nuevo.
+                </p>
+                <div class="flex gap-2 mt-4">
+                    <button onclick="cerrarTokenEval()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-lg hover:bg-gray-200 transition">Cancelar</button>
+                    <button onclick="validarTokenEval()" class="flex-1 bg-[#ea580c] text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition">Ingresar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="save-indicator"><i class="fas fa-save mr-1"></i> Guardado</div>
 
@@ -169,10 +213,10 @@
         <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
     </button>
 
-    <!-- 6. Certificación -->
-    <button onclick="nav('quiz')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
-        <i class="fas fa-graduation-cap text-3xl text-green-500 mb-2"></i>                
-        <span class="font-bold text-gray-700 text-xs text-center">CERTIFICACIÓN</span>
+    <!-- 6. Evaluación -->
+    <button onclick="nav('eval')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
+        <i class="fas fa-user-check text-3xl text-green-500 mb-2"></i>
+        <span class="font-bold text-gray-700 text-xs text-center">EVALUACIÓN</span>
     </button>
 
     <!-- 7. Panel Administrativo -->
@@ -325,19 +369,34 @@
         </div>
     </main>
 
-    <main id="view-quiz" class="section-content p-4 max-w-lg mx-auto">
-        <div id="quizStart" class="text-center mt-10">
-            <i class="fas fa-shield-alt text-6xl text-orange-600 mb-4"></i>
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">Certificación Operativa</h2>
-            <button onclick="startQuiz()" class="bg-orange-600 text-white font-bold py-4 px-10 rounded-full shadow-lg active:scale-95">INICIAR EXAMEN</button>
+    <main id="view-eval" class="section-content p-4 max-w-2xl mx-auto">
+        <!-- PANTALLA DE SELECCIÓN -->
+        <div id="evalStart">
+            <div class="text-center mb-6 mt-4">
+                <i class="fas fa-user-check text-5xl text-orange-600 mb-3"></i>
+                <h2 class="text-2xl font-black text-gray-800">Evaluación de Operadores</h2>
+                <p class="text-sm text-gray-500">Selecciona el tipo de evaluación a aplicar.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="iniciarEval('conduccion')" class="menu-btn bg-white p-5 rounded-xl shadow-md border-l-4 border-orange-500 flex items-center gap-4 text-left transform transition hover:scale-[1.02]">
+                    <i class="fas fa-truck-moving text-3xl text-orange-500 w-10 text-center"></i>
+                    <div>
+                        <span class="font-bold text-gray-800 block text-sm">Evaluación de Conducción</span>
+                        <span class="text-[11px] text-gray-500">Inspección, enganche, maniobras y manejo defensivo</span>
+                    </div>
+                </button>
+                <button onclick="iniciarEval('descarga')" class="menu-btn bg-white p-5 rounded-xl shadow-md border-l-4 border-orange-600 flex items-center gap-4 text-left transform transition hover:scale-[1.02]">
+                    <i class="fas fa-fill-drip text-3xl text-orange-600 w-10 text-center"></i>
+                    <div>
+                        <span class="font-bold text-gray-800 block text-sm">Evaluación de Descarga de Tolvas</span>
+                        <span class="text-[11px] text-gray-500">Posicionamiento, EPP, operación y limpieza</span>
+                    </div>
+                </button>
+            </div>
         </div>
-        <div id="quizBox" class="hidden space-y-4"></div>
-        <div id="quizEnd" class="hidden text-center bg-white p-8 rounded-xl shadow border border-gray-200 mt-10">
-            <h3 class="text-xl font-bold text-gray-800">Calificación Final</h3>
-            <div id="quizScore" class="text-6xl font-black text-orange-600 my-4"></div>
-            <p id="quizMsg" class="text-sm font-bold text-gray-500 mb-6"></p>
-            <button onclick="location.reload()" class="text-blue-600 font-bold underline">Volver al Inicio</button>
-        </div>
+
+        <!-- FORMULARIO DINÁMICO -->
+        <div id="evalForm" class="hidden"></div>
     </main>
 
     <script>
@@ -560,14 +619,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             tolva2: commonTolvaItems
         };
 
-        const quizData = [
-            {q:"¿Límite máximo de velocidad permitido (Full)?", o:["80 km/h","95 km/h","110 km/h"], a:0},
-            {q:"Manejo Defensivo: Distancia con vehículo delantero", o:["Pegado a la defensa","Regla de 4 segundos","10 metros"], a:1},
-            {q:"¿Qué palanca accionas PRIMERO al descargar?", o:["Palanca 3 (Arrastre)","Palanca 4 (Sinfín)","Cualquiera"], a:1},
-            {q:"Señales de Tránsito AMARILLAS indican:", o:["Alto total","Información","Prevención / Advertencia"], a:2},
-            {q:"Distancia mínima con cables de luz:", o:["3 metros","10 metros","15 metros"], a:1}
-        ];
-
         // LÓGICA
         let currentRevTab = 'tracto';
         let revResults = {};
@@ -608,7 +659,43 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             autoGuardar();
         }
 
+        // ACCESO PROTEGIDO AL MÓDULO DE EVALUACIÓN
+        const EVAL_TOKEN = "opmaster2026";
+        let evalDesbloqueado = false;
+
+        function abrirTokenEval() {
+            const ov = document.getElementById('evalTokenOverlay');
+            const inp = document.getElementById('evalTokenInput');
+            const err = document.getElementById('evalTokenError');
+            if (err) err.classList.add('hidden');
+            if (inp) inp.value = '';
+            if (ov) ov.classList.remove('hidden');
+            setTimeout(() => { if (inp) inp.focus(); }, 50);
+        }
+
+        function cerrarTokenEval() {
+            const ov = document.getElementById('evalTokenOverlay');
+            if (ov) ov.classList.add('hidden');
+        }
+
+        function validarTokenEval() {
+            const inp = document.getElementById('evalTokenInput');
+            const err = document.getElementById('evalTokenError');
+            if (inp && inp.value === EVAL_TOKEN) {
+                evalDesbloqueado = true;
+                cerrarTokenEval();
+                nav('eval');
+            } else {
+                if (err) err.classList.remove('hidden');
+                if (inp) { inp.value = ''; inp.focus(); }
+            }
+        }
+
         function nav(id) {
+            if (id === 'eval' && !evalDesbloqueado) {
+                abrirTokenEval();
+                return;
+            }
             document.querySelectorAll('.section-content').forEach(e => e.classList.remove('active'));
             const view = document.getElementById('view-'+id);
             if(view) {
@@ -620,8 +707,9 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             const prog = document.getElementById('progContainer');
             if(prog) prog.style.display = id === 'guia' ? 'block' : 'none';
             
-            if(id === 'rev') setTimeout(resizeCanvas, 200); 
-            if(id === 'guia') renderGuide(); 
+            if(id === 'rev') setTimeout(resizeCanvas, 200);
+            if(id === 'guia') renderGuide();
+            if(id === 'eval') volverEvalMenu();
         }
 
         // GUÍA
@@ -1214,31 +1302,343 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
         
         function clearChat() { document.getElementById('chatBox').innerHTML = ''; }
 
-        // QUIZ
-        function startQuiz() {
-            document.getElementById('quizStart').classList.add('hidden');
-            const box = document.getElementById('quizBox');
-            box.classList.remove('hidden');
-            box.innerHTML = quizData.map((q, i) => `
-                <div class="bg-white p-4 rounded shadow mb-3 border border-gray-200">
-                    <p class="font-bold text-sm text-blue-900 mb-3">${i+1}. ${q.q}</p>
-                    ${q.o.map((opt, j) => `<button onclick="ans(this,${i},${j})" class="w-full text-left p-3 border rounded mb-2 text-xs font-bold hover:bg-gray-100">${opt}</button>`).join('')}
-                </div>`).join('');
-        }
-        let score = 0;
-        function ans(btn, qIdx, oIdx) {
-            const p = btn.parentElement;
-            p.querySelectorAll('button').forEach(b => b.disabled = true);
-            if(oIdx === quizData[qIdx].a) { btn.classList.add('bg-green-100','border-green-500','text-green-800'); score++; }
-            else { btn.classList.add('bg-red-100','border-red-500'); }
-            
-            if(document.querySelectorAll('#quizBox button:disabled').length >= quizData.length * 3) {
-                document.getElementById('quizBox').classList.add('hidden');
-                document.getElementById('quizEnd').classList.remove('hidden');
-                document.getElementById('quizScore').innerText = `${score}/${quizData.length}`;
-                document.getElementById('quizMsg').innerText = score === quizData.length ? "¡PERFECTO! Eres un Máster. 🏆" : "Hay que repasar el manual.";
-                if(score === quizData.length) confetti();
+        // ==============================================================
+        // EVALUACIÓN DE OPERADORES (Conducción / Descarga de Tolvas)
+        // ==============================================================
+        const evaluaciones = {
+            conduccion: {
+                titulo: "EVALUACIÓN OFICIAL DE CONDUCCIÓN",
+                icono: "fa-truck-moving",
+                storageKey: "evalOficialBachoco_conduccion",
+                campos: [
+                    { id: "opNombre", label: "OPERADOR EVALUADO", type: "text" },
+                    { id: "opFecha", label: "FECHA", type: "date" },
+                    { id: "opLicencia", label: "LICENCIA / EXPEDIENTE", type: "text" },
+                    { id: "opNegocio", label: "UNIDAD DE NEGOCIO", type: "text" },
+                    { id: "opConfig", label: "CONFIGURACIÓN", type: "text", placeholder: "Ej. Full / Cascadia" }
+                ],
+                secciones: [
+                    { titulo: "1. Inspección Pre-Viaje", pts: 12, items: [
+                        { id: "s1_1", desc: "Niveles (Aceite motor, Anticongelante, etc.)", pts: 2 },
+                        { id: "s1_2", desc: "Estado de Bandas y Carrocería", pts: 2 },
+                        { id: "s1_3", desc: "Presencia de fugas de fluidos", pts: 2 },
+                        { id: "s1_4", desc: "Neumáticos (Presión y estado)", pts: 2 },
+                        { id: "s1_5", desc: "Luces generales", pts: 2 },
+                        { id: "s1_6", desc: "Documentos de la unidad", pts: 2 }
+                    ]},
+                    { titulo: "2. Enganche y Desacople", pts: 17, items: [
+                        { id: "s2_1", desc: "Verifica zona segura / suelo firme", pts: 3 },
+                        { id: "s2_2", desc: "Uso de 3 puntos de apoyo", pts: 3 },
+                        { id: "s2_3", desc: "Desconecta líneas antes de desacoplar", pts: 3 },
+                        { id: "s2_4", desc: "Alineación de 5ta rueda y perno rey", pts: 3 },
+                        { id: "s2_5", desc: "Prueba de jalón y verificación de muelas", pts: 3 },
+                        { id: "s2_6", desc: "Levanta patines por completo", pts: 2 }
+                    ]},
+                    { titulo: "3. Maniobras en Patio", pts: 24, items: [
+                        { id: "s3_1", desc: "Reversa en línea recta (30m)", pts: 8 },
+                        { id: "s3_2", desc: "Estacionamiento (Cordón / Batería)", pts: 8 },
+                        { id: "s3_3", desc: "Maniobra de lado ciego / en L", pts: 8 }
+                    ]},
+                    { titulo: "4. Conducción Técnico-Económica", pts: 23, items: [
+                        { id: "s4_1", desc: "Opera en rango verde de revoluciones", pts: 5 },
+                        { id: "s4_2", desc: "Realiza cambios progresivos", pts: 5 },
+                        { id: "s4_3", desc: "Uso adecuado del embrague (No descansa pie)", pts: 5 },
+                        { id: "s4_4", desc: "Uso adecuado de freno de motor", pts: 4 },
+                        { id: "s4_5", desc: "Arranque suave", pts: 4 }
+                    ]},
+                    { titulo: "5. Educación Vial y Manejo Defensivo", pts: 24, items: [
+                        { id: "s5_1", desc: "Revisión constante de espejos", pts: 6 },
+                        { id: "s5_2", desc: "Distancia de seguimiento adecuada", pts: 6 },
+                        { id: "s5_3", desc: "Uso de cinturón y direccionales", pts: 6 },
+                        { id: "s5_4", desc: "Respeta señalamientos y velocidad", pts: 6 }
+                    ]}
+                ]
+            },
+            descarga: {
+                titulo: "EVALUACIÓN OFICIAL - DESCARGA DE TOLVAS",
+                icono: "fa-fill-drip",
+                storageKey: "evalOficialBachoco_descarga",
+                campos: [
+                    { id: "opNombre", label: "OPERADOR EVALUADO", type: "text" },
+                    { id: "opFecha", label: "FECHA", type: "date" },
+                    { id: "opGranja", label: "GRANJA / DESTINO", type: "text" },
+                    { id: "opEco", label: "ECONÓMICO / NO. TOLVA", type: "text" }
+                ],
+                secciones: [
+                    { titulo: "1. Llegada y Posicionamiento", pts: 20, items: [
+                        { id: "s1_1", desc: "Confirma con encargado el silo correcto (Evita mezcla)", pts: 5 },
+                        { id: "s1_2", desc: "Alineación correcta del tubo sin forzarse", pts: 5 },
+                        { id: "s1_3", desc: "Verifica tapa del silo abierta y limpia", pts: 5 },
+                        { id: "s1_4", desc: "Coloca conos de seguridad o delimita área", pts: 5 }
+                    ]},
+                    { titulo: "2. Preparación Mecánica y EPP", pts: 20, items: [
+                        { id: "s2_1", desc: "Uso de EPP completo (Casco, lentes, botas, etc.)", pts: 5 },
+                        { id: "s2_2", desc: "Revisión de mangueras hidráulicas antes de conectar", pts: 5 },
+                        { id: "s2_3", desc: "Conexión suave de Toma de Fuerza (PTO)", pts: 5 },
+                        { id: "s2_4", desc: "Ajuste de RPM correctas (No sobre-revoluciona)", pts: 5 }
+                    ]},
+                    { titulo: "3. Operación de Descarga", pts: 40, items: [
+                        { id: "s3_1", desc: "Apertura secuencial de compuertas (evita atascos)", pts: 10 },
+                        { id: "s3_2", desc: "Monitoreo auditivo del sistema (ruidos extraños)", pts: 10 },
+                        { id: "s3_3", desc: "Control de flujo para no ahogar el sistema", pts: 10 },
+                        { id: "s3_4", desc: "Verificación visual de compartimentos vacíos", pts: 10 }
+                    ]},
+                    { titulo: "4. Limpieza y Salida", pts: 20, items: [
+                        { id: "s4_1", desc: "Realiza barrido final del tubo (sistema vacío)", pts: 5 },
+                        { id: "s4_2", desc: "Desconecta PTO y baja RPM antes de apagar", pts: 5 },
+                        { id: "s4_3", desc: "Asegura el tubo en su base (candado/seguro)", pts: 5 },
+                        { id: "s4_4", desc: "Entrega documentación completa y limpia zona", pts: 5 }
+                    ]}
+                ]
             }
+        };
+
+        const EVAL_MASTERS = [
+            "FRANCISCO ALBERTO AMBROSIO SOLIS",
+            "J. CARLOS SALAS",
+            "JOSE MANUEL PEREZ LINARES",
+            "OMAR"
+        ];
+
+        let evalTipoActual = null;
+        let evalRespuestas = {};
+
+        function volverEvalMenu() {
+            evalTipoActual = null;
+            evalRespuestas = {};
+            document.getElementById('evalForm').classList.add('hidden');
+            document.getElementById('evalForm').innerHTML = '';
+            document.getElementById('evalStart').classList.remove('hidden');
+        }
+
+        function iniciarEval(tipo) {
+            const cfg = evaluaciones[tipo];
+            if (!cfg) return;
+            evalTipoActual = tipo;
+            evalRespuestas = {};
+
+            const totalItems = cfg.secciones.reduce((acc, s) => acc + s.items.length, 0);
+
+            const camposHtml = cfg.campos.map(c => `
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">${c.label}</label>
+                    <input type="${c.type}" id="ev_${c.id}" data-eid="${c.id}"
+                        class="eval-input w-full p-2 border rounded text-xs font-bold uppercase"
+                        placeholder="${c.placeholder || ''}">
+                </div>`).join('');
+
+            const seccionesHtml = cfg.secciones.map(sec => `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 overflow-hidden">
+                    <h3 class="bg-slate-800 text-white text-xs font-bold px-3 py-2 flex justify-between items-center">
+                        <span>${sec.titulo}</span>
+                        <span class="text-orange-300">${sec.pts} pts</span>
+                    </h3>
+                    <div>
+                        ${sec.items.map(item => `
+                        <div class="flex justify-between items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-0">
+                            <div class="flex-1 text-xs text-gray-700">
+                                ${item.desc}
+                                <span class="block text-[10px] text-gray-400 font-bold mt-0.5">Valor: ${item.pts} pts</span>
+                            </div>
+                            <div class="flex gap-1" data-item="${item.id}">
+                                <button type="button" onclick="evalResponder('${item.id}','SI',${item.pts})" data-val="SI"  class="eval-rad w-9 h-9 text-[11px] font-black border rounded text-gray-500 bg-white">SÍ</button>
+                                <button type="button" onclick="evalResponder('${item.id}','NO',${item.pts})" data-val="NO"  class="eval-rad w-9 h-9 text-[11px] font-black border rounded text-gray-500 bg-white">NO</button>
+                                <button type="button" onclick="evalResponder('${item.id}','NA',${item.pts})" data-val="NA"  class="eval-rad w-9 h-9 text-[11px] font-black border rounded text-gray-500 bg-white">N/A</button>
+                            </div>
+                        </div>`).join('')}
+                    </div>
+                </div>`).join('');
+
+            const html = `
+                <!-- Encabezado tipo documento -->
+                <div id="eval-doc">
+                    <div class="text-center border-b-4 border-orange-600 pb-3 mb-4">
+                        <div class="text-orange-600 font-black text-xl tracking-wide">GRUPO BACHOCO</div>
+                        <div class="text-[11px] text-gray-500 font-bold uppercase tracking-wider">${cfg.titulo}</div>
+                        <div class="text-[9px] text-gray-400 font-bold uppercase mt-1">Flota Propia · PA Chapo</div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4 grid grid-cols-2 gap-3">
+                        ${camposHtml}
+                    </div>
+
+                    ${seccionesHtml}
+
+                    <!-- Resultado -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 text-center mb-4">
+                        <div class="text-[11px] font-bold text-gray-500 uppercase">Calificación Final (Mínimo aprobatorio: 80%)</div>
+                        <div id="evalScore" class="text-3xl font-black text-gray-800 my-2">0 / 100 <span class="text-lg text-gray-400">(0%)</span></div>
+                        <div id="evalBadge" class="inline-block px-5 py-1.5 rounded-full text-sm font-bold text-white" style="background:#cbd5e1;">PENDIENTE</div>
+                        <div id="evalProgreso" class="text-[10px] text-gray-400 font-bold mt-2">0 de ${totalItems} criterios evaluados</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Observaciones y Recomendaciones</label>
+                        <textarea id="ev_opObs" data-eid="opObs" class="eval-input w-full p-3 border rounded text-xs" rows="3" placeholder="Derrames, tiempos de demora, áreas de mejora..."></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6 mb-2 mt-8">
+                        <div class="text-center">
+                            <select id="ev_opMaster" data-eid="opMaster" class="eval-input w-full text-center font-bold text-xs border-0 border-b border-black bg-transparent pb-1">
+                                <option value="">-- SELECCIONAR EVALUADOR --</option>
+                                ${EVAL_MASTERS.map(m => `<option value="${m}">${m}</option>`).join('')}
+                            </select>
+                            <div class="text-[10px] text-gray-500 mt-1">SUPERVISOR DE PRUEBA / MÁSTER</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-black h-6 mb-1"></div>
+                            <div class="text-[10px] text-gray-500">CONDUCTOR EVALUADO</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Acciones -->
+                <div class="no-print mt-6 space-y-3">
+                    <button type="button" onclick="evalMarcarTodoSi()" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg shadow active:scale-95 transition text-sm">
+                        <i class="fas fa-check-double mr-1"></i> MARCAR TODO "SÍ"
+                    </button>
+                    <button type="button" onclick="imprimirEval()" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-4 rounded-xl shadow-xl active:scale-95 transition text-base">
+                        <i class="fas fa-file-pdf mr-2"></i> IMPRIMIR / GUARDAR PDF
+                    </button>
+                    <button type="button" onclick="limpiarEval()" class="w-full bg-slate-700 text-white font-bold py-3 rounded-lg shadow active:scale-95 transition text-sm">
+                        <i class="fas fa-trash mr-1"></i> LIMPIAR PARA NUEVA EVALUACIÓN
+                    </button>
+                    <button type="button" onclick="volverEvalMenu()" class="w-full text-blue-600 font-bold text-sm py-2">
+                        <i class="fas fa-arrow-left mr-1"></i> Cambiar tipo de evaluación
+                    </button>
+                </div>`;
+
+            const form = document.getElementById('evalForm');
+            form.innerHTML = html;
+            document.getElementById('evalStart').classList.add('hidden');
+            form.classList.remove('hidden');
+
+            // Auto-guardado en cada cambio de los campos de texto
+            form.querySelectorAll('.eval-input').forEach(el => {
+                el.addEventListener('input', evalGuardar);
+                el.addEventListener('change', evalGuardar);
+            });
+
+            cargarEval();
+            calcularEval();
+            window.scrollTo(0, 0);
+        }
+
+        function evalResponder(itemId, valor, pts) {
+            evalRespuestas[itemId] = valor;
+            const grupo = document.querySelector(`[data-item="${itemId}"]`);
+            if (grupo) {
+                grupo.querySelectorAll('.eval-rad').forEach(btn => {
+                    btn.classList.remove('eval-si', 'eval-no', 'eval-na');
+                    btn.classList.add('text-gray-500', 'bg-white');
+                    if (btn.dataset.val === valor) {
+                        btn.classList.remove('text-gray-500', 'bg-white');
+                        btn.classList.add('eval-' + valor.toLowerCase());
+                    }
+                });
+            }
+            evalGuardar();
+            calcularEval();
+        }
+
+        function evalMarcarTodoSi() {
+            const cfg = evaluaciones[evalTipoActual];
+            if (!cfg) return;
+            cfg.secciones.forEach(sec => sec.items.forEach(item => evalResponder(item.id, 'SI', item.pts)));
+        }
+
+        function calcularEval() {
+            const cfg = evaluaciones[evalTipoActual];
+            if (!cfg) return;
+            let ganados = 0;
+            let aplicables = 100;
+            let contestados = 0;
+            let total = 0;
+
+            cfg.secciones.forEach(sec => sec.items.forEach(item => {
+                total++;
+                const r = evalRespuestas[item.id];
+                if (!r) return;
+                contestados++;
+                if (r === 'SI') ganados += item.pts;
+                else if (r === 'NA') aplicables -= item.pts;
+            }));
+
+            const pct = aplicables > 0 ? Math.round((ganados / aplicables) * 100) : 0;
+            document.getElementById('evalScore').innerHTML =
+                `${ganados} / ${aplicables} <span class="text-lg text-gray-400">(${pct}%)</span>`;
+
+            const badge = document.getElementById('evalBadge');
+            if (contestados === 0) {
+                badge.innerText = "PENDIENTE";
+                badge.style.background = "#cbd5e1";
+            } else if (pct >= 80) {
+                badge.innerText = "APTO (APROBADO)";
+                badge.style.background = "#16a34a";
+            } else {
+                badge.innerText = "NO APTO";
+                badge.style.background = "#dc2626";
+            }
+            document.getElementById('evalProgreso').innerText = `${contestados} de ${total} criterios evaluados`;
+        }
+
+        function evalGuardar() {
+            const cfg = evaluaciones[evalTipoActual];
+            if (!cfg) return;
+            const datos = { inputs: {}, radios: evalRespuestas };
+            document.querySelectorAll('#evalForm .eval-input').forEach(el => {
+                datos.inputs[el.dataset.eid] = el.value;
+            });
+            try {
+                localStorage.setItem(cfg.storageKey, JSON.stringify(datos));
+                const ind = document.getElementById('save-indicator');
+                if (ind) { ind.style.display = 'block'; setTimeout(() => ind.style.display = 'none', 800); }
+            } catch (e) { console.warn('No se pudo guardar la evaluación', e); }
+        }
+
+        function cargarEval() {
+            const cfg = evaluaciones[evalTipoActual];
+            if (!cfg) return;
+            const guardado = localStorage.getItem(cfg.storageKey);
+            if (!guardado) return;
+            try {
+                const datos = JSON.parse(guardado);
+                for (const id in (datos.inputs || {})) {
+                    const el = document.getElementById('ev_' + id);
+                    if (el) el.value = datos.inputs[id];
+                }
+                evalRespuestas = datos.radios || {};
+                for (const itemId in evalRespuestas) {
+                    const grupo = document.querySelector(`[data-item="${itemId}"]`);
+                    if (!grupo) continue;
+                    grupo.querySelectorAll('.eval-rad').forEach(btn => {
+                        if (btn.dataset.val === evalRespuestas[itemId]) {
+                            btn.classList.remove('text-gray-500', 'bg-white');
+                            btn.classList.add('eval-' + evalRespuestas[itemId].toLowerCase());
+                        }
+                    });
+                }
+            } catch (e) { console.warn('No se pudo cargar la evaluación', e); }
+        }
+
+        function limpiarEval() {
+            const cfg = evaluaciones[evalTipoActual];
+            if (!cfg) return;
+            if (confirm("¿Estás seguro? Se borrarán los datos para evaluar a un nuevo operador.")) {
+                localStorage.removeItem(cfg.storageKey);
+                iniciarEval(evalTipoActual);
+            }
+        }
+
+        function imprimirEval() {
+            const cfg = evaluaciones[evalTipoActual];
+            if (!cfg) return;
+            const total = cfg.secciones.reduce((a, s) => a + s.items.length, 0);
+            const contestados = Object.keys(evalRespuestas).length;
+            if (contestados < total) {
+                if (!confirm(`Faltan ${total - contestados} criterios por evaluar. ¿Imprimir de todos modos?`)) return;
+            }
+            window.print();
         }
     </script>
 
