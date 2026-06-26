@@ -392,6 +392,13 @@
                         <span class="text-[11px] text-gray-500">Posicionamiento, EPP, operación y limpieza</span>
                     </div>
                 </button>
+                <button onclick="iniciarEval('operadoresOriginal')" class="menu-btn bg-white p-5 rounded-xl shadow-md border-l-4 border-slate-800 flex items-center gap-4 text-left transform transition hover:scale-[1.02]">
+                    <i class="fas fa-file-alt text-3xl text-slate-800 w-10 text-center"></i>
+                    <div>
+                        <span class="font-bold text-gray-800 block text-sm">Evaluación Operadores Original</span>
+                        <span class="text-[11px] text-gray-500">Formato del PDF adjunto convertido a HTML con suma automática</span>
+                    </div>
+                </button>
             </div>
         </div>
 
@@ -1354,6 +1361,57 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     ]}
                 ]
             },
+            operadoresOriginal: {
+                titulo: "EVALUACIÓN DE CONDUCCIÓN PARA VEHÍCULOS UNITARIOS, ARTICULADOS Y DOBLEMENTE ARTICULADOS",
+                subtitulo: "Centro de Entrenamiento y Desarrollo para Operadores",
+                icono: "fa-file-alt",
+                storageKey: "evalOficialBachoco_operadoresOriginal",
+                estiloDocumento: "original",
+                campos: [
+                    { id: "opNombre", label: "NOMBRE DEL OPERADOR", type: "text" },
+                    { id: "opFecha", label: "FECHA", type: "date" },
+                    { id: "opUnidad", label: "UNIDAD / ECONÓMICO", type: "text" },
+                    { id: "opTipoUnidad", label: "TIPO DE VEHÍCULO", type: "text", placeholder: "Unitario / Articulado / Full" },
+                    { id: "opLicencia", label: "LICENCIA / EXPEDIENTE", type: "text" },
+                    { id: "opEvaluador", label: "EVALUADOR", type: "text" }
+                ],
+                secciones: [
+                    { titulo: "1. Inspección Previa al Viaje", pts: 12, items: [
+                        { id: "o1_1", desc: "Revisa niveles de aceite, anticongelante, dirección hidráulica y líquido limpiaparabrisas.", pts: 2 },
+                        { id: "o1_2", desc: "Verifica fugas visibles de aire, aceite, combustible o refrigerante.", pts: 2 },
+                        { id: "o1_3", desc: "Inspecciona llantas, rines, birlos, presión y estado general.", pts: 2 },
+                        { id: "o1_4", desc: "Revisa luces, reflejantes, limpiaparabrisas y claxon.", pts: 2 },
+                        { id: "o1_5", desc: "Valida documentos, placas, tarjeta de circulación y equipo de emergencia.", pts: 2 },
+                        { id: "o1_6", desc: "Reporta condiciones inseguras antes de iniciar operación.", pts: 2 }
+                    ]},
+                    { titulo: "2. Enganche, Desenganche y Acoplamiento", pts: 17, items: [
+                        { id: "o2_1", desc: "Selecciona zona segura, nivelada y con espacio suficiente para la maniobra.", pts: 3 },
+                        { id: "o2_2", desc: "Usa tres puntos de apoyo al subir o bajar de la unidad.", pts: 3 },
+                        { id: "o2_3", desc: "Alinea quinta rueda, perno rey, dolly y remolques sin golpes ni arrastres.", pts: 3 },
+                        { id: "o2_4", desc: "Conecta y verifica líneas de aire, eléctricas, cadenas y seguros.", pts: 3 },
+                        { id: "o2_5", desc: "Realiza prueba de jalón y confirma cierre correcto de muelas.", pts: 3 },
+                        { id: "o2_6", desc: "Levanta patines y revisa que no queden interferencias antes de avanzar.", pts: 2 }
+                    ]},
+                    { titulo: "3. Maniobras de Patio", pts: 24, items: [
+                        { id: "o3_1", desc: "Controla reversa en línea recta manteniendo trayectoria y distancia segura.", pts: 8 },
+                        { id: "o3_2", desc: "Realiza estacionamiento o acomodo en cajón sin invadir áreas de riesgo.", pts: 8 },
+                        { id: "o3_3", desc: "Ejecuta maniobra en L o lado ciego usando espejos, referencias y pausas de verificación.", pts: 8 }
+                    ]},
+                    { titulo: "4. Conducción Técnico-Económica", pts: 23, items: [
+                        { id: "o4_1", desc: "Arranca de manera progresiva y evita aceleraciones bruscas.", pts: 4 },
+                        { id: "o4_2", desc: "Mantiene revoluciones dentro del rango eficiente de operación.", pts: 5 },
+                        { id: "o4_3", desc: "Realiza cambios progresivos y anticipados según carga y terreno.", pts: 5 },
+                        { id: "o4_4", desc: "Usa correctamente embrague, freno de motor y freno de servicio.", pts: 5 },
+                        { id: "o4_5", desc: "Conserva velocidad estable y reduce consumo sin comprometer seguridad.", pts: 4 }
+                    ]},
+                    { titulo: "5. Conducción en Carretera: Educación Vial y Manejo Defensivo", pts: 24, items: [
+                        { id: "o5_1", desc: "Usa cinturón, direccionales y respeta señalamientos durante el recorrido.", pts: 6 },
+                        { id: "o5_2", desc: "Mantiene distancia de seguimiento y anticipa riesgos del entorno.", pts: 6 },
+                        { id: "o5_3", desc: "Revisa espejos constantemente y controla puntos ciegos.", pts: 6 },
+                        { id: "o5_4", desc: "Respeta límites de velocidad, carril correcto y normas de cortesía vial.", pts: 6 }
+                    ]}
+                ]
+            },
             descarga: {
                 titulo: "EVALUACIÓN OFICIAL - DESCARGA DE TOLVAS",
                 icono: "fa-fill-drip",
@@ -1427,7 +1485,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                         placeholder="${c.placeholder || ''}">
                 </div>`).join('');
 
-            const seccionesHtml = cfg.secciones.map(sec => `
+            const seccionesHtml = cfg.secciones.map((sec, idx) => `
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 overflow-hidden">
                     <h3 class="bg-slate-800 text-white text-xs font-bold px-3 py-2 flex justify-between items-center">
                         <span>${sec.titulo}</span>
@@ -1447,14 +1505,25 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                             </div>
                         </div>`).join('')}
                     </div>
+                    <div class="bg-slate-50 px-3 py-2 text-right text-[11px] font-black text-slate-700 border-t">
+                        Subtotal: <span id="evalSecScore_${idx}">0</span> / <span id="evalSecTotal_${idx}">${sec.pts}</span> pts
+                    </div>
                 </div>`).join('');
+
+            const docHeaderClass = cfg.estiloDocumento === 'original'
+                ? 'text-center border-2 border-slate-800 p-3 mb-4 bg-white'
+                : 'text-center border-b-4 border-orange-600 pb-3 mb-4';
+            const docTitleClass = cfg.estiloDocumento === 'original'
+                ? 'text-slate-900 font-black text-sm tracking-wide uppercase'
+                : 'text-orange-600 font-black text-xl tracking-wide';
+            const docSubtitle = cfg.subtitulo || 'GRUPO BACHOCO';
 
             const html = `
                 <!-- Encabezado tipo documento -->
                 <div id="eval-doc">
-                    <div class="text-center border-b-4 border-orange-600 pb-3 mb-4">
-                        <div class="text-orange-600 font-black text-xl tracking-wide">GRUPO BACHOCO</div>
-                        <div class="text-[11px] text-gray-500 font-bold uppercase tracking-wider">${cfg.titulo}</div>
+                    <div class="${docHeaderClass}">
+                        <div class="text-[10px] text-gray-500 font-black uppercase tracking-widest">${docSubtitle}</div>
+                        <div class="${docTitleClass}">${cfg.titulo}</div>
                         <div class="text-[9px] text-gray-400 font-bold uppercase mt-1">Flota Propia · PA Chapo</div>
                     </div>
 
@@ -1475,20 +1544,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     <div class="mb-4">
                         <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Observaciones y Recomendaciones</label>
                         <textarea id="ev_opObs" data-eid="opObs" class="eval-input w-full p-3 border rounded text-xs" rows="3" placeholder="Derrames, tiempos de demora, áreas de mejora..."></textarea>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-6 mb-2 mt-8">
-                        <div class="text-center">
-                            <select id="ev_opMaster" data-eid="opMaster" class="eval-input w-full text-center font-bold text-xs border-0 border-b border-black bg-transparent pb-1">
-                                <option value="">-- SELECCIONAR EVALUADOR --</option>
-                                ${EVAL_MASTERS.map(m => `<option value="${m}">${m}</option>`).join('')}
-                            </select>
-                            <div class="text-[10px] text-gray-500 mt-1">SUPERVISOR DE PRUEBA / MÁSTER</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="border-b border-black h-6 mb-1"></div>
-                            <div class="text-[10px] text-gray-500">CONDUCTOR EVALUADO</div>
-                        </div>
                     </div>
                 </div>
 
@@ -1563,6 +1618,20 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 if (r === 'SI') ganados += item.pts;
                 else if (r === 'NA') aplicables -= item.pts;
             }));
+
+            cfg.secciones.forEach((sec, idx) => {
+                let secGanados = 0;
+                let secAplicables = sec.pts;
+                sec.items.forEach(item => {
+                    const r = evalRespuestas[item.id];
+                    if (r === 'SI') secGanados += item.pts;
+                    else if (r === 'NA') secAplicables -= item.pts;
+                });
+                const secScore = document.getElementById(`evalSecScore_${idx}`);
+                const secTotal = document.getElementById(`evalSecTotal_${idx}`);
+                if (secScore) secScore.innerText = secGanados;
+                if (secTotal) secTotal.innerText = secAplicables;
+            });
 
             const pct = aplicables > 0 ? Math.round((ganados / aplicables) * 100) : 0;
             document.getElementById('evalScore').innerHTML =
