@@ -29,7 +29,16 @@
     <link rel="stylesheet" href="./css/fontawesome.min.css">
     
     <style>
+        :root { color-scheme: light; }
         body { font-family: 'Roboto', sans-serif; background-color: #f8fafc; padding-bottom: 40px; }
+        input, textarea, select {
+            background-color: #fff;
+            color: #1f2937;
+            caret-color: #ea580c;
+        }
+        input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
+        input:read-only { background-color: #f3f4f6; color: #4b5563; }
+        input[type="date"], input[type="datetime-local"] { color-scheme: light; }
         .section-content { display: none; }
         .section-content.active { display: block; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -74,7 +83,7 @@
             header, #login-overlay, #save-indicator, #progContainer, .no-print { display: none !important; }
             .section-content:not(.active) { display: none !important; }
             #view-eval { padding: 0 !important; max-width: 100% !important; }
-            #eval-doc .shadow-sm, #eval-doc .shadow, #eval-doc .shadow-md { box-shadow: none !important; }
+            #reporte-evaluacion .shadow-sm, #reporte-evaluacion .shadow, #reporte-evaluacion .shadow-md { box-shadow: none !important; }
             .eval-rad { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .eval-si, .eval-no, .eval-na, #evalBadge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
@@ -1520,7 +1529,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
             const html = `
                 <!-- Encabezado tipo documento -->
-                <div id="eval-doc">
+                <div id="reporte-evaluacion">
                     <div class="${docHeaderClass}">
                         <div class="text-[10px] text-gray-500 font-black uppercase tracking-widest">${docSubtitle}</div>
                         <div class="${docTitleClass}">${cfg.titulo}</div>
@@ -1552,8 +1561,8 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     <button type="button" onclick="evalMarcarTodoSi()" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg shadow active:scale-95 transition text-sm">
                         <i class="fas fa-check-double mr-1"></i> MARCAR TODO "SÍ"
                     </button>
-                    <button type="button" onclick="imprimirEval()" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-4 rounded-xl shadow-xl active:scale-95 transition text-base">
-                        <i class="fas fa-file-pdf mr-2"></i> IMPRIMIR / GUARDAR PDF
+                    <button type="button" onclick="descargarPDF()" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-4 rounded-xl shadow-xl active:scale-95 transition text-base">
+                        <i class="fas fa-file-pdf mr-2"></i> DESCARGAR PDF
                     </button>
                     <button type="button" onclick="limpiarEval()" class="w-full bg-slate-700 text-white font-bold py-3 rounded-lg shadow active:scale-95 transition text-sm">
                         <i class="fas fa-trash mr-1"></i> LIMPIAR PARA NUEVA EVALUACIÓN
@@ -1699,15 +1708,225 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             }
         }
 
-        function imprimirEval() {
+        function validarEvalAntesDePDF() {
             const cfg = evaluaciones[evalTipoActual];
-            if (!cfg) return;
+            if (!cfg) return false;
             const total = cfg.secciones.reduce((a, s) => a + s.items.length, 0);
             const contestados = Object.keys(evalRespuestas).length;
             if (contestados < total) {
-                if (!confirm(`Faltan ${total - contestados} criterios por evaluar. ¿Imprimir de todos modos?`)) return;
+                if (!confirm(`Faltan ${total - contestados} criterios por evaluar. ¿Descargar PDF de todos modos?`)) return false;
             }
-            window.print();
+            return true;
+        }
+
+        function evalCampoValor(id) {
+            const el = document.getElementById('ev_' + id);
+            return el && el.value ? el.value.trim().toUpperCase() : '-';
+        }
+
+        function evalResumenCalificacion(cfg) {
+            let ganados = 0;
+            let aplicables = 100;
+            let contestados = 0;
+            let total = 0;
+
+            cfg.secciones.forEach(sec => sec.items.forEach(item => {
+                total++;
+                const r = evalRespuestas[item.id];
+                if (!r) return;
+                contestados++;
+                if (r === 'SI') ganados += item.pts;
+                else if (r === 'NA') aplicables -= item.pts;
+            }));
+
+            const pct = aplicables > 0 ? Math.round((ganados / aplicables) * 100) : 0;
+            const estado = contestados === 0 ? 'PENDIENTE' : (pct >= 80 ? 'APTO (APROBADO)' : 'NO APTO');
+            return { ganados, aplicables, contestados, total, pct, estado };
+        }
+
+        function limpiarNombreArchivo(texto) {
+            return String(texto || 'Evaluacion_Tolva')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^\w-]+/g, '_')
+                .replace(/^_+|_+$/g, '') || 'Evaluacion_Tolva';
+        }
+
+        async function descargarPDF() {
+            if (!validarEvalAntesDePDF()) return;
+            if (!window.jspdf) {
+                alert("No se pudo cargar la librería para generar PDF. Abre la app con internet e intenta de nuevo.");
+                return;
+            }
+
+            const cfg = evaluaciones[evalTipoActual];
+            if (!cfg) {
+                alert("No se encontró la evaluación para generar el PDF.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageW = 210;
+            const pageH = 297;
+            const margin = 12;
+            const contentW = pageW - margin * 2;
+            const lineH = 4.4;
+            const resumen = evalResumenCalificacion(cfg);
+            const subtitulo = cfg.subtitulo || 'GRUPO BACHOCO';
+            const fechaDoc = evalCampoValor('opFecha') !== '-' ? evalCampoValor('opFecha') : new Date().toLocaleDateString('es-MX');
+
+            let y = 12;
+            let pagina = 1;
+
+            const dibujarEncabezado = () => {
+                pdf.setFillColor(234, 88, 12);
+                pdf.rect(margin, y, contentW, 12, 'F');
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(11);
+                pdf.text('EVALUACION DE OPERADORES', margin + 3, y + 7.8);
+                pdf.setFontSize(7);
+                pdf.text('FECHA: ' + fechaDoc, pageW - margin - 3, y + 5, { align: 'right' });
+                pdf.text('PAGINA: ' + pagina, pageW - margin - 3, y + 9, { align: 'right' });
+
+                y += 17;
+                pdf.setTextColor(75, 85, 99);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(7.5);
+                pdf.text(subtitulo.toUpperCase(), margin, y);
+                y += 4.5;
+                pdf.setTextColor(15, 23, 42);
+                pdf.setFontSize(9.5);
+                const tituloLineas = pdf.splitTextToSize(cfg.titulo.toUpperCase(), contentW);
+                pdf.text(tituloLineas, margin, y);
+                y += Math.max(10, tituloLineas.length * 4.5 + 4);
+            };
+
+            const nuevaPaginaSiHaceFalta = (altoNecesario) => {
+                if (y + altoNecesario <= pageH - 12) return;
+                pdf.addPage();
+                pagina++;
+                y = 12;
+                dibujarEncabezado();
+            };
+
+            const textoEnCaja = (texto, x, yTexto, ancho, opciones = {}) => {
+                const lineas = pdf.splitTextToSize(String(texto || '-'), ancho);
+                pdf.text(lineas, x, yTexto, opciones);
+                return lineas.length;
+            };
+
+            dibujarEncabezado();
+
+            const campoW = (contentW - 4) / 2;
+            let campoY = y;
+            cfg.campos.forEach((campo, idx) => {
+                const col = idx % 2;
+                if (idx > 0 && col === 0) campoY += 14;
+                const x = margin + col * (campoW + 4);
+                pdf.setFillColor(248, 250, 252);
+                pdf.setDrawColor(203, 213, 225);
+                pdf.setLineWidth(0.25);
+                pdf.rect(x, campoY, campoW, 11.5, 'FD');
+                pdf.setTextColor(100, 116, 139);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(6.5);
+                pdf.text(campo.label.toUpperCase(), x + 2, campoY + 4);
+                pdf.setTextColor(15, 23, 42);
+                pdf.setFontSize(7.5);
+                textoEnCaja(evalCampoValor(campo.id), x + 2, campoY + 8.5, campoW - 4);
+            });
+            y = campoY + 16;
+
+            if (resumen.contestados === 0) pdf.setFillColor(148, 163, 184);
+            else if (resumen.pct >= 80) pdf.setFillColor(22, 163, 74);
+            else pdf.setFillColor(220, 38, 38);
+            pdf.roundedRect(margin, y, contentW, 13, 2, 2, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(9);
+            pdf.text(`CALIFICACION: ${resumen.ganados} / ${resumen.aplicables} (${resumen.pct}%)`, margin + 4, y + 5.5);
+            pdf.text(resumen.estado, pageW - margin - 4, y + 5.5, { align: 'right' });
+            pdf.setFontSize(7);
+            pdf.text(`${resumen.contestados} de ${resumen.total} criterios evaluados`, margin + 4, y + 10);
+            y += 18;
+
+            cfg.secciones.forEach((sec) => {
+                nuevaPaginaSiHaceFalta(30);
+                pdf.setFillColor(51, 65, 85);
+                pdf.rect(margin, y, contentW, 8, 'F');
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(8.5);
+                pdf.text(sec.titulo.toUpperCase(), margin + 3, y + 5.3);
+                pdf.text(`${sec.pts} PTS`, pageW - margin - 3, y + 5.3, { align: 'right' });
+                y += 9.5;
+
+                sec.items.forEach((item) => {
+                    const descLines = pdf.splitTextToSize(item.desc, contentW - 45);
+                    const rowH = Math.max(8, descLines.length * lineH + 3);
+                    nuevaPaginaSiHaceFalta(rowH + 1);
+
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.setDrawColor(226, 232, 240);
+                    pdf.rect(margin, y, contentW, rowH, 'FD');
+                    pdf.setTextColor(30, 41, 59);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setFontSize(7.3);
+                    pdf.text(descLines, margin + 2.5, y + 4.8);
+
+                    const respuesta = evalRespuestas[item.id] || '-';
+                    const badgeX = pageW - margin - 33;
+                    if (respuesta === 'SI') pdf.setFillColor(22, 163, 74);
+                    else if (respuesta === 'NO') pdf.setFillColor(220, 38, 38);
+                    else if (respuesta === 'NA') pdf.setFillColor(107, 114, 128);
+                    else pdf.setFillColor(203, 213, 225);
+                    pdf.roundedRect(badgeX, y + 1.8, 12, 4.8, 1, 1, 'F');
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.setFontSize(6.5);
+                    pdf.text(respuesta, badgeX + 6, y + 5.2, { align: 'center' });
+
+                    pdf.setTextColor(71, 85, 105);
+                    pdf.text(`${item.pts} pts`, pageW - margin - 3, y + 5.2, { align: 'right' });
+                    y += rowH;
+                });
+
+                y += 4;
+            });
+
+            const obs = evalCampoValor('opObs');
+            nuevaPaginaSiHaceFalta(28);
+            pdf.setFillColor(255, 247, 237);
+            pdf.setDrawColor(253, 186, 116);
+            pdf.rect(margin, y, contentW, 24, 'FD');
+            pdf.setTextColor(154, 52, 18);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(7.5);
+            pdf.text('OBSERVACIONES Y RECOMENDACIONES', margin + 3, y + 5);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(67, 56, 45);
+            pdf.text(pdf.splitTextToSize(obs, contentW - 6).slice(0, 4), margin + 3, y + 10);
+            y += 31;
+
+            nuevaPaginaSiHaceFalta(24);
+            const firmaW = (contentW - 8) / 2;
+            pdf.setDrawColor(100, 116, 139);
+            pdf.line(margin, y + 12, margin + firmaW, y + 12);
+            pdf.line(margin + firmaW + 8, y + 12, margin + firmaW * 2 + 8, y + 12);
+            pdf.setTextColor(30, 41, 59);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(7);
+            pdf.text(evalCampoValor('opNombre'), margin + firmaW / 2, y + 17, { align: 'center' });
+            pdf.text(evalCampoValor('opEvaluador') !== '-' ? evalCampoValor('opEvaluador') : 'EVALUADOR', margin + firmaW + 8 + firmaW / 2, y + 17, { align: 'center' });
+            pdf.setTextColor(100, 116, 139);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('NOMBRE DEL OPERADOR', margin + firmaW / 2, y + 21, { align: 'center' });
+            pdf.text('NOMBRE DEL EVALUADOR', margin + firmaW + 8 + firmaW / 2, y + 21, { align: 'center' });
+
+            const nombre = limpiarNombreArchivo(`${cfg.titulo}_${evalCampoValor('opNombre')}`);
+            pdf.save(`${nombre}.pdf`);
         }
     </script>
 

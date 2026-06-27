@@ -9,7 +9,15 @@
   <script src="./js/jspdf.min.js"></script>
   <link rel="stylesheet" href="./css/fontawesome.min.css">
   <style>
+    :root { color-scheme: light; }
     body { background: #f4f1ec; color: #1f2933; font-family: ui-sans-serif, system-ui, sans-serif; }
+    input, textarea, select {
+      background-color: #fff;
+      color: #1f2937;
+      caret-color: #7c2d12;
+    }
+    input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
+    input[type="date"], input[type="datetime-local"] { color-scheme: light; }
     .panel-card { background: rgba(255,255,255,.92); border: 1px solid rgba(124,45,18,.14); box-shadow: 0 12px 34px rgba(68, 36, 18, .08); }
     .status-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
     .toast { transform: translateY(-12px); opacity: 0; pointer-events: none; transition: .25s ease; }
