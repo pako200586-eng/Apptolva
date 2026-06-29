@@ -1,5 +1,5 @@
-const CACHE_NAME = "apptolva-cache-v21";
-const RUNTIME_CACHE = "apptolva-runtime-v21";
+const CACHE_NAME = "apptolva-cache-v22";
+const RUNTIME_CACHE = "apptolva-runtime-v22";
 const DB_NAME = "apptolva-offline-db";
 const DB_VERSION = 1;
 const PENDING_STORE = "pending-reportes";
@@ -107,7 +107,15 @@ async function notifyClients(message) {
   clientsList.forEach((client) => client.postMessage(message));
 }
 
+// ✅ Cache estático con filtro de dominio
 async function cacheStaticRequest(request) {
+  const url = new URL(request.url);
+
+  // Solo cachea recursos de tu dominio (apptolva.com)
+  if (url.origin !== self.location.origin) {
+    return fetch(request); // ignora extensiones y otros esquemas
+  }
+
   const cached = await caches.match(request);
   if (cached) return cached;
 
@@ -119,7 +127,15 @@ async function cacheStaticRequest(request) {
   return response;
 }
 
+// ✅ Estrategia network-first con filtro de dominio
 async function networkFirstRequest(request) {
+  const url = new URL(request.url);
+
+  // Solo aplica caché a recursos de tu dominio
+  if (url.origin !== self.location.origin) {
+    return fetch(request); // ignora externos y extensiones
+  }
+
   try {
     const response = await fetch(request);
     if (request.method === "GET" && response && response.ok) {
