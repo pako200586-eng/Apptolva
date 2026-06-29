@@ -1,5 +1,6 @@
-const CACHE_NAME = "apptolva-cache-v22";
-const RUNTIME_CACHE = "apptolva-runtime-v22";
+const CACHE_VERSION = "v23";
+const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
+const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
 const DB_VERSION = 1;
 const PENDING_STORE = "pending-reportes";
@@ -11,9 +12,12 @@ const OFFLINE_URLS = [
   "./bitacora_master.html",
   "./admin.html",
   "./viewer.html",
+  "./sw.js",
   "./manifest.json",
   "./icon-192x192.png",
   "./icon-512x512.png",
+  "./screenshot-mobile.png",
+  "./screenshot-desktop.png",
   "./css/fontawesome.min.css",
   "./js/tailwindcss.js",
   "./js/signature_pad.min.js",
@@ -107,7 +111,26 @@ async function notifyClients(message) {
   clientsList.forEach((client) => client.postMessage(message));
 }
 
-// ✅ Cache estático con filtro de dominio
+async function precacheOfflineUrls() {
+  const cache = await caches.open(CACHE_NAME);
+  const requests = OFFLINE_URLS.map((url) => new Request(url, { cache: "reload" }));
+  const results = await Promise.allSettled(
+    requests.map(async (request) => {
+      const response = await fetch(request);
+      if (!response || !response.ok) {
+        throw new Error(`No se pudo precachear ${request.url}`);
+      }
+      await cache.put(request, response);
+    })
+  );
+
+  const failed = results.filter((result) => result.status === "rejected");
+  if (failed.length) {
+    console.warn("Service worker: algunos recursos offline no se precargaron.", failed);
+  }
+}
+
+// Cache estático con filtro de dominio
 async function cacheStaticRequest(request) {
   const url = new URL(request.url);
 
@@ -116,7 +139,7 @@ async function cacheStaticRequest(request) {
     return fetch(request); // ignora extensiones y otros esquemas
   }
 
-  const cached = await caches.match(request);
+  const cached = await caches.match(request, { ignoreSearch: true });
   if (cached) return cached;
 
   const response = await fetch(request);
@@ -127,7 +150,7 @@ async function cacheStaticRequest(request) {
   return response;
 }
 
-// ✅ Estrategia network-first con filtro de dominio
+// Estrategia network-first con filtro de dominio
 async function networkFirstRequest(request) {
   const url = new URL(request.url);
 
@@ -144,7 +167,7 @@ async function networkFirstRequest(request) {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
+    const cached = await caches.match(request, { ignoreSearch: true });
     if (cached) return cached;
     throw error;
   }
@@ -213,9 +236,7 @@ async function enviarReportesPendientes() {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS))
-  );
+  event.waitUntil(precacheOfflineUrls());
   self.skipWaiting();
 });
 
@@ -272,7 +293,7 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      networkFirstRequest(event.request).catch(() => caches.match("./index.html"))
+      networkFirstRequest(event.request).catch(() => caches.match("./index.html", { ignoreSearch: true }))
     );
     return;
   }
