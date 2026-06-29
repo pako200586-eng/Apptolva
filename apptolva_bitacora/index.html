@@ -418,6 +418,7 @@
     <script>
         // --- VARIABLES GLOBALES Y CLAVES ---
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
+        const GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec';
         
         // --- 1. INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', function() {
@@ -482,6 +483,28 @@
             if(confirm("¿Seguro que quieres borrar todos los datos guardados y empezar de cero?")) {
                 localStorage.removeItem(STORAGE_KEY);
                 location.reload();
+            }
+        }
+
+        async function enviarResumenGoogleSheets(resumen) {
+            if (!navigator.onLine || !GOOGLE_SHEETS_WEBHOOK_URL) return false;
+
+            try {
+                await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({
+                        fecha: resumen.fecha || '',
+                        operador: resumen.operador || '',
+                        vehiculo: resumen.vehiculo || '',
+                        status: resumen.status || '',
+                        pdfUrl: resumen.pdfUrl || ''
+                    })
+                });
+                return true;
+            } catch (error) {
+                console.warn('No se pudo enviar el resumen a Google Sheets:', error);
+                return false;
             }
         }
 
@@ -1205,6 +1228,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                 let envioOk = false;
                 let envioOffline = false;
+                let reporteUrl = "";
                 try {
                     const resp = await fetch('/api/store-bitacora', {
                         method: 'POST',
@@ -1214,9 +1238,20 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     const data = await resp.json().catch(() => ({}));
                     envioOk = resp.ok;
                     envioOffline = resp.status === 202 || data.queued === true || data.offline === true;
+                    reporteUrl = data.url || "";
                 } catch (error) {
                     // El service worker encola el reporte cuando no hay conexión.
                     envioOffline = true;
+                }
+
+                if (envioOk) {
+                    await enviarResumenGoogleSheets({
+                        fecha: new Date().toISOString(),
+                        operador: opNombre,
+                        vehiculo: u,
+                        status: fallasDetectadas.length ? "CON FALLAS" : "OK",
+                        pdfUrl: reporteUrl
+                    });
                 }
 
                 // LIMPIEZA POST-REPORTE
