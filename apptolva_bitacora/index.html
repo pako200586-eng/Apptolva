@@ -418,7 +418,7 @@
     <script>
         // --- VARIABLES GLOBALES Y CLAVES ---
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
-        const GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec';
+        const urlWebhook = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
         
         // --- 1. INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', function() {
@@ -487,12 +487,13 @@
         }
 
         async function enviarResumenGoogleSheets(resumen) {
-            if (!navigator.onLine || !GOOGLE_SHEETS_WEBHOOK_URL) return false;
+            if (!navigator.onLine || !urlWebhook) return false;
 
             try {
-                await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+                await fetch(urlWebhook, {
                     method: 'POST',
                     mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
                         fecha: resumen.fecha || '',
                         operador: resumen.operador || '',
