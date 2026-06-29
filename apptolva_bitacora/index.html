@@ -418,7 +418,6 @@
     <script>
         // --- VARIABLES GLOBALES Y CLAVES ---
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
-        const urlWebhook = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
         
         // --- 1. INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', function() {
@@ -486,27 +485,21 @@
             }
         }
 
-        async function enviarResumenGoogleSheets(resumen) {
-            if (!navigator.onLine || !urlWebhook) return false;
-
-            try {
-                await fetch(urlWebhook, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
-                        fecha: resumen.fecha || '',
-                        operador: resumen.operador || '',
-                        vehiculo: resumen.vehiculo || '',
-                        status: resumen.status || '',
-                        pdfUrl: resumen.pdfUrl || ''
-                    })
-                });
-                return true;
-            } catch (error) {
-                console.warn('No se pudo enviar el resumen a Google Sheets:', error);
-                return false;
-            }
+        async function enviarResumenASheet(datosReporte) {
+          const urlWebhook = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
+          try {
+            await fetch(urlWebhook, {
+              method: "POST",
+              mode: "no-cors",
+              headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+              },
+              body: JSON.stringify(datosReporte)
+            });
+            console.log("Resumen enviado a Google Sheets con éxito");
+          } catch (error) {
+            console.error("Error al enviar a Google Sheets:", error);
+          }
         }
 
         // --- 3. LOGIN SYSTEM ---
@@ -1246,7 +1239,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 }
 
                 if (envioOk) {
-                    await enviarResumenGoogleSheets({
+                    await enviarResumenASheet({
                         fecha: new Date().toISOString(),
                         operador: opNombre,
                         vehiculo: u,
