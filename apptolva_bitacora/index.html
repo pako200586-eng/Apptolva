@@ -1183,6 +1183,29 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                 const checklistArr = Object.entries(revResults).map(([item, estado]) => ({ item, estado }));
                 const fallasDetectadas = Object.keys(revResults).filter((k) => revResults[k] === 'MAL');
+                const fallasLista = [];
+                secciones.forEach((sec) => {
+                    (revData[sec.id] || []).forEach((cat) => {
+                        cat.i.forEach((item) => {
+                            if (revResults[sec.id + '-' + item] === 'MAL') {
+                                fallasLista.push(sec.titulo + ' - ' + item);
+                            }
+                        });
+                    });
+                });
+                const fallasReportadas = fallasLista.length ? fallasLista.join(', ') : 'Sin fallas';
+
+                const notasSecciones = [
+                    { etiqueta: 'NOTAS TRACTO CAMIÓN', valor: obsData.tracto },
+                    { etiqueta: 'NOTAS TOLVA 1', valor: obsData.tolva1 },
+                    { etiqueta: 'NOTAS DOLLY', valor: obsData.dolly },
+                    { etiqueta: 'NOTAS TOLVA 2', valor: obsData.tolva2 }
+                ];
+                const observaciones = notasSecciones
+                    .filter((n) => n.valor && n.valor.trim())
+                    .map((n) => n.etiqueta + ': ' + n.valor.trim())
+                    .join(' | ') || 'Sin observaciones';
+
                 // Estructura autocontenida para que el panel /admin reproduzca el PDF idéntico al del operador.
                 const checklistData = secciones.map((sec) => ({
                     id: sec.id,
@@ -1239,38 +1262,12 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 }
 
                 if (envioOk) {
-                    // Recorre todo el checklist y arma la lista de componentes marcados como falla (MAL).
-                    const fallasLista = [];
-                    secciones.forEach((sec) => {
-                        (revData[sec.id] || []).forEach((cat) => {
-                            cat.i.forEach((item) => {
-                                if (revResults[sec.id + '-' + item] === 'MAL') {
-                                    fallasLista.push(sec.titulo + ' - ' + item);
-                                }
-                            });
-                        });
-                    });
-                    const fallasReportadas = fallasLista.length ? fallasLista.join(', ') : 'Sin fallas';
-
-                    // Une las notas escritas por el operador en cada sección en una sola cadena.
-                    const notasSecciones = [
-                        { etiqueta: 'NOTAS TRACTO CAMIÓN', valor: obsData.tracto },
-                        { etiqueta: 'NOTAS TOLVA1', valor: obsData.tolva1 },
-                        { etiqueta: 'NOTAS DOLLY', valor: obsData.dolly },
-                        { etiqueta: 'NOTAS TOLVA 2', valor: obsData.tolva2 }
-                    ];
-                    const observacionesTexto = notasSecciones
-                        .filter((n) => n.valor && n.valor.trim())
-                        .map((n) => n.etiqueta + ': ' + n.valor.trim())
-                        .join(' | ');
-                    const observaciones = observacionesTexto || 'Sin observaciones';
-
                     await enviarResumenASheet({
                         fecha: new Date().toISOString(),
                         operador: opNombre,
                         vehiculo: u,
                         status: fallasDetectadas.length ? "CON FALLAS" : "OK",
-                        pdfUrl: reporteUrl,
+                        urlPdf: reporteUrl,
                         fallasReportadas: fallasReportadas,
                         observaciones: observaciones
                     });
