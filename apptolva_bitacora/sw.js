@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v24";
+const CACHE_VERSION = "v25";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -16,6 +16,9 @@ const OFFLINE_URLS = [
   "./manifest.json",
   "./icon-192x192.png",
   "./icon-512x512.png",
+  "./icon-maskable-512x512.png",
+  "./favicon-32x32.png",
+  "./apple-touch-icon.png",
   "./screenshot-mobile.png",
   "./screenshot-desktop.png",
   "./css/fontawesome.min.css",

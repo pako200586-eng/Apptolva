@@ -4,7 +4,7 @@
   "short_name": "AppTolva",
   "description": "Aplicación interna para operadores de tractocamiones de Grupo Bachoco con bitácoras, checklist y reportes offline.",
   "lang": "es-MX",
-  "version": "10.0",
+  "version": "10.1",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -22,6 +22,12 @@
     },
     {
       "src": "./icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
