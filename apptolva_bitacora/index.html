@@ -1184,17 +1184,29 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
                 const checklistArr = Object.entries(revResults).map(([item, estado]) => ({ item, estado }));
                 const fallasDetectadas = Object.keys(revResults).filter((k) => revResults[k] === 'MAL');
-                const fallasLista = [];
-                secciones.forEach((sec) => {
-                    (revData[sec.id] || []).forEach((cat) => {
-                        cat.i.forEach((item) => {
-                            if (revResults[sec.id + '-' + item] === 'MAL') {
-                                fallasLista.push(sec.titulo + ' - ' + item);
-                            }
+                // Número económico capturado por componente (S/N si el input quedó vacío).
+                const numeroPorComponente = {
+                    tracto: (u && u.trim()) ? u.trim() : 'S/N',
+                    tolva1: t1,
+                    dolly: dolly,
+                    tolva2: t2
+                };
+                // Agrupamos las fallas detectadas bajo cada componente, sin repetir el nombre del componente en cada falla.
+                const fallasReportadas = secciones
+                    .map((sec) => {
+                        const fallas = [];
+                        (revData[sec.id] || []).forEach((cat) => {
+                            cat.i.forEach((item) => {
+                                if (revResults[sec.id + '-' + item] === 'MAL') {
+                                    fallas.push(item);
+                                }
+                            });
                         });
-                    });
-                });
-                const fallasReportadas = fallasLista.length ? fallasLista.join(', ') : 'Sin fallas';
+                        return { numero: numeroPorComponente[sec.id] || 'S/N', fallas };
+                    })
+                    .filter((c) => c.fallas.length)
+                    .map((c) => '[' + c.numero + ']: ' + c.fallas.join(', '))
+                    .join(' | ') || 'Sin fallas';
 
                 const notasSecciones = [
                     { etiqueta: 'NOTAS TRACTO CAMIÓN', valor: obsData.tracto },
