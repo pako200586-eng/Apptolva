@@ -1191,32 +1191,55 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     dolly: dolly,
                     tolva2: t2
                 };
-                // Agrupamos las fallas detectadas bajo cada componente, sin repetir el nombre del componente en cada falla.
-                const fallasReportadas = secciones
-                    .map((sec) => {
-                        const fallas = [];
-                        (revData[sec.id] || []).forEach((cat) => {
-                            cat.i.forEach((item) => {
-                                if (revResults[sec.id + '-' + item] === 'MAL') {
-                                    fallas.push(item);
-                                }
-                            });
-                        });
-                        return { numero: numeroPorComponente[sec.id] || 'S/N', fallas };
-                    })
-                    .filter((c) => c.fallas.length)
-                    .map((c) => '[' + c.numero + ']: ' + c.fallas.join(', '))
-                    .join(' | ') || 'Sin fallas';
+                // --- MODIFICACIÓN 1: Fallas separadas por columna con número económico ---
+                // 1. Un arreglo distinto para cada componente.
+                const fallasTractoArr = [];
+                const fallasTolva1Arr = [];
+                const fallasDollyArr = [];
+                const fallasTolva2Arr = [];
+                const arreglosFallas = {
+                    tracto: fallasTractoArr,
+                    tolva1: fallasTolva1Arr,
+                    dolly: fallasDollyArr,
+                    tolva2: fallasTolva2Arr
+                };
 
+                // 2. Recorremos el checklist y guardamos el nombre de la falla en el arreglo correspondiente.
+                Object.keys(arreglosFallas).forEach((compId) => {
+                    (revData[compId] || []).forEach((cat) => {
+                        cat.i.forEach((item) => {
+                            if (revResults[compId + '-' + item] === 'MAL') {
+                                arreglosFallas[compId].push(item);
+                            }
+                        });
+                    });
+                });
+
+                // 3. Convertimos cada arreglo en texto separado por comas con el número económico al inicio.
+                //    Formato: "14123: Llanta lisa, Fugas"  |  sin fallas: "14123: Sin fallas".
+                const formatearFallas = (compId) => {
+                    const numero = numeroPorComponente[compId] || 'S/N';
+                    const fallas = arreglosFallas[compId];
+                    return numero + ': ' + (fallas.length ? fallas.join(', ') : 'Sin fallas');
+                };
+                const fallasTracto = formatearFallas('tracto');
+                const fallasTolva1 = formatearFallas('tolva1');
+                const fallasDolly = formatearFallas('dolly');
+                const fallasTolva2 = formatearFallas('tolva2');
+
+                // --- MODIFICACIÓN 2: Notas con número económico ---
+                // 1. Leemos las notas de cada componente (textareas reflejados en obsData).
                 const notasSecciones = [
-                    { etiqueta: 'NOTAS TRACTO CAMIÓN', valor: obsData.tracto },
-                    { etiqueta: 'NOTAS TOLVA 1', valor: obsData.tolva1 },
-                    { etiqueta: 'NOTAS DOLLY', valor: obsData.dolly },
-                    { etiqueta: 'NOTAS TOLVA 2', valor: obsData.tolva2 }
+                    { comp: 'tracto', valor: obsData.tracto },
+                    { comp: 'tolva1', valor: obsData.tolva1 },
+                    { comp: 'dolly', valor: obsData.dolly },
+                    { comp: 'tolva2', valor: obsData.tolva2 }
                 ];
+                // 2-3. Prefijo con número económico; 4. omitimos componentes sin notas y unimos con ' | '.
+                //      Formato: "14103: Revisar suspensión".
                 const observaciones = notasSecciones
                     .filter((n) => n.valor && n.valor.trim())
-                    .map((n) => n.etiqueta + ': ' + n.valor.trim())
+                    .map((n) => (numeroPorComponente[n.comp] || 'S/N') + ': ' + n.valor.trim())
                     .join(' | ') || 'Sin observaciones';
 
                 // Estructura autocontenida para que el panel /admin reproduzca el PDF idéntico al del operador.
@@ -1281,7 +1304,10 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                         vehiculo: u,
                         status: fallasDetectadas.length ? "CON FALLAS" : "OK",
                         urlPdf: reporteUrl,
-                        fallasReportadas: fallasReportadas,
+                        fallasTracto: fallasTracto,
+                        fallasTolva1: fallasTolva1,
+                        fallasDolly: fallasDolly,
+                        fallasTolva2: fallasTolva2,
                         observaciones: observaciones
                     });
                 }
