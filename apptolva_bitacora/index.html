@@ -1191,56 +1191,65 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     dolly: dolly,
                     tolva2: t2
                 };
-                // --- MODIFICACIÓN 1: Fallas separadas por columna con número económico ---
-                // 1. Un arreglo distinto para cada componente.
-                const fallasTractoArr = [];
-                const fallasTolva1Arr = [];
-                const fallasDollyArr = [];
-                const fallasTolva2Arr = [];
-                const arreglosFallas = {
-                    tracto: fallasTractoArr,
-                    tolva1: fallasTolva1Arr,
-                    dolly: fallasDollyArr,
-                    tolva2: fallasTolva2Arr
+                // --- MODIFICACIÓN 2: Fallas agrupadas por categoría (sección HTML) dentro de cada componente ---
+                // 1. Estructura por componente que conserva a qué categoría/sección pertenece cada falla,
+                //    respetando el orden de aparición en el checklist.
+                //    Ej.: { tracto: { "ELÉCTRICO": ["Luces", "Estado de los cables"], "FRENOS": ["Mangueras"] }, ... }
+                const fallasPorCategoria = {
+                    tracto: {},
+                    tolva1: {},
+                    dolly: {},
+                    tolva2: {}
                 };
 
-                // 2. Recorremos el checklist y guardamos el nombre de la falla en el arreglo correspondiente.
-                Object.keys(arreglosFallas).forEach((compId) => {
+                // 2. Recorremos el checklist detectando la categoría (cat.cat) de cada falla marcada como 'MAL'
+                //    y la agrupamos dentro de su componente.
+                Object.keys(fallasPorCategoria).forEach((compId) => {
                     (revData[compId] || []).forEach((cat) => {
                         cat.i.forEach((item) => {
                             if (revResults[compId + '-' + item] === 'MAL') {
-                                arreglosFallas[compId].push(item);
+                                if (!fallasPorCategoria[compId][cat.cat]) {
+                                    fallasPorCategoria[compId][cat.cat] = [];
+                                }
+                                fallasPorCategoria[compId][cat.cat].push(item);
                             }
                         });
                     });
                 });
 
-                // 3. Convertimos cada arreglo en texto separado por comas con el número económico al inicio.
-                //    Formato: "14123: Llanta lisa, Fugas"  |  sin fallas: "14123: Sin fallas".
+                // 3. Convertimos cada componente en una cadena con el número económico y las fallas agrupadas.
+                //    Formato: "14123: [ELÉCTRICO]: Luces, Cables | [MECÁNICO]: Fugas, Bandas".
+                //    Sin fallas: "14123: Sin fallas".
                 const formatearFallas = (compId) => {
                     const numero = numeroPorComponente[compId] || 'S/N';
-                    const fallas = arreglosFallas[compId];
-                    return numero + ': ' + (fallas.length ? fallas.join(', ') : 'Sin fallas');
+                    const categorias = fallasPorCategoria[compId];
+                    const nombresCat = Object.keys(categorias);
+                    if (!nombresCat.length) {
+                        return numero + ': Sin fallas';
+                    }
+                    const bloques = nombresCat.map((nombreCat) =>
+                        '[' + nombreCat + ']: ' + categorias[nombreCat].join(', ')
+                    );
+                    return numero + ': ' + bloques.join(' | ');
                 };
                 const fallasTracto = formatearFallas('tracto');
                 const fallasTolva1 = formatearFallas('tolva1');
                 const fallasDolly = formatearFallas('dolly');
                 const fallasTolva2 = formatearFallas('tolva2');
 
-                // --- MODIFICACIÓN 2: Notas con número económico ---
-                // 1. Leemos las notas de cada componente (textareas reflejados en obsData).
-                const notasSecciones = [
-                    { comp: 'tracto', valor: obsData.tracto },
-                    { comp: 'tolva1', valor: obsData.tolva1 },
-                    { comp: 'dolly', valor: obsData.dolly },
-                    { comp: 'tolva2', valor: obsData.tolva2 }
-                ];
-                // 2-3. Prefijo con número económico; 4. omitimos componentes sin notas y unimos con ' | '.
-                //      Formato: "14103: Revisar suspensión".
-                const observaciones = notasSecciones
-                    .filter((n) => n.valor && n.valor.trim())
-                    .map((n) => (numeroPorComponente[n.comp] || 'S/N') + ': ' + n.valor.trim())
-                    .join(' | ') || 'Sin observaciones';
+                // --- MODIFICACIÓN 1: Notas separadas por componente con número económico ---
+                // 1. Leemos el textarea de notas de cada componente (reflejado en obsData).
+                // 2. Prefijamos con su número económico. 3. Una variable independiente por componente.
+                //    Formato: "14123: Fuga en manguera"  |  vacío: "14123: Sin observaciones".
+                const formatearNota = (compId) => {
+                    const numero = numeroPorComponente[compId] || 'S/N';
+                    const texto = (obsData[compId] || '').trim();
+                    return numero + ': ' + (texto ? texto : 'Sin observaciones');
+                };
+                const notasTracto = formatearNota('tracto');
+                const notasTolva1 = formatearNota('tolva1');
+                const notasDolly = formatearNota('dolly');
+                const notasTolva2 = formatearNota('tolva2');
 
                 // Estructura autocontenida para que el panel /admin reproduzca el PDF idéntico al del operador.
                 const checklistData = secciones.map((sec) => ({
@@ -1308,7 +1317,10 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                         fallasTolva1: fallasTolva1,
                         fallasDolly: fallasDolly,
                         fallasTolva2: fallasTolva2,
-                        observaciones: observaciones
+                        notasTracto: notasTracto,
+                        notasTolva1: notasTolva1,
+                        notasDolly: notasDolly,
+                        notasTolva2: notasTolva2
                     });
                 }
 
