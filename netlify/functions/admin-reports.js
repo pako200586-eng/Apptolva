@@ -1,7 +1,9 @@
 import { getDatabase } from "@netlify/database";
 
-const ALLOWED_METHODS = "GET, OPTIONS";
+const ALLOWED_METHODS = "GET, DELETE, OPTIONS";
 const ALLOWED_HEADERS = "Content-Type, X-Admin-Token, Authorization";
+const ID_PATTERN = /^[a-f0-9]{32}$/i;
+const MAX_DELETE_IDS = 200;
 
 function jsonResponse(status, body, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -95,24 +97,6 @@ function normalizeRow(row) {
   };
 }
 
-function extractAlert(row) {
-  const payloadText = JSON.stringify(row.payload || {}).toLowerCase();
-  const isFailure = row.report_type === "falla";
-  const hasCriticalWord = /(freno|frenos|llanta|llantas|luces|direccion|dirección|fuga|temperatura|presion|presión)/.test(payloadText);
-
-  if (!isFailure && !hasCriticalWord && row.priority === "baja") return null;
-
-  return {
-    id: row.id,
-    folio: row.folio,
-    unitId: row.unit_id,
-    driverName: row.driver_name,
-    priority: row.priority,
-    createdAt: row.created_at,
-    summary: row.payload?.failureType || row.payload?.falla || row.payload?.incident || "Revisión con posible incidencia",
-  };
-}
-
 export default async (req) => {
   const corsHeaders = createCorsHeaders(req);
 
@@ -120,12 +104,43 @@ export default async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  if (req.method !== "GET") {
-    return jsonResponse(405, { error: "Method Not Allowed" }, corsHeaders);
-  }
-
   if (!hasAdminAccess(req)) {
     return jsonResponse(401, { error: "Unauthorized" }, corsHeaders);
+  }
+
+  if (req.method === "DELETE") {
+    let body = {};
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse(400, { error: "Cuerpo JSON inválido" }, corsHeaders);
+    }
+
+    const ids = Array.isArray(body?.ids)
+      ? [...new Set(body.ids.filter((id) => typeof id === "string" && ID_PATTERN.test(id)))]
+      : [];
+
+    if (!ids.length) {
+      return jsonResponse(400, { error: "No se recibieron reportes válidos para eliminar" }, corsHeaders);
+    }
+    if (ids.length > MAX_DELETE_IDS) {
+      return jsonResponse(400, { error: `No se pueden eliminar más de ${MAX_DELETE_IDS} reportes a la vez` }, corsHeaders);
+    }
+
+    const database = getDatabase();
+    try {
+      const result = await database.pool.query(
+        "DELETE FROM bitacora_reports WHERE id = ANY($1::text[])",
+        [ids],
+      );
+      return jsonResponse(200, { deleted: result.rowCount || 0 }, corsHeaders);
+    } catch (error) {
+      return jsonResponse(500, { error: error.message }, corsHeaders);
+    }
+  }
+
+  if (req.method !== "GET") {
+    return jsonResponse(405, { error: "Method Not Allowed" }, corsHeaders);
   }
 
   const url = new URL(req.url);
@@ -152,7 +167,7 @@ export default async (req) => {
           COUNT(*)::int AS total,
           COUNT(*) FILTER (WHERE report_type = 'checklist')::int AS checklist,
           COUNT(*) FILTER (WHERE report_type = 'bitacora')::int AS bitacoras,
-          COUNT(*) FILTER (WHERE priority = 'alta')::int AS altas,
+          COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS hoy,
           COUNT(DISTINCT driver_name)::int AS operadores,
           COUNT(DISTINCT unit_id)::int AS unidades
         FROM bitacora_reports
@@ -189,17 +204,11 @@ export default async (req) => {
       });
     }
 
-    const alerts = reportsResult.rows
-      .map(extractAlert)
-      .filter(Boolean)
-      .slice(0, 40);
-
     return jsonResponse(
       200,
       {
         summary: summaryResult.rows[0] || {},
         reports,
-        alerts,
         generatedAt: new Date().toISOString(),
       },
       corsHeaders,
