@@ -1251,6 +1251,32 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 const notasDolly = formatearNota('dolly');
                 const notasTolva2 = formatearNota('tolva2');
 
+                // --- MODIFICACIÓN 3: Tickets individuales por cada falla detectada ---
+                // 1. Arreglo vacío que acumulará un objeto por cada input marcado como falla ('MAL').
+                // 2. Recorremos el checklist y, por cada falla, hacemos push de un ticket con:
+                //    componente (nombre legible), numeroEconomico, categoria (sección HTML) y falla (nombre del ítem).
+                const ticketsFallas = [];
+                const nombresComponente = {
+                    tracto: 'Tracto',
+                    tolva1: 'Tolva 1',
+                    dolly: 'Dolly',
+                    tolva2: 'Tolva 2'
+                };
+                Object.keys(nombresComponente).forEach((compId) => {
+                    (revData[compId] || []).forEach((cat) => {
+                        cat.i.forEach((item) => {
+                            if (revResults[compId + '-' + item] === 'MAL') {
+                                ticketsFallas.push({
+                                    componente: nombresComponente[compId],
+                                    numeroEconomico: numeroPorComponente[compId] || 'S/N',
+                                    categoria: cat.cat,
+                                    falla: item
+                                });
+                            }
+                        });
+                    });
+                });
+
                 // Estructura autocontenida para que el panel /admin reproduzca el PDF idéntico al del operador.
                 const checklistData = secciones.map((sec) => ({
                     id: sec.id,
@@ -1284,6 +1310,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     firmaOp2: firmaOp2Img,
                     firmaSup: firmaSupImg,
                     fallas: fallasDetectadas,
+                    ticketsFallas: ticketsFallas,
                     observaciones: obsData,
                     priority: fallasDetectadas.length ? "alta" : "baja"
                 };
