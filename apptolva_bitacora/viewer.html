@@ -444,6 +444,7 @@
             const folio = data.folio || 'S/F';
             const u = data.unitId || '-';
             const opNombre = data.driverName || '-';
+            const numeroEmpleado = data.employeeNumber || data.numeroEmpleado || '';
             const t1 = data.tolva1 || 'S/N';
             const t2 = data.tolva2 || 'S/N';
             const dolly = data.dolly || 'S/N';
@@ -483,7 +484,7 @@
                 doc.text('REPORTE DE INSPECCIÓN', margin + 3, y + 7.5);
                 doc.setFontSize(7.5);
                 doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 4.5, { align: 'right' });
-                doc.text('FOLIO: ' + folio + '   VERSION: 9.2', pageW - margin - 2, y + 9, { align: 'right' });
+                doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 9, { align: 'right' });
 
                 y += 14;
 
@@ -503,8 +504,9 @@
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(8);
                 const half = contentW / 2;
+                const empleadoTexto = numeroEmpleado ? '   No. EMP: ' + numeroEmpleado : '';
                 doc.text('UNIDAD: ' + u, margin + 3, y + 5);
-                doc.text('OPERADOR: ' + opNombre, margin + half + 3, y + 5);
+                doc.text('OPERADOR: ' + opNombre + empleadoTexto, margin + half + 3, y + 5);
                 doc.text('TOLVA 1: ' + t1, margin + 3, y + 11);
                 doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 11);
                 doc.text('DOLLY: ' + dolly, margin + 3, y + 17);
@@ -528,6 +530,7 @@
                 const CAT_BOX_H = 5.5;
                 const CAT_INCREMENT = 6.5;
                 const ITEM_INCREMENT = 6;
+                const ITEM_LINE_HEIGHT = 3.1;
                 const MIN_OBS_H = 12;
                 const OBS_TOP_PADDING = 8;
                 const OBS_LINE_HEIGHT = 4;
@@ -566,7 +569,13 @@
                     y += CAT_INCREMENT;
 
                     (cat.items || []).forEach(entry => {
-                        if (col < NUM_COLS - 1 && y + ITEM_INCREMENT > COL_BOTTOM) {
+                        const itemText = entry.item || '';
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(6.5);
+                        const itemLines = doc.splitTextToSize(itemText, colW - 17);
+                        const itemHeight = Math.max(ITEM_INCREMENT, 2.5 + itemLines.length * ITEM_LINE_HEIGHT);
+
+                        if (col < NUM_COLS - 1 && y + itemHeight > COL_BOTTOM) {
                             col++;
                             y = COL_START_Y;
                         }
@@ -576,12 +585,10 @@
                         doc.setFillColor(255, 255, 255);
                         doc.setDrawColor(238, 238, 238);
                         doc.setLineWidth(0.15);
-                        doc.rect(cxItem, y - 3, colW, 5.5, 'FD');
+                        doc.rect(cxItem, y - 3, colW, itemHeight - 0.5, 'FD');
 
-                        doc.setFont('helvetica', 'normal');
                         doc.setTextColor(50, 50, 50);
-                        doc.setFontSize(7);
-                        doc.text(entry.item || '', cxItem + 3, y + 0.5);
+                        doc.text(itemLines, cxItem + 3, y + 0.2);
 
                         const v = entry.estado;
                         if (v === 'OK') {
@@ -600,7 +607,7 @@
                             doc.text('-', cxRight - 2, y + 0.5, { align: 'right' });
                         }
 
-                        y += ITEM_INCREMENT;
+                        y += itemHeight;
                     });
 
                     y += 2;

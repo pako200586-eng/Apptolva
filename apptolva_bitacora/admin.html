@@ -106,6 +106,7 @@
                   <th class="px-4 py-3">Tipo</th>
                   <th class="px-4 py-3">Unidad</th>
                   <th class="px-4 py-3">Operador</th>
+                  <th class="px-4 py-3">No. Empleado</th>
                   <th class="px-4 py-3">Estado</th>
                   <th class="px-4 py-3">Fecha</th>
                   <th class="px-4 py-3">PDF</th>
@@ -196,6 +197,7 @@
           <td class="px-4 py-3 capitalize">${escapeHtml(report.type)}</td>
           <td class="px-4 py-3">${escapeHtml(report.unitId)}</td>
           <td class="px-4 py-3">${escapeHtml(report.driverName)}</td>
+          <td class="px-4 py-3">${escapeHtml(report.employeeNumber || report.payload?.employeeNumber || '')}</td>
           <td class="px-4 py-3"><span class="status-dot bg-green-600"></span> ${escapeHtml(report.syncStatus)}</td>
           <td class="px-4 py-3 whitespace-nowrap">${formatDate(report.createdAt)}</td>
           <td class="px-4 py-3">
@@ -277,7 +279,7 @@
       const query = (params || filters()).toString();
       if (!options.silent) {
         $('syncState').textContent = 'Consultando reportes...';
-        $('tabla-datos').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
+        $('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
       }
 
       const response = await fetch(`/api/admin-reports${query ? `?${query}` : ''}`, { headers: authHeaders() });
@@ -298,7 +300,7 @@
       } catch (error) {
         $('loginMsg').textContent = error.message;
         $('loginMsg').classList.remove('hidden');
-        $('tabla-datos').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
+        $('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
       }
     });
 
@@ -369,12 +371,13 @@
     });
     $('exportCsv').addEventListener('click', async () => {
       if (!state.reports.length) return showToast('No hay datos para exportar');
-      const header = ['folio', 'tipo', 'unidad', 'operador', 'estado', 'fecha'];
+      const header = ['folio', 'tipo', 'unidad', 'operador', 'numero_empleado', 'estado', 'fecha'];
       const lines = state.reports.map((report) => [
         report.folio,
         report.type,
         report.unitId,
         report.driverName,
+        report.employeeNumber || report.payload?.employeeNumber || '',
         report.syncStatus,
         report.createdAt,
       ].map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','));
@@ -393,7 +396,8 @@
       doc.text('Panel Administrativo AppTolva', 14, 18);
       doc.setFontSize(9);
       state.reports.slice(0, 45).forEach((report, index) => {
-        doc.text(`${report.folio} | ${report.type} | ${report.unitId} | ${report.driverName} | ${formatDate(report.createdAt)}`, 14, 30 + index * 5);
+        const employeeNumber = report.employeeNumber || report.payload?.employeeNumber || '';
+        doc.text(`${report.folio} | ${report.type} | ${report.unitId} | ${report.driverName} | ${employeeNumber} | ${formatDate(report.createdAt)}`, 14, 30 + index * 5);
       });
       doc.save('apptolva-reportes.pdf');
     });
