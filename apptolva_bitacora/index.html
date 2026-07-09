@@ -279,8 +279,9 @@
                     <input type="text" id="revTolva1" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me" placeholder="NO. 1ra TOLVA">
                     <input type="text" id="revTolva2" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me campo-full" placeholder="NO. 2da TOLVA">
                 </div>
-                <div class="grid grid-cols-2 gap-2 mb-2">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
                     <input type="text" id="revOperador" class="p-2 border rounded text-xs save-me" placeholder="Nombre Operador">
+                    <input type="text" id="revEmpleado" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="No. Empleado">
                     <input type="datetime-local" id="revHora" class="p-2 border rounded text-xs save-me">
                 </div>
                 <div class="grid grid-cols-2 gap-2 mb-2">
@@ -440,6 +441,7 @@
         // --- 2. SISTEMA DE AUTO-GUARDADO ---
         function autoGuardar() {
             try {
+                revResults = filtrarResultadosChecklist(revResults);
                 const data = {
                     inputs: {},
                     checklist: revResults,
@@ -467,7 +469,7 @@
                         const el = document.getElementById(id);
                         if (el) el.value = value;
                     }
-                    if (data.checklist) revResults = data.checklist;
+                    if (data.checklist) revResults = filtrarResultadosChecklist(data.checklist);
                     if (data.obs) obsData = data.obs;
                     if (data.modalidad) {
                         modalidadActual = data.modalidad;
@@ -621,14 +623,13 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
         // --- CHECKLIST DATA ---
         const commonTolvaItems = [
-            {cat:"MOTOR (TOLVA)", i:["Nivel de aceite", "Fugas", "Filtros"]},
-            {cat:"DOCUMENTOS", i:["Permiso Federal", "Permiso doble art", "Placas Fisicas", "Certificación Fis-Mec", "Tarjeta Circulación", "Engomado Fis-Mec"]},
+            {cat:"SISTEMA HIDRÁULICO", i:["Nivel de aceite", "Fugas", "Filtros", "Mangueras", "Manometros", "Válvulas"]},
+            {cat:"DOCUMENTOS", i:["Permiso Federal", "Placas Fisicas", "Certificación Fis-Mec", "Tarjeta Circulación", "Engomado Fis-Mec"]},
             {cat:"ESTRUCTURA", i:["Tapas", "Tolva", "Pluma", "Línea de vida", "Pasamanos", "Compartimentos", "Banco de válvulas"]},
             {cat:"ELÉCTRICO", i:["Luces", "Estado de los cables", "Enchufes 7 vias", "Conectores"]},
             {cat:"SUSPENSIÓN", i:["Bolsa de aire", "Válvulas de suspensión", "Amortiguadores"]},
-            {cat:"ACCESORIOS", i:["Banderolas", "Etiquetas de seguridad", "Logotipo", "Sistema Iluminación", "Matraca dolly"]},
-            {cat:"FRENOS", i:["Mangueras", "Balatas", "Rotochambers", "Matracas", "Levas", "ABS"]},
-            {cat:"SISTEMA HIDRÁULICO", i:["Mangueras", "Manometros", "Válvulas"]}
+            {cat:"ACCESORIOS", i:["Banderolas", "Etiquetas de seguridad"]},
+            {cat:"FRENOS", i:["Mangueras", "Balatas", "Rotochambers", "Matracas", "Levas", "ABS"]}
         ];
 
         const revData = {
@@ -637,9 +638,9 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 {cat:"ELÉCTRICO", i:["Luces en general", "Luces de navegación", "Estado de los cables", "Baterías", "Alarmas y reverceros", "A/C", "Sin Espías (testigos)", "Conectores"]},
                 {cat:"FRENOS", i:["Mangueras", "Balatas", "Rotochamber", "Chambers", "Matracas", "Sin fuga de aire", "Compresor", "ABS"]},
                 {cat:"SUSPENSIÓN", i:["Bolsas de aire", "Amortiguadores", "Muelles", "Birlos de rueda", "Llantas"]},
-                {cat:"ACCESORIOS", i:["Gato Hidráulicos", "Matraca Dolly", "Reflejantes", "Extintor", "Tumbaburro", "Colchoneta", "Estereo", "Cámaras", "Logotipo", "Torreta"]},
-                {cat:"CARROCERÍA", i:["Retrovisores", "Parabrisas", "Chasis", "Plumillas (tricos)", "Yugo de flecha"]},
-                {cat:"INTERIOR", i:["Limpieza", "Tablero", "Asientos", "Cristales"]},
+                {cat:"ACCESORIOS", i:["Reflejantes", "Extintor", "Cámaras", "Torreta"]},
+                {cat:"CARROCERÍA", i:["Retrovisores", "Parabrisas / Cristales", "Chasis", "Plumillas (tricos)", "Yugo de flecha"]},
+                {cat:"INTERIOR", i:["Limpieza", "Tablero", "Asientos"]},
                 {cat:"DOCUMENTOS", i:["Tarjeta de Circulación F", "Tarjeta de Circulación E", "Póliza de Seguro", "Permiso Federal", "Permiso doble art.", "Certificación Fis-Mec", "Engomado Fis-Mec", "Placa Física", "Licencia Federal", "Licencia Estatal", "Certificado Médico"]}
             ],
             tolva1: commonTolvaItems,
@@ -647,11 +648,40 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 {cat:"ELÉCTRICO", i:["Luces en general", "Estado de los cables", "Conectores"]},
                 {cat:"SUSPENSIÓN", i:["Amortiguadores", "Cámara de Suspensión", "Birlos de rueda", "Llantas"]},
                 {cat:"FRENOS", i:["Mangueras", "Balatas", "Chambers", "Matracas autoajuste", "Sin fugas de aire", "ABS"]},
-                {cat:"ACCESORIOS", i:["Matraca Dolly", "Reflejantes", "Logotipo", "Cadena", "Engrasado", "Bujes"]},
+                {cat:"ACCESORIOS", i:["Matraca Dolly", "Reflejantes", "Cadena", "Engrasado", "Bujes"]},
                 {cat:"DOCUMENTOS", i:["Verificación fis-mec", "Engomado fis-mec"]}
             ],
             tolva2: commonTolvaItems
         };
+
+        const checklistKeyAliases = {
+            'tracto-Parabrisas / Cristales': ['tracto-Parabrisas', 'tracto-Cristales']
+        };
+
+        function migrarResultadosChecklist(resultados) {
+            const next = { ...(resultados || {}) };
+            Object.entries(checklistKeyAliases).forEach(([target, aliases]) => {
+                if (next[target]) return;
+                const aliasMal = aliases.find((key) => next[key] === 'MAL');
+                const aliasOk = aliases.find((key) => next[key] === 'OK');
+                const aliasKey = aliasMal || aliasOk;
+                if (aliasKey) next[target] = next[aliasKey];
+            });
+            return next;
+        }
+
+        function filtrarResultadosChecklist(resultados) {
+            const migrated = migrarResultadosChecklist(resultados);
+            const validKeys = new Set();
+            Object.keys(revData).forEach((compId) => {
+                (revData[compId] || []).forEach((cat) => {
+                    cat.i.forEach((item) => validKeys.add(compId + '-' + item));
+                });
+            });
+            return Object.fromEntries(
+                Object.entries(migrated).filter(([key, value]) => validKeys.has(key) && (value === 'OK' || value === 'MAL'))
+            );
+        }
 
         // LÓGICA
         let currentRevTab = 'tracto';
@@ -913,6 +943,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
         async function procesarFinal() {
             const u = document.getElementById('revUnidad').value;
             const opNombre = document.getElementById('nombreOpTexto').value;
+            const numeroEmpleado = document.getElementById('revEmpleado').value.trim();
             
             if (!u || !opNombre) return alert("⚠️ Error: Falta Unidad o Nombre del Operador.");
 
@@ -959,6 +990,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 const t1 = document.getElementById('revTolva1').value || 'S/N';
                 const t2 = document.getElementById('revTolva2').value || 'S/N';
                 const dolly = document.getElementById('revDolly').value || 'S/N';
+                revResults = filtrarResultadosChecklist(revResults);
 
                 // GENERACIÓN DE PDF (4 páginas, una por componente)
                 const { jsPDF } = window.jspdf;
@@ -1003,7 +1035,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     doc.text('REPORTE DE INSPECCIÓN', margin + 3, y + 7.5);
                     doc.setFontSize(7.5);
                     doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 4.5, {align: 'right'});
-                    doc.text('FOLIO: ' + folio + '   VERSION: 9.2', pageW - margin - 2, y + 9, {align: 'right'});
+                    doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 9, {align: 'right'});
 
                     y += 14;
 
@@ -1024,8 +1056,9 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     doc.setFont('helvetica', 'bold');
                     doc.setFontSize(8);
                     const half = contentW / 2;
+                    const empleadoTexto = numeroEmpleado ? '   No. EMP: ' + numeroEmpleado : '';
                     doc.text('UNIDAD: ' + u, margin + 3, y + 5);
-                    doc.text('OPERADOR: ' + opNombre, margin + half + 3, y + 5);
+                    doc.text('OPERADOR: ' + opNombre + empleadoTexto, margin + half + 3, y + 5);
                     doc.text('TOLVA 1: ' + t1, margin + 3, y + 11);
                     doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 11);
                     doc.text('DOLLY: ' + dolly, margin + 3, y + 17);
@@ -1048,7 +1081,8 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     const COL_HEIGHT = 170;              // altura útil de cada columna en mm
                     const CAT_BOX_H = 5.5;               // altura del recuadro de categoría
                     const CAT_INCREMENT = 6.5;           // avance de Y tras dibujar cabecera de categoría
-                    const ITEM_INCREMENT = 6;            // avance de Y tras dibujar cada ítem
+                    const ITEM_INCREMENT = 6;            // avance mínimo de Y tras dibujar cada ítem
+                    const ITEM_LINE_HEIGHT = 3.1;        // interlineado para nombres largos de fallas
                     const MIN_OBS_H = 12;                // altura mínima del bloque de observaciones
                     const OBS_TOP_PADDING = 8;           // margen superior dentro del bloque de observaciones
                     const OBS_LINE_HEIGHT = 4;           // altura de cada línea de texto en observaciones
@@ -1090,8 +1124,13 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                             y += CAT_INCREMENT;
 
                             cat.i.forEach(item => {
+                                doc.setFont('helvetica', 'normal');
+                                doc.setFontSize(6.5);
+                                const itemLines = doc.splitTextToSize(item, colW - 17);
+                                const itemHeight = Math.max(ITEM_INCREMENT, 2.5 + itemLines.length * ITEM_LINE_HEIGHT);
+
                                 // Mover a la siguiente columna si el ítem no cabe
-                                if (col < NUM_COLS - 1 && y + ITEM_INCREMENT > COL_BOTTOM) {
+                                if (col < NUM_COLS - 1 && y + itemHeight > COL_BOTTOM) {
                                     col++;
                                     y = COL_START_Y;
                                 }
@@ -1101,12 +1140,10 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                                 doc.setFillColor(255, 255, 255);
                                 doc.setDrawColor(238, 238, 238);
                                 doc.setLineWidth(0.15);
-                                doc.rect(cxItem, y - 3, colW, 5.5, 'FD');
+                                doc.rect(cxItem, y - 3, colW, itemHeight - 0.5, 'FD');
 
-                                doc.setFont('helvetica', 'normal');
                                 doc.setTextColor(50, 50, 50);
-                                doc.setFontSize(7);
-                                doc.text(item, cxItem + 3, y + 0.5);
+                                doc.text(itemLines, cxItem + 3, y + 0.2);
 
                                 const k = sec.id + '-' + item;
                                 const v = revResults[k];
@@ -1126,7 +1163,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                                     doc.text('-', cxRight - 2, y + 0.5, {align: 'right'});
                                 }
 
-                                y += ITEM_INCREMENT;
+                                y += itemHeight;
                             });
 
                             y += 2;
@@ -1291,6 +1328,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     folio: folio,
                     unitId: u,
                     driverName: opNombre,
+                    employeeNumber: numeroEmpleado,
                     license: "",
                     reportType: "checklist",
                     modalidad: modalidadActual,
@@ -1337,6 +1375,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     await enviarResumenASheet({
                         fecha: new Date().toISOString(),
                         operador: opNombre,
+                        numeroEmpleado: numeroEmpleado,
                         vehiculo: u,
                         status: fallasDetectadas.length ? "CON FALLAS" : "OK",
                         urlPdf: reporteUrl,

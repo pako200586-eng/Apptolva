@@ -87,6 +87,7 @@ function normalizeRow(row) {
     type: row.report_type,
     unitId: row.unit_id,
     driverName: row.driver_name,
+    employeeNumber: payload.employeeNumber || payload.numeroEmpleado || "",
     license: row.license,
     priority: row.priority,
     syncStatus: row.sync_status,
