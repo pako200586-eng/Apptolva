@@ -58,8 +58,13 @@ function getFirebaseCredential() {
 }
 
 function getFirebaseAuth() {
-  const app = getApps()[0] || initializeApp({ credential: getFirebaseCredential() });
-  return getAuth(app);
+  try {
+    const app = getApps()[0] || initializeApp({ credential: getFirebaseCredential() });
+    return getAuth(app);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(message, { cause: error });
+  }
 }
 
 async function hasAdminAccess(req) {
@@ -85,8 +90,9 @@ async function authorizeRequest(req, corsHeaders) {
     if (await hasAdminAccess(req)) return null;
     return jsonResponse(401, { error: "Unauthorized" }, corsHeaders);
   } catch (error) {
-    console.error("Firebase Admin authentication is unavailable:", error?.message || error);
-    return jsonResponse(500, { error: "Firebase Admin authentication is unavailable" }, corsHeaders);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Firebase Admin authentication is unavailable:", message);
+    return jsonResponse(500, { error: message }, corsHeaders);
   }
 }
 
