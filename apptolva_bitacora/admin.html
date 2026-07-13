@@ -40,6 +40,9 @@
         <button id="refreshBtn" class="rounded-md bg-white px-4 py-2 text-sm font-black text-[#7c2d12] shadow-sm hover:bg-orange-50">
           <i class="fas fa-sync-alt mr-2"></i>Actualizar
         </button>
+        <button id="logoutBtn" class="hidden rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
+          <i class="fas fa-right-from-bracket mr-2"></i>Cerrar sesión
+        </button>
         <a href="./index.html" class="rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
           <i class="fas fa-mobile-screen mr-2"></i>App operador
         </a>
@@ -50,9 +53,14 @@
   <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
     <section id="loginPanel" class="panel-card mx-auto max-w-md rounded-lg p-5">
       <h2 class="text-lg font-black text-[#7c2d12]">Acceso de supervisor</h2>
-      <p class="mt-1 text-sm text-slate-600">Usa el token administrativo configurado en Netlify. Si no hay token configurado, el panel entra en modo abierto interno.</p>
-      <input id="adminToken" type="password" class="mt-4 w-full rounded-md border border-slate-300 px-3 py-3 text-sm outline-none focus:border-[#7c2d12]" placeholder="Token administrativo">
-      <button id="loginBtn" class="mt-3 w-full rounded-md bg-[#294936] px-4 py-3 text-sm font-black text-white hover:bg-[#203b2b]">Entrar al panel</button>
+      <p class="mt-1 text-sm text-slate-600">Ingresa con la cuenta de supervisor autorizada en Firebase Authentication.</p>
+      <form id="loginForm" class="mt-4 space-y-3">
+        <label class="block text-sm font-bold text-slate-700" for="adminEmail">Correo</label>
+        <input id="adminEmail" type="email" autocomplete="username" required class="w-full rounded-md border border-slate-300 px-3 py-3 text-sm outline-none focus:border-[#7c2d12]" placeholder="supervisor@empresa.com">
+        <label class="block text-sm font-bold text-slate-700" for="adminPassword">Contraseña</label>
+        <input id="adminPassword" type="password" autocomplete="current-password" required class="w-full rounded-md border border-slate-300 px-3 py-3 text-sm outline-none focus:border-[#7c2d12]" placeholder="Contraseña">
+        <button id="loginBtn" type="submit" class="w-full rounded-md bg-[#294936] px-4 py-3 text-sm font-black text-white hover:bg-[#203b2b] disabled:cursor-wait disabled:opacity-60">Entrar al panel</button>
+      </form>
       <p id="loginMsg" class="mt-3 hidden text-sm font-bold text-red-700"></p>
     </section>
 
@@ -147,12 +155,29 @@
     </section>
   </main>
 
-  <script>
-    const state = { token: sessionStorage.getItem('apptolvaAdminToken') || '', reports: [], allReports: [], lastTotal: 0, selected: new Set(), tableSignature: '' };
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "__FIREBASE_API_KEY__",
+      authDomain: "gen-lang-client-0015118308.firebaseapp.com",
+      projectId: "gen-lang-client-0015118308",
+      storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
+      messagingSenderId: "228375512926",
+      appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
+      measurementId: "G-SK8TYXT3JD"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const state = { user: null, reports: [], allReports: [], lastTotal: 0, selected: new Set(), tableSignature: '' };
     const $ = (id) => document.getElementById(id);
 
-    function authHeaders() {
-      return state.token ? { 'X-Admin-Token': state.token } : {};
+    async function authHeaders() {
+      if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
+      const idToken = await state.user.getIdToken();
+      return { Authorization: `Bearer ${idToken}` };
     }
 
     function filters() {
@@ -276,33 +301,47 @@
     }
 
     async function cargarDatos(params, options = {}) {
+      if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
       const query = (params || filters()).toString();
       if (!options.silent) {
         $('syncState').textContent = 'Consultando reportes...';
         $('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
       }
 
-      const response = await fetch(`/api/admin-reports${query ? `?${query}` : ''}`, { headers: authHeaders() });
-      if (response.status === 401) throw new Error('Token administrativo inválido');
+      const response = await fetch(`/api/admin-reports${query ? `?${query}` : ''}`, { headers: await authHeaders() });
+      if (response.status === 401) throw new Error('La sesión venció o no es válida');
       if (!response.ok) throw new Error('No se pudieron cargar los reportes');
 
       const data = await response.json();
       render({ ...data, filtered: Boolean(query) }, options);
     }
 
-    $('loginBtn').addEventListener('click', async () => {
-      state.token = $('adminToken').value.trim();
-      sessionStorage.setItem('apptolvaAdminToken', state.token);
+    function loginErrorMessage(error) {
+      const messages = {
+        'auth/invalid-credential': 'Correo o contraseña incorrectos.',
+        'auth/invalid-email': 'Escribe un correo válido.',
+        'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+        'auth/network-request-failed': 'No se pudo conectar con Firebase Authentication.'
+      };
+      return messages[error.code] || 'No se pudo iniciar sesión. Verifica tus datos.';
+    }
+
+    $('loginForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      $('loginBtn').disabled = true;
+      $('loginMsg').classList.add('hidden');
       try {
-        await cargarDatos();
-        $('loginPanel').classList.add('hidden');
-        $('dashboard').classList.remove('hidden');
+        await signInWithEmailAndPassword(auth, $('adminEmail').value.trim(), $('adminPassword').value);
+        $('adminPassword').value = '';
       } catch (error) {
-        $('loginMsg').textContent = error.message;
+        $('loginMsg').textContent = loginErrorMessage(error);
         $('loginMsg').classList.remove('hidden');
-        $('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
+      } finally {
+        $('loginBtn').disabled = false;
       }
     });
+
+    $('logoutBtn').addEventListener('click', () => signOut(auth));
 
     $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));
     $('applyFilters').addEventListener('click', () => cargarDatos(filters()).catch((error) => showToast(error.message)));
@@ -334,10 +373,10 @@
       try {
         const response = await fetch('/api/admin-reports', {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          headers: { 'Content-Type': 'application/json', ...await authHeaders() },
           body: JSON.stringify({ ids }),
         });
-        if (response.status === 401) throw new Error('Token administrativo inválido');
+        if (response.status === 401) throw new Error('La sesión venció o no es válida');
         if (!response.ok) {
           const detail = await response.json().catch(() => ({}));
           throw new Error(detail.error || 'No se pudieron eliminar los reportes');
@@ -402,9 +441,36 @@
       doc.save('apptolva-reportes.pdf');
     });
 
-    if (state.token) $('adminToken').value = state.token;
+    onAuthStateChanged(auth, async (user) => {
+      const authenticatedUser = user?.email && user.providerData.some((provider) => provider.providerId === 'password')
+        ? user
+        : null;
+
+      state.user = authenticatedUser;
+      $('loginPanel').classList.toggle('hidden', Boolean(authenticatedUser));
+      $('dashboard').classList.toggle('hidden', !authenticatedUser);
+      $('logoutBtn').classList.toggle('hidden', !authenticatedUser);
+      $('refreshBtn').disabled = !authenticatedUser;
+
+      if (!authenticatedUser) {
+        state.reports = [];
+        state.allReports = [];
+        state.selected.clear();
+        state.lastTotal = 0;
+        return;
+      }
+
+      $('loginMsg').classList.add('hidden');
+      try {
+        await cargarDatos();
+      } catch (error) {
+        $('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
+        showToast(error.message);
+      }
+    });
+
     setInterval(() => {
-      if (!$('dashboard').classList.contains('hidden')) cargarDatos(filters(), { silent: true }).catch(() => {});
+      if (state.user) cargarDatos(filters(), { silent: true }).catch(() => {});
     }, 30000);
 
     if ('serviceWorker' in navigator) {
@@ -416,7 +482,7 @@
           showToast('Reporte guardado offline pendiente de sincronizar');
         }
         if (event.data?.type === 'REPORT_SYNCED') {
-          cargarDatos(filters(), { silent: true }).catch(() => {});
+          if (state.user) cargarDatos(filters(), { silent: true }).catch(() => {});
           showToast('Service worker sincronizó un reporte');
         }
       });
