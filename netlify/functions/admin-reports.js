@@ -1,9 +1,18 @@
 import { getDatabase } from "@netlify/database";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
 const ALLOWED_METHODS = "GET, DELETE, OPTIONS";
 const ALLOWED_HEADERS = "Content-Type, Authorization";
 const ID_PATTERN = /^[a-f0-9]{32}$/i;
 const MAX_DELETE_IDS = 200;
+const REJECTED_TOKEN_ERRORS = new Set([
+  "auth/argument-error",
+  "auth/id-token-expired",
+  "auth/id-token-revoked",
+  "auth/invalid-id-token",
+  "auth/user-disabled",
+]);
 
 function jsonResponse(status, body, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -22,32 +31,62 @@ function createCorsHeaders(req) {
   };
 }
 
+function getEnvironmentVariable(name) {
+  return globalThis.Netlify?.env?.get(name) || process.env[name] || "";
+}
+
+function getFirebaseCredential() {
+  const serviceAccountJson = getEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT");
+
+  if (serviceAccountJson) {
+    try {
+      return cert(JSON.parse(serviceAccountJson));
+    } catch {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT must contain valid service account JSON");
+    }
+  }
+
+  const projectId = getEnvironmentVariable("FIREBASE_PROJECT_ID");
+  const clientEmail = getEnvironmentVariable("FIREBASE_CLIENT_EMAIL");
+  const privateKey = getEnvironmentVariable("FIREBASE_PRIVATE_KEY").replace(/\\n/g, "\n");
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error("Firebase Admin credentials are not configured");
+  }
+
+  return cert({ projectId, clientEmail, privateKey });
+}
+
+function getFirebaseAuth() {
+  const app = getApps()[0] || initializeApp({ credential: getFirebaseCredential() });
+  return getAuth(app);
+}
+
 async function hasAdminAccess(req) {
   const authHeader = req.headers.get("authorization") || "";
-  const idToken = authHeader.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : "";
-  const apiKey = process.env.FIREBASE_API_KEY;
+  const idToken = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || "";
 
-  if (!idToken || !apiKey) return false;
+  if (!idToken) return false;
 
   try {
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-    });
-
-    if (!response.ok) return false;
-    const result = await response.json();
-    const [user] = Array.isArray(result.users) ? result.users : [];
-    const usesPasswordProvider = user?.providerUserInfo?.some(
-      (provider) => provider.providerId === "password",
+    const decodedToken = await getFirebaseAuth().verifyIdToken(idToken, true);
+    return Boolean(
+      decodedToken.email
+      && decodedToken.firebase?.sign_in_provider === "password",
     );
+  } catch (error) {
+    if (REJECTED_TOKEN_ERRORS.has(error?.code)) return false;
+    throw error;
+  }
+}
 
-    return Boolean(user?.email && usesPasswordProvider && !user.disabled);
-  } catch {
-    return false;
+async function authorizeRequest(req, corsHeaders) {
+  try {
+    if (await hasAdminAccess(req)) return null;
+    return jsonResponse(401, { error: "Unauthorized" }, corsHeaders);
+  } catch (error) {
+    console.error("Firebase Admin authentication is unavailable:", error?.message || error);
+    return jsonResponse(500, { error: "Firebase Admin authentication is unavailable" }, corsHeaders);
   }
 }
 
@@ -121,9 +160,8 @@ export default async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  if (!(await hasAdminAccess(req))) {
-    return jsonResponse(401, { error: "Unauthorized" }, corsHeaders);
-  }
+  const authorizationError = await authorizeRequest(req, corsHeaders);
+  if (authorizationError) return authorizationError;
 
   if (req.method === "DELETE") {
     let body = {};
