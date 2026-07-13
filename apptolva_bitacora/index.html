@@ -488,23 +488,6 @@
             }
         }
 
-        async function enviarResumenASheet(datosReporte) {
-          const urlWebhook = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
-          try {
-            await fetch(urlWebhook, {
-              method: "POST",
-              mode: "no-cors",
-              headers: {
-                "Content-Type": "text/plain;charset=utf-8"
-              },
-              body: JSON.stringify(datosReporte)
-            });
-            console.log("Resumen enviado a Google Sheets con éxito");
-          } catch (error) {
-            console.error("Error al enviar a Google Sheets:", error);
-          }
-        }
-
         // --- 3. LOGIN SYSTEM ---
         function checkLogin() {
             try {
@@ -953,7 +936,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             
             // 1. ESTADO DE CARGA Y BLOQUEO
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> ASIGNANDO FOLIO...';
+            btn.textContent = 'Enviando reporte, no cierre la pantalla...';
             btn.classList.add('opacity-75');
             msg.classList.remove('hidden');
 
@@ -1353,59 +1336,54 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                     priority: fallasDetectadas.length ? "alta" : "baja"
                 };
 
-                let envioOk = false;
-                let envioOffline = false;
-                let reporteUrl = "";
-                try {
-                    const resp = await fetch('/api/store-bitacora', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(reportePayload)
-                    });
-                    const data = await resp.json().catch(() => ({}));
-                    envioOk = resp.ok;
-                    envioOffline = resp.status === 202 || data.queued === true || data.offline === true;
-                    reporteUrl = data.url || "";
-                } catch (error) {
-                    // El service worker encola el reporte cuando no hay conexión.
-                    envioOffline = true;
+                const resp = await fetch('/api/store-bitacora', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reportePayload)
+                });
+                const data = await resp.json().catch(() => ({}));
+                const envioOffline = resp.status === 202 || data.queued === true || data.offline === true;
+                const reporteUrl = data.url || "";
+
+                if (!resp.ok || envioOffline) {
+                    throw new Error(data.error || data.message || 'No se pudo guardar el reporte en la base de datos.');
                 }
 
-                if (envioOk) {
-                    await enviarResumenASheet({
-                        fecha: new Date().toISOString(),
-                        operador: opNombre,
-                        numeroEmpleado: numeroEmpleado,
-                        vehiculo: u,
-                        status: fallasDetectadas.length ? "CON FALLAS" : "OK",
-                        urlPdf: reporteUrl,
-                        fallasTracto: fallasTracto,
-                        fallasTolva1: fallasTolva1,
-                        fallasDolly: fallasDolly,
-                        fallasTolva2: fallasTolva2,
-                        notasTracto: notasTracto,
-                        notasTolva1: notasTolva1,
-                        notasDolly: notasDolly,
-                        notasTolva2: notasTolva2
-                    });
-                }
+                const datosGoogleSheets = {
+                    ...reportePayload,
+                    fechaEnvio: new Date().toISOString(),
+                    operador: opNombre,
+                    numeroEmpleado: numeroEmpleado,
+                    vehiculo: u,
+                    status: fallasDetectadas.length ? "CON FALLAS" : "OK",
+                    urlPdf: reporteUrl,
+                    fallasTracto: fallasTracto,
+                    fallasTolva1: fallasTolva1,
+                    fallasDolly: fallasDolly,
+                    fallasTolva2: fallasTolva2,
+                    notasTracto: notasTracto,
+                    notasTolva1: notasTolva1,
+                    notasDolly: notasDolly,
+                    notasTolva2: notasTolva2
+                };
+                const urlWebhook = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
+                await fetch(urlWebhook, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(datosGoogleSheets)
+                });
 
                 // LIMPIEZA POST-REPORTE
                 localStorage.removeItem(STORAGE_KEY);
-                restaurarBoton(btn, originalText, msg);
-
-                if (envioOffline) {
-                    alert("📴 REPORTE GUARDADO SIN SEÑAL\n\nFolio: " + folio + "\n\nSe enviará automáticamente al panel de supervisión cuando vuelva la conexión. El PDF ya quedó descargado en tu dispositivo.");
-                } else if (envioOk) {
-                    alert("✅ REPORTE ENVIADO AUTOMÁTICAMENTE\n\nFolio: " + folio + "\n\nEl reporte llegó al panel de supervisión y el PDF se descargó en tu dispositivo.");
-                } else {
-                    alert("⚠️ El PDF se descargó (Folio " + folio + ") pero el envío al servidor falló. Vuelve a intentarlo cuando tengas mejor señal.");
-                }
+                alert("✅ REPORTE ENVIADO AUTOMÁTICAMENTE\n\nFolio: " + folio + "\n\nEl reporte llegó al panel de supervisión y a Google Sheets. El PDF se descargó en tu dispositivo.");
                 location.reload();
 
             } catch (error) {
                 console.error(error);
-                alert("❌ ERROR DE CONEXIÓN: No se pudo asignar folio. Revisa tu internet.");
+                alert("❌ ERROR DE ENVÍO: No se completó el reporte. Revisa tu conexión e intenta nuevamente sin cerrar la pantalla.");
                 restaurarBoton(btn, originalText, msg);
             }
         }
