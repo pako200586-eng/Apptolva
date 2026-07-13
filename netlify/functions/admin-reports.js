@@ -1,7 +1,7 @@
 import { getDatabase } from "@netlify/database";
 
 const ALLOWED_METHODS = "GET, DELETE, OPTIONS";
-const ALLOWED_HEADERS = "Content-Type, X-Admin-Token, Authorization";
+const ALLOWED_HEADERS = "Content-Type, Authorization";
 const ID_PATTERN = /^[a-f0-9]{32}$/i;
 const MAX_DELETE_IDS = 200;
 
@@ -22,17 +22,33 @@ function createCorsHeaders(req) {
   };
 }
 
-function hasAdminAccess(req) {
-  const requiredToken = process.env.ADMIN_TOKEN || process.env.ADMIN_DASHBOARD_TOKEN;
-  if (!requiredToken) return true;
-
-  const tokenFromHeader = req.headers.get("x-admin-token");
+async function hasAdminAccess(req) {
   const authHeader = req.headers.get("authorization") || "";
-  const bearerToken = authHeader.startsWith("Bearer ")
+  const idToken = authHeader.startsWith("Bearer ")
     ? authHeader.slice(7).trim()
     : "";
+  const apiKey = process.env.FIREBASE_API_KEY;
 
-  return tokenFromHeader === requiredToken || bearerToken === requiredToken;
+  if (!idToken || !apiKey) return false;
+
+  try {
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+
+    if (!response.ok) return false;
+    const result = await response.json();
+    const [user] = Array.isArray(result.users) ? result.users : [];
+    const usesPasswordProvider = user?.providerUserInfo?.some(
+      (provider) => provider.providerId === "password",
+    );
+
+    return Boolean(user?.email && usesPasswordProvider && !user.disabled);
+  } catch {
+    return false;
+  }
 }
 
 function buildWhere(searchParams) {
@@ -105,7 +121,7 @@ export default async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  if (!hasAdminAccess(req)) {
+  if (!(await hasAdminAccess(req))) {
     return jsonResponse(401, { error: "Unauthorized" }, corsHeaders);
   }
 

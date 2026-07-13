@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v33";
+const CACHE_VERSION = "v34";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -263,6 +263,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname === "/api/store-bitacora" ||
     url.pathname === "/.netlify/functions/store-bitacora"
   );
+  const isAdminApi = isSameOrigin && url.pathname === "/api/admin-reports";
   const isFunctionApi = isSameOrigin && url.pathname.includes("/.netlify/functions/");
 
   if (isBitacoraApi && event.request.method === "POST") {
@@ -281,6 +282,16 @@ self.addEventListener("fetch", (event) => {
         }))
       );
     }
+    return;
+  }
+
+  if (isAdminApi) {
+    event.respondWith(fetch(event.request).catch(() => new Response(JSON.stringify({
+      error: "Sin conexión. El panel administrativo requiere una sesión en línea."
+    }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" }
+    })));
     return;
   }
 
