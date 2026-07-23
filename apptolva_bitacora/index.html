@@ -924,15 +924,19 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
         // --- REPORTE GENERADOR (V9.2 - FOLIO AUTOMÁTICO AL FINAL) ---
         async function procesarFinal() {
-            const u = document.getElementById('revUnidad').value;
-            const opNombre = document.getElementById('nombreOpTexto').value;
+            const u = document.getElementById('revUnidad').value.trim();
+            const opNombre = document.getElementById('nombreOpTexto').value.trim();
             const numeroEmpleado = document.getElementById('revEmpleado').value.trim();
-            
-            if (!u || !opNombre) return alert("⚠️ Error: Falta Unidad o Nombre del Operador.");
 
-            const btn = document.getElementById('btnFinal');
-            const msg = document.getElementById('statusMsg');
-            const originalText = btn.innerHTML;
+            // NUEVA VALIDACIÓN ESTRICTA
+if (!u || !opNombre || !numeroEmpleado) {
+    return alert("⚠️ Error: Son obligatorios la Unidad, Nombre del Operador y Número de Empleado.");
+}
+
+            
+const btn = document.getElementById('btnFinal');
+const msg = document.getElementById('statusMsg');
+const originalText = btn.innerHTML;
             
             // 1. ESTADO DE CARGA Y BLOQUEO
             btn.disabled = true;
