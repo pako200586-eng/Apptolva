@@ -1,18 +1,18 @@
 import { getDatabase } from "@netlify/database";
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import { createPublicKey, verify as verifySignature } from "node:crypto";
 
 const ALLOWED_METHODS = "GET, DELETE, OPTIONS";
 const ALLOWED_HEADERS = "Content-Type, Authorization";
 const ID_PATTERN = /^[a-f0-9]{32}$/i;
 const MAX_DELETE_IDS = 200;
-const REJECTED_TOKEN_ERRORS = new Set([
-  "auth/argument-error",
-  "auth/id-token-expired",
-  "auth/id-token-revoked",
-  "auth/invalid-id-token",
-  "auth/user-disabled",
-]);
+const FIREBASE_CERTIFICATES_URL =
+  "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+const TOKEN_CLOCK_TOLERANCE_SECONDS = 300;
+
+let cachedCertificates = null;
+let certificatesExpireAt = 0;
+
+class InvalidFirebaseTokenError extends Error {}
 
 function jsonResponse(status, body, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -35,36 +35,122 @@ function getEnvironmentVariable(name) {
   return globalThis.Netlify?.env?.get(name) || process.env[name] || "";
 }
 
-function getFirebaseCredential() {
+function getFirebaseProjectId() {
+  const configuredProjectId = getEnvironmentVariable("FIREBASE_PROJECT_ID");
+  if (configuredProjectId) return configuredProjectId;
+
   const serviceAccountJson = getEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT");
 
   if (serviceAccountJson) {
     try {
-      return cert(JSON.parse(serviceAccountJson));
+      const projectId = JSON.parse(serviceAccountJson)?.project_id;
+      if (projectId) return projectId;
     } catch {
       throw new Error("FIREBASE_SERVICE_ACCOUNT must contain valid service account JSON");
     }
   }
 
-  const projectId = getEnvironmentVariable("FIREBASE_PROJECT_ID");
-  const clientEmail = getEnvironmentVariable("FIREBASE_CLIENT_EMAIL");
-  const privateKey = getEnvironmentVariable("FIREBASE_PRIVATE_KEY").replace(/\\n/g, "\n");
-
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error("Firebase Admin credentials are not configured");
-  }
-
-  return cert({ projectId, clientEmail, privateKey });
+  throw new Error("FIREBASE_PROJECT_ID is not configured");
 }
 
-function getFirebaseAuth() {
+function decodeBase64UrlJson(value) {
   try {
-    const app = getApps()[0] || initializeApp({ credential: getFirebaseCredential() });
-    return getAuth(app);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(message, { cause: error });
+    return JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+  } catch {
+    throw new InvalidFirebaseTokenError("Malformed Firebase ID token");
   }
+}
+
+function certificateCacheDuration(headers) {
+  const cacheControl = headers.get("cache-control") || "";
+  const maxAge = Number(cacheControl.match(/max-age=(\d+)/i)?.[1] || 0);
+  return Math.max(60, maxAge || 3600) * 1000;
+}
+
+async function getFirebaseCertificates(forceRefresh = false) {
+  if (!forceRefresh && cachedCertificates && Date.now() < certificatesExpireAt) {
+    return cachedCertificates;
+  }
+
+  const response = await fetch(FIREBASE_CERTIFICATES_URL);
+  if (!response.ok) {
+    throw new Error(`Firebase certificate service returned ${response.status}`);
+  }
+
+  const certificates = await response.json();
+  if (!certificates || typeof certificates !== "object") {
+    throw new Error("Firebase certificate service returned invalid data");
+  }
+
+  cachedCertificates = certificates;
+  certificatesExpireAt = Date.now() + certificateCacheDuration(response.headers);
+  return certificates;
+}
+
+function validateFirebaseClaims(payload, projectId) {
+  const now = Math.floor(Date.now() / 1000);
+  const expectedIssuer = `https://securetoken.google.com/${projectId}`;
+  const audienceMatches = payload.aud === projectId
+    || (Array.isArray(payload.aud) && payload.aud.includes(projectId));
+
+  if (!audienceMatches || payload.iss !== expectedIssuer) {
+    throw new InvalidFirebaseTokenError("Firebase token project does not match");
+  }
+  if (typeof payload.sub !== "string" || !payload.sub || payload.sub.length > 128) {
+    throw new InvalidFirebaseTokenError("Firebase token subject is invalid");
+  }
+  if (typeof payload.exp !== "number" || payload.exp <= now) {
+    throw new InvalidFirebaseTokenError("Firebase token has expired");
+  }
+  if (
+    typeof payload.iat !== "number"
+    || payload.iat > now + TOKEN_CLOCK_TOLERANCE_SECONDS
+  ) {
+    throw new InvalidFirebaseTokenError("Firebase token issue time is invalid");
+  }
+  if (
+    payload.auth_time !== undefined
+    && (typeof payload.auth_time !== "number"
+      || payload.auth_time > now + TOKEN_CLOCK_TOLERANCE_SECONDS)
+  ) {
+    throw new InvalidFirebaseTokenError("Firebase token authentication time is invalid");
+  }
+}
+
+async function verifyFirebaseIdToken(idToken) {
+  const parts = idToken.split(".");
+  if (parts.length !== 3 || parts.some((part) => !part)) {
+    throw new InvalidFirebaseTokenError("Malformed Firebase ID token");
+  }
+
+  const header = decodeBase64UrlJson(parts[0]);
+  const payload = decodeBase64UrlJson(parts[1]);
+  if (header.alg !== "RS256" || typeof header.kid !== "string" || !header.kid) {
+    throw new InvalidFirebaseTokenError("Firebase token header is invalid");
+  }
+
+  let certificates = await getFirebaseCertificates();
+  let certificate = certificates[header.kid];
+  if (!certificate) {
+    certificates = await getFirebaseCertificates(true);
+    certificate = certificates[header.kid];
+  }
+  if (!certificate) {
+    throw new InvalidFirebaseTokenError("Firebase token signing key is unknown");
+  }
+
+  const validSignature = verifySignature(
+    "RSA-SHA256",
+    Buffer.from(`${parts[0]}.${parts[1]}`),
+    createPublicKey(certificate),
+    Buffer.from(parts[2], "base64url"),
+  );
+  if (!validSignature) {
+    throw new InvalidFirebaseTokenError("Firebase token signature is invalid");
+  }
+
+  validateFirebaseClaims(payload, getFirebaseProjectId());
+  return payload;
 }
 
 async function hasAdminAccess(req) {
@@ -74,13 +160,13 @@ async function hasAdminAccess(req) {
   if (!idToken) return false;
 
   try {
-    const decodedToken = await getFirebaseAuth().verifyIdToken(idToken, true);
+    const decodedToken = await verifyFirebaseIdToken(idToken);
     return Boolean(
       decodedToken.email
       && decodedToken.firebase?.sign_in_provider === "password",
     );
   } catch (error) {
-    if (REJECTED_TOKEN_ERRORS.has(error?.code)) return false;
+    if (error instanceof InvalidFirebaseTokenError) return false;
     throw error;
   }
 }
@@ -91,7 +177,7 @@ async function authorizeRequest(req, corsHeaders) {
     return jsonResponse(401, { error: "Unauthorized" }, corsHeaders);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("Firebase Admin authentication is unavailable:", message);
+    console.error("Firebase authentication is unavailable:", message);
     return jsonResponse(500, { error: message }, corsHeaders);
   }
 }
