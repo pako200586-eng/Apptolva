@@ -469,9 +469,14 @@
       }
     });
 
+      // Auto-refresh cada 3 minutos, y solo si la pestaña está visible en pantalla.
+    // Antes corría cada 30s sin importar si alguien la estaba viendo, lo que generaba
+    // consultas innecesarias a la base de datos cuando el panel quedaba abierto de fondo.
     setInterval(() => {
-      if (state.user) cargarDatos(filters(), { silent: true }).catch(() => {});
-    }, 30000);
+      if (state.user && document.visibilityState === 'visible') {
+        cargarDatos(filters(), { silent: true }).catch(() => {});
+      }
+    }, 180000);
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event) => {
