@@ -1,0 +1,40 @@
+name: Agente Autónomo Gemini
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  ejecutar_agente:
+    # Filtro: Solo se ejecuta si el comentario incluye la llamada al agente
+    if: contains(github.event.comment.body, '@gemini-cli')
+    runs-on: ubuntu-latest
+    
+    # Permisos críticos para que el agente pueda alterar código y hacer push
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Clonar el repositorio completo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Configurar entorno de ejecución
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Procesar instrucción y auto-modificar código
+        env:
+          # Requiere que guardes tu API Key en los Secrets del repositorio
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extrae el texto exacto de tu comentario en GitHub
+          INSTRUCCION=$(jq -r .comment.body "$GITHUB_EVENT_PATH")
+          
+          # Ejecuta el CLI analizando todo el directorio local y aplicando los cambios
+          npx @google/gemini-cli execute --workspace ./ --prompt "$INSTRUCCION" --auto-commit
