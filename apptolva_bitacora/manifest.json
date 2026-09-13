@@ -36,13 +36,13 @@
   "screenshots": [
     {
       "src": "./screenshot-mobile.png",
-      "sizes": "1080x1920",
+      "sizes": "1084x2207",
       "type": "image/png",
       "label": "Vista de bitácora en móvil"
     },
     {
       "src": "./screenshot-desktop.png",
-      "sizes": "1920x1080",
+      "sizes": "1370x772",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Panel de control en escritorio"
