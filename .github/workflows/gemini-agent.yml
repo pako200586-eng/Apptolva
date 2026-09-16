@@ -44,8 +44,9 @@ jobs:
 
             // 2. Conectar a Gemini
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+
+                    
             const systemContext = "Actúa como desarrollador Senior en PWAs, JavaScript y Firebase. Respuestas cortas, en formato Markdown y enfocadas en código directo sin introducciones.";
             const result = await model.generateContent(`${systemContext}\n\nConsulta: ${instruccion}`);
             const respuestaGemini = result.response.text();
