@@ -44,7 +44,7 @@ jobs:
 
             // 2. Conectar a Gemini
             with:
-          script: |
+      
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             const model = genAI.getGenerativeModel({
               model: "gemini-3-flash-preview",
@@ -52,7 +52,7 @@ jobs:
                 temperature: 0.2
               }
             });
-            // El flujo continuará sin errores reales.
+            
 
 
                     
