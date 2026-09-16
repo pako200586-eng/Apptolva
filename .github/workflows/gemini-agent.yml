@@ -2,15 +2,14 @@ name: Asistente Gemini Móvil
 
 on:
   issue_comment:
-    types: [created]
+    types: 
+      - created
 
 jobs:
   procesar_con_gemini:
-    # Filtro: Se activa únicamente si el comentario desde el móvil contiene @gemini
     if: ${{ contains(github.event.comment.body, '@gemini') }}
     runs-on: ubuntu-latest
     
-    # Permisos para poder responder en el hilo
     permissions:
       issues: write
       pull-requests: write
@@ -23,7 +22,7 @@ jobs:
       - name: Setup de entorno Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Instalar SDK de Google
         run: npm install @google/generative-ai
@@ -36,31 +35,22 @@ jobs:
           script: |
             const { GoogleGenerativeAI } = require(`${process.env.GITHUB_WORKSPACE}/node_modules/@google/generative-ai`);
             
-            // 1. Extraer la instrucción del comentario hecho en el móvil
             const cuerpoComentario = context.payload.comment.body;
             const instruccion = cuerpoComentario.replace('@gemini', '').trim();
             
             if (!instruccion) return;
 
-            // 2. Conectar a Gemini
-            with:
-      
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({
-              model: "gemini-3-flash-preview",
-              generationConfig: {
+            const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+            generationConfig: {
                 temperature: 0.2
               }
             });
             
-
-
-                    
             const systemContext = "Actúa como desarrollador Senior en PWAs, JavaScript y Firebase. Respuestas cortas, en formato Markdown y enfocadas en código directo sin introducciones.";
             const result = await model.generateContent(`${systemContext}\n\nConsulta: ${instruccion}`);
             const respuestaGemini = result.response.text();
 
-            // 3. Imprimir respuesta como un nuevo comentario en el Issue/PR
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
