@@ -1,10 +1,12 @@
-const CACHE_VERSION = "v36";
+const CACHE_VERSION = "v38";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
 const DB_VERSION = 1;
 const PENDING_STORE = "pending-reportes";
 const SYNC_TAG = "sync-reportes";
+
+const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
 
 const OFFLINE_URLS = [
   "./",
@@ -81,10 +83,11 @@ async function withPendingStore(mode, callback) {
   });
 }
 
-async function savePendingReport(payload) {
+async function savePendingReport(payload, type = "bitacora") {
   const id = payload.offlineQueueId || crypto.randomUUID();
   const record = {
     id,
+    type,
     payload,
     createdAt: new Date().toISOString(),
     attempts: 0
@@ -114,6 +117,17 @@ async function notifyClients(message) {
   clientsList.forEach((client) => client.postMessage(message));
 }
 
+async function requestBackgroundSync() {
+  if (!self.registration.sync) return false;
+  try {
+    await self.registration.sync.register(SYNC_TAG);
+    return true;
+  } catch (error) {
+    console.warn("No se pudo registrar Background Sync", error);
+    return false;
+  }
+}
+
 async function precacheOfflineUrls() {
   const cache = await caches.open(CACHE_NAME);
   const requests = OFFLINE_URLS.map((url) => new Request(url, { cache: "reload" }));
@@ -133,14 +147,9 @@ async function precacheOfflineUrls() {
   }
 }
 
-// Cache estático con filtro de dominio
 async function cacheStaticRequest(request) {
   const url = new URL(request.url);
-
-  // Solo cachea recursos de tu dominio (apptolva.com)
-  if (url.origin !== self.location.origin) {
-    return fetch(request); // ignora extensiones y otros esquemas
-  }
+  if (url.origin !== self.location.origin) return fetch(request);
 
   const cached = await caches.match(request, { ignoreSearch: true });
   if (cached) return cached;
@@ -148,25 +157,20 @@ async function cacheStaticRequest(request) {
   const response = await fetch(request);
   if (response && response.ok) {
     const cache = await caches.open(RUNTIME_CACHE);
-    cache.put(request, response.clone());
+    await cache.put(request, response.clone());
   }
   return response;
 }
 
-// Estrategia network-first con filtro de dominio
 async function networkFirstRequest(request) {
   const url = new URL(request.url);
-
-  // Solo aplica caché a recursos de tu dominio
-  if (url.origin !== self.location.origin) {
-    return fetch(request); // ignora externos y extensiones
-  }
+  if (url.origin !== self.location.origin) return fetch(request);
 
   try {
     const response = await fetch(request);
     if (request.method === "GET" && response && response.ok) {
       const cache = await caches.open(RUNTIME_CACHE);
-      cache.put(request, response.clone());
+      await cache.put(request, response.clone());
     }
     return response;
   } catch (error) {
@@ -179,11 +183,11 @@ async function networkFirstRequest(request) {
 async function queueBitacoraRequest(request) {
   try {
     const response = await fetch(request.clone());
-    if (response && response.ok) return response;
     return response;
   } catch (error) {
     const payload = await request.clone().json();
-    const record = await savePendingReport(payload);
+    const record = await savePendingReport(payload, "bitacora");
+    await requestBackgroundSync();
     await notifyClients({
       type: "REPORT_QUEUED",
       id: record.id,
@@ -203,6 +207,33 @@ async function queueBitacoraRequest(request) {
   }
 }
 
+async function queueAppScriptRequest(request) {
+  try {
+    return await fetch(request.clone());
+  } catch (error) {
+    const payload = await request.clone().json();
+    const record = await savePendingReport(payload, payload.tipo || "emergencia");
+    await requestBackgroundSync();
+    await notifyClients({
+      type: "REPORT_QUEUED",
+      id: record.id,
+      folio: payload.folio || "",
+      operator: payload.operador || "",
+      unitId: payload.unidad || "",
+      kind: payload.tipo || "emergencia"
+    });
+    return new Response(JSON.stringify({
+      offline: true,
+      queued: true,
+      localId: record.id,
+      message: "Reporte guardado offline. Se sincronizará cuando vuelva la señal."
+    }), {
+      status: 202,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+
 async function enviarReportesPendientes() {
   const pendientes = await getPendingReports();
   if (!pendientes.length) return;
@@ -211,28 +242,45 @@ async function enviarReportesPendientes() {
     const payload = { ...reporte.payload };
     delete payload.offlineQueueId;
 
+    const url = reporte.type === "emergencia"
+      ? GAS_DOPOST_URL
+      : "/api/store-bitacora";
+
     try {
-      const response = await fetch("/api/store-bitacora", {
+      const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": reporte.type === "emergencia"
+            ? "text/plain;charset=utf-8"
+            : "application/json"
+        },
         body: JSON.stringify(payload)
       });
 
-      if (response.ok) {
-        const result = await response.json().catch(() => ({}));
-        await deletePendingReport(reporte.id);
+      if (!response.ok) {
         await notifyClients({
-          type: "REPORT_SYNCED",
+          type: "REPORT_SYNC_WAITING",
           id: reporte.id,
-          folio: payload.folio,
-          operator: payload.driverName || "",
-          unitId: payload.unitId || "",
-          url: result.url || "",
-          expiresAt: result.expiresAt || ""
+          kind: reporte.type
         });
+        continue;
       }
+
+      await deletePendingReport(reporte.id);
+      await notifyClients({
+        type: "REPORT_SYNCED",
+        id: reporte.id,
+        folio: payload.folio || "",
+        operator: payload.driverName || payload.operador || "",
+        unitId: payload.unitId || payload.unidad || "",
+        kind: reporte.type
+      });
     } catch (error) {
-      await notifyClients({ type: "REPORT_SYNC_WAITING", id: reporte.id });
+      await notifyClients({
+        type: "REPORT_SYNC_WAITING",
+        id: reporte.id,
+        kind: reporte.type
+      });
       throw error;
     }
   }
@@ -265,9 +313,15 @@ self.addEventListener("fetch", (event) => {
   );
   const isAdminApi = isSameOrigin && url.pathname === "/api/admin-reports";
   const isFunctionApi = isSameOrigin && url.pathname.includes("/.netlify/functions/");
+  const isGasDoPost = url.href === GAS_DOPOST_URL;
 
   if (isBitacoraApi && event.request.method === "POST") {
     event.respondWith(queueBitacoraRequest(event.request));
+    return;
+  }
+
+  if (isGasDoPost && event.request.method === "POST") {
+    event.respondWith(queueAppScriptRequest(event.request));
     return;
   }
 
