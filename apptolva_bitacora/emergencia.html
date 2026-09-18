@@ -113,7 +113,11 @@ function onFallaFotoSeleccionada(event) {
 function construirPayload() {
     const unidad = document.getElementById('fallaUnidad').value.trim();
     const descripcion = document.getElementById('fallaDesc').value.trim();
-    const operador = localStorage.getItem('nombreOperadorActual') || '';
+    const operador =
+        localStorage.getItem('nombreOperadorActual') ||
+        localStorage.getItem('nom087_driverName') ||
+        localStorage.getItem('driverName') ||
+        '';
     return {
         tipo: 'emergencia',
         operador, unidad, descripcion,
@@ -130,24 +134,68 @@ function construirPayload() {
     };
 }
 
+function obtenerUbicacionActual() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('GPS no disponible'));
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => resolve({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                capturedAt: new Date().toISOString(),
+                source: 'device-geolocation'
+            }),
+            reject,
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    });
+}
+
 async function registrarEmergenciaEnSistema() {
     const button = document.getElementById('btnRegistrarEmergencia');
     const status = document.getElementById('fallaSaveStatus');
-    const payload = construirPayload();
-    if (!payload.unidad || !payload.descripcion) {
-        alert('Pon la unidad y describe la falla antes de registrar.');
+    const unidad = document.getElementById('fallaUnidad').value.trim();
+    const descripcion = document.getElementById('fallaDesc').value.trim();
+    if (!unidad) {
+        alert('Escribe la unidad.');
+        return;
+    }
+    if (!descripcion) {
+        alert('Describe la falla.');
         return;
     }
     button.disabled = true;
-    button.textContent = 'ENVIANDO...';
     status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-blue-100 text-blue-700';
-    status.textContent = 'Enviando...';
+    status.textContent = 'Obteniendo GPS...';
     try {
+        try {
+            fallaUbicacion = await obtenerUbicacionActual();
+        } catch (error) {
+            console.warn('GPS no disponible', error);
+            fallaUbicacion = null;
+        }
+        const payload = construirPayload();
+        button.textContent = 'ENVIANDO...';
         const response = await fetch(GAS_DOPOST_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
-        const data = await response.json();
-        if (!response.ok || data.error) throw new Error(data.error || 'El servidor rechazó el reporte');
-        status.className = `text-center text-xs font-bold mt-3 p-2 rounded ${data.offline ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`;
-        status.textContent = data.offline ? 'Sin señal. Guardado y pendiente de envío.' : '✓ Registrado correctamente.';
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (error) {
+            throw new Error('Google Apps Script no devolvió JSON válido');
+        }
+        if (data.offline && data.queued) {
+            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-amber-100 text-amber-700';
+            status.textContent = 'Sin señal. Guardado y pendiente de envío.';
+        } else if (!response.ok || data.success !== true) {
+            throw new Error(data.error || 'Google Apps Script no confirmó el registro');
+        } else {
+            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-green-100 text-green-700';
+            status.textContent = '✓ Registrado correctamente.';
+        }
     } catch (error) {
         status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-red-100 text-red-700';
         status.textContent = `No se pudo registrar: ${error.message}`;

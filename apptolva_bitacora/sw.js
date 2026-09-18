@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v37";
+const CACHE_VERSION = "v38";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -268,7 +268,7 @@ async function enviarReportesPendientes() {
       } catch (error) {
         result = {};
       }
-      if (response.ok && !result.error && result.success !== false) {
+      if (response.ok && result && result.success === true) {
         await deletePendingReport(reporte.id);
         await notifyClients({
           type: "REPORT_SYNCED",
