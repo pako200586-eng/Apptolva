@@ -111,7 +111,7 @@ function onFallaFotoSeleccionada(event) {
 }
 
 function construirPayload() {
-    const unidad = document.getElementById('fallaUnidad').value.trim();
+    const unidad = document.getElementById('fallaUnidad').value.trim().toUpperCase();
     const descripcion = document.getElementById('fallaDesc').value.trim();
     const operador =
         localStorage.getItem('nombreOperadorActual') ||
@@ -174,8 +174,9 @@ async function registrarEmergenciaEnSistema() {
         try {
             fallaUbicacion = await obtenerUbicacionActual();
         } catch (error) {
-            console.warn('GPS no disponible', error);
-            fallaUbicacion = null;
+            // Si el reintento falla, conservamos la ubicación capturada al abrir la pantalla
+            // en vez de borrarla: es la evidencia del lugar de la falla.
+            console.warn('GPS no disponible en el reintento', error);
         }
         const payload = construirPayload();
         button.textContent = 'ENVIANDO...';
