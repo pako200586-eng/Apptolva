@@ -117,6 +117,13 @@ async function notifyClients(message) {
   clientsList.forEach((client) => client.postMessage(message));
 }
 
+function normalizarTipoReporte(tipo) {
+  const valor = String(tipo || "").trim().toLowerCase();
+  return valor === "emergencia" || valor === "emergencia en ruta"
+    ? "emergencia"
+    : "bitacora";
+}
+
 async function requestBackgroundSync() {
   if (!self.registration.sync) return false;
   try {
@@ -212,7 +219,8 @@ async function queueAppScriptRequest(request) {
     return await fetch(request.clone());
   } catch (error) {
     const payload = await request.clone().json();
-    const record = await savePendingReport(payload, payload.tipo || "emergencia");
+    const tipo = normalizarTipoReporte(payload.tipo);
+    const record = await savePendingReport(payload, tipo);
     await requestBackgroundSync();
     await notifyClients({
       type: "REPORT_QUEUED",
@@ -220,7 +228,7 @@ async function queueAppScriptRequest(request) {
       folio: payload.folio || "",
       operator: payload.operador || "",
       unitId: payload.unidad || "",
-      kind: payload.tipo || "emergencia"
+      kind: tipo
     });
     return new Response(JSON.stringify({
       offline: true,
@@ -242,22 +250,29 @@ async function enviarReportesPendientes() {
     const payload = { ...reporte.payload };
     delete payload.offlineQueueId;
 
-    const url = reporte.type === "emergencia"
-      ? GAS_DOPOST_URL
-      : "/api/store-bitacora";
+    const esReporteEmergencia = reporte.type === "emergencia";
+    const url = esReporteEmergencia ? GAS_DOPOST_URL : "/api/store-bitacora";
 
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: {
-          "Content-Type": reporte.type === "emergencia"
+          "Content-Type": esReporteEmergencia
             ? "text/plain;charset=utf-8"
             : "application/json"
         },
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
+      const responseText = await response.text();
+      let parsed;
+      try {
+        parsed = JSON.parse(responseText);
+      } catch (error) {
+        parsed = { raw: responseText };
+      }
+
+      if (!response.ok || (parsed && parsed.success === false) || (parsed && parsed.error)) {
         await notifyClients({
           type: "REPORT_SYNC_WAITING",
           id: reporte.id,
@@ -281,7 +296,7 @@ async function enviarReportesPendientes() {
         id: reporte.id,
         kind: reporte.type
       });
-      throw error;
+      continue;
     }
   }
 }

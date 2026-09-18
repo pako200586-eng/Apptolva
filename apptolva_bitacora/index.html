@@ -91,7 +91,6 @@
     </style>
 </head>
 <body class="text-slate-800">
-
     <!-- Compuerta de acceso al módulo de Evaluación -->
     <div id="evalTokenOverlay" class="hidden fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -342,27 +341,283 @@
         </div>
         <div class="h-10"></div>
     </main>
+<script>
+    const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
+</script>
+    <!-- ============================================================== -->
+<main id="view-falla" class="section-content p-4 max-w-lg mx-auto">
+    <div class="bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm">
+        <h2 class="font-bold text-xl text-red-700 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Reportar Falla</h2>
 
-    <main id="view-falla" class="section-content p-4 max-w-lg mx-auto">
-        <div class="bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm">
-            <h2 class="font-bold text-xl text-red-700 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Reportar Falla</h2>
-            <select id="fallaContact" class="w-full p-3 border border-gray-300 rounded mb-4 bg-white font-bold text-sm">
-                <option value="5219211098696">📡 LOGÍSTICA / MONITOREO (24H)</option>
-                <option value="5219212683079">🔧 MANTENIMIENTO</option>
-                <option value="5219212682626">👷 TURNO A: F. Ambrosio</option>
-                <option value="5219212405675">👷 TURNO A: J.M. Pérez</option>
-                <option value="5219241472462">👷 TURNO B: Salas</option>
-                <option value="5219212656411">👷 TURNO B: Omar</option>
-                <option value="5219211230242">🚨 JEFE TRANSPORTE (Ing. B)</option>
-            </select>
-            <textarea id="fallaDesc" class="w-full p-4 border border-gray-300 rounded mb-4 text-sm" rows="4" placeholder="Describe la falla..."></textarea>
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="sendWhatsappFalla()" class="bg-green-600 text-white font-bold py-3 rounded shadow active:scale-95">ENVIAR</button>
-                <button onclick="copyFallaText()" class="bg-blue-600 text-white font-bold py-3 rounded shadow active:scale-95">COPIAR (GRUPO)</button>
-            </div>
-            <p id="copyOk" class="text-center text-xs font-bold text-green-700 mt-2 hidden">¡Copiado! Pégalo en el grupo.</p>
+        <select id="fallaContact" class="w-full p-3 border border-gray-300 rounded mb-3 bg-white font-bold text-sm">
+            <option value="5219211098696">📡 LOGÍSTICA / MONITOREO (24H)</option>
+            <option value="5219212683079">🔧 MANTENIMIENTO</option>
+            <option value="5219212682626">👷 TURNO A: F. Ambrosio</option>
+            <option value="5219212405675">👷 TURNO A: J.M. Pérez</option>
+            <option value="5219241472462">👷 TURNO B: Salas</option>
+            <option value="5219212656411">👷 TURNO B: Omar</option>
+            <option value="5219211230242">🚨 JEFE TRANSPORTE (Ing. B)</option>
+        </select>
+
+        <input type="text" id="fallaUnidad" class="w-full p-3 border border-gray-300 rounded mb-3 text-sm font-bold uppercase" placeholder="NO. DE UNIDAD">
+
+        <textarea id="fallaDesc" class="w-full p-4 border border-gray-300 rounded mb-3 text-sm" rows="4" placeholder="Describe la falla..."></textarea>
+
+        <!-- Captura de foto -->
+        <div class="mb-3">
+            <label class="w-full flex flex-col items-center justify-center border-2 border-dashed border-red-300 rounded-lg p-4 bg-white cursor-pointer active:scale-[0.98] transition">
+                <i class="fas fa-camera text-2xl text-red-500 mb-1"></i>
+                <span id="fallaFotoLabel" class="text-xs font-bold text-gray-600">TOMAR FOTO DE EVIDENCIA</span>
+                <input type="file" id="fallaFotoInput" accept="image/*" capture="environment" class="hidden" onchange="onFallaFotoSeleccionada(event)">
+            </label>
+            <img id="fallaFotoPreview" class="hidden w-full mt-2 rounded-lg border max-h-48 object-cover">
         </div>
-    </main>
+
+        <!-- Estatus de ubicación -->
+        <p id="fallaGpsStatus" class="text-[10px] text-gray-400 mb-3 text-center">
+            <i class="fas fa-map-marker-alt mr-1"></i> Obteniendo ubicación...
+        </p>
+
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="sendWhatsappFalla()" class="bg-green-600 text-white font-bold py-3 rounded shadow active:scale-95">
+                <i class="fab fa-whatsapp mr-1"></i> AVISAR YA
+            </button>
+            <button onclick="registrarEmergenciaEnSistema()" id="btnRegistrarEmergencia" class="bg-red-600 text-white font-bold py-3 rounded shadow active:scale-95">
+                <i class="fas fa-database mr-1"></i> REGISTRAR
+            </button>
+        </div>
+
+        <p id="fallaSaveStatus" class="hidden text-center text-xs font-bold mt-3 p-2 rounded"></p>
+        <p id="copyOk" class="text-center text-xs font-bold text-green-700 mt-2 hidden">¡Copiado! Pégalo en el grupo.</p>
+    </div>
+</main>
+
+<script>
+// ============================================================
+// ESTADO DEL MÓDULO DE FALLA/EMERGENCIA
+// ============================================================
+var fallaFotoBase64 = null;   // sin el prefijo data:image/...
+var fallaUbicacion = null;    // { lat, lng }
+
+// ============================================================
+// 1. UBICACIÓN — se pide apenas se abre la pantalla de falla
+// ============================================================
+function iniciarCapturaFalla() {
+    fallaFotoBase64 = null;
+    fallaUbicacion = null;
+    document.getElementById('fallaFotoPreview').classList.add('hidden');
+    document.getElementById('fallaFotoLabel').textContent = 'TOMAR FOTO DE EVIDENCIA';
+    document.getElementById('fallaSaveStatus').classList.add('hidden');
+
+    var statusEl = document.getElementById('fallaGpsStatus');
+    statusEl.innerHTML = '<i class="fas fa-map-marker-alt mr-1"></i> Obteniendo ubicación...';
+
+    if (!navigator.geolocation) {
+        statusEl.innerHTML = '<i class="fas fa-map-marker-alt mr-1 text-gray-400"></i> Ubicación no disponible en este dispositivo';
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function (pos) {
+            fallaUbicacion = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                accuracy: pos.coords.accuracy,
+                capturedAt: new Date().toISOString()
+            };
+            statusEl.innerHTML = '<i class="fas fa-map-marker-alt mr-1 text-green-600"></i> Ubicación capturada ✓';
+        },
+        function (err) {
+            statusEl.innerHTML = '<i class="fas fa-map-marker-alt mr-1 text-amber-500"></i> No se pudo obtener ubicación (se enviará sin ella)';
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+}
+// Llama a esto desde tu función nav() cuando el destino sea 'falla', por ejemplo:
+//   if (destino === 'falla') iniciarCapturaFalla();
+
+// ============================================================
+// 2. FOTO — comprime a ancho máx 1280px y calidad 0.6 antes de guardar
+// ============================================================
+function onFallaFotoSeleccionada(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    comprimirImagen(file, 1280, 0.6).then(function (base64SinPrefijo) {
+        fallaFotoBase64 = base64SinPrefijo;
+        var preview = document.getElementById('fallaFotoPreview');
+        preview.src = 'data:image/jpeg;base64,' + base64SinPrefijo;
+        preview.classList.remove('hidden');
+        document.getElementById('fallaFotoLabel').textContent = 'FOTO LISTA — toca para cambiarla';
+    }).catch(function (err) {
+        alert('No se pudo procesar la foto: ' + err.message);
+    });
+}
+
+function comprimirImagen(file, maxAncho, calidad) {
+    return new Promise(function (resolve, reject) {
+        var img = new Image();
+        var reader = new FileReader();
+
+        reader.onerror = function () { reject(new Error('No se pudo leer el archivo')); };
+        reader.onload = function (e) {
+            img.onerror = function () { reject(new Error('No se pudo decodificar la imagen')); };
+            img.onload = function () {
+                var escala = Math.min(1, maxAncho / img.width);
+                var canvas = document.createElement('canvas');
+                canvas.width = img.width * escala;
+                canvas.height = img.height * escala;
+
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                var dataUrl = canvas.toDataURL('image/jpeg', calidad);
+                // Quitamos el prefijo "data:image/jpeg;base64," para mandar solo el base64 puro
+                resolve(dataUrl.split(',')[1]);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// ============================================================
+// 3. ENVÍO — tu propio sw.js ya intercepta este POST:
+//    si hay red lo manda directo; si NO hay red, lo guarda solo
+//    en su IndexedDB (apptolva-offline-db / pending-reportes) y
+//    lo reintenta con Background Sync (tag "sync-reportes") en
+//    cuanto vuelva la señal. No hace falta duplicar nada de eso aquí.
+// ============================================================
+async function registrarEmergenciaEnSistema() {
+    var boton = document.getElementById('btnRegistrarEmergencia');
+    var statusEl = document.getElementById('fallaSaveStatus');
+    var unidad = document.getElementById('fallaUnidad').value.trim();
+    var descripcion = document.getElementById('fallaDesc').value.trim();
+
+    if (!unidad || !descripcion) {
+        alert('Pon la unidad y describe la falla antes de registrar.');
+        return;
+    }
+
+    var operadorEl = document.getElementById('revOperador');
+    var operador = operadorEl ? operadorEl.value.trim() : (localStorage.getItem('nombreOperadorActual') || '');
+
+    var payload = {
+        tipo: 'emergencia',
+        operador: operador,
+        unidad: unidad,
+        descripcion: descripcion,
+        lat: fallaUbicacion ? fallaUbicacion.lat : null,
+        lng: fallaUbicacion ? fallaUbicacion.lng : null,
+        latitud: fallaUbicacion ? fallaUbicacion.lat : null,
+        longitud: fallaUbicacion ? fallaUbicacion.lng : null,
+        precisionGps: fallaUbicacion ? fallaUbicacion.accuracy : null,
+        fechaGps: fallaUbicacion ? fallaUbicacion.capturedAt : null,
+        gps: fallaUbicacion ? {
+            lat: fallaUbicacion.lat,
+            lng: fallaUbicacion.lng,
+            accuracy: fallaUbicacion.accuracy,
+            capturedAt: fallaUbicacion.capturedAt,
+            source: 'device-geolocation'
+        } : null,
+        fotoBase64: fallaFotoBase64,
+        fotos: fallaFotoBase64 ? [{
+            nombre: 'evidencia.jpg',
+            mimeType: 'image/jpeg',
+            data: 'data:image/jpeg;base64,' + fallaFotoBase64
+        }] : [],
+        fecha: new Date().toISOString()
+    };
+
+    boton.disabled = true;
+    boton.textContent = 'ENVIANDO...';
+    statusEl.classList.remove('hidden');
+    statusEl.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-blue-100 text-blue-700';
+    statusEl.textContent = 'Enviando...';
+
+    try {
+        var resp = await fetch(GAS_DOPOST_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        var data = await resp.json();
+
+        if (!resp.ok) {
+            throw new Error(data && data.error ? data.error : 'El servidor rechazó el reporte');
+        }
+
+        if (data && data.error) {
+            throw new Error(data.error);
+        }
+
+        if (data && data.offline && data.queued) {
+            statusEl.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-amber-100 text-amber-700';
+            statusEl.textContent = 'Sin señal ahora. Guardado y se enviará solo cuando haya conexión.';
+            boton.textContent = 'GUARDADO (pendiente de red)';
+        } else {
+            statusEl.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-green-100 text-green-700';
+            statusEl.textContent = '✓ Registrado en el sistema correctamente.';
+            boton.textContent = 'REGISTRADO ✓';
+        }
+    } catch (errRed) {
+        statusEl.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-red-100 text-red-700';
+        statusEl.textContent = 'No se pudo enviar ni guardar localmente. Usa "AVISAR YA" mientras tanto.';
+        boton.textContent = 'ERROR';
+    } finally {
+        setTimeout(function () {
+            boton.disabled = false;
+            boton.innerHTML = '<i class="fas fa-database mr-1"></i> REGISTRAR';
+        }, 3000);
+    }
+}
+    // ============================================================
+// 4. WHATSAPP INMEDIATO — ahora manda la foto también, si el
+//    teléfono lo soporta (Web Share API). Si no, cae al link wa.me de siempre.
+// ============================================================
+async function sendWhatsappFalla() {
+    var numero = document.getElementById('fallaContact').value;
+    var unidad = document.getElementById('fallaUnidad').value.trim();
+    var descripcion = document.getElementById('fallaDesc').value.trim();
+    var texto = '🚨 EMERGENCIA/FALLA\nUnidad: ' + unidad + '\n' + descripcion;
+    if (fallaUbicacion) {
+        texto += '\nUbicación: https://maps.google.com/?q=' + fallaUbicacion.lat + ',' + fallaUbicacion.lng;
+    }
+
+    if (fallaFotoBase64 && navigator.canShare) {
+        try {
+            var blob = await (await fetch('data:image/jpeg;base64,' + fallaFotoBase64)).blob();
+            var file = new File([blob], 'evidencia.jpg', { type: 'image/jpeg' });
+            if (navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], text: texto });
+                return;
+            }
+        } catch (e) {
+            // si el share falla o el usuario cancela, seguimos al fallback de abajo
+        }
+    }
+
+    // Fallback: comportamiento original (sin foto adjunta)
+    window.open('https://wa.me/' + numero + '?text=' + encodeURIComponent(texto), '_blank');
+}
+
+function copyFallaText() {
+    var unidad = document.getElementById('fallaUnidad').value.trim();
+    var descripcion = document.getElementById('fallaDesc').value.trim();
+    var texto = '🚨 EMERGENCIA/FALLA\nUnidad: ' + unidad + '\n' + descripcion;
+    if (fallaUbicacion) {
+        texto += '\nUbicación: https://maps.google.com/?q=' + fallaUbicacion.lat + ',' + fallaUbicacion.lng;
+    }
+    navigator.clipboard.writeText(texto).then(function () {
+        var ok = document.getElementById('copyOk');
+        ok.classList.remove('hidden');
+        setTimeout(function () { ok.classList.add('hidden'); }, 2500);
+    });
+}
+</script>
 
     <main id="view-ia" class="section-content p-4 max-w-lg mx-auto">
         <div class="flex flex-col h-[75vh] bg-white rounded-xl shadow border border-gray-300 overflow-hidden">
@@ -420,6 +675,7 @@
     <script>
         // --- VARIABLES GLOBALES Y CLAVES ---
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
+        
         
         // --- 1. INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', function() {
@@ -757,6 +1013,7 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             if(id === 'rev') setTimeout(resizeCanvas, 200);
             if(id === 'guia') renderGuide();
             if(id === 'eval') volverEvalMenu();
+            if (id === 'falla') iniciarCapturaFalla();
         }
 
         // GUÍA
@@ -1397,18 +1654,6 @@ const originalText = btn.innerHTML;
             btn.innerHTML = html;
             btn.classList.remove('opacity-75');
             msg.classList.add('hidden');
-        }
-
-        // FALLAS
-        function sendWhatsappFalla() {
-            const ph = document.getElementById('fallaContact').value;
-            const tx = document.getElementById('fallaDesc').value;
-            if(!tx) return alert("Escribe la falla");
-            window.open(`https://wa.me/${ph}?text=${encodeURIComponent("🚨 FALLA URGENTE: " + tx)}`, '_blank');
-        }
-        function copyFallaText() {
-            navigator.clipboard.writeText("🚨 FALLA URGENTE: " + document.getElementById('fallaDesc').value);
-            document.getElementById('copyOk').classList.remove('hidden');
         }
 
         // --- IA CON VOZ ---
