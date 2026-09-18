@@ -218,7 +218,7 @@
     <!-- ============================================================== -->
 
     <!-- 5. Reporte de Fallas -->
-    <button onclick="nav('falla')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-red-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+    <button onclick="window.location.href='emergencia.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-red-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
         <i class="fas fa-exclamation-triangle text-3xl text-red-500 mb-2"></i>                
         <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
     </button>
@@ -341,27 +341,6 @@
             <p id="statusMsg" class="text-center text-xs font-bold text-gray-400 mt-2 hidden">Contactando a la nube para asignar folio...</p>
         </div>
         <div class="h-10"></div>
-    </main>
-
-    <main id="view-falla" class="section-content p-4 max-w-lg mx-auto">
-        <div class="bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm">
-            <h2 class="font-bold text-xl text-red-700 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Reportar Falla</h2>
-            <select id="fallaContact" class="w-full p-3 border border-gray-300 rounded mb-4 bg-white font-bold text-sm">
-                <option value="5219211098696">📡 LOGÍSTICA / MONITOREO (24H)</option>
-                <option value="5219212683079">🔧 MANTENIMIENTO</option>
-                <option value="5219212682626">👷 TURNO A: F. Ambrosio</option>
-                <option value="5219212405675">👷 TURNO A: J.M. Pérez</option>
-                <option value="5219241472462">👷 TURNO B: Salas</option>
-                <option value="5219212656411">👷 TURNO B: Omar</option>
-                <option value="5219211230242">🚨 JEFE TRANSPORTE (Ing. B)</option>
-            </select>
-            <textarea id="fallaDesc" class="w-full p-4 border border-gray-300 rounded mb-4 text-sm" rows="4" placeholder="Describe la falla..."></textarea>
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="sendWhatsappFalla()" class="bg-green-600 text-white font-bold py-3 rounded shadow active:scale-95">ENVIAR</button>
-                <button onclick="copyFallaText()" class="bg-blue-600 text-white font-bold py-3 rounded shadow active:scale-95">COPIAR (GRUPO)</button>
-            </div>
-            <p id="copyOk" class="text-center text-xs font-bold text-green-700 mt-2 hidden">¡Copiado! Pégalo en el grupo.</p>
-        </div>
     </main>
 
     <main id="view-ia" class="section-content p-4 max-w-lg mx-auto">
@@ -1397,18 +1376,6 @@ const originalText = btn.innerHTML;
             btn.innerHTML = html;
             btn.classList.remove('opacity-75');
             msg.classList.add('hidden');
-        }
-
-        // FALLAS
-        function sendWhatsappFalla() {
-            const ph = document.getElementById('fallaContact').value;
-            const tx = document.getElementById('fallaDesc').value;
-            if(!tx) return alert("Escribe la falla");
-            window.open(`https://wa.me/${ph}?text=${encodeURIComponent("🚨 FALLA URGENTE: " + tx)}`, '_blank');
-        }
-        function copyFallaText() {
-            navigator.clipboard.writeText("🚨 FALLA URGENTE: " + document.getElementById('fallaDesc').value);
-            document.getElementById('copyOk').classList.remove('hidden');
         }
 
         // --- IA CON VOZ ---
