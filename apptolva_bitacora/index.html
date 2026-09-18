@@ -131,6 +131,7 @@
         
         <input type="password" id="passInput" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-2xl tracking-widest mb-4 font-bold outline-none focus:border-orange-500" placeholder="PIN" maxlength="4">
         
+        <p id="errorMsg" class="hidden text-xs font-bold text-red-600 mb-3">PIN incorrecto. Inténtalo de nuevo.</p>
         <button onclick="checkLogin()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition uppercase">Entrar</button>
         
         <div class="mt-6 pt-4 border-t border-gray-100 text-left">
@@ -230,7 +231,7 @@
     </button>
 
     <!-- 7. Panel Administrativo -->
-    <button onclick="window.location.href='https://www.apptolva.com/admin.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-800 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02] col-span-2">
+    <button onclick="window.location.href='admin.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-800 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02] col-span-2">
         <i class="fas fa-user-shield text-3xl text-green-800 mb-2"></i>
         <span class="font-bold text-gray-700 text-xs text-center">PANEL ADMINISTRATIVO</span>
     </button>

@@ -359,7 +359,7 @@
             if (!el) return;
             const val = localStorage.getItem('nom087_' + id);
             if (val) el.value = val;
-..............................................................................            el.addEventListener('input', (e) => {
+            el.addEventListener('input', (e) => {
                 localStorage.setItem('nom087_' + id, e.target.value);
                 if (id === 'driverName' && e.target.value.trim()) {
                     localStorage.setItem('nombreOperadorActual', e.target.value.trim());
