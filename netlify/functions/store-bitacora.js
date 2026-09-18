@@ -232,6 +232,7 @@ export default async (req) => {
       return jsonResponse(
         200,
         {
+          success: true,
           id,
           folio: data.folio.trim(),
           fecha: new Date().toISOString(),

@@ -1,14 +1,16 @@
-const CACHE_VERSION = "v36";
+const CACHE_VERSION = "v38";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
 const DB_VERSION = 1;
 const PENDING_STORE = "pending-reportes";
 const SYNC_TAG = "sync-reportes";
+const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
 
 const OFFLINE_URLS = [
   "./",
   "./index.html",
+  "./emergencia.html",
   "./bitacora_master.html",
   "./admin.html",
   "./viewer.html",
@@ -81,10 +83,11 @@ async function withPendingStore(mode, callback) {
   });
 }
 
-async function savePendingReport(payload) {
+async function savePendingReport(payload, type = "bitacora") {
   const id = payload.offlineQueueId || crypto.randomUUID();
   const record = {
     id,
+    type,
     payload,
     createdAt: new Date().toISOString(),
     attempts: 0
@@ -112,6 +115,22 @@ async function deletePendingReport(id) {
 async function notifyClients(message) {
   const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
   clientsList.forEach((client) => client.postMessage(message));
+}
+
+function normalizarTipoReporte(tipo) {
+  const valor = String(tipo || "").trim().toLowerCase();
+  return valor === "emergencia" || valor === "emergencia en ruta" ? "emergencia" : "bitacora";
+}
+
+async function requestBackgroundSync() {
+  if (!self.registration.sync) return false;
+  try {
+    await self.registration.sync.register(SYNC_TAG);
+    return true;
+  } catch (error) {
+    console.warn("No se pudo registrar Background Sync", error);
+    return false;
+  }
 }
 
 async function precacheOfflineUrls() {
@@ -183,7 +202,8 @@ async function queueBitacoraRequest(request) {
     return response;
   } catch (error) {
     const payload = await request.clone().json();
-    const record = await savePendingReport(payload);
+    const record = await savePendingReport(payload, "bitacora");
+    await requestBackgroundSync();
     await notifyClients({
       type: "REPORT_QUEUED",
       id: record.id,
@@ -203,6 +223,27 @@ async function queueBitacoraRequest(request) {
   }
 }
 
+async function queueAppScriptRequest(request) {
+  try {
+    return await fetch(request.clone());
+  } catch (error) {
+    const payload = await request.clone().json();
+    const type = normalizarTipoReporte(payload.tipo);
+    const record = await savePendingReport(payload, type);
+    await requestBackgroundSync();
+    await notifyClients({ type: "REPORT_QUEUED", id: record.id, kind: type });
+    return new Response(JSON.stringify({
+      offline: true,
+      queued: true,
+      localId: record.id,
+      message: "Reporte guardado offline. Se sincronizará cuando vuelva la señal."
+    }), {
+      status: 202,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+
 async function enviarReportesPendientes() {
   const pendientes = await getPendingReports();
   if (!pendientes.length) return;
@@ -210,30 +251,38 @@ async function enviarReportesPendientes() {
   for (const reporte of pendientes) {
     const payload = { ...reporte.payload };
     delete payload.offlineQueueId;
+    const isEmergency = reporte.type === "emergencia";
+    const url = isEmergency ? GAS_DOPOST_URL : "/api/store-bitacora";
 
     try {
-      const response = await fetch("/api/store-bitacora", {
+      const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": isEmergency ? "text/plain;charset=utf-8" : "application/json" },
         body: JSON.stringify(payload)
       });
 
-      if (response.ok) {
-        const result = await response.json().catch(() => ({}));
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (error) {
+        result = {};
+      }
+      if (response.ok && result && result.success === true) {
         await deletePendingReport(reporte.id);
         await notifyClients({
           type: "REPORT_SYNCED",
           id: reporte.id,
           folio: payload.folio,
-          operator: payload.driverName || "",
-          unitId: payload.unitId || "",
-          url: result.url || "",
-          expiresAt: result.expiresAt || ""
+          operator: payload.driverName || payload.operador || "",
+          unitId: payload.unitId || payload.unidad || "",
+          kind: reporte.type
         });
+      } else {
+        await notifyClients({ type: "REPORT_SYNC_WAITING", id: reporte.id, kind: reporte.type });
       }
     } catch (error) {
-      await notifyClients({ type: "REPORT_SYNC_WAITING", id: reporte.id });
-      throw error;
+      await notifyClients({ type: "REPORT_SYNC_WAITING", id: reporte.id, kind: reporte.type });
     }
   }
 }
@@ -265,9 +314,15 @@ self.addEventListener("fetch", (event) => {
   );
   const isAdminApi = isSameOrigin && url.pathname === "/api/admin-reports";
   const isFunctionApi = isSameOrigin && url.pathname.includes("/.netlify/functions/");
+  const isGasDoPost = url.href === GAS_DOPOST_URL;
 
   if (isBitacoraApi && event.request.method === "POST") {
     event.respondWith(queueBitacoraRequest(event.request));
+    return;
+  }
+
+  if (isGasDoPost && event.request.method === "POST") {
+    event.respondWith(queueAppScriptRequest(event.request));
     return;
   }
 
@@ -307,7 +362,10 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      networkFirstRequest(event.request).catch(() => caches.match("./index.html", { ignoreSearch: true }))
+      networkFirstRequest(event.request).catch(async () =>
+        (await caches.match(event.request, { ignoreSearch: true })) ||
+        caches.match("./index.html", { ignoreSearch: true })
+      )
     );
     return;
   }

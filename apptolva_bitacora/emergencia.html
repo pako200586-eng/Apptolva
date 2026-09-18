@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#dc2626">
+    <title>Reportar emergencia | AppTolva</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+    <link rel="stylesheet" href="./css/fontawesome.min.css">
+    <script src="./js/tailwindcss.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800">
+    <header class="bg-red-600 text-white p-4 sticky top-0 z-10 shadow flex items-center gap-3">
+        <a href="index.html" aria-label="Volver al menú" class="text-white text-2xl"><i class="fas fa-arrow-left"></i></a>
+        <div>
+            <h1 class="font-black text-lg leading-tight">Reportar falla / emergencia</h1>
+            <p class="text-xs text-red-100">Emergencia en ruta</p>
+        </div>
+    </header>
+
+    <main class="p-4 max-w-lg mx-auto">
+        <section class="bg-red-50 p-5 rounded-xl border border-red-200 shadow-sm">
+            <h2 class="font-bold text-xl text-red-700 mb-4"><i class="fas fa-exclamation-triangle mr-2"></i>Registrar falla</h2>
+            <select id="fallaContact" class="w-full p-3 border border-gray-300 rounded mb-3 bg-white font-bold text-sm">
+                <option value="5219211098696">LOGÍSTICA / MONITOREO (24H)</option>
+                <option value="5219212683079">MANTENIMIENTO</option>
+                <option value="5219212682626">TURNO A: F. Ambrosio</option>
+                <option value="5219212405675">TURNO A: J.M. Pérez</option>
+                <option value="5219241472462">TURNO B: Salas</option>
+                <option value="5219212656411">TURNO B: Omar</option>
+                <option value="5219211230242">JEFE TRANSPORTE (Ing. B)</option>
+            </select>
+            <input id="fallaUnidad" class="w-full p-3 border border-gray-300 rounded mb-3 text-sm font-bold uppercase" placeholder="NO. DE UNIDAD" autocomplete="off">
+            <textarea id="fallaDesc" class="w-full p-4 border border-gray-300 rounded mb-3 text-sm" rows="4" placeholder="Describe la falla..."></textarea>
+            <label class="mb-3 w-full flex flex-col items-center justify-center border-2 border-dashed border-red-300 rounded-lg p-4 bg-white cursor-pointer">
+                <i class="fas fa-camera text-2xl text-red-500 mb-1"></i>
+                <span id="fallaFotoLabel" class="text-xs font-bold text-gray-600">TOMAR FOTO DE EVIDENCIA</span>
+                <input type="file" id="fallaFotoInput" accept="image/*" capture="environment" class="hidden" onchange="onFallaFotoSeleccionada(event)">
+            </label>
+            <img id="fallaFotoPreview" class="hidden w-full mb-3 rounded-lg border max-h-48 object-cover" alt="Vista previa de evidencia">
+            <p id="fallaGpsStatus" class="text-[10px] text-gray-500 mb-3 text-center"><i class="fas fa-map-marker-alt mr-1"></i>Obteniendo ubicación...</p>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="sendWhatsappFalla()" class="bg-green-600 text-white font-bold py-3 rounded shadow active:scale-95"><i class="fab fa-whatsapp mr-1"></i> AVISAR YA</button>
+                <button onclick="registrarEmergenciaEnSistema()" id="btnRegistrarEmergencia" class="bg-red-600 text-white font-bold py-3 rounded shadow active:scale-95"><i class="fas fa-database mr-1"></i> REGISTRAR</button>
+            </div>
+            <p id="fallaSaveStatus" class="hidden text-center text-xs font-bold mt-3 p-2 rounded"></p>
+            <button onclick="copyFallaText()" class="w-full mt-3 bg-blue-600 text-white font-bold py-2 rounded">COPIAR PARA GRUPO</button>
+            <p id="copyOk" class="hidden text-center text-xs font-bold text-green-700 mt-2">¡Copiado!</p>
+        </section>
+    </main>
+
+<script>
+const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
+let fallaFotoBase64 = null;
+let fallaUbicacion = null;
+
+function iniciarCapturaFalla() {
+    const status = document.getElementById('fallaGpsStatus');
+    if (!navigator.geolocation) {
+        status.textContent = 'Ubicación no disponible en este dispositivo';
+        return;
+    }
+    navigator.geolocation.getCurrentPosition((position) => {
+        fallaUbicacion = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            capturedAt: new Date().toISOString()
+        };
+        status.innerHTML = '<i class="fas fa-map-marker-alt mr-1 text-green-600"></i>Ubicación capturada ✓';
+    }, () => {
+        status.innerHTML = '<i class="fas fa-map-marker-alt mr-1 text-amber-500"></i>No se pudo obtener ubicación (se enviará sin ella)';
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+
+function comprimirImagen(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        const image = new Image();
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+        image.onerror = () => reject(new Error('No se pudo decodificar la imagen'));
+        reader.onload = (event) => { image.src = event.target.result; };
+        image.onload = () => {
+            const scale = Math.min(1, 1280 / image.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.width * scale));
+            canvas.height = Math.max(1, Math.round(image.height * scale));
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.6).split(',')[1]);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function onFallaFotoSeleccionada(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    comprimirImagen(file).then((base64) => {
+        fallaFotoBase64 = base64;
+        const preview = document.getElementById('fallaFotoPreview');
+        preview.src = `data:image/jpeg;base64,${base64}`;
+        preview.classList.remove('hidden');
+        document.getElementById('fallaFotoLabel').textContent = 'FOTO LISTA — toca para cambiarla';
+    }).catch((error) => alert(`No se pudo procesar la foto: ${error.message}`));
+}
+
+function construirPayload() {
+    const unidad = document.getElementById('fallaUnidad').value.trim();
+    const descripcion = document.getElementById('fallaDesc').value.trim();
+    const operador =
+        localStorage.getItem('nombreOperadorActual') ||
+        localStorage.getItem('nom087_driverName') ||
+        localStorage.getItem('driverName') ||
+        '';
+    return {
+        tipo: 'emergencia',
+        operador, unidad, descripcion,
+        lat: fallaUbicacion?.lat || null,
+        lng: fallaUbicacion?.lng || null,
+        latitud: fallaUbicacion?.lat || null,
+        longitud: fallaUbicacion?.lng || null,
+        precisionGps: fallaUbicacion?.accuracy || null,
+        fechaGps: fallaUbicacion?.capturedAt || null,
+        gps: fallaUbicacion ? { ...fallaUbicacion, source: 'device-geolocation' } : null,
+        fotoBase64: fallaFotoBase64,
+        fotos: fallaFotoBase64 ? [{ nombre: 'evidencia.jpg', mimeType: 'image/jpeg', data: `data:image/jpeg;base64,${fallaFotoBase64}` }] : [],
+        fecha: new Date().toISOString()
+    };
+}
+
+function obtenerUbicacionActual() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('GPS no disponible'));
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => resolve({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                capturedAt: new Date().toISOString(),
+                source: 'device-geolocation'
+            }),
+            reject,
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    });
+}
+
+async function registrarEmergenciaEnSistema() {
+    const button = document.getElementById('btnRegistrarEmergencia');
+    const status = document.getElementById('fallaSaveStatus');
+    const unidad = document.getElementById('fallaUnidad').value.trim();
+    const descripcion = document.getElementById('fallaDesc').value.trim();
+    if (!unidad) {
+        alert('Escribe la unidad.');
+        return;
+    }
+    if (!descripcion) {
+        alert('Describe la falla.');
+        return;
+    }
+    button.disabled = true;
+    status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-blue-100 text-blue-700';
+    status.textContent = 'Obteniendo GPS...';
+    try {
+        try {
+            fallaUbicacion = await obtenerUbicacionActual();
+        } catch (error) {
+            console.warn('GPS no disponible', error);
+            fallaUbicacion = null;
+        }
+        const payload = construirPayload();
+        button.textContent = 'ENVIANDO...';
+        const response = await fetch(GAS_DOPOST_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (error) {
+            throw new Error('Google Apps Script no devolvió JSON válido');
+        }
+        if (data.offline && data.queued) {
+            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-amber-100 text-amber-700';
+            status.textContent = 'Sin señal. Guardado y pendiente de envío.';
+        } else if (!response.ok || data.success !== true) {
+            throw new Error(data.error || 'Google Apps Script no confirmó el registro');
+        } else {
+            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-green-100 text-green-700';
+            status.textContent = '✓ Registrado correctamente.';
+        }
+    } catch (error) {
+        status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-red-100 text-red-700';
+        status.textContent = `No se pudo registrar: ${error.message}`;
+    } finally {
+        setTimeout(() => { button.disabled = false; button.innerHTML = '<i class="fas fa-database mr-1"></i> REGISTRAR'; }, 3000);
+    }
+}
+
+function textoFalla() {
+    const payload = construirPayload();
+    const location = payload.gps ? `\nUbicación: https://maps.google.com/?q=${payload.gps.lat},${payload.gps.lng}` : '';
+    return `🚨 EMERGENCIA/FALLA\nUnidad: ${payload.unidad}\n${payload.descripcion}${location}`;
+}
+async function sendWhatsappFalla() {
+    const text = textoFalla();
+    if (fallaFotoBase64 && navigator.canShare) {
+        try {
+            const blob = await (await fetch(`data:image/jpeg;base64,${fallaFotoBase64}`)).blob();
+            const file = new File([blob], 'evidencia.jpg', { type: 'image/jpeg' });
+            if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; }
+        } catch (error) { console.warn('No se pudo compartir la evidencia; se usará WhatsApp.', error); }
+    }
+    window.open(`https://wa.me/${document.getElementById('fallaContact').value}?text=${encodeURIComponent(text)}`, '_blank');
+}
+function copyFallaText() {
+    navigator.clipboard.writeText(textoFalla()).then(() => {
+        const ok = document.getElementById('copyOk');
+        ok.classList.remove('hidden');
+        setTimeout(() => ok.classList.add('hidden'), 2500);
+    }).catch(() => alert('No se pudo copiar el reporte.'));
+}
+iniciarCapturaFalla();
+</script>
+</body>
+</html>
