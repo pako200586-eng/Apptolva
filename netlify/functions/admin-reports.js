@@ -35,6 +35,21 @@ function getEnvironmentVariable(name) {
   return globalThis.Netlify?.env?.get(name) || process.env[name] || "";
 }
 
+function getAllowedAdminEmails() {
+  return getEnvironmentVariable("ADMIN_EMAILS")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+// Sin ADMIN_EMAILS configurada se conserva el comportamiento anterior (cualquier cuenta
+// de correo/contrasena verificada), para que una variable faltante no deje el panel sin acceso.
+function isAllowedAdminEmail(email) {
+  const allowedEmails = getAllowedAdminEmails();
+  if (!allowedEmails.length) return true;
+  return allowedEmails.includes(String(email).trim().toLowerCase());
+}
+
 function getFirebaseProjectId() {
   const configuredProjectId = getEnvironmentVariable("FIREBASE_PROJECT_ID");
   if (configuredProjectId) return configuredProjectId;
@@ -163,7 +178,8 @@ async function hasAdminAccess(req) {
     const decodedToken = await verifyFirebaseIdToken(idToken);
     return Boolean(
       decodedToken.email
-      && decodedToken.firebase?.sign_in_provider === "password",
+      && decodedToken.firebase?.sign_in_provider === "password"
+      && isAllowedAdminEmail(decodedToken.email),
     );
   } catch (error) {
     if (error instanceof InvalidFirebaseTokenError) return false;

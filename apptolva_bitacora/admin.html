@@ -54,6 +54,7 @@
     <section id="loginPanel" class="panel-card mx-auto max-w-md rounded-lg p-5">
       <h2 class="text-lg font-black text-[#7c2d12]">Acceso de supervisor</h2>
       <p class="mt-1 text-sm text-slate-600">Ingresa con la cuenta de supervisor autorizada en Firebase Authentication.</p>
+      <p id="allowedHint" class="mt-2 hidden rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-xs font-bold text-[#7c2d12]"></p>
       <form id="loginForm" class="mt-4 space-y-3">
         <label class="block text-sm font-bold text-slate-700" for="adminEmail">Correo</label>
         <input id="adminEmail" type="email" autocomplete="username" required class="w-full rounded-md border border-slate-300 px-3 py-3 text-sm outline-none focus:border-[#7c2d12]" placeholder="supervisor@empresa.com">
@@ -168,6 +169,16 @@
       appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
       measurementId: "G-SK8TYXT3JD"
     };
+
+    // Correos de supervisor con acceso al panel. Se inyectan desde la variable de
+    // entorno ADMIN_EMAILS durante el build (build.sh). Si la variable no existe el
+    // marcador queda intacto y no se aplica el filtro, para no dejar el panel sin acceso.
+    const ADMIN_EMAILS_RAW = "__ADMIN_EMAILS__";
+    const allowedAdminEmails = ADMIN_EMAILS_RAW.includes('__ADMIN_EMAILS')
+      ? []
+      : ADMIN_EMAILS_RAW.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
+    const isAllowedAdmin = (email) => !allowedAdminEmails.length
+      || allowedAdminEmails.includes(String(email || '').trim().toLowerCase());
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
@@ -323,15 +334,29 @@
         'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
         'auth/network-request-failed': 'No se pudo conectar con Firebase Authentication.'
       };
-      return messages[error.code] || 'No se pudo iniciar sesión. Verifica tus datos.';
+      if (messages[error.code]) return messages[error.code];
+      if (!error.code && error.message) return error.message;
+      return 'No se pudo iniciar sesión. Verifica tus datos.';
+    }
+
+    if (allowedAdminEmails.length) {
+      $('allowedHint').textContent = allowedAdminEmails.length === 1
+        ? `Cuenta autorizada: ${allowedAdminEmails[0]}`
+        : `Cuentas autorizadas: ${allowedAdminEmails.join(', ')}`;
+      $('allowedHint').classList.remove('hidden');
+      if (!$('adminEmail').value) $('adminEmail').value = allowedAdminEmails[0];
     }
 
     $('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       $('loginBtn').disabled = true;
       $('loginMsg').classList.add('hidden');
+      const email = $('adminEmail').value.trim();
       try {
-        await signInWithEmailAndPassword(auth, $('adminEmail').value.trim(), $('adminPassword').value);
+        if (!isAllowedAdmin(email)) {
+          throw new Error('Este correo no tiene acceso al panel administrativo.');
+        }
+        await signInWithEmailAndPassword(auth, email, $('adminPassword').value);
         $('adminPassword').value = '';
       } catch (error) {
         $('loginMsg').textContent = loginErrorMessage(error);
@@ -442,9 +467,18 @@
     });
 
     onAuthStateChanged(auth, async (user) => {
-      const authenticatedUser = user?.email && user.providerData.some((provider) => provider.providerId === 'password')
+      const authenticatedUser = user?.email
+        && user.providerData.some((provider) => provider.providerId === 'password')
+        && isAllowedAdmin(user.email)
         ? user
         : null;
+
+      if (user && !authenticatedUser) {
+        $('loginMsg').textContent = 'Esta cuenta no tiene acceso al panel administrativo.';
+        $('loginMsg').classList.remove('hidden');
+        await signOut(auth);
+        return;
+      }
 
       state.user = authenticatedUser;
       $('loginPanel').classList.toggle('hidden', Boolean(authenticatedUser));
