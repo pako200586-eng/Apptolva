@@ -54,7 +54,6 @@
     <section id="loginPanel" class="panel-card mx-auto max-w-md rounded-lg p-5">
       <h2 class="text-lg font-black text-[#7c2d12]">Acceso de supervisor</h2>
       <p class="mt-1 text-sm text-slate-600">Ingresa con la cuenta de supervisor autorizada en Firebase Authentication.</p>
-      <p id="allowedHint" class="mt-2 hidden rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-xs font-bold text-[#7c2d12]"></p>
       <form id="loginForm" class="mt-4 space-y-3">
         <label class="block text-sm font-bold text-slate-700" for="adminEmail">Correo</label>
         <input id="adminEmail" type="email" autocomplete="username" required class="w-full rounded-md border border-slate-300 px-3 py-3 text-sm outline-none focus:border-[#7c2d12]" placeholder="supervisor@empresa.com">
@@ -95,8 +94,21 @@
         </div>
       </div>
 
+      <!-- PESTAÑAS DE NAVEGACIÓN (MANTENIMIENTO) -->
+      <div class="flex space-x-2">
+        <button id="btn-vista-reportes" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white shadow-sm transition">
+          Reportes Recibidos
+        </button>
+        <button id="btn-vista-fallas" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
+          Fallas Detectadas
+        </button>
+        <button id="btn-vista-ordenes" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
+          Órdenes de Trabajo
+        </button>
+      </div>
+
       <div class="grid gap-5 lg:grid-cols-[1.6fr_.9fr]">
-        <section class="panel-card overflow-hidden rounded-lg">
+        <section id="vista-reportes" class="panel-card overflow-hidden rounded-lg block">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3">
             <h2 class="font-black text-[#7c2d12]">Checklist y bitácoras recibidas</h2>
             <button id="deleteSelected" disabled
@@ -125,6 +137,86 @@
             </table>
           </div>
           <div id="emptyState" class="hidden px-4 py-10 text-center text-sm font-bold text-slate-500">No hay reportes para los filtros seleccionados.</div>
+        </section>
+
+        <!-- VISTA: FALLAS DETECTADAS -->
+        <section id="vista-fallas" class="panel-card overflow-hidden rounded-lg hidden">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
+            <h2 class="font-black text-[#7c2d12]">Fallas Pendientes de Asignación</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-orange-100 text-sm">
+              <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
+                <tr>
+                  <th class="px-4 py-3">Reporte ID</th>
+                  <th class="px-4 py-3">Unidad</th>
+                  <th class="px-4 py-3">Operador</th>
+                  <th class="px-4 py-3">Fallas (#)</th>
+                  <th class="px-4 py-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-orange-50">
+                <tr class="hover:bg-orange-50/70">
+                  <td class="px-4 py-3 font-bold text-slate-700">REP-2026-089</td>
+                  <td class="px-4 py-3">T-25 / TOLVA 102</td>
+                  <td class="px-4 py-3">Juan Pérez</td>
+                  <td class="px-4 py-3">
+                    <span class="rounded-md bg-red-100 px-2 py-1 text-xs font-black text-red-800">3 detectadas</span>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <button class="rounded-md bg-[#294936] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#203b2b]">
+                      GENERAR OT
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- VISTA: ÓRDENES DE TRABAJO -->
+        <section id="vista-ordenes" class="panel-card overflow-hidden rounded-lg hidden">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
+            <h2 class="font-black text-[#7c2d12]">Control de Órdenes de Trabajo</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-orange-100 text-sm">
+              <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
+                <tr>
+                  <th class="px-4 py-3">OT</th>
+                  <th class="px-4 py-3">Unidad</th>
+                  <th class="px-4 py-3">Fecha</th>
+                  <th class="px-4 py-3">Estatus</th>
+                  <th class="px-4 py-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-orange-50">
+                <tr class="hover:bg-orange-50/70">
+                  <td class="px-4 py-3 font-black text-[#7c2d12]">OT-2026-00001</td>
+                  <td class="px-4 py-3">TRACTO T-14</td>
+                  <td class="px-4 py-3">24/09/2026</td>
+                  <td class="px-4 py-3">
+                    <select class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-[#7c2d12]">
+                      <option value="NUEVA">NUEVA</option>
+                      <option value="ASIGNADA" selected>ASIGNADA</option>
+                      <option value="EN PROCESO">EN PROCESO</option>
+                      <option value="PENDIENTE REFACCION">PENDIENTE REFACCIÓN</option>
+                      <option value="TERMINADA">TERMINADA</option>
+                      <option value="CERRADA">CERRADA</option>
+                    </select>
+                  </td>
+                  <td class="px-4 py-3 text-right space-x-1">
+                    <button class="rounded-md border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                      SEGUIMIENTO
+                    </button>
+                    <button class="rounded-md bg-[#7c2d12] px-2 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#5f220e]">
+                      PDF
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <aside class="space-y-5">
@@ -161,7 +253,7 @@
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 
     const firebaseConfig = {
-      apiKey: "__FIREBASE_API_KEY__",
+      apiKey: "AIzaSyB-zX1PF3_Ei567UgYoYozOCttCN75PwO4",
       authDomain: "gen-lang-client-0015118308.firebaseapp.com",
       projectId: "gen-lang-client-0015118308",
       storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
@@ -169,16 +261,6 @@
       appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
       measurementId: "G-SK8TYXT3JD"
     };
-
-    // Correos de supervisor con acceso al panel. Se inyectan desde la variable de
-    // entorno ADMIN_EMAILS durante el build (build.sh). Si la variable no existe el
-    // marcador queda intacto y no se aplica el filtro, para no dejar el panel sin acceso.
-    const ADMIN_EMAILS_RAW = "__ADMIN_EMAILS__";
-    const allowedAdminEmails = ADMIN_EMAILS_RAW.includes('__ADMIN_EMAILS')
-      ? []
-      : ADMIN_EMAILS_RAW.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
-    const isAllowedAdmin = (email) => !allowedAdminEmails.length
-      || allowedAdminEmails.includes(String(email || '').trim().toLowerCase());
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
@@ -261,8 +343,7 @@
               <span class="rounded-full bg-white px-2 py-1 text-xs font-black text-[#7c2d12]">${count}</span>
             </div>`).join('')
         : '<p class="text-sm text-slate-500">Sin datos con los filtros actuales.</p>';
-      $('topUnidades').innerHTML = rows(tally('unitId'));
-      $('topOperadores').innerHTML = rows(tally('driverName'));
+      $('topUnidades').innerHTML = rows(tally('unitId'));$('topOperadores').innerHTML = rows(tally('driverName'));
     }
 
     function syncSelectionUI() {
@@ -289,17 +370,13 @@
       state.reports = data.reports || [];
       if (!data.filtered) state.allReports = state.reports;
 
-      // Descarta selecciones de reportes que ya no están en la lista.
       const presentIds = new Set(state.reports.map((report) => report.id));
       state.selected.forEach((id) => { if (!presentIds.has(id)) state.selected.delete(id); });
 
-      // Reconstruye la tabla solo si los datos cambiaron: evita el salto de scroll en la
-      // actualización automática cuando no hay reportes nuevos.
       const signature = state.reports.map((report) => `${report.id}:${report.syncStatus}`).join('|');
       if (!(options.silent && signature === state.tableSignature)) {
         state.tableSignature = signature;
-        $('tabla-datos').innerHTML = state.reports.map(reportRowHtml).join('');
-        $('emptyState').classList.toggle('hidden', state.reports.length > 0);
+        $('tabla-datos').innerHTML = state.reports.map(reportRowHtml).join('');$('emptyState').classList.toggle('hidden', state.reports.length > 0);
         renderResumen();
       }
       syncSelectionUI();
@@ -315,8 +392,7 @@
       if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
       const query = (params || filters()).toString();
       if (!options.silent) {
-        $('syncState').textContent = 'Consultando reportes...';
-        $('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
+        $('syncState').textContent = 'Consultando reportes...';$('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
       }
 
       const response = await fetch(`/api/admin-reports${query ? `?${query}` : ''}`, { headers: await authHeaders() });
@@ -334,33 +410,15 @@
         'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
         'auth/network-request-failed': 'No se pudo conectar con Firebase Authentication.'
       };
-      if (messages[error.code]) return messages[error.code];
-      if (!error.code && error.message) return error.message;
-      return 'No se pudo iniciar sesión. Verifica tus datos.';
+      return messages[error.code] || 'No se pudo iniciar sesión. Verifica tus datos.';
     }
 
-    if (allowedAdminEmails.length) {
-      $('allowedHint').textContent = allowedAdminEmails.length === 1
-        ? `Cuenta autorizada: ${allowedAdminEmails[0]}`
-        : `Cuentas autorizadas: ${allowedAdminEmails.join(', ')}`;
-      $('allowedHint').classList.remove('hidden');
-      if (!$('adminEmail').value) $('adminEmail').value = allowedAdminEmails[0];
-    }
-
-    $('loginForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      $('loginBtn').disabled = true;
+    $('loginForm').addEventListener('submit', async (event) => {       event.preventDefault();$('loginBtn').disabled = true;
       $('loginMsg').classList.add('hidden');
-      const email = $('adminEmail').value.trim();
       try {
-        if (!isAllowedAdmin(email)) {
-          throw new Error('Este correo no tiene acceso al panel administrativo.');
-        }
-        await signInWithEmailAndPassword(auth, email, $('adminPassword').value);
-        $('adminPassword').value = '';
+        await signInWithEmailAndPassword(auth, $('adminEmail').value.trim(), $('adminPassword').value);$('adminPassword').value = '';
       } catch (error) {
-        $('loginMsg').textContent = loginErrorMessage(error);
-        $('loginMsg').classList.remove('hidden');
+        $('loginMsg').textContent = loginErrorMessage(error);$('loginMsg').classList.remove('hidden');
       } finally {
         $('loginBtn').disabled = false;
       }
@@ -368,8 +426,7 @@
 
     $('logoutBtn').addEventListener('click', () => signOut(auth));
 
-    $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));
-    $('applyFilters').addEventListener('click', () => cargarDatos(filters()).catch((error) => showToast(error.message)));
+    $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));$('applyFilters').addEventListener('click', () => cargarDatos(filters()).catch((error) => showToast(error.message)));
 
     $('tabla-datos').addEventListener('change', (event) => {
       const checkbox = event.target.closest('.row-check');
@@ -408,7 +465,7 @@
         }
         const result = await response.json();
         state.selected.clear();
-        state.lastTotal = 0; // Evita el aviso de "reportes nuevos" al bajar el total.
+        state.lastTotal = 0; 
         showToast(`${result.deleted || 0} reporte(s) eliminado(s)`);
         await cargarDatos(filters()).catch(() => {});
       } catch (error) {
@@ -416,6 +473,7 @@
         syncSelectionUI();
       }
     });
+
     $('forceSyncBtn').addEventListener('click', async () => {
       try {
         const registration = await navigator.serviceWorker?.ready;
@@ -433,6 +491,7 @@
       }
       setTimeout(() => cargarDatos().catch(() => {}), 2500);
     });
+
     $('exportCsv').addEventListener('click', async () => {
       if (!state.reports.length) return showToast('No hay datos para exportar');
       const header = ['folio', 'tipo', 'unidad', 'operador', 'numero_empleado', 'estado', 'fecha'];
@@ -453,6 +512,7 @@
       link.click();
       URL.revokeObjectURL(url);
     });
+
     $('exportPdf').addEventListener('click', () => {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -467,24 +527,13 @@
     });
 
     onAuthStateChanged(auth, async (user) => {
-      const authenticatedUser = user?.email
-        && user.providerData.some((provider) => provider.providerId === 'password')
-        && isAllowedAdmin(user.email)
+      const authenticatedUser = user?.email && user.providerData.some((provider) => provider.providerId === 'password')
         ? user
         : null;
 
-      if (user && !authenticatedUser) {
-        $('loginMsg').textContent = 'Esta cuenta no tiene acceso al panel administrativo.';
-        $('loginMsg').classList.remove('hidden');
-        await signOut(auth);
-        return;
-      }
-
       state.user = authenticatedUser;
-      $('loginPanel').classList.toggle('hidden', Boolean(authenticatedUser));
-      $('dashboard').classList.toggle('hidden', !authenticatedUser);
-      $('logoutBtn').classList.toggle('hidden', !authenticatedUser);
-      $('refreshBtn').disabled = !authenticatedUser;
+      $('loginPanel').classList.toggle('hidden', Boolean(authenticatedUser));$('dashboard').classList.toggle('hidden', !authenticatedUser);
+      $('logoutBtn').classList.toggle('hidden', !authenticatedUser);$('refreshBtn').disabled = !authenticatedUser;
 
       if (!authenticatedUser) {
         state.reports = [];
@@ -503,9 +552,6 @@
       }
     });
 
-      // Auto-refresh cada 3 minutos, y solo si la pestaña está visible en pantalla.
-    // Antes corría cada 30s sin importar si alguien la estaba viendo, lo que generaba
-    // consultas innecesarias a la base de datos cuando el panel quedaba abierto de fondo.
     setInterval(() => {
       if (state.user && document.visibilityState === 'visible') {
         cargarDatos(filters(), { silent: true }).catch(() => {});
@@ -526,6 +572,34 @@
         }
       });
     }
+
+    // Lógica de navegación de Mantenimiento
+    const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes'];
+    
+    vistasMantenimiento.forEach(id => {
+      const btn = $(`btn-${id}`);
+      if(btn) {
+        btn.addEventListener('click', () => {
+          vistasMantenimiento.forEach(v => {
+            const vista = $(v);
+            const boton = $(`btn-${v}`);
+            
+            if (vista) {
+              vista.classList.add('hidden');
+              vista.classList.remove('block');
+            }
+            if (boton) {
+              boton.classList.remove('bg-[#7c2d12]', 'text-white');
+              boton.classList.add('bg-white', 'text-[#7c2d12]');
+            }
+          });
+          
+          $(id).classList.remove('hidden');$(id).classList.add('block');
+          btn.classList.remove('bg-white', 'text-[#7c2d12]');
+          btn.classList.add('bg-[#7c2d12]', 'text-white');
+        });
+      }
+    });
   </script>
 </body>
 </html>
