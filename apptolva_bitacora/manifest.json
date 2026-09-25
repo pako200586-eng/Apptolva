@@ -33,6 +33,34 @@
       "purpose": "maskable"
     }
   ],
+  "shortcuts": [
+    {
+      "name": "Bitácora NOM-087",
+      "short_name": "Bitácora",
+      "description": "Registro de conducción y descanso",
+      "url": "./bitacora_master.html", 
+      "icons": [
+        {
+          "src": "./icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Checklist Cascadia",
+      "short_name": "Revisión",
+      "description": "Inspección pre-viaje de la unidad",
+      "url": "./index.html?vista=checklist",
+      "icons": [
+        {
+          "src": "./icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
   "screenshots": [
     {
       "src": "./screenshot-mobile.png",
