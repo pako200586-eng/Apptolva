@@ -148,25 +148,17 @@
             <table class="min-w-full divide-y divide-orange-100 text-sm">
               <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
                 <tr>
-                  <th class="px-4 py-3">Reporte ID</th>
+                  <th class="px-4 py-3">Folio</th>
                   <th class="px-4 py-3">Unidad</th>
                   <th class="px-4 py-3">Operador</th>
-                  <th class="px-4 py-3">Fallas (#)</th>
+                  <th class="px-4 py-3">Falla Reportada</th>
                   <th class="px-4 py-3 text-right">Acción</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-orange-50">
-                <tr class="hover:bg-orange-50/70">
-                  <td class="px-4 py-3 font-bold text-slate-700">REP-2026-089</td>
-                  <td class="px-4 py-3">T-25 / TOLVA 102</td>
-                  <td class="px-4 py-3">Juan Pérez</td>
-                  <td class="px-4 py-3">
-                    <span class="rounded-md bg-red-100 px-2 py-1 text-xs font-black text-red-800">3 detectadas</span>
-                  </td>
-                  <td class="px-4 py-3 text-right">
-                    <button class="rounded-md bg-[#294936] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#203b2b]">
-                      GENERAR OT
-                    </button>
+              <tbody id="tabla-fallas-body" class="divide-y divide-orange-50">
+                <tr>
+                  <td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">
+                    Haz clic en la pestaña para cargar las fallas pendientes.
                   </td>
                 </tr>
               </tbody>
@@ -573,6 +565,101 @@
       });
     }
 
+    // Exponer la función globalmente
+    window.generarOT = async function(reporteId, unidad) {
+      if(!confirm(`¿Generar Orden de Trabajo automática para la unidad ${unidad}?`)) return;
+      
+      showToast('Generando Orden de Trabajo...');
+      
+      try {
+        // Ejecutar el método POST hacia tu nuevo backend
+        const response = await fetch('/api/mantenimiento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reporte_id: reporteId,
+            unidad: unidad,
+            operador: 'Operador Asignado' // Se puede dinámicamente extraer si se requiere
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Mostrar notificación de éxito con el folio autogenerado
+          showToast(`¡OT ${data.orden.folio_ot} generada con éxito!`);
+          
+          // Refrescar la tabla actual de fallas
+          cargarFallas();
+          
+          // Cambiar automáticamente a la vista de Órdenes de Trabajo simulando un clic
+          const btnOrdenes = $('btn-vista-ordenes');
+          if (btnOrdenes) btnOrdenes.click();
+          
+          // Aquí posteriormente agregaremos la función cargarOrdenes() para llenar esa tabla
+        } else {
+          showToast('Error al generar la OT: ' + (data.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error("Error POST:", error);
+        showToast('Error de comunicación con el servidor.');
+      }
+    };
+
+    async function cargarFallas() {
+      const tbody = $('tabla-fallas-body');
+      if (!tbody) return;
+      
+      tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Buscando fallas en la base de datos...</td></tr>';
+
+      try {
+        // Hacemos GET al nuevo endpoint que creaste
+        const response = await fetch('/api/mantenimiento');
+        if (!response.ok) throw new Error('Error al consultar el servidor');
+        
+        const data = await response.json();
+
+        if (data.success && data.fallas && data.fallas.length > 0) {
+          tbody.innerHTML = ''; // Limpiar estado de carga
+          
+          data.fallas.forEach(reporte => {
+            // El backend ya filtró y nos entregó el arreglo JSONB listo
+            const tickets = reporte.detalles_falla || [];
+            
+            tickets.forEach(falla => {
+              const fila = document.createElement('tr');
+              fila.className = 'hover:bg-orange-50/70 transition-colors';
+              
+              // Se extrae la descripción según como la guardes en el JSON del operador
+              const descripcionFalla = falla.descripcion || falla.falla || falla.fallaReportada || 'Falla sin detalle';
+              
+              fila.innerHTML = `
+                <td class="px-4 py-3 font-bold text-slate-700">${escapeHtml(reporte.folio)}</td>
+                <td class="px-4 py-3">${escapeHtml(reporte.unidad)}</td>
+                <td class="px-4 py-3 truncate max-w-[150px]">${escapeHtml(reporte.operador)}</td>
+                <td class="px-4 py-3">
+                  <span class="rounded-md bg-red-100 px-2 py-1 text-xs font-black text-red-800 uppercase">
+                    ${escapeHtml(descripcionFalla)}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <button onclick="window.generarOT('${reporte.reporte_id}', '${escapeHtml(reporte.unidad)}')" 
+                          class="rounded-md bg-[#294936] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#203b2b]">
+                    GENERAR OT
+                  </button>
+                </td>
+              `;
+              tbody.appendChild(fila);
+            });
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">No hay fallas pendientes de atención.</td></tr>';
+        }
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-red-700">Error de comunicación: ${error.message}</td></tr>`;
+      }
+    }
+
     // Lógica de navegación de Mantenimiento
     const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes'];
     
@@ -597,6 +684,11 @@
           $(id).classList.remove('hidden');$(id).classList.add('block');
           btn.classList.remove('bg-white', 'text-[#7c2d12]');
           btn.classList.add('bg-[#7c2d12]', 'text-white');
+
+          // INYECCIÓN: Si se abre la pestaña de fallas, ejecutar consulta a Postgres
+          if (id === 'vista-fallas') {
+            cargarFallas();
+          }
         });
       }
     });
