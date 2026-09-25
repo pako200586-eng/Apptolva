@@ -1,33 +1,32 @@
 {
-  "id": "/index.html",
+  "id": "https://apptolva.com/",
   "name": "App Tolva Bitácora Bachoco",
   "short_name": "AppTolva",
   "description": "Aplicación interna para operadores de tractocamiones de Grupo Bachoco con bitácoras, checklist y reportes offline.",
   "lang": "es-MX",
   "version": "10.1",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/index.html",
+  "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay"],
   "background_color": "#ffffff",
   "theme_color": "#ea580c",
   "orientation": "portrait-primary",
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "./icon-192x192.png",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icon-512x512.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icon-maskable-512x512.png",
+      "src": "/icon-maskable-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -38,10 +37,10 @@
       "name": "Bitácora NOM-087",
       "short_name": "Bitácora",
       "description": "Registro de conducción y descanso",
-      "url": "./bitacora_master.html", 
+      "url": "/bitacora_master.html",
       "icons": [
         {
-          "src": "./icon-192x192.png",
+          "src": "/icon-192x192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -51,10 +50,10 @@
       "name": "Checklist Cascadia",
       "short_name": "Revisión",
       "description": "Inspección pre-viaje de la unidad",
-      "url": "./index.html?vista=checklist",
+      "url": "/?vista=checklist",
       "icons": [
         {
-          "src": "./icon-192x192.png",
+          "src": "/icon-192x192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -63,13 +62,14 @@
   ],
   "screenshots": [
     {
-      "src": "./screenshot-mobile.png",
+      "src": "/screenshot-mobile.png",
       "sizes": "1084x2207",
       "type": "image/png",
+      "form_factor": "narrow",
       "label": "Vista de bitácora en móvil"
     },
     {
-      "src": "./screenshot-desktop.png",
+      "src": "/screenshot-desktop.png",
       "sizes": "1370x772",
       "type": "image/png",
       "form_factor": "wide",
