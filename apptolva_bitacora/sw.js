@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v39";
+Const CACHE_VERSION = "v40";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -384,5 +384,28 @@ self.addEventListener("sync", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SYNC_NOW") {
     event.waitUntil(enviarReportesPendientes());
+  }
+});
+// Manejo de clic en notificaciones para abrir módulo NOM-087
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  if (event.action === "abrir_bitacora" || !event.action) {
+    const bitacoraUrl = "./bitacora_master.html"; // <-- Ruta directa al archivo maestro
+
+    event.waitUntil(
+      clients.matchAll({ type: "window" }).then((clientList) => {
+        // Escanea si el operador ya tiene la bitácora abierta en RAM
+        for (const client of clientList) {
+          if (client.url.includes("bitacora_master.html") && "focus" in client) {
+            return client.focus(); // Lo trae al frente sin recargar
+          }
+        }
+        // Si no está abierta, lanza el archivo
+        if (clients.openWindow) {
+          return clients.openWindow(bitacoraUrl);
+        }
+      })
+    );
   }
 });
