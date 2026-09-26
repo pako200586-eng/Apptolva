@@ -152,6 +152,7 @@
                   <th class="px-4 py-3">Unidad</th>
                   <th class="px-4 py-3">Operador</th>
                   <th class="px-4 py-3">Falla Reportada</th>
+                  <th class="px-4 py-3">Observaciones</th>
                   <th class="px-4 py-3 text-right">Acción</th>
                 </tr>
               </thead>
@@ -565,6 +566,38 @@
       });
     }
 
+    function generarPDFOT(orden) {
+      if (!window.jspdf) {
+        showToast('No se pudo abrir el PDF porque la librería no está disponible.');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      doc.setFillColor(124, 45, 18);
+      doc.rect(0, 0, 210, 30, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.text('Orden de Trabajo', 14, 18);
+
+      doc.setTextColor(17, 24, 39);
+      doc.setFontSize(11);
+      let y = 42;
+      doc.text(`Folio OT: ${orden?.folio_ot || 'N/A'}`, 14, y); y += 8;
+      doc.text(`Estatus: ${orden?.estatus || 'N/A'}`, 14, y); y += 8;
+      doc.text(`Fecha apertura: ${orden?.fecha_apertura || 'N/A'}`, 14, y); y += 8;
+      doc.text('Se generó a partir de una falla reportada por el operador.', 14, y); y += 14;
+
+      doc.setDrawColor(124, 45, 18);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(12, y, 186, 25, 3, 3, 'S');
+      doc.setFontSize(10);
+      doc.text('Este documento puede imprimirse o archivarse como evidencia del mantenimiento solicitado.', 18, y + 10);
+
+      doc.save(`OT-${orden?.folio_ot || 'generada'}.pdf`);
+    }
+
     // Exponer la función globalmente
     window.generarOT = async function(reporteId, unidad) {
       if(!confirm(`¿Generar Orden de Trabajo automática para la unidad ${unidad}?`)) return;
@@ -572,37 +605,37 @@
       showToast('Generando Orden de Trabajo...');
       
       try {
-        // Ejecutar el método POST hacia tu nuevo backend
         const response = await fetch('/api/mantenimiento', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             reporte_id: reporteId,
             unidad: unidad,
-            operador: 'Operador Asignado' // Se puede dinámicamente extraer si se requiere
+            operador: 'Operador Asignado'
           })
         });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'No se pudo generar la OT');
+        }
 
         const data = await response.json();
 
         if (data.success) {
-          // Mostrar notificación de éxito con el folio autogenerado
+          alert(`OT generada con éxito. Folio autogenerado: ${data.orden.folio_ot}`);
+          generarPDFOT(data.orden);
           showToast(`¡OT ${data.orden.folio_ot} generada con éxito!`);
-          
-          // Refrescar la tabla actual de fallas
           cargarFallas();
-          
-          // Cambiar automáticamente a la vista de Órdenes de Trabajo simulando un clic
           const btnOrdenes = $('btn-vista-ordenes');
           if (btnOrdenes) btnOrdenes.click();
-          
-          // Aquí posteriormente agregaremos la función cargarOrdenes() para llenar esa tabla
+          window.location.reload();
         } else {
           showToast('Error al generar la OT: ' + (data.error || 'Desconocido'));
         }
       } catch (error) {
         console.error("Error POST:", error);
-        showToast('Error de comunicación con el servidor.');
+        showToast(error.message || 'Error de comunicación con el servidor.');
       }
     };
 
@@ -630,8 +663,8 @@
               const fila = document.createElement('tr');
               fila.className = 'hover:bg-orange-50/70 transition-colors';
               
-              // Se extrae la descripción según como la guardes en el JSON del operador
               const descripcionFalla = falla.descripcion || falla.falla || falla.fallaReportada || 'Falla sin detalle';
+              const observaciones = reporte.observaciones || 'Sin observaciones registradas por el operador';
               
               fila.innerHTML = `
                 <td class="px-4 py-3 font-bold text-slate-700">${escapeHtml(reporte.folio)}</td>
@@ -642,6 +675,7 @@
                     ${escapeHtml(descripcionFalla)}
                   </span>
                 </td>
+                <td class="px-4 py-3 text-sm text-slate-600">${escapeHtml(observaciones)}</td>
                 <td class="px-4 py-3 text-right">
                   <button onclick="window.generarOT('${reporte.reporte_id}', '${escapeHtml(reporte.unidad)}')" 
                           class="rounded-md bg-[#294936] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#203b2b]">

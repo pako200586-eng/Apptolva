@@ -27,7 +27,8 @@ export default async (req) => {
           unit_id AS unidad, 
           driver_name AS operador, 
           created_at AS fecha,
-          payload->'ticketsFallas' AS detalles_falla
+          payload->'ticketsFallas' AS detalles_falla,
+          payload->>'observaciones' AS observaciones 
         FROM bitacora_reports
         WHERE payload->'ticketsFallas' IS NOT NULL
           AND jsonb_typeof(payload->'ticketsFallas') = 'array'
