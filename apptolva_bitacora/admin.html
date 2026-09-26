@@ -776,7 +776,11 @@
             alert(`La falla en ${itemFalla.componente} ya tenía OT abierta. Se incrementó la recurrencia a: ${data.recurrencia}`);
           } else {
             alert(`OT generada con éxito. Folio autogenerado: ${data.orden.folio_ot}`);
-            generarPDFOT(data.orden);
+            if (window.imprimirOT_Bachoco) {
+              window.imprimirOT_Bachoco(data.orden);
+            } else {
+              generarPDFOT(data.orden);
+            }
           }
           cargarFallas();
           const btnOrdenes = $('btn-vista-ordenes');
@@ -825,7 +829,11 @@
             alert(`La falla general ya tenía OT abierta. Se incrementó la recurrencia a: ${data.recurrencia}`);
           } else {
             alert(`OT generada con éxito. Folio autogenerado: ${data.orden.folio_ot}`);
-            generarPDFOT(data.orden);
+            if (window.imprimirOT_Bachoco) {
+              window.imprimirOT_Bachoco(data.orden);
+            } else {
+              generarPDFOT(data.orden);
+            }
           }
           showToast(`¡OT ${data.orden?.folio_ot || 'reiterada'} procesada!`);
           cargarFallas();
