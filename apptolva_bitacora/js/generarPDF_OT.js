@@ -58,98 +58,132 @@ function generarDocumentoOT(dataOT) {
   }
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'letter'
+  });
 
-  doc.setFillColor(220, 110, 20);
-  doc.rect(0, 0, 210, 22, 'F');
-  doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('ORDEN DE TRABAJO MANTENIMIENTO FF PA CHAPO', 105, 12, { align: 'center' });
-
-  doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Bachoco', 170, 18, { align: 'right' });
-  doc.text('Flota propia planta de alimentos el Chapo', 14, 28);
-  doc.text('Carretera El Chapo', 14, 32);
-  doc.text('Muelle del Gavilán', 14, 36);
+  doc.text('ORDEN DE TRABAJO MANTENIMIENTO FF PA CHAPO', 105, 14, { align: 'center' });
 
-  const headersMatriz = [
+  doc.setFontSize(13);
+  doc.setTextColor(232, 119, 34);
+  doc.text('Bachoco', 195, 18, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Flota propia planta de alimentos el Chapo', 15, 18);
+  doc.text('Carretera El Chapo', 15, 21);
+  doc.text('Muelle del Gavilán', 15, 24);
+
+  const fechaHoy = new Date().toLocaleDateString('es-MX');
+  const matrizDatos = [
     [
       { content: 'UNIDAD:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: dataOT?.unidad || '' },
-      { content: 'FOLIO OT:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: String(dataOT?.folio_ot || 'N/A'), styles: { fontStyle: 'bold', textColor: [200, 0, 0] } }
+      { content: String(dataOT?.unidad || '') },
+      { content: 'FOLIO ORDEN TRABAJO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: `OT-${dataOT?.folio_ot || dataOT?.folio || ''}`, styles: { fontStyle: 'bold', textColor: [200, 0, 0] } }
     ],
     [
-      { content: 'OPERADOR:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: dataOT?.operador || '' },
-      { content: 'SISTEMA:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: dataOT?.sistema || 'CORRECTIVO' }
+      { content: 'NOMBRE DEL OPERADOR:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: String(dataOT?.operador || '') },
+      { content: 'TRABAJO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: String(dataOT?.sistema || 'CORRECTIVO') }
     ],
     [
-      { content: 'COMPONENTE:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: dataOT?.componente || 'TRACTOCAMIÓN' },
+      { content: 'ELECTROMECÁNICO ASIGNADO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: '' },
       { content: 'TURNO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
       { content: '' }
     ],
     [
-      { content: 'FECHA:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: dataOT?.fecha_apertura ? new Date(dataOT.fecha_apertura).toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX') },
-      { content: 'FOLIO REPORT:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: String(dataOT?.folio_bitacora || dataOT?.reporte_id || 'N/A') }
+      { content: 'FECHA DE ASIGNACIÓN:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: fechaHoy },
+      { content: 'FOLIO CHECK-LIST:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: String(dataOT?.folio_bitacora || dataOT?.reporteId || 'N/A') }
+    ],
+    [
+      { content: 'SERVICIO MANTENIMIENTO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: 'CORRECTIVO DERIVADO DE BITÁCORA' },
+      { content: 'FIRMA:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+      { content: '' }
     ]
   ];
 
-  if (typeof doc.autoTable === 'function') {
-    doc.autoTable({
-      startY: 42,
-      body: headersMatriz,
-      theme: 'grid',
-      styles: { fontSize: 7, cellPadding: 1.8, lineColor: [100, 100, 100], lineWidth: 0.2 },
-      columnStyles: { 0: { cellWidth: 36 }, 1: { cellWidth: 54 }, 2: { cellWidth: 34 }, 3: { cellWidth: 54 } }
-    });
-  }
+  doc.autoTable({
+    startY: 28,
+    margin: { left: 15, right: 15 },
+    body: matrizDatos,
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.5, lineColor: [80, 80, 80], lineWidth: 0.2 },
+    columnStyles: {
+      0: { cellWidth: 42 },
+      1: { cellWidth: 52 },
+      2: { cellWidth: 42 },
+      3: { cellWidth: 50 }
+    }
+  });
 
-  let curY = (typeof doc.lastAutoTable !== 'undefined' ? doc.lastAutoTable.finalY : 120) + 6;
+  const startDescY = doc.lastAutoTable.finalY + 3;
+  const descripcionCompleta = `COMPONENTE AFECTADO: ${dataOT?.componente || 'GENERAL'}\nSISTEMA: ${dataOT?.sistema || ''}\nDESCRIPCIÓN DE LA FALLA: ${dataOT?.descripcion_falla || dataOT?.descripcion || ''}`;
 
-  const bloques = [
-    [{ content: `COMPONENTE AFECTADO: ${dataOT?.componente || 'TRACTOCAMIÓN'} - SISTEMA: ${dataOT?.sistema || 'GENERAL / REVISIÓN'}`, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
-    [{ content: `DESCRIPCIÓN DEL TRABAJO:\n${dataOT?.descripcion_falla || dataOT?.descripcion || 'Sin descripción'}\n(Recurrencias reportadas: ${dataOT?.recurrencia || 1})`, styles: { minCellHeight: 22 } }],
-    [{ content: 'COMENTARIOS DEL EJECUTOR:', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
-    [{ content: '', styles: { minCellHeight: 15 } }],
-    [{ content: 'COMENTARIOS DEL OPERADOR:', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
-    [{ content: '', styles: { minCellHeight: 15 } }]
-  ];
+  doc.autoTable({
+    startY: startDescY,
+    margin: { left: 15, right: 15 },
+    body: [
+      [{ content: 'DESCRIPCIÓN DEL TRABAJO A REALIZAR:', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
+      [{ content: descripcionCompleta, styles: { minCellHeight: 18 } }],
+      [{ content: 'COMENTARIOS DEL EJECUTOR (TALLER):', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
+      [{ content: '', styles: { minCellHeight: 14 } }],
+      [{ content: 'COMENTARIOS DEL OPERADOR AL RECIBIR:', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
+      [{ content: '', styles: { minCellHeight: 14 } }]
+    ],
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.8, lineColor: [80, 80, 80], lineWidth: 0.2 }
+  });
 
-  if (typeof doc.autoTable === 'function') {
-    doc.autoTable({
-      startY: curY,
-      body: bloques,
-      theme: 'grid',
-      styles: { fontSize: 7, cellPadding: 2, lineColor: [100, 100, 100], lineWidth: 0.2 }
-    });
-    curY = doc.lastAutoTable.finalY + 8;
-  }
-
-  doc.setFontSize(7);
+  const posGraficosY = doc.lastAutoTable.finalY + 4;
   doc.setFont('helvetica', 'bold');
-  doc.text('TRACTOCAMIÓN', 18, curY);
-  doc.text('TOLVA 1 / DOLLY / TOLVA 2', 18, curY + 30);
+  doc.setFontSize(7.5);
+  doc.text('TRACTOCAMIÓN', 15, posGraficosY + 3);
+  doc.text('TOLVA / DOLLY', 15, posGraficosY + 32);
 
-  const posYFirmas = 248;
-  doc.line(22, posYFirmas, 85, posYFirmas);
-  doc.line(125, posYFirmas, 190, posYFirmas);
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineDashPattern([1.5, 1.5], 0);
+  doc.rect(15, posGraficosY + 5, 186, 23);
+  doc.rect(15, posGraficosY + 34, 186, 25);
+  doc.setLineDashPattern([], 0);
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(6.5);
+  doc.setTextColor(120, 120, 120);
+  doc.text('(Área de inspección y marcado visual para electromecánicos)', 105, posGraficosY + 17, { align: 'center' });
+  doc.text('(Área de marcado: Dolly / Tolva 1 / Tolva 2)', 105, posGraficosY + 47, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
+
+  const posYFirmas = 250;
+  doc.setDrawColor(0, 0, 0);
+  doc.line(25, posYFirmas, 85, posYFirmas);
+  doc.line(125, posYFirmas, 185, posYFirmas);
+
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text('EJECUTÓ MANTENIMIENTO', 53, posYFirmas + 4, { align: 'center' });
-  doc.text('OPERADOR QUE VALIDA', 158, posYFirmas + 4, { align: 'center' });
+  doc.text('EJECUTÓ MANTENIMIENTO', 55, posYFirmas + 4, { align: 'center' });
+  doc.text('OPERADOR QUE VALIDA', 155, posYFirmas + 4, { align: 'center' });
 
-  doc.setFillColor(0, 150, 60);
-  doc.rect(14, 260, 182, 3, 'F');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(100, 100, 100);
+  doc.text('(Firma de Taller)', 55, posYFirmas + 7, { align: 'center' });
+  doc.text('(Firma de Conformidad)', 155, posYFirmas + 7, { align: 'center' });
 
-  const blobUrl = doc.output('bloburl');
-  window.open(blobUrl, '_blank');
+  doc.setFillColor(0, 150, 57);
+  doc.rect(15, 262, 186, 2.5, 'F');
+
+  window.open(doc.output('bloburl'), '_blank');
 }
 
 if (typeof window !== 'undefined') {

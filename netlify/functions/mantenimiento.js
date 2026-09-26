@@ -20,6 +20,35 @@ export default async (req) => {
 
   if (req.method === "GET") {
     try {
+      const url = new URL(req.url);
+      const tipo = url.searchParams.get("tipo");
+
+      if (tipo === "ordenes") {
+        const result = await database.pool.query(`
+          SELECT 
+            id,
+            folio_ot,
+            reporte_id,
+            unidad,
+            operador,
+            componente,
+            sistema,
+            descripcion_falla,
+            estatus,
+            payload,
+            fecha_apertura,
+            recurrencia,
+            updated_at
+          FROM ordenes_trabajo
+          ORDER BY fecha_apertura DESC NULLS LAST, folio_ot DESC NULLS LAST
+        `);
+
+        return new Response(JSON.stringify({ success: true, ordenes: result.rows }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        });
+      }
+
       const result = await database.pool.query(`
         SELECT 
           id AS reporte_id, 
@@ -48,6 +77,30 @@ export default async (req) => {
   if (req.method === "POST") {
     try {
       const body = await req.json();
+
+      if (body?.accion === "actualizar_estatus") {
+        const otId = body.ot_id;
+        const nuevoEstatus = body.estatus || 'NUEVA';
+
+        if (!otId) {
+          return new Response(JSON.stringify({ error: "Falta el identificador de la OT" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders }
+          });
+        }
+
+        await database.pool.query(`
+          UPDATE ordenes_trabajo
+          SET estatus = $1, updated_at = NOW()
+          WHERE id = $2
+        `, [nuevoEstatus, otId]);
+
+        return new Response(JSON.stringify({ success: true, ot_id: otId, estatus: nuevoEstatus }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        });
+      }
+
       const unidad = body.unidad || 'N/A';
       const componente = body.componente || 'TRACTOCAMIÓN';
       const descripcion = body.descripcion || body.observaciones || 'Falla sin detalle';

@@ -312,28 +312,10 @@
                   <th class="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-orange-50">
-                <tr class="hover:bg-orange-50/70">
-                  <td class="px-4 py-3 font-black text-[#7c2d12]">OT-2026-00001</td>
-                  <td class="px-4 py-3">TRACTO T-14</td>
-                  <td class="px-4 py-3">24/09/2026</td>
-                  <td class="px-4 py-3">
-                    <select class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-[#7c2d12]">
-                      <option value="NUEVA">NUEVA</option>
-                      <option value="ASIGNADA" selected>ASIGNADA</option>
-                      <option value="EN PROCESO">EN PROCESO</option>
-                      <option value="PENDIENTE REFACCION">PENDIENTE REFACCIÓN</option>
-                      <option value="TERMINADA">TERMINADA</option>
-                      <option value="CERRADA">CERRADA</option>
-                    </select>
-                  </td>
-                  <td class="px-4 py-3 text-right space-x-1">
-                    <button class="rounded-md border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
-                      SEGUIMIENTO
-                    </button>
-                    <button class="rounded-md bg-[#7c2d12] px-2 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#5f220e]">
-                      PDF
-                    </button>
+              <tbody id="tabla-ordenes-body" class="divide-y divide-orange-50">
+                <tr>
+                  <td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">
+                    Haz clic en la pestaña para cargar las órdenes de trabajo.
                   </td>
                 </tr>
               </tbody>
@@ -923,6 +905,114 @@
       }
     }
 
+    async function cargarOrdenes() {
+      const tbody = $('tabla-ordenes-body');
+      if (!tbody) return;
+
+      tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando órdenes de trabajo...</td></tr>';
+
+      try {
+        const response = await fetch('/api/mantenimiento?tipo=ordenes');
+        if (!response.ok) throw new Error('Error al consultar las órdenes');
+
+        const data = await response.json();
+        const ordenes = Array.isArray(data?.ordenes) ? data.ordenes : [];
+
+        if (!ordenes.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">No hay órdenes de trabajo registradas.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = '';
+
+        ordenes.forEach((orden) => {
+          const fila = document.createElement('tr');
+          fila.className = 'hover:bg-orange-50/70';
+
+          const folioOt = orden?.folio_ot || 'N/A';
+          const unidad = orden?.unidad || 'N/A';
+          const fecha = orden?.fecha_apertura ? new Date(orden.fecha_apertura).toLocaleDateString('es-MX') : 'Sin fecha';
+          const estatus = orden?.estatus || 'NUEVA';
+
+          fila.innerHTML = `
+            <td class="px-4 py-3 font-black text-[#7c2d12]">${escapeHtml(String(folioOt))}</td>
+            <td class="px-4 py-3">${escapeHtml(String(unidad))}</td>
+            <td class="px-4 py-3">${escapeHtml(String(fecha))}</td>
+            <td class="px-4 py-3">
+              <select data-ot-id="${escapeHtml(String(orden.id || ''))}" class="ot-status-select rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-[#7c2d12]">
+                <option value="NUEVA" ${estatus === 'NUEVA' ? 'selected' : ''}>NUEVA</option>
+                <option value="ASIGNADA" ${estatus === 'ASIGNADA' ? 'selected' : ''}>ASIGNADA</option>
+                <option value="EN PROCESO" ${estatus === 'EN PROCESO' ? 'selected' : ''}>EN PROCESO</option>
+                <option value="PENDIENTE REFACCION" ${estatus === 'PENDIENTE REFACCION' ? 'selected' : ''}>PENDIENTE REFACCIÓN</option>
+                <option value="TERMINADA" ${estatus === 'TERMINADA' ? 'selected' : ''}>TERMINADA</option>
+                <option value="CERRADA" ${estatus === 'CERRADA' ? 'selected' : ''}>CERRADA</option>
+              </select>
+            </td>
+            <td class="px-4 py-3 text-right space-x-1">
+              <button class="ot-seguimiento rounded-md border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                SEGUIMIENTO
+              </button>
+              <button data-ot='${encodeURIComponent(JSON.stringify(orden))}' class="ot-pdf rounded-md bg-[#7c2d12] px-2 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#5f220e]">
+                PDF
+              </button>
+            </td>
+          `;
+
+          const pdfBtn = fila.querySelector('.ot-pdf');
+          if (pdfBtn) {
+            pdfBtn.addEventListener('click', () => {
+              try {
+                const ot = JSON.parse(decodeURIComponent(pdfBtn.dataset.ot || '{}'));
+                if (window.generarDocumentoOT) {
+                  window.generarDocumentoOT(ot);
+                } else if (window.generarOT) {
+                  window.generarOT(ot.reporte_id, ot.unidad);
+                } else {
+                  showToast('No hay generador PDF disponible');
+                }
+              } catch (error) {
+                console.error('No se pudo abrir PDF de OT:', error);
+              }
+            });
+          }
+
+          const seguimientoBtn = fila.querySelector('.ot-seguimiento');
+          if (seguimientoBtn) {
+            seguimientoBtn.addEventListener('click', () => {
+              showToast(`Seguimiento para ${folioOt}`);
+            });
+          }
+
+          const statusSelect = fila.querySelector('.ot-status-select');
+          if (statusSelect) {
+            statusSelect.addEventListener('change', async (event) => {
+              try {
+                const nuevoEstatus = event.target.value;
+                const otId = event.target.dataset.otId;
+                if (!otId) return;
+
+                const response = await fetch('/api/mantenimiento', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ accion: 'actualizar_estatus', ot_id: otId, estatus: nuevoEstatus })
+                });
+
+                if (!response.ok) throw new Error('No se pudo actualizar el estatus');
+                showToast(`Estatus actualizado a ${nuevoEstatus}`);
+              } catch (error) {
+                console.error('Error al cambiar estatus:', error);
+                showToast(error.message || 'No se pudo actualizar');
+              }
+            });
+          }
+
+          tbody.appendChild(fila);
+        });
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-red-700">Error de comunicación: ${error.message}</td></tr>`;
+      }
+    }
+
     // Lógica de navegación de Mantenimiento
     const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes'];
     
@@ -948,9 +1038,12 @@
           btn.classList.remove('bg-white', 'text-[#7c2d12]');
           btn.classList.add('bg-[#7c2d12]', 'text-white');
 
-          // INYECCIÓN: Si se abre la pestaña de fallas, ejecutar consulta a Postgres
           if (id === 'vista-fallas') {
             cargarFallas();
+          }
+
+          if (id === 'vista-ordenes') {
+            cargarOrdenes();
           }
         });
       }
