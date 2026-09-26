@@ -679,8 +679,8 @@
 
     function generarPDFOT(orden) {
       try {
-        if (window.generarDocumentoOT) {
-          window.generarDocumentoOT(orden);
+        if (window.imprimirOT_Bachoco) {
+          window.imprimirOT_Bachoco(orden);
           return;
         }
 
@@ -963,7 +963,9 @@
             pdfBtn.addEventListener('click', () => {
               try {
                 const ot = JSON.parse(decodeURIComponent(pdfBtn.dataset.ot || '{}'));
-                if (window.generarDocumentoOT) {
+                if (window.imprimirOT_Bachoco) {
+                  window.imprimirOT_Bachoco(ot);
+                } else if (window.generarDocumentoOT) {
                   window.generarDocumentoOT(ot);
                 } else if (window.generarOT) {
                   window.generarOT(ot.reporte_id, ot.unidad);

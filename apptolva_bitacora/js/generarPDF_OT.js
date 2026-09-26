@@ -8,190 +8,195 @@ const CATALOGO_SISTEMAS = [
   { sistema: 'CLIMATIZACIÓN', palabrasClave: ['a/c', 'aire acondicionado', 'clima', 'compresor'] }
 ];
 
-function generarDocumentoOT(dataOT) {
-  const hoja = document.getElementById('hoja-ot');
-
-  if (hoja) {
-    const unidad = String(dataOT?.unidad || 'N/A');
-    const folio = String(dataOT?.folio_ot || dataOT?.folio || 'N/A');
-    const componente = String(dataOT?.componente || 'TRACTOCAMIÓN');
-    const sistema = String(dataOT?.sistema || 'GENERAL / REVISIÓN');
-    const operador = String(dataOT?.operador || '');
-    const descripcion = String(dataOT?.descripcion_falla || dataOT?.descripcion || 'Sin descripción');
-    const fecha = dataOT?.fecha_apertura
-      ? new Date(dataOT.fecha_apertura).toLocaleDateString('es-MX')
-      : new Date().toLocaleDateString('es-MX');
-
-    const normalizedComponent = String(componente).toUpperCase();
-    const selectedMark = normalizedComponent.includes('DOLLY')
-      ? 'dolly'
-      : normalizedComponent.includes('TOLVA')
-        ? 'tolva'
-        : 'tracto';
-
-    document.querySelectorAll('.component-mark').forEach((mark) => {
-      const shouldShow = mark.dataset.component === selectedMark;
-      mark.classList.toggle('hidden', !shouldShow);
-      mark.style.border = shouldShow ? '2px solid #d33' : '1px solid transparent';
-      mark.style.borderRadius = shouldShow ? '6px' : '0';
-      mark.style.padding = shouldShow ? '4px' : '0';
-      mark.style.background = shouldShow ? '#fff7ed' : 'transparent';
-    });
-
-    document.getElementById('ot-unidad').textContent = unidad;
-    document.getElementById('ot-folio').textContent = folio;
-    document.getElementById('ot-componente').textContent = componente;
-    document.getElementById('ot-trabajo').textContent = sistema;
-    document.getElementById('ot-operador').textContent = operador;
-    document.getElementById('ot-fecha').textContent = fecha;
-    document.getElementById('ot-folio-checklist').textContent = String(dataOT?.folio_bitacora || 'N/A');
-    document.getElementById('ot-descripcion').innerHTML = `SISTEMA: ${sistema} | ÍTEM: ${componente}<br>FALLA REPORTADA: ${descripcion}`;
-
-    hoja.classList.remove('hidden');
-    hoja.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.print();
-    return;
-  }
-
-  if (!window.jspdf) {
-    throw new Error('La librería jsPDF no está disponible.');
-  }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'letter'
-  });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('ORDEN DE TRABAJO MANTENIMIENTO FF PA CHAPO', 105, 14, { align: 'center' });
-
-  doc.setFontSize(13);
-  doc.setTextColor(232, 119, 34);
-  doc.text('Bachoco', 195, 18, { align: 'right' });
-  doc.setTextColor(0, 0, 0);
-
-  doc.setFontSize(6.5);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Flota propia planta de alimentos el Chapo', 15, 18);
-  doc.text('Carretera El Chapo', 15, 21);
-  doc.text('Muelle del Gavilán', 15, 24);
-
+function imprimirOT_Bachoco(ordenData) {
+  const folioOT = ordenData.folio_ot ? `OT-${ordenData.folio_ot}` : (ordenData.folio || 'S/F');
+  const unidad = ordenData.unidad || '';
+  const operador = ordenData.operador || '';
+  const componente = ordenData.componente || 'TRACTOCAMIÓN';
+  const sistema = ordenData.sistema || 'GENERAL';
+  const descripcion = ordenData.descripcion_falla || ordenData.descripcion || 'Sin descripción';
+  const folioCheckList = ordenData.folio_bitacora || ordenData.reporte_id || 'N/A';
   const fechaHoy = new Date().toLocaleDateString('es-MX');
-  const matrizDatos = [
-    [
-      { content: 'UNIDAD:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: String(dataOT?.unidad || '') },
-      { content: 'FOLIO ORDEN TRABAJO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: `OT-${dataOT?.folio_ot || dataOT?.folio || ''}`, styles: { fontStyle: 'bold', textColor: [200, 0, 0] } }
-    ],
-    [
-      { content: 'NOMBRE DEL OPERADOR:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: String(dataOT?.operador || '') },
-      { content: 'TRABAJO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: String(dataOT?.sistema || 'CORRECTIVO') }
-    ],
-    [
-      { content: 'ELECTROMECÁNICO ASIGNADO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: '' },
-      { content: 'TURNO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: '' }
-    ],
-    [
-      { content: 'FECHA DE ASIGNACIÓN:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: fechaHoy },
-      { content: 'FOLIO CHECK-LIST:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: String(dataOT?.folio_bitacora || dataOT?.reporteId || 'N/A') }
-    ],
-    [
-      { content: 'SERVICIO MANTENIMIENTO:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: 'CORRECTIVO DERIVADO DE BITÁCORA' },
-      { content: 'FIRMA:', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-      { content: '' }
-    ]
-  ];
 
-  doc.autoTable({
-    startY: 28,
-    margin: { left: 15, right: 15 },
-    body: matrizDatos,
-    theme: 'grid',
-    styles: { fontSize: 7, cellPadding: 1.5, lineColor: [80, 80, 80], lineWidth: 0.2 },
-    columnStyles: {
-      0: { cellWidth: 42 },
-      1: { cellWidth: 52 },
-      2: { cellWidth: 42 },
-      3: { cellWidth: 50 }
-    }
-  });
+  const ventanaImpresion = window.open('', '_blank');
 
-  const startDescY = doc.lastAutoTable.finalY + 3;
-  const descripcionCompleta = `COMPONENTE AFECTADO: ${dataOT?.componente || 'GENERAL'}\nSISTEMA: ${dataOT?.sistema || ''}\nDESCRIPCIÓN DE LA FALLA: ${dataOT?.descripcion_falla || dataOT?.descripcion || ''}`;
+  ventanaImpresion.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Orden de Trabajo - ${folioOT}</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <style>
+        @page {
+          size: letter portrait;
+          margin: 8mm;
+        }
+        @media print {
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            background-color: white !important;
+            padding: 0 !important;
+          }
+          .no-print { display: none !important; }
+        }
+      </style>
+    </head>
+    <body class="bg-gray-100 flex justify-center text-black font-sans text-xs p-2">
+      <div class="w-[216mm] min-h-[265mm] bg-white p-6 border border-gray-400 flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <h1 class="text-xs font-bold tracking-wider text-gray-800">ORDEN DE TRABAJO MANTENIMIENTO FP PA CHAPO</h1>
+              <div class="mt-1 text-[9px] text-gray-700 leading-tight">
+                <p class="font-bold">Flota propia planta de alimentos el Chapo</p>
+                <p>Localidad: El chapo</p>
+                <p>Ixhuatlan del Sureste</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-2xl font-extrabold text-[#E35205] tracking-tight">Bachoco</span>
+              <div class="h-1 bg-green-600 rounded-full mt-0.5 w-full"></div>
+            </div>
+          </div>
 
-  doc.autoTable({
-    startY: startDescY,
-    margin: { left: 15, right: 15 },
-    body: [
-      [{ content: 'DESCRIPCIÓN DEL TRABAJO A REALIZAR:', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
-      [{ content: descripcionCompleta, styles: { minCellHeight: 18 } }],
-      [{ content: 'COMENTARIOS DEL EJECUTOR (TALLER):', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
-      [{ content: '', styles: { minCellHeight: 14 } }],
-      [{ content: 'COMENTARIOS DEL OPERADOR AL RECIBIR:', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }],
-      [{ content: '', styles: { minCellHeight: 14 } }]
-    ],
-    theme: 'grid',
-    styles: { fontSize: 7, cellPadding: 1.8, lineColor: [80, 80, 80], lineWidth: 0.2 }
-  });
+          <table class="w-full border-collapse border border-gray-600 mb-3 text-[9px]">
+            <tbody>
+              <tr>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 w-[20%] text-center uppercase">Unidad</td>
+                <td class="border border-gray-600 p-1 w-[30%] font-bold text-sm">${unidad}</td>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 w-[20%] uppercase text-center">Folio Orden Trabajo</td>
+                <td class="border border-gray-600 p-1 w-[30%] font-bold text-red-600 text-center text-sm">${folioOT}</td>
+              </tr>
+              <tr>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 text-center uppercase">Nombre del Operador</td>
+                <td class="border border-gray-600 p-1">${operador}</td>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 uppercase text-center">Componente Afectado</td>
+                <td class="border border-gray-600 p-1 font-bold text-blue-900 text-center">${componente}</td>
+              </tr>
+              <tr>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 text-center uppercase">Electromecánico Asignado</td>
+                <td class="border border-gray-600 p-1"></td>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 uppercase text-center">Sistema Mecánico</td>
+                <td class="border border-gray-600 p-1 text-center">${sistema}</td>
+              </tr>
+              <tr>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 text-center uppercase">Proveedor Externo</td>
+                <td class="border border-gray-600 p-1"></td>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 uppercase text-center">Turno</td>
+                <td class="border border-gray-600 p-1 text-center">48 HRS</td>
+              </tr>
+              <tr>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 text-center uppercase">Fecha de la Solicitud</td>
+                <td class="border border-gray-600 p-1">${fechaHoy}</td>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 uppercase text-center">Folio Check List</td>
+                <td class="border border-gray-600 p-1 text-center font-bold">${folioCheckList}</td>
+              </tr>
+              <tr>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 text-center uppercase">Fecha de Realización</td>
+                <td class="border border-gray-600 p-1"></td>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 uppercase text-center">Kilometraje</td>
+                <td class="border border-gray-600 p-1"></td>
+              </tr>
+              <tr>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 text-center uppercase">Supervisor Mantenimiento</td>
+                <td class="border border-gray-600 p-1 font-semibold">Pedro Palomec</td>
+                <td class="bg-gray-200 border border-gray-600 font-bold p-1 uppercase text-center">Firma</td>
+                <td class="border border-gray-600 p-1"></td>
+              </tr>
+            </tbody>
+          </table>
 
-  const posGraficosY = doc.lastAutoTable.finalY + 4;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('TRACTOCAMIÓN', 15, posGraficosY + 3);
-  doc.text('TOLVA / DOLLY', 15, posGraficosY + 32);
+          <div class="border border-gray-600 mb-2">
+            <div class="flex">
+              <div class="w-[22%] bg-gray-200 p-2 border-r border-gray-600 font-bold uppercase text-[9px] flex items-center justify-center text-center">
+                Descripción del Trabajo
+              </div>
+              <div class="w-[78%] min-h-[45px] p-2 bg-white text-[10px] font-semibold">
+                ${descripcion}
+              </div>
+            </div>
+          </div>
 
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineDashPattern([1.5, 1.5], 0);
-  doc.rect(15, posGraficosY + 5, 186, 23);
-  doc.rect(15, posGraficosY + 34, 186, 25);
-  doc.setLineDashPattern([], 0);
+          <div class="border border-gray-600 mb-2">
+            <div class="flex">
+              <div class="w-[22%] bg-gray-200 p-2 border-r border-gray-600 font-bold uppercase text-[9px] flex items-center justify-center text-center">
+                Comentarios del Ejecutor
+              </div>
+              <div class="w-[78%] min-h-[40px] p-2 bg-white"></div>
+            </div>
+          </div>
 
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(6.5);
-  doc.setTextColor(120, 120, 120);
-  doc.text('(Área de inspección y marcado visual para electromecánicos)', 105, posGraficosY + 17, { align: 'center' });
-  doc.text('(Área de marcado: Dolly / Tolva 1 / Tolva 2)', 105, posGraficosY + 47, { align: 'center' });
-  doc.setTextColor(0, 0, 0);
+          <div class="border border-gray-600 mb-3">
+            <div class="flex">
+              <div class="w-[22%] bg-gray-200 p-2 border-r border-gray-600 font-bold uppercase text-[9px] flex items-center justify-center text-center">
+                Comentarios del Operador
+              </div>
+              <div class="w-[78%] min-h-[40px] p-2 bg-white"></div>
+            </div>
+          </div>
 
-  const posYFirmas = 250;
-  doc.setDrawColor(0, 0, 0);
-  doc.line(25, posYFirmas, 85, posYFirmas);
-  doc.line(125, posYFirmas, 185, posYFirmas);
+          <div class="grid grid-cols-2 gap-3 border border-gray-400 p-2 mb-2 bg-gray-50">
+            <div class="col-span-2 border-b border-gray-300 pb-1">
+              <span class="text-[9px] font-bold tracking-wider block mb-1">TRACTOCAMION</span>
+              <div class="h-20 border border-dashed border-gray-400 flex items-center justify-center bg-white">
+                <img src="/img/esquema-tractocamion.png" onerror="this.parentElement.innerHTML='<span class=\'text-gray-400 text-[9px]\'>Diagrama Tracto (Marcar área intervenida)</span>'" class="max-h-full object-contain">
+              </div>
+            </div>
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('EJECUTÓ MANTENIMIENTO', 55, posYFirmas + 4, { align: 'center' });
-  doc.text('OPERADOR QUE VALIDA', 155, posYFirmas + 4, { align: 'center' });
+            <div class="col-span-1">
+              <span class="text-[9px] font-bold tracking-wider block mb-1">TOLVA</span>
+              <div class="h-18 border border-dashed border-gray-400 flex items-center justify-center bg-white">
+                <img src="/img/esquema-tolva.png" onerror="this.parentElement.innerHTML='<span class=\'text-gray-400 text-[9px]\'>Diagrama Tolva (Descarga/Manivelas)</span>'" class="max-h-full object-contain">
+              </div>
+            </div>
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.setTextColor(100, 100, 100);
-  doc.text('(Firma de Taller)', 55, posYFirmas + 7, { align: 'center' });
-  doc.text('(Firma de Conformidad)', 155, posYFirmas + 7, { align: 'center' });
+            <div class="col-span-1">
+              <span class="text-[9px] font-bold tracking-wider block mb-1">DOLLY</span>
+              <div class="h-18 border border-dashed border-gray-400 flex items-center justify-center bg-white">
+                <img src="/img/esquema-dolly.png" onerror="this.parentElement.innerHTML='<span class=\'text-gray-400 text-[9px]\'>Diagrama Dolly (Lanza/Quinta)</span>'" class="max-h-full object-contain">
+              </div>
+            </div>
+          </div>
+        </div>
 
-  doc.setFillColor(0, 150, 57);
-  doc.rect(15, 262, 186, 2.5, 'F');
+        <div>
+          <div class="grid grid-cols-2 gap-16 mt-3 mb-2 px-8 text-center text-[9px] font-bold">
+            <div>
+              <div class="border-b border-black mb-1"></div>
+              <span>EJECUTÓ MANTENIMIENTO</span>
+            </div>
+            <div>
+              <div class="border-b border-black mb-1"></div>
+              <span>OPERADOR QUE VALIDA</span>
+            </div>
+          </div>
+          <div class="h-3 bg-[#00A850] w-full mt-2"></div>
+        </div>
+      </div>
 
-  window.open(doc.output('bloburl'), '_blank');
+      <script>
+        window.onload = function() {
+          setTimeout(() => {
+            window.print();
+          }, 400);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+
+  ventanaImpresion.document.close();
 }
 
 if (typeof window !== 'undefined') {
-  window.generarDocumentoOT = generarDocumentoOT;
+  window.imprimirOT_Bachoco = imprimirOT_Bachoco;
 }
 
 if (typeof globalThis !== 'undefined') {
-  globalThis.generarDocumentoOT = generarDocumentoOT;
+  globalThis.imprimirOT_Bachoco = imprimirOT_Bachoco;
 }
 
-export { CATALOGO_SISTEMAS, generarDocumentoOT };
+export { CATALOGO_SISTEMAS, imprimirOT_Bachoco };
+
