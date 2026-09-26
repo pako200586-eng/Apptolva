@@ -7,6 +7,10 @@
   <title>Panel Administrativo | AppTolva</title>
   <script src="./js/tailwindcss.js"></script>
   <script src="./js/jspdf.min.js"></script>
+  <script src="./js/catalogoBachoco.js"></script>
+  <script src="./js/normalizadorFallas.js"></script>
+  <script src="./js/procesadorInspeccion.js"></script>
+  <script src="./js/generarPDF_OT.js"></script>
   <link rel="stylesheet" href="./css/fontawesome.min.css">
   <style>
     :root { color-scheme: light; }
@@ -105,6 +109,131 @@
         <button id="btn-vista-ordenes" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           Órdenes de Trabajo
         </button>
+      </div>
+
+      <div id="hoja-ot" class="hidden max-w-[800px] mx-auto p-6 bg-white border border-gray-400 font-sans text-black">
+        <div class="flex justify-between items-start border-b-2 border-black pb-2">
+          <div>
+            <h2 class="text-xs font-bold uppercase tracking-wider">Flota propia planta de alimentos el Chapo</h2>
+            <p class="text-[10px] text-gray-700 leading-tight">Carretera El Chapo<br>Muelle del Gavilán</p>
+          </div>
+          <div class="text-center">
+            <h1 class="text-sm font-extrabold uppercase">ORDEN DE TRABAJO MANTENIMIENTO FF PA CHAPO</h1>
+          </div>
+          <div>
+            <span class="text-2xl font-black text-[#E87722] tracking-tighter">Bachoco</span>
+          </div>
+        </div>
+
+        <table class="w-full mt-3 border-collapse border border-black text-[10px]">
+          <tbody>
+            <tr>
+              <td class="border border-black bg-gray-200 font-bold p-1 w-28">UNIDAD:</td>
+              <td class="border border-black p-1 w-44 font-bold text-sm" id="ot-unidad">14132</td>
+              <td class="border border-black bg-gray-200 font-bold p-1 w-36">FOLIO ORDEN TRABAJO:</td>
+              <td class="border border-black p-1 text-red-600 font-black text-sm" id="ot-folio">OT-104</td>
+            </tr>
+            <tr>
+              <td class="border border-black bg-gray-200 font-bold p-1">COMPONENTE:</td>
+              <td class="border border-black p-1 font-bold text-blue-900" id="ot-componente">TRACTOCAMIÓN</td>
+              <td class="border border-black bg-gray-200 font-bold p-1">TRABAJO:</td>
+              <td class="border border-black p-1" id="ot-trabajo">CARROCERÍA / CHASIS</td>
+            </tr>
+            <tr>
+              <td class="border border-black bg-gray-200 font-bold p-1">NOMBRE DEL OPERADOR:</td>
+              <td class="border border-black p-1" id="ot-operador">Ernesto Peralta</td>
+              <td class="border border-black bg-gray-200 font-bold p-1">TURNO:</td>
+              <td class="border border-black p-1">1RO / 48 HRS</td>
+            </tr>
+            <tr>
+              <td class="border border-black bg-gray-200 font-bold p-1">ELECTROMECÁNICO ASIGNADO:</td>
+              <td class="border border-black p-1" id="ot-mecanico">_____________________</td>
+              <td class="border border-black bg-gray-200 font-bold p-1">FOLIO CHECK-LIST:</td>
+              <td class="border border-black p-1 font-bold" id="ot-folio-checklist">F-2430</td>
+            </tr>
+            <tr>
+              <td class="border border-black bg-gray-200 font-bold p-1">FECHA DE ASIGNACIÓN:</td>
+              <td class="border border-black p-1" id="ot-fecha">26/09/2026</td>
+              <td class="border border-black bg-gray-200 font-bold p-1">FECHA DE REALIZACIÓN:</td>
+              <td class="border border-black p-1"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="w-full mt-2 border-collapse border border-black text-[10px]">
+          <tr>
+            <td class="border border-black bg-gray-200 font-bold p-1 w-44">SERVICIO DE MANTENIMIENTO:</td>
+            <td class="border border-black p-1 w-64">CORRECTIVO DERIVADO DE BITÁCORA</td>
+            <td class="border border-black bg-gray-200 font-bold p-1 w-20">FIRMA:</td>
+            <td class="border border-black p-1"></td>
+          </tr>
+        </table>
+
+        <div class="mt-2 border border-black">
+          <div class="bg-gray-200 text-[10px] font-bold p-1 border-b border-black">DESCRIPCIÓN DEL TRABAJO A REALIZAR:</div>
+          <div class="p-2 text-xs min-h-[50px] font-semibold" id="ot-descripcion">
+            SISTEMA: CARROCERÍA | ÍTEM: Parabrisas / Cristales<br>
+            FALLA REPORTADA: Parabrisas fisurado lado copiloto y golpe en defensa.
+          </div>
+        </div>
+
+        <div class="mt-2 border border-black">
+          <div class="bg-gray-200 text-[10px] font-bold p-1 border-b border-black">COMENTARIOS DEL EJECUTOR (TALLER):</div>
+          <div class="p-2 min-h-[45px] text-xs"></div>
+        </div>
+
+        <div class="mt-2 border border-black">
+          <div class="bg-gray-200 text-[10px] font-bold p-1 border-b border-black">COMENTARIOS DEL OPERADOR AL RECIBIR:</div>
+          <div class="p-2 min-h-[45px] text-xs"></div>
+        </div>
+
+        <div class="mt-4 border border-dashed border-gray-400 p-2 text-center">
+          <div class="text-[10px] font-bold text-gray-600 mb-1">MARCAR CON UNA "X" O CÍRCULO LA ZONA DEL COMPONENTE INTERVENIDO</div>
+          <div class="grid grid-cols-2 gap-4 items-center justify-items-center">
+            <div class="component-mark" data-component="tracto">
+              <p class="text-[9px] font-bold uppercase mb-1">Tractocamión (Cabina / Chasis)</p>
+              <svg class="w-48 h-20 stroke-current text-gray-800 fill-none" viewBox="0 0 200 80">
+                <path d="M 20 60 L 50 60 L 50 30 L 120 30 L 140 45 L 180 45 L 180 60 L 190 60" stroke-width="2"/>
+                <circle cx="50" cy="65" r="8" stroke-width="2"/>
+                <circle cx="70" cy="65" r="8" stroke-width="2"/>
+                <circle cx="160" cy="65" r="8" stroke-width="2"/>
+                <path d="M 60 35 L 85 60 M 85 35 L 60 60" stroke="#d33" stroke-width="2.2" fill="none"/>
+              </svg>
+            </div>
+            <div class="component-mark" data-component="tolva">
+              <p class="text-[9px] font-bold uppercase mb-1">Tolva / Remolque (Bazuca / Chumacera / Descarga)</p>
+              <svg class="w-48 h-20 stroke-current text-gray-800 fill-none" viewBox="0 0 200 80">
+                <rect x="20" y="20" width="150" height="35" rx="10" stroke-width="2"/>
+                <line x1="30" y1="55" x2="160" y2="55" stroke-width="2"/>
+                <circle cx="120" cy="62" r="7" stroke-width="2"/>
+                <circle cx="140" cy="62" r="7" stroke-width="2"/>
+                <path d="M 72 28 L 100 50 M 100 28 L 72 50" stroke="#d33" stroke-width="2.2" fill="none"/>
+              </svg>
+            </div>
+            <div class="component-mark" data-component="dolly">
+              <p class="text-[9px] font-bold uppercase mb-1">Dolly (Enganche / Lanza / Suspensión)</p>
+              <svg class="w-48 h-20 stroke-current text-gray-800 fill-none" viewBox="0 0 200 80">
+                <path d="M 30 52 L 70 52 L 90 30 L 150 30 L 165 52 L 180 52" stroke-width="2"/>
+                <circle cx="80" cy="60" r="8" stroke-width="2"/>
+                <circle cx="150" cy="60" r="8" stroke-width="2"/>
+                <path d="M 95 25 L 118 48 M 118 25 L 95 48" stroke="#d33" stroke-width="2.2" fill="none"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 flex justify-around text-center text-[10px]">
+          <div class="border-t border-black w-48 pt-1">
+            <span class="font-bold">EJECUTÓ MANTENIMIENTO</span><br>
+            <span class="text-gray-500 text-[8px]">(Firma Electromecánico / Taller)</span>
+          </div>
+          <div class="border-t border-black w-48 pt-1">
+            <span class="font-bold">OPERADOR QUE VALIDA</span><br>
+            <span class="text-gray-500 text-[8px]">(Firma de Conformidad)</span>
+          </div>
+        </div>
+
+        <div class="w-full h-1.5 bg-[#009639] mt-6"></div>
       </div>
 
       <div class="grid gap-5 lg:grid-cols-[1.6fr_.9fr]">
@@ -567,35 +696,117 @@
     }
 
     function generarPDFOT(orden) {
-      if (!window.jspdf) {
-        showToast('No se pudo abrir el PDF porque la librería no está disponible.');
-        return;
+      try {
+        if (window.generarDocumentoOT) {
+          window.generarDocumentoOT(orden);
+          return;
+        }
+
+        if (!window.jspdf) {
+          showToast('No se pudo abrir el PDF porque la librería no está disponible.');
+          return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        doc.setFillColor(124, 45, 18);
+        doc.rect(0, 0, 210, 30, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
+        doc.text('Orden de Trabajo', 14, 18);
+
+        doc.setTextColor(17, 24, 39);
+        doc.setFontSize(11);
+        let y = 42;
+        doc.text(`Folio OT: ${orden?.folio_ot || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Estatus: ${orden?.estatus || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Fecha apertura: ${orden?.fecha_apertura || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Componente: ${orden?.componente || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Sistema: ${orden?.sistema || 'N/A'}`, 14, y); y += 8;
+        doc.text(`Descripción: ${orden?.descripcion_falla || orden?.descripcion || 'N/A'}`, 14, y); y += 12;
+
+        doc.setDrawColor(124, 45, 18);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(12, y, 186, 25, 3, 3, 'S');
+        doc.setFontSize(10);
+        doc.text('Este documento puede imprimirse o archivarse como evidencia del mantenimiento solicitado.', 18, y + 10);
+
+        doc.save(`OT-${orden?.folio_ot || 'generada'}.pdf`);
+      } catch (error) {
+        console.error('Error al generar PDF:', error);
+        showToast('No se pudo generar el PDF de la OT.');
+      }
+    }
+
+    function normalizarFallaDesdeReporte(reporte) {
+      const fallasNormalizadas = window.normalizarObservaciones
+        ? window.normalizarObservaciones(reporte)
+        : [];
+
+      if (fallasNormalizadas.length) {
+        return fallasNormalizadas;
       }
 
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      return [
+        {
+          reporte_id: reporte?.reporte_id || '',
+          folio_bitacora: reporte?.folio || '',
+          unidad: reporte?.unidad || '',
+          operador: reporte?.operador || '',
+          fecha: reporte?.fecha || '',
+          componente: 'TRACTOCAMIÓN',
+          sistema: 'GENERAL / REVISIÓN',
+          descripcion: 'Falla no clasificada por el operador',
+          origen: 'FALLA GENERICA'
+        }
+      ];
+    }
 
-      doc.setFillColor(124, 45, 18);
-      doc.rect(0, 0, 210, 30, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(18);
-      doc.text('Orden de Trabajo', 14, 18);
+    async function crearOTDesdeFalla(itemFalla) {
+      try {
+        const response = await fetch('/api/mantenimiento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reporte_id: itemFalla.reporte_id,
+            folio_bitacora: itemFalla.folio_bitacora,
+            unidad: itemFalla.unidad,
+            operador: itemFalla.operador,
+            componente: itemFalla.componente,
+            sistema: itemFalla.sistema,
+            descripcion: itemFalla.descripcion,
+            fecha: itemFalla.fecha,
+            origen: itemFalla.origen,
+            observaciones: itemFalla.descripcion,
+          })
+        });
 
-      doc.setTextColor(17, 24, 39);
-      doc.setFontSize(11);
-      let y = 42;
-      doc.text(`Folio OT: ${orden?.folio_ot || 'N/A'}`, 14, y); y += 8;
-      doc.text(`Estatus: ${orden?.estatus || 'N/A'}`, 14, y); y += 8;
-      doc.text(`Fecha apertura: ${orden?.fecha_apertura || 'N/A'}`, 14, y); y += 8;
-      doc.text('Se generó a partir de una falla reportada por el operador.', 14, y); y += 14;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'No se pudo generar la OT');
+        }
 
-      doc.setDrawColor(124, 45, 18);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(12, y, 186, 25, 3, 3, 'S');
-      doc.setFontSize(10);
-      doc.text('Este documento puede imprimirse o archivarse como evidencia del mantenimiento solicitado.', 18, y + 10);
+        const data = await response.json();
 
-      doc.save(`OT-${orden?.folio_ot || 'generada'}.pdf`);
+        if (data.success) {
+          if (data.reiterada) {
+            alert(`La falla en ${itemFalla.componente} ya tenía OT abierta. Se incrementó la recurrencia a: ${data.recurrencia}`);
+          } else {
+            alert(`OT generada con éxito. Folio autogenerado: ${data.orden.folio_ot}`);
+            generarPDFOT(data.orden);
+          }
+          cargarFallas();
+          const btnOrdenes = $('btn-vista-ordenes');
+          if (btnOrdenes) btnOrdenes.click();
+          window.location.reload();
+        } else {
+          showToast('Error al generar la OT: ' + (data.error || 'Desconocido'));
+        }
+      } catch (error) {
+        console.error('Error POST:', error);
+        showToast(error.message || 'Error de comunicación con el servidor.');
+      }
     }
 
     // Exponer la función globalmente
@@ -611,7 +822,12 @@
           body: JSON.stringify({
             reporte_id: reporteId,
             unidad: unidad,
-            operador: 'Operador Asignado'
+            operador: 'Operador Asignado',
+            componente: 'TRACTOCAMIÓN',
+            sistema: 'GENERAL / REVISIÓN',
+            descripcion: 'Falla general del reporte',
+            fecha: new Date().toISOString(),
+            origen: 'REPORTE GENERAL'
           })
         });
 
@@ -623,9 +839,13 @@
         const data = await response.json();
 
         if (data.success) {
-          alert(`OT generada con éxito. Folio autogenerado: ${data.orden.folio_ot}`);
-          generarPDFOT(data.orden);
-          showToast(`¡OT ${data.orden.folio_ot} generada con éxito!`);
+          if (data.reiterada) {
+            alert(`La falla general ya tenía OT abierta. Se incrementó la recurrencia a: ${data.recurrencia}`);
+          } else {
+            alert(`OT generada con éxito. Folio autogenerado: ${data.orden.folio_ot}`);
+            generarPDFOT(data.orden);
+          }
+          showToast(`¡OT ${data.orden?.folio_ot || 'reiterada'} procesada!`);
           cargarFallas();
           const btnOrdenes = $('btn-vista-ordenes');
           if (btnOrdenes) btnOrdenes.click();
@@ -653,36 +873,45 @@
         const data = await response.json();
 
         if (data.success && data.fallas && data.fallas.length > 0) {
-          tbody.innerHTML = ''; // Limpiar estado de carga
-          
-          data.fallas.forEach(reporte => {
-            // El backend ya filtró y nos entregó el arreglo JSONB listo
-            const tickets = reporte.detalles_falla || [];
-            
-            tickets.forEach(falla => {
+          tbody.innerHTML = '';
+
+          data.fallas.forEach((reporte) => {
+            const fallasNormalizadas = normalizarFallaDesdeReporte(reporte);
+
+            fallasNormalizadas.forEach((falla) => {
               const fila = document.createElement('tr');
-              fila.className = 'hover:bg-orange-50/70 transition-colors';
-              
-              const descripcionFalla = falla.descripcion || falla.falla || falla.fallaReportada || 'Falla sin detalle';
-              const observaciones = reporte.observaciones || 'Sin observaciones registradas por el operador';
-              
+              fila.className = 'hover:bg-orange-50/70 transition-colors align-top';
+
               fila.innerHTML = `
-                <td class="px-4 py-3 font-bold text-slate-700">${escapeHtml(reporte.folio)}</td>
-                <td class="px-4 py-3">${escapeHtml(reporte.unidad)}</td>
-                <td class="px-4 py-3 truncate max-w-[150px]">${escapeHtml(reporte.operador)}</td>
+                <td class="px-4 py-3 font-bold text-slate-700">${escapeHtml(falla.folio_bitacora || reporte.folio)}</td>
+                <td class="px-4 py-3">${escapeHtml(falla.unidad || reporte.unidad)}</td>
+                <td class="px-4 py-3 truncate max-w-[150px]">${escapeHtml(falla.operador || reporte.operador)}</td>
                 <td class="px-4 py-3">
-                  <span class="rounded-md bg-red-100 px-2 py-1 text-xs font-black text-red-800 uppercase">
-                    ${escapeHtml(descripcionFalla)}
+                  <span class="rounded-md bg-red-100 px-2 py-1 text-[10px] font-black text-red-800 uppercase">
+                    ${escapeHtml(falla.componente || 'TRACTOCAMIÓN')}
                   </span>
+                  <div class="mt-1 text-[10px] font-bold text-slate-500">${escapeHtml(falla.sistema || 'GENERAL / REVISIÓN')}</div>
                 </td>
-                <td class="px-4 py-3 text-sm text-slate-600">${escapeHtml(observaciones)}</td>
+                <td class="px-4 py-3 text-sm text-slate-600 max-w-[220px]">${escapeHtml(falla.descripcion || 'Sin observaciones registradas por el operador')}</td>
                 <td class="px-4 py-3 text-right">
-                  <button onclick="window.generarOT('${reporte.reporte_id}', '${escapeHtml(reporte.unidad)}')" 
-                          class="rounded-md bg-[#294936] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#203b2b]">
+                  <button data-falla='${encodeURIComponent(JSON.stringify(falla))}' class="btn-generar-ot rounded-md bg-[#294936] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#203b2b]">
                     GENERAR OT
                   </button>
                 </td>
               `;
+
+              const boton = fila.querySelector('.btn-generar-ot');
+              if (boton) {
+                boton.addEventListener('click', () => {
+                  try {
+                    const itemFalla = JSON.parse(decodeURIComponent(boton.dataset.falla));
+                    crearOTDesdeFalla(itemFalla);
+                  } catch (error) {
+                    console.error('No se pudo convertir la falla:', error);
+                  }
+                });
+              }
+
               tbody.appendChild(fila);
             });
           });
