@@ -1,4 +1,4 @@
-Const CACHE_VERSION = "v40";
+const CACHE_VERSION = "v41";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -29,6 +29,16 @@ const OFFLINE_URLS = [
   "./js/jspdf.min.js",
   "./js/qrcode.min.js",
   "./js/confetti.min.js",
+  "./js/catalogoBachoco.js",
+  "./js/normalizadorFallas.js",
+  "./js/procesadorInspeccion.js",
+  "./js/generarPDF_OT.js",
+  "./img/ot/logo.jpg",
+  "./img/ot/tracto.jpg",
+  "./img/ot/tolva1.jpg",
+  "./img/ot/tolva2.jpg",
+  "./img/ot/dolly1.jpg",
+  "./img/ot/dolly2.jpg",
   "./webfonts/fa-solid-900.woff2",
   "./webfonts/fa-brands-400.woff2",
   "./webfonts/fa-regular-400.woff2",

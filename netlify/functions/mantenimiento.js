@@ -1,4 +1,5 @@
 import { getDatabase } from "@netlify/database";
+import { authorizeRequest } from "../lib/firebase-auth.js";
 
 function createCorsHeaders(req) {
   const requestOrigin = req.headers.get("origin");
@@ -9,12 +10,68 @@ function createCorsHeaders(req) {
   };
 }
 
+// Datos de la OT enriquecidos con el checklist de origen (folio, tolvas, dolly y km)
+// para poder llenar el formato impreso de la orden de trabajo.
+const ORDEN_CON_BITACORA_SQL = `
+  SELECT
+    o.id,
+    o.folio_ot,
+    o.reporte_id,
+    o.unidad,
+    o.operador,
+    o.componente,
+    o.sistema,
+    o.descripcion_falla,
+    o.estatus,
+    o.payload,
+    o.fecha_apertura,
+    o.recurrencia,
+    o.updated_at,
+    o.electromecanico,
+    o.proveedor_externo,
+    o.supervisor_mantenimiento,
+    o.fecha_realizacion,
+    o.comentarios_ejecutor,
+    o.comentarios_operador,
+    COALESCE(NULLIF(o.kilometraje, ''), b.payload->>'km') AS kilometraje,
+    COALESCE(b.folio, o.payload->>'folio_bitacora') AS folio_bitacora,
+    b.payload->>'tolva1' AS tolva1,
+    b.payload->>'tolva2' AS tolva2,
+    b.payload->>'dolly' AS dolly,
+    b.payload->>'km' AS km
+  FROM ordenes_trabajo o
+  LEFT JOIN bitacora_reports b ON b.id = o.reporte_id
+`;
+
+const ESTATUS_VALIDOS = ['NUEVA', 'ASIGNADA', 'EN PROCESO', 'PENDIENTE REFACCION', 'TERMINADA', 'CERRADA'];
+
+// Campos del formato de OT que el supervisor captura desde el panel.
+const CAMPOS_DETALLE = [
+  'electromecanico',
+  'proveedor_externo',
+  'supervisor_mantenimiento',
+  'fecha_realizacion',
+  'kilometraje',
+  'comentarios_ejecutor',
+  'comentarios_operador',
+];
+
+function jsonResponse(status, body, corsHeaders) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders }
+  });
+}
+
 export default async (req) => {
   const corsHeaders = createCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
+
+  const authorizationError = await authorizeRequest(req, corsHeaders);
+  if (authorizationError) return authorizationError;
 
   const database = getDatabase();
 
@@ -23,24 +80,24 @@ export default async (req) => {
       const url = new URL(req.url);
       const tipo = url.searchParams.get("tipo");
 
+      if (tipo === "seguimiento") {
+        const otId = url.searchParams.get("ot_id");
+        if (!otId) return jsonResponse(400, { error: "Falta el identificador de la OT" }, corsHeaders);
+
+        const result = await database.pool.query(`
+          SELECT id, accion, usuario, comentario, fecha
+          FROM ot_seguimiento
+          WHERE ot_id = $1
+          ORDER BY fecha DESC
+        `, [otId]);
+
+        return jsonResponse(200, { success: true, seguimiento: result.rows }, corsHeaders);
+      }
+
       if (tipo === "ordenes") {
         const result = await database.pool.query(`
-          SELECT 
-            id,
-            folio_ot,
-            reporte_id,
-            unidad,
-            operador,
-            componente,
-            sistema,
-            descripcion_falla,
-            estatus,
-            payload,
-            fecha_apertura,
-            recurrencia,
-            updated_at
-          FROM ordenes_trabajo
-          ORDER BY fecha_apertura DESC NULLS LAST, folio_ot DESC NULLS LAST
+          ${ORDEN_CON_BITACORA_SQL}
+          ORDER BY o.fecha_apertura DESC NULLS LAST, o.folio_ot DESC NULLS LAST
         `);
 
         return new Response(JSON.stringify({ success: true, ordenes: result.rows }), {
@@ -82,6 +139,10 @@ export default async (req) => {
         const otId = body.ot_id;
         const nuevoEstatus = body.estatus || 'NUEVA';
 
+        if (!ESTATUS_VALIDOS.includes(nuevoEstatus)) {
+          return jsonResponse(400, { error: "Estatus no válido" }, corsHeaders);
+        }
+
         if (!otId) {
           return new Response(JSON.stringify({ error: "Falta el identificador de la OT" }), {
             status: 400,
@@ -95,10 +156,42 @@ export default async (req) => {
           WHERE id = $2
         `, [nuevoEstatus, otId]);
 
+        await database.pool.query(`
+          INSERT INTO ot_seguimiento (id, ot_id, accion, usuario, comentario)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [crypto.randomUUID().replace(/-/g, ""), otId, 'CAMBIO_ESTATUS', 'Supervisor (panel)', `Estatus actualizado a ${nuevoEstatus}`]);
+
         return new Response(JSON.stringify({ success: true, ot_id: otId, estatus: nuevoEstatus }), {
           status: 200,
           headers: { "Content-Type": "application/json", ...corsHeaders }
         });
+      }
+
+      if (body?.accion === "actualizar_detalle") {
+        const otId = body.ot_id;
+        if (!otId) return jsonResponse(400, { error: "Falta el identificador de la OT" }, corsHeaders);
+
+        const valores = CAMPOS_DETALLE.map((campo) => {
+          const valor = body[campo] == null ? '' : String(body[campo]).trim().slice(0, 2000);
+          return valor || null;
+        });
+        const asignaciones = CAMPOS_DETALLE.map((campo, i) => `${campo} = $${i + 1}`).join(', ');
+
+        const actualizada = await database.pool.query(`
+          UPDATE ordenes_trabajo
+          SET ${asignaciones}, updated_at = NOW()
+          WHERE id = $${CAMPOS_DETALLE.length + 1}
+        `, [...valores, otId]);
+
+        if (!actualizada.rowCount) return jsonResponse(404, { error: "La OT no existe" }, corsHeaders);
+
+        await database.pool.query(`
+          INSERT INTO ot_seguimiento (id, ot_id, accion, usuario, comentario)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [crypto.randomUUID().replace(/-/g, ""), otId, 'ACTUALIZACIÓN', 'Supervisor (panel)', 'Datos de ejecución de la OT actualizados.']);
+
+        const orden = await database.pool.query(`${ORDEN_CON_BITACORA_SQL} WHERE o.id = $1`, [otId]);
+        return jsonResponse(200, { success: true, orden: orden.rows[0] }, corsHeaders);
       }
 
       const unidad = body.unidad || 'N/A';
@@ -112,7 +205,7 @@ export default async (req) => {
         WHERE unidad = $1
           AND componente = $2
           AND descripcion_falla = $3
-          AND estatus IN ('NUEVA', 'PENDIENTE', 'EN_PROCESO')
+          AND estatus IN ('NUEVA', 'ASIGNADA', 'PENDIENTE', 'EN PROCESO', 'EN_PROCESO', 'PENDIENTE REFACCION')
         LIMIT 1
       `, [unidad, componente, descripcion]);
 
@@ -163,7 +256,8 @@ export default async (req) => {
         JSON.stringify(body)
       ]);
 
-      const nuevaOT = result.rows[0];
+      const creada = await database.pool.query(`${ORDEN_CON_BITACORA_SQL} WHERE o.id = $1`, [otId]);
+      const nuevaOT = creada.rows[0] || result.rows[0];
 
       await database.pool.query(`
         INSERT INTO ot_seguimiento (id, ot_id, accion, usuario, comentario)

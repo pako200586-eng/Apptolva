@@ -1,17 +1,20 @@
 #!/bin/bash
+set -e
 
-if [ -n "$FIREBASE_API_KEY" ]; then
-  sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" index.html
-  sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" bitacora_master.html
-  sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" admin.html
-else
-  echo "Warning: FIREBASE_API_KEY is not set."
+# La configuración web de Firebase se inyecta en el build desde la variable
+# FIREBASE_API_KEY (Netlify > Project configuration > Environment variables).
+if [ -z "$FIREBASE_API_KEY" ]; then
+  echo "Error: FIREBASE_API_KEY no está configurada; el inicio de sesión no funcionaría." >&2
+  exit 1
 fi
 
-if [ -n "$ADMIN_EMAILS" ]; then
-  sed -i "s|__ADMIN_EMAILS__|$ADMIN_EMAILS|g" admin.html
-else
-  echo "Warning: ADMIN_EMAILS is not set."
+for archivo in index.html bitacora_master.html admin.html; do
+  sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" "$archivo"
+done
+
+if grep -q "__FIREBASE_API_KEY__" index.html bitacora_master.html admin.html; then
+  echo "Error: quedaron marcadores __FIREBASE_API_KEY__ sin reemplazar." >&2
+  exit 1
 fi
 
 echo "Build script completed."
