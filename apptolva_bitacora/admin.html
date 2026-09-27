@@ -92,14 +92,14 @@
           <button id="applyFilters" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white">Filtrar</button>
         </div>
         <div class="mt-3 flex flex-wrap gap-2">
-          <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv mr-2"></i>Excel CSV</button>
+          <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv mr-2"></i>Excel CSV (Resumen checklist)</button>
           <button id="exportPdf" class="rounded-md border border-[#7c2d12] px-3 py-2 text-sm font-bold text-[#7c2d12]"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
           <span id="syncState" class="ml-auto text-xs font-bold uppercase tracking-wide text-slate-500">Esperando datos</span>
         </div>
       </div>
 
       <!-- PESTAÑAS DE NAVEGACIÓN (MANTENIMIENTO) -->
-      <div class="flex space-x-2">
+      <div class="flex flex-wrap gap-2">
         <button id="btn-vista-reportes" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white shadow-sm transition">
           Reportes Recibidos
         </button>
@@ -108,6 +108,9 @@
         </button>
         <button id="btn-vista-ordenes" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           Órdenes de Trabajo
+        </button>
+        <button id="btn-vista-dashboard" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
+          <i class="fas fa-chart-pie mr-1"></i>Dashboard
         </button>
       </div>
 
@@ -198,7 +201,80 @@
           </div>
         </section>
 
-        <aside class="space-y-5">
+        <!-- VISTA: DASHBOARD DE MÉTRICAS -->
+        <section id="vista-dashboard" class="hidden space-y-5 lg:col-span-2">
+          <div class="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 class="text-lg font-black text-[#7c2d12]">Dashboard de fallas y mantenimiento</h2>
+              <p class="text-xs text-slate-500">Fallas marcadas en los checklist filtrados. <strong>Realizadas</strong> = fallas atendidas en OT terminadas o cerradas; el resto se considera pendiente.</p>
+            </div>
+            <span id="dashEstado" class="text-xs font-bold uppercase tracking-wide text-slate-500"></span>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Checklist analizados</p><strong id="kpiChecklist" class="text-3xl text-slate-800">0</strong></div>
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Fallas reportadas</p><strong id="kpiFallas" class="text-3xl text-[#7c2d12]">0</strong></div>
+            <div class="panel-card rounded-lg border-red-200 p-4 text-center"><p class="text-xs font-bold uppercase text-red-700">Fallas pendientes</p><strong id="kpiPendientes" class="text-3xl text-red-600">0</strong></div>
+            <div class="panel-card rounded-lg border-green-200 p-4 text-center"><p class="text-xs font-bold uppercase text-green-700">Fallas realizadas</p><strong id="kpiRealizadas" class="text-3xl text-green-700">0</strong></div>
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Tasa de efectividad</p><strong id="kpiTasa" class="text-3xl text-[#294936]">0%</strong></div>
+          </div>
+
+          <div class="grid gap-5 lg:grid-cols-2">
+            <div class="panel-card rounded-lg p-4">
+              <h3 class="font-black text-slate-700">Distribución de fallas por estatus</h3>
+              <div id="chartEstatus" class="mt-3"></div>
+            </div>
+            <div class="panel-card rounded-lg p-4">
+              <h3 class="font-black text-slate-700">Top categorías: % pendientes vs realizadas</h3>
+              <div id="chartCategorias" class="mt-3"></div>
+            </div>
+            <div class="panel-card rounded-lg p-4">
+              <h3 class="font-black text-slate-700">Distribución por componente: pendientes vs realizadas</h3>
+              <div id="chartComponentes" class="mt-3"></div>
+            </div>
+            <div class="panel-card rounded-lg p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-black text-slate-700">Análisis de Pareto (80/20) por categoría</h3>
+                <select id="paretoComponente" class="rounded-md border border-slate-300 px-2 py-1 text-xs font-bold">
+                  <option value="tracto">Tracto</option>
+                  <option value="tolva1">Tolva 1</option>
+                  <option value="dolly">Dolly</option>
+                  <option value="tolva2">Tolva 2</option>
+                  <option value="todos">Todos los componentes</option>
+                </select>
+              </div>
+              <div id="chartPareto" class="mt-3"></div>
+            </div>
+            <div class="panel-card rounded-lg p-4">
+              <h3 class="font-black text-slate-700">Unidades con más fallas reportadas</h3>
+              <div id="chartUnidades" class="mt-3"></div>
+            </div>
+            <div class="panel-card rounded-lg p-4">
+              <h3 class="font-black text-slate-700">Fallas reportadas por día</h3>
+              <div id="chartTendencia" class="mt-3"></div>
+            </div>
+          </div>
+
+          <div class="panel-card overflow-hidden rounded-lg">
+            <h3 class="border-b border-orange-100 bg-orange-50 px-4 py-3 font-black text-[#7c2d12]">Resumen y control de fallas por categoría</h3>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-orange-100 text-sm">
+                <thead class="bg-[#1e3a5f] text-left text-xs uppercase tracking-wide text-white">
+                  <tr>
+                    <th class="px-4 py-3">Categoría</th>
+                    <th class="px-4 py-3 text-right">Total reportadas</th>
+                    <th class="px-4 py-3 text-right">Pendientes</th>
+                    <th class="px-4 py-3 text-right">Realizadas</th>
+                    <th class="px-4 py-3 text-right">% Cumplimiento</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaCategorias" class="divide-y divide-orange-50"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <aside id="panelLateral" class="space-y-5">
           <section class="panel-card rounded-lg p-4">
             <div class="flex items-center justify-between">
               <h2 class="font-black text-[#7c2d12]">Pendientes offline</h2>
@@ -400,6 +476,7 @@
         state.tableSignature = signature;
         $('tabla-datos').innerHTML = state.reports.map(reportRowHtml).join('');$('emptyState').classList.toggle('hidden', state.reports.length > 0);
         renderResumen();
+        renderDashboard();
       }
       syncSelectionUI();
 
@@ -514,24 +591,131 @@
       setTimeout(() => cargarDatos().catch(() => {}), 2500);
     });
 
-    $('exportCsv').addEventListener('click', async () => {
-      if (!state.reports.length) return showToast('No hay datos para exportar');
-      const header = ['folio', 'tipo', 'unidad', 'operador', 'numero_empleado', 'estado', 'fecha'];
-      const lines = state.reports.map((report) => [
-        report.folio,
-        report.type,
-        report.unitId,
-        report.driverName,
-        report.employeeNumber || report.payload?.employeeNumber || '',
-        report.syncStatus,
-        report.createdAt,
-      ].map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','));
-      const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
+    // ===== Resumen técnico del checklist (mismo formato que la hoja "RESUMENES DE CHECK LIST") =====
+    const COMPONENTES = [
+      { key: 'tracto', nombre: 'Tracto' },
+      { key: 'tolva1', nombre: 'Tolva 1' },
+      { key: 'dolly', nombre: 'Dolly' },
+      { key: 'tolva2', nombre: 'Tolva 2' }
+    ];
+
+    function componenteKey(nombre) {
+      const texto = String(nombre || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      if (texto.includes('DOLLY')) return 'dolly';
+      if (/TOLVA\s*2|TOLVA2/.test(texto)) return 'tolva2';
+      if (/TOLVA\s*1|TOLVA1/.test(texto)) return 'tolva1';
+      return 'tracto';
+    }
+
+    // Número económico de cada componente (S/N si el operador no lo capturó).
+    function numerosEconomicos(report) {
+      const p = report.payload || {};
+      const limpio = (valor) => String(valor ?? '').trim() || 'S/N';
+      return {
+        tracto: limpio(p.unitId || report.unitId),
+        tolva1: limpio(p.tolva1),
+        dolly: limpio(p.dolly),
+        tolva2: limpio(p.tolva2)
+      };
+    }
+
+    // Fallas (ítems marcados MAL) agrupadas por componente, conservando su categoría.
+    function fallasPorComponente(report) {
+      const p = report.payload || {};
+      const resultado = { tracto: [], tolva1: [], dolly: [], tolva2: [] };
+
+      if (Array.isArray(p.checklistData) && p.checklistData.length) {
+        p.checklistData.forEach((seccion) => {
+          const destino = resultado[seccion?.id] || resultado[componenteKey(seccion?.titulo)];
+          (seccion?.categorias || []).forEach((cat) => {
+            (cat?.items || []).forEach((it) => {
+              if (it?.estado === 'MAL') destino.push({ categoria: cat.cat || 'GENERAL', item: it.item });
+            });
+          });
+        });
+        return resultado;
+      }
+
+      if (Array.isArray(p.ticketsFallas) && p.ticketsFallas.length) {
+        p.ticketsFallas.forEach((t) => {
+          resultado[componenteKey(t?.componente)].push({ categoria: t?.categoria || 'GENERAL', item: t?.falla || '' });
+        });
+        return resultado;
+      }
+
+      const marcadas = Array.isArray(p.checklist)
+        ? p.checklist.filter((c) => c?.estado === 'MAL').map((c) => c.item)
+        : (Array.isArray(p.fallas) ? p.fallas : []);
+      marcadas.forEach((clave) => {
+        const [comp, ...resto] = String(clave || '').split('-');
+        const destino = resultado[comp] ? comp : 'tracto';
+        resultado[destino].push({ categoria: 'GENERAL', item: resultado[comp] ? resto.join('-') : clave });
+      });
+      return resultado;
+    }
+
+    function observacionesDe(report) {
+      const obs = report.payload?.observaciones;
+      if (obs && typeof obs === 'object') return obs;
+      if (typeof obs === 'string') {
+        try { return JSON.parse(obs) || {}; } catch { return { tracto: obs }; }
+      }
+      return {};
+    }
+
+    function resumenChecklist(report) {
+      const numeros = numerosEconomicos(report);
+      const fallas = fallasPorComponente(report);
+      const obs = observacionesDe(report);
+      const resumen = {};
+      COMPONENTES.forEach(({ key }) => {
+        const grupos = new Map();
+        fallas[key].forEach(({ categoria, item }) => {
+          if (!grupos.has(categoria)) grupos.set(categoria, []);
+          grupos.get(categoria).push(item);
+        });
+        resumen[`fallas_${key}`] = `${numeros[key]}: ${grupos.size
+          ? [...grupos].map(([cat, items]) => `[${cat}]: ${items.join(', ')}`).join(' | ')
+          : 'Sin fallas'}`;
+        resumen[`notas_${key}`] = `${numeros[key]}: ${String(obs[key] || '').trim() || 'Sin observaciones'}`;
+      });
+      return resumen;
+    }
+
+    function fechaCorta(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value || '');
+      return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    }
+
+    $('exportCsv').addEventListener('click', () => {
+      const checklists = state.reports.filter((report) => report.type === 'checklist');
+      if (!checklists.length) return showToast('No hay checklist para exportar con los filtros actuales');
+
+      const header = ['Fecha', 'Operador', 'Unidad', 'Fallas Tracto', 'Fallas Tolva 1', 'Fallas Dolly', 'Fallas Tolva 2', 'Notas Tracto', 'Notas Tolva 1', 'Notas Dolly', 'Notas Tolva 2'];
+      // Orden cronológico ascendente, igual que la bitácora de taller.
+      const lines = [...checklists]
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        .map((report) => {
+          const r = resumenChecklist(report);
+          return [
+            fechaCorta(report.createdAt),
+            report.driverName,
+            report.unitId,
+            r.fallas_tracto, r.fallas_tolva1, r.fallas_dolly, r.fallas_tolva2,
+            r.notas_tracto, r.notas_tolva1, r.notas_dolly, r.notas_tolva2,
+          ].map((value) => `"${String(value ?? '').replace(/\r?\n/g, ' ').replaceAll('"', '""').trim()}"`).join(',');
+        });
+
+      // BOM UTF-8 para que Excel respete acentos (ELÉCTRICO, CARROCERÍA...).
+      const blob = new Blob(['﻿' + [header.join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'apptolva-reportes.csv';
+      link.download = `RESUMEN_CHECKLIST_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
       link.click();
+      link.remove();
       URL.revokeObjectURL(url);
     });
 
@@ -935,8 +1119,307 @@
       }
     });
 
+    // ===== Dashboard de métricas (gráficas SVG sin librerías externas) =====
+    const COLOR_PENDIENTE = '#dc2626';
+    const COLOR_REALIZADA = '#16a34a';
+    const COLOR_BARRA = '#1e5a96';
+    const COLOR_MARCA = '#7c2d12';
+    const ESTATUS_REALIZADA = new Set(['TERMINADA', 'CERRADA']);
+    const dashState = { ordenes: null, cargando: null };
+
+    const sinAcentos = (texto) => String(texto || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    // "FRENOS / AIRE" y "FRENOS" cuentan como la misma categoría.
+    const categoriaKey = (texto) => sinAcentos(texto).split('/')[0].trim() || 'GENERAL';
+    const pct = (parte, total) => (total ? (parte / total) * 100 : 0);
+    const fmtPct = (valor) => `${valor.toFixed(1)}%`;
+    const vacio = (mensaje = 'Sin datos con los filtros actuales.') => `<p class="py-10 text-center text-sm font-bold text-slate-400">${mensaje}</p>`;
+    const leyenda = (items) => `<div class="mt-2 flex flex-wrap justify-center gap-4 text-xs font-bold text-slate-600">${items.map(([label, color]) =>
+      `<span class="inline-flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm" style="background:${color}"></span>${escapeHtml(label)}</span>`).join('')}</div>`;
+    const corto = (texto, max = 14) => (texto.length > max ? `${texto.slice(0, max - 1)}…` : texto);
+
+    function chartDona(segmentos) {
+      const total = segmentos.reduce((s, x) => s + x.value, 0);
+      if (!total) return vacio();
+      const r = 70, grosor = 34, c = 2 * Math.PI * r;
+      let acumulado = 0;
+      const arcos = segmentos.filter((x) => x.value > 0).map((x) => {
+        const largo = (x.value / total) * c;
+        const arco = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${x.color}" stroke-width="${grosor}"
+          stroke-dasharray="${largo} ${c - largo}" stroke-dashoffset="${-acumulado}" transform="rotate(-90 100 100)">
+          <title>${escapeHtml(x.label)}: ${x.value} (${fmtPct(pct(x.value, total))})</title></circle>`;
+        acumulado += largo;
+        return arco;
+      }).join('');
+      return `<div class="flex flex-wrap items-center justify-center gap-6">
+        <svg viewBox="0 0 200 200" class="h-52 w-52">${arcos}
+          <text x="100" y="96" text-anchor="middle" font-size="26" font-weight="900" fill="#1f2933">${total}</text>
+          <text x="100" y="116" text-anchor="middle" font-size="11" fill="#64748b">fallas</text></svg>
+        <div class="space-y-2 text-sm">${segmentos.map((x) => `
+          <div class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:${x.color}"></span>
+            <span class="font-bold text-slate-700">${escapeHtml(x.label)}</span>
+            <span class="text-slate-500">${x.value} · ${fmtPct(pct(x.value, total))}</span></div>`).join('')}</div></div>`;
+    }
+
+    function chartBarras100(filas) {
+      if (!filas.length) return vacio();
+      const W = 520, izq = 120, der = 12, alto = 20, gap = 8, top = 6;
+      const ancho = W - izq - der;
+      const H = top + filas.length * (alto + gap) + 22;
+      const barras = filas.map((f, i) => {
+        const y = top + i * (alto + gap);
+        const total = f.pendientes + f.realizadas;
+        const wp = (f.pendientes / total) * ancho;
+        return `<text x="${izq - 6}" y="${y + alto / 2 + 4}" text-anchor="end" font-size="11" fill="#334155">${escapeHtml(corto(f.label, 18))}</text>
+          <rect x="${izq}" y="${y}" width="${wp}" height="${alto}" fill="${COLOR_PENDIENTE}"><title>${escapeHtml(f.label)} · Pendientes: ${f.pendientes} (${fmtPct(pct(f.pendientes, total))})</title></rect>
+          <rect x="${izq + wp}" y="${y}" width="${ancho - wp}" height="${alto}" fill="${COLOR_REALIZADA}"><title>${escapeHtml(f.label)} · Realizadas: ${f.realizadas} (${fmtPct(pct(f.realizadas, total))})</title></rect>`;
+      }).join('');
+      const ejes = [0, 25, 50, 75, 100].map((v) => {
+        const x = izq + (v / 100) * ancho;
+        return `<line x1="${x}" x2="${x}" y1="${top}" y2="${H - 20}" stroke="#e2e8f0"/><text x="${x}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#64748b">${v}%</text>`;
+      }).join('');
+      return `<svg viewBox="0 0 ${W} ${H}" class="w-full">${ejes}${barras}</svg>${leyenda([['Pendiente', COLOR_PENDIENTE], ['Realizada', COLOR_REALIZADA]])}`;
+    }
+
+    function escalaMax(valor) {
+      if (valor <= 5) return 5;
+      const paso = Math.pow(10, Math.floor(Math.log10(valor)));
+      return Math.ceil(valor / paso) * paso;
+    }
+
+    function chartColumnasApiladas(filas) {
+      if (!filas.some((f) => f.pendientes + f.realizadas)) return vacio();
+      const W = 520, H = 250, izq = 40, der = 10, top = 10, abajo = 30;
+      const max = escalaMax(Math.max(...filas.map((f) => f.pendientes + f.realizadas)));
+      const ancho = W - izq - der, altoUtil = H - top - abajo;
+      const banda = ancho / filas.length, barra = Math.min(70, banda * 0.55);
+      const y = (v) => top + altoUtil - (v / max) * altoUtil;
+      const ejes = [0, .25, .5, .75, 1].map((f) => {
+        const v = Math.round(max * f);
+        return `<line x1="${izq}" x2="${W - der}" y1="${y(v)}" y2="${y(v)}" stroke="#e2e8f0"/><text x="${izq - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#64748b">${v}</text>`;
+      }).join('');
+      const barras = filas.map((f, i) => {
+        const x = izq + i * banda + (banda - barra) / 2;
+        const total = f.pendientes + f.realizadas;
+        return `<rect x="${x}" y="${y(f.pendientes)}" width="${barra}" height="${y(0) - y(f.pendientes)}" fill="${COLOR_PENDIENTE}"><title>${f.label} · Pendientes: ${f.pendientes}</title></rect>
+          <rect x="${x}" y="${y(total)}" width="${barra}" height="${y(f.pendientes) - y(total)}" fill="${COLOR_REALIZADA}"><title>${f.label} · Realizadas: ${f.realizadas}</title></rect>
+          <text x="${x + barra / 2}" y="${y(total) - 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">${total}</text>
+          <text x="${x + barra / 2}" y="${H - 10}" text-anchor="middle" font-size="11" fill="#334155">${escapeHtml(f.label)}</text>`;
+      }).join('');
+      return `<svg viewBox="0 0 ${W} ${H}" class="w-full">${ejes}${barras}</svg>${leyenda([['Pendiente', COLOR_PENDIENTE], ['Realizada', COLOR_REALIZADA]])}`;
+    }
+
+    function chartPareto(filas) {
+      if (!filas.length) return vacio('Sin fallas reportadas para este componente.');
+      const W = 520, H = 270, izq = 36, der = 42, top = 12, abajo = 70;
+      const total = filas.reduce((s, f) => s + f.value, 0);
+      const max = escalaMax(filas[0].value);
+      const ancho = W - izq - der, altoUtil = H - top - abajo;
+      const banda = ancho / filas.length, barra = banda * 0.62;
+      const y = (v) => top + altoUtil - (v / max) * altoUtil;
+      const yp = (p) => top + altoUtil - (p / 100) * altoUtil;
+      let acumulado = 0;
+      const puntos = [];
+      const ejes = [0, .25, .5, .75, 1].map((f) => {
+        const v = Math.round(max * f);
+        return `<line x1="${izq}" x2="${W - der}" y1="${y(v)}" y2="${y(v)}" stroke="#e2e8f0"/>
+          <text x="${izq - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#64748b">${v}</text>
+          <text x="${W - der + 6}" y="${yp(f * 100) + 4}" font-size="10" fill="#64748b">${f * 100}%</text>`;
+      }).join('');
+      const barras = filas.map((f, i) => {
+        const x = izq + i * banda + (banda - barra) / 2;
+        acumulado += f.value;
+        const p = pct(acumulado, total);
+        puntos.push([x + barra / 2, yp(p), p, f.label]);
+        const lx = x + barra / 2, ly = H - abajo + 12;
+        return `<rect x="${x}" y="${y(f.value)}" width="${barra}" height="${y(0) - y(f.value)}" fill="${COLOR_BARRA}"><title>${escapeHtml(f.label)}: ${f.value} fallas</title></rect>
+          <text x="${lx}" y="${ly}" text-anchor="end" font-size="10" fill="#334155" transform="rotate(-40 ${lx} ${ly})">${escapeHtml(corto(f.label))}</text>`;
+      }).join('');
+      const linea = `<polyline points="${puntos.map(([px, py]) => `${px},${py}`).join(' ')}" fill="none" stroke="${COLOR_PENDIENTE}" stroke-width="2"/>` +
+        puntos.map(([px, py, p, label]) => `<circle cx="${px}" cy="${py}" r="3" fill="${COLOR_PENDIENTE}"><title>${escapeHtml(label)} · acumulado ${fmtPct(p)}</title></circle>`).join('') +
+        `<line x1="${izq}" x2="${W - der}" y1="${yp(80)}" y2="${yp(80)}" stroke="${COLOR_PENDIENTE}" stroke-dasharray="4 4" opacity=".45"/>`;
+      return `<svg viewBox="0 0 ${W} ${H}" class="w-full">${ejes}${barras}${linea}</svg>${leyenda([['Frecuencia', COLOR_BARRA], ['% Acumulado', COLOR_PENDIENTE]])}`;
+    }
+
+    function chartBarrasHorizontales(filas, color) {
+      if (!filas.length) return vacio();
+      const W = 520, izq = 70, der = 36, alto = 20, gap = 8, top = 4;
+      const max = Math.max(...filas.map((f) => f.value));
+      const ancho = W - izq - der;
+      const H = top + filas.length * (alto + gap);
+      return `<svg viewBox="0 0 ${W} ${H}" class="w-full">${filas.map((f, i) => {
+        const y = top + i * (alto + gap);
+        const w = Math.max(2, (f.value / max) * ancho);
+        return `<text x="${izq - 6}" y="${y + alto / 2 + 4}" text-anchor="end" font-size="11" font-weight="700" fill="#334155">${escapeHtml(corto(f.label, 10))}</text>
+          <rect x="${izq}" y="${y}" width="${w}" height="${alto}" rx="3" fill="${color}"><title>${escapeHtml(f.label)}: ${f.value}</title></rect>
+          <text x="${izq + w + 5}" y="${y + alto / 2 + 4}" font-size="11" fill="#334155">${f.value}</text>`;
+      }).join('')}</svg>`;
+    }
+
+    function chartTendencia(filas) {
+      if (!filas.length) return vacio();
+      const W = 520, H = 220, izq = 32, der = 10, top = 10, abajo = 40;
+      const max = escalaMax(Math.max(...filas.map((f) => f.value), 1));
+      const ancho = W - izq - der, altoUtil = H - top - abajo;
+      const banda = ancho / filas.length, barra = Math.max(2, banda * 0.7);
+      const y = (v) => top + altoUtil - (v / max) * altoUtil;
+      const cadaCuanto = Math.ceil(filas.length / 10);
+      const ejes = [0, .5, 1].map((f) => {
+        const v = Math.round(max * f);
+        return `<line x1="${izq}" x2="${W - der}" y1="${y(v)}" y2="${y(v)}" stroke="#e2e8f0"/><text x="${izq - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#64748b">${v}</text>`;
+      }).join('');
+      return `<svg viewBox="0 0 ${W} ${H}" class="w-full">${ejes}${filas.map((f, i) => {
+        const x = izq + i * banda + (banda - barra) / 2;
+        const etiqueta = i % cadaCuanto === 0
+          ? `<text x="${x + barra / 2}" y="${H - abajo + 14}" text-anchor="middle" font-size="10" fill="#64748b">${escapeHtml(f.label)}</text>` : '';
+        return `<rect x="${x}" y="${y(f.value)}" width="${barra}" height="${y(0) - y(f.value)}" fill="${COLOR_MARCA}"><title>${escapeHtml(f.label)}: ${f.value} fallas · ${f.checklists} checklist</title></rect>${etiqueta}`;
+      }).join('')}</svg>`;
+    }
+
+    // Aplica a las OT los mismos filtros de fecha y unidad del panel.
+    function ordenesFiltradas() {
+      const desde = $('fromFilter').value;
+      const hasta = $('toFilter').value;
+      const unidad = $('unitFilter').value.trim().toLowerCase();
+      return (dashState.ordenes || []).filter((orden) => {
+        const fecha = orden.fecha_apertura ? new Date(orden.fecha_apertura) : null;
+        if (desde && fecha && fecha < new Date(desde)) return false;
+        if (hasta && fecha && fecha > new Date(`${hasta}T23:59:59.999Z`)) return false;
+        if (unidad && !String(orden.unidad || '').toLowerCase().includes(unidad)) return false;
+        return true;
+      });
+    }
+
+    function calcularMetricas() {
+      const checklists = state.reports.filter((report) => report.type === 'checklist');
+      const celdas = new Map(); // `${componente}|${categoria}` -> { componente, categoria, label, reportadas, realizadas }
+      const porUnidad = new Map();
+      const porDia = new Map();
+
+      checklists.forEach((report) => {
+        const fallas = fallasPorComponente(report);
+        const numeros = numerosEconomicos(report);
+        const dia = new Date(report.createdAt);
+        const claveDia = Number.isNaN(dia.getTime()) ? 'Sin fecha' : `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
+        const registroDia = porDia.get(claveDia) || { value: 0, checklists: 0 };
+        registroDia.checklists += 1;
+        COMPONENTES.forEach(({ key }) => {
+          fallas[key].forEach(({ categoria }) => {
+            const cat = categoriaKey(categoria);
+            const id = `${key}|${cat}`;
+            const celda = celdas.get(id) || { componente: key, categoria: cat, label: String(categoria).toUpperCase(), reportadas: 0, realizadas: 0 };
+            celda.reportadas += 1;
+            celdas.set(id, celda);
+            if (numeros[key] !== 'S/N') porUnidad.set(numeros[key], (porUnidad.get(numeros[key]) || 0) + 1);
+            registroDia.value += 1;
+          });
+        });
+        porDia.set(claveDia, registroDia);
+      });
+
+      // Fallas atendidas: OT terminadas/cerradas (su recurrencia agrupa reportes repetidos de la misma falla).
+      const atendidas = new Map();
+      ordenesFiltradas().forEach((orden) => {
+        if (!ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) return;
+        const id = `${componenteKey(orden.componente)}|${categoriaKey(orden.sistema)}`;
+        atendidas.set(id, (atendidas.get(id) || 0) + Math.max(1, Number(orden.recurrencia) || 1));
+      });
+      celdas.forEach((celda, id) => { celda.realizadas = Math.min(celda.reportadas, atendidas.get(id) || 0); });
+
+      return { checklists, celdas: [...celdas.values()], porUnidad, porDia };
+    }
+
+    function renderDashboard() {
+      if ($('vista-dashboard').classList.contains('hidden')) return;
+      const { checklists, celdas, porUnidad, porDia } = calcularMetricas();
+      const sumar = (lista, campo) => lista.reduce((s, x) => s + x[campo], 0);
+      const reportadas = sumar(celdas, 'reportadas');
+      const realizadas = sumar(celdas, 'realizadas');
+      const pendientes = reportadas - realizadas;
+
+      $('kpiChecklist').textContent = checklists.length;
+      $('kpiFallas').textContent = reportadas;
+      $('kpiPendientes').textContent = pendientes;
+      $('kpiRealizadas').textContent = realizadas;
+      $('kpiTasa').textContent = fmtPct(pct(realizadas, reportadas));
+
+      $('chartEstatus').innerHTML = chartDona([
+        { label: 'Pendiente', value: pendientes, color: COLOR_PENDIENTE },
+        { label: 'Realizada', value: realizadas, color: COLOR_REALIZADA }
+      ]);
+
+      const categorias = new Map();
+      celdas.forEach((c) => {
+        const actual = categorias.get(c.categoria) || { label: c.label, reportadas: 0, realizadas: 0 };
+        actual.reportadas += c.reportadas;
+        actual.realizadas += c.realizadas;
+        categorias.set(c.categoria, actual);
+      });
+      const listaCategorias = [...categorias.values()].sort((a, b) => b.reportadas - a.reportadas);
+
+      $('chartCategorias').innerHTML = chartBarras100(listaCategorias.slice(0, 11).map((c) => ({
+        label: c.label, pendientes: c.reportadas - c.realizadas, realizadas: c.realizadas
+      })));
+
+      $('chartComponentes').innerHTML = chartColumnasApiladas(COMPONENTES.map(({ key, nombre }) => {
+        const propias = celdas.filter((c) => c.componente === key);
+        const rep = sumar(propias, 'reportadas'), rea = sumar(propias, 'realizadas');
+        return { label: nombre, pendientes: rep - rea, realizadas: rea };
+      }));
+
+      const componentePareto = $('paretoComponente').value;
+      const pareto = new Map();
+      celdas.filter((c) => componentePareto === 'todos' || c.componente === componentePareto).forEach((c) => {
+        const actual = pareto.get(c.categoria) || { label: c.label, value: 0 };
+        actual.value += c.reportadas;
+        pareto.set(c.categoria, actual);
+      });
+      $('chartPareto').innerHTML = chartPareto([...pareto.values()].sort((a, b) => b.value - a.value).slice(0, 12));
+
+      $('chartUnidades').innerHTML = chartBarrasHorizontales(
+        [...porUnidad.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([label, value]) => ({ label, value })),
+        COLOR_BARRA
+      );
+
+      $('chartTendencia').innerHTML = chartTendencia([...porDia.entries()]
+        .filter(([dia]) => dia !== 'Sin fecha')
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([dia, datos]) => ({ label: dia.slice(8, 10) + '/' + dia.slice(5, 7), ...datos })));
+
+      $('tablaCategorias').innerHTML = listaCategorias.length
+        ? listaCategorias.map((c) => {
+          const cumplimiento = pct(c.realizadas, c.reportadas);
+          return `<tr class="hover:bg-orange-50/70">
+            <td class="px-4 py-2 font-bold text-slate-700">${escapeHtml(c.label)}</td>
+            <td class="px-4 py-2 text-right">${c.reportadas}</td>
+            <td class="px-4 py-2 text-right font-bold text-red-600">${c.reportadas - c.realizadas}</td>
+            <td class="px-4 py-2 text-right font-bold text-green-700">${c.realizadas}</td>
+            <td class="px-4 py-2 text-right font-black">${fmtPct(cumplimiento)}</td></tr>`;
+        }).join('')
+        : '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">Sin fallas reportadas con los filtros actuales.</td></tr>';
+
+      $('dashEstado').textContent = dashState.ordenes
+        ? `${checklists.length} checklist · ${ordenesFiltradas().length} OT consideradas`
+        : 'Sin datos de OT: solo se muestran fallas reportadas';
+    }
+
+    async function cargarDashboard() {
+      $('dashEstado').textContent = 'Cargando métricas...';
+      renderDashboard();
+      if (!dashState.cargando) {
+        dashState.cargando = fetch('/api/mantenimiento?tipo=ordenes', { headers: await authHeaders() })
+          .then((response) => (response.ok ? response.json() : Promise.reject(new Error('No se pudieron cargar las OT'))))
+          .then((data) => { dashState.ordenes = Array.isArray(data?.ordenes) ? data.ordenes : []; })
+          .catch((error) => showToast(error.message))
+          .finally(() => { dashState.cargando = null; });
+      }
+      await dashState.cargando;
+      renderDashboard();
+    }
+
+    $('paretoComponente').addEventListener('change', renderDashboard);
+
     // Lógica de navegación de Mantenimiento
-    const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes'];
+    const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes', 'vista-dashboard'];
     
     vistasMantenimiento.forEach(id => {
       const btn = $(`btn-${id}`);
@@ -966,6 +1449,12 @@
 
           if (id === 'vista-ordenes') {
             cargarOrdenes();
+          }
+
+          // El dashboard usa todo el ancho: se oculta el panel lateral.
+          $('panelLateral').classList.toggle('hidden', id === 'vista-dashboard');
+          if (id === 'vista-dashboard') {
+            cargarDashboard();
           }
         });
       }
