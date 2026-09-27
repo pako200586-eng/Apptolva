@@ -26,6 +26,13 @@ export const ordenesTrabajo = pgTable("ordenes_trabajo", {
   recurrencia: integer("recurrencia").default(1),
   estatus: text("estatus").default("NUEVA"),
   payload: jsonb("payload"),
+  electromecanico: text("electromecanico"),
+  proveedorExterno: text("proveedor_externo"),
+  supervisorMantenimiento: text("supervisor_mantenimiento"),
+  fechaRealizacion: text("fecha_realizacion"),
+  kilometraje: text("kilometraje"),
+  comentariosEjecutor: text("comentarios_ejecutor"),
+  comentariosOperador: text("comentarios_operador"),
   fechaApertura: timestamp("fecha_apertura", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
