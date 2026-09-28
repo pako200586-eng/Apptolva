@@ -148,7 +148,11 @@
                 
                 <div><label class="text-xs text-gray-400 block mb-1">Licencia Federal</label><input type="text" id="license" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="Num. Licencia"></div>
                 <!-- CAMPO VIGENCIA -->
-                <div><label class="text-xs text-gray-400 block mb-1">Vigencia Lic.</label><input type="date" id="licenseExp" class="bachoco-input w-full rounded-lg p-2 text-xs border border-gray-300"></div>
+                <div>
+                    <label class="text-xs text-gray-400 block mb-1">Vigencia Lic.</label>
+                    <input type="date" id="licenseExp" class="bachoco-input w-full rounded-lg p-2 text-xs border border-gray-300">
+                    <span id="licenseExpBadge" class="hidden mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full"></span>
+                </div>
 
                 <!-- Número de Serie Vehicular (VIN) -->
                 <div class="col-span-2"><label class="text-xs font-bold text-gray-500 block mb-1">No. Serie Vehicular (VIN)</label><input type="text" id="vin" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300 font-mono text-xs" placeholder="1FUJA6CG57LW86529" maxlength="17"></div>
@@ -272,8 +276,8 @@
 
         <!-- 4. Bitácora (Lista) -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
-            <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                <h3 class="font-bold text-gray-600 text-xs uppercase">Registros</h3>
+            <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center gap-2">
+                <h3 class="font-bold text-gray-600 text-xs uppercase flex items-center gap-2">Registros <span id="logCountBadge" class="text-[10px] font-mono text-gray-400"></span></h3>
                 <button onclick="window.openObs()" aria-label="Agregar nota al registro actual" class="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded flex items-center gap-1 hover:bg-orange-200 active:scale-95 transition"><i class="fas fa-sticky-note"></i> Agregar Nota</button>
             </div>
             <div id="logList" class="divide-y divide-gray-100 max-h-60 overflow-y-auto"></div>
@@ -342,6 +346,8 @@
         const SHIFT_START_HOUR = 8; // Los turnos inician a las 08:00 a.m.
         const OFFLINE_SYNC_TAG = "sync-reportes";
         const GPS_TIMEOUT_MS = 8000;
+        const MAX_LOGS_SYNC = 300; // Límite aceptado por /api/store-bitacora; debe coincidir con el servidor.
+        const LICENSE_EXP_WARNING_DAYS = 15;
 
         // --- 1. LÓGICA DE DATOS LOCALES ---
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
@@ -369,6 +375,12 @@
         const initialDriverName = document.getElementById('driverName')?.value.trim();
         if (initialDriverName) localStorage.setItem('nombreOperadorActual', initialDriverName);
 
+        // Validaciones ligeras de datos capturados (no bloquean el guardado offline)
+        document.getElementById('licenseExp')?.addEventListener('change', checkLicenseExpiry);
+        document.getElementById('kmFin')?.addEventListener('blur', checkKmRange);
+        document.getElementById('vin')?.addEventListener('blur', checkVinFormat);
+        checkLicenseExpiry();
+
         // Reloj
         setInterval(() => {
             const now = new Date();
@@ -377,12 +389,67 @@
             if (clock) clock.innerText = timeString;
         }, 1000);
 
-        function guardarLocal() { localStorage.setItem('nom087_logs', JSON.stringify(logs)); updateUI(); }
+        function guardarLocal() {
+            try {
+                localStorage.setItem('nom087_logs', JSON.stringify(logs));
+            } catch (e) {
+                console.error("No se pudo guardar la bitácora localmente:", e);
+                alert("⚠️ No hay espacio de almacenamiento suficiente en este dispositivo para guardar la bitácora. Genera el PDF ahora y termina el turno para liberar espacio.");
+            }
+            updateUI();
+        }
+
+        function checkLicenseExpiry() {
+            const el = document.getElementById('licenseExp');
+            const badge = document.getElementById('licenseExpBadge');
+            if (!el || !badge) return;
+            if (!el.value) { badge.classList.add('hidden'); return; }
+            const expDate = new Date(el.value + 'T00:00:00');
+            if (isNaN(expDate.getTime())) { badge.classList.add('hidden'); return; }
+            const today = new Date(); today.setHours(0,0,0,0);
+            const diffDays = Math.floor((expDate - today) / (24*60*60*1000));
+            badge.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-yellow-100', 'text-yellow-700');
+            if (diffDays < 0) {
+                badge.textContent = 'Licencia VENCIDA';
+                badge.classList.add('bg-red-100', 'text-red-700');
+            } else if (diffDays <= LICENSE_EXP_WARNING_DAYS) {
+                badge.textContent = `Vence en ${diffDays} día(s)`;
+                badge.classList.add('bg-yellow-100', 'text-yellow-700');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function checkKmRange() {
+            const kmInicioEl = document.getElementById('kmInicio');
+            const kmFinEl = document.getElementById('kmFin');
+            if (!kmInicioEl || !kmFinEl) return;
+            const kmInicio = parseFloat(kmInicioEl.value);
+            const kmFin = parseFloat(kmFinEl.value);
+            if (!isNaN(kmInicio) && !isNaN(kmFin) && kmFin < kmInicio) {
+                alert("⚠️ El Km Fin no puede ser menor que el Km Inicio. Revisa el odómetro.");
+            }
+        }
+
+        function checkVinFormat() {
+            const vinEl = document.getElementById('vin');
+            if (!vinEl || !vinEl.value) return;
+            const vin = vinEl.value.trim().toUpperCase();
+            if (vin.length > 0 && (vin.length !== 17 || /[IOQ]/.test(vin))) {
+                alert("⚠️ El VIN capturado no parece válido: debe tener 17 caracteres y no incluir las letras I, O ni Q. Verifica la tarjeta de circulación.");
+            }
+        }
 
         function formatGps(gps) {
             if (!gps || typeof gps.lat !== "number" || typeof gps.lng !== "number") return "GPS no capturado";
             const precision = typeof gps.accuracy === "number" ? ` ±${Math.round(gps.accuracy)}m` : "";
             return `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}${precision}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function updateGpsStatus(gps, message) {
@@ -474,6 +541,12 @@
                 document.getElementById('destination').value = '';
                 localStorage.removeItem('nom087_origin');
                 localStorage.removeItem('nom087_destination');
+                // Km Inicio/Fin corresponden al viaje que termina; deben limpiarse para no
+                // arrastrar el kilometraje del turno anterior al nuevo periodo.
+                document.getElementById('kmInicio').value = '';
+                document.getElementById('kmFin').value = '';
+                localStorage.removeItem('nom087_kmInicio');
+                localStorage.removeItem('nom087_kmFin');
                 location.reload();
             }
         }
@@ -493,7 +566,7 @@
         function updateUI() {
             document.querySelectorAll('.status-btn').forEach(b => { b.classList.remove('active'); if(b.id === `btn-${currentStatus}`) b.classList.add('active'); });
             const list = document.getElementById('logList'); list.innerHTML = '';
-            
+
             const now = new Date().getTime();
 
             [...logs].reverse().forEach(l => {
@@ -502,7 +575,7 @@
                 const stName = stNames[l.status] || "Otro";
                 const clss = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-purple-500"];
                 const cls = clss[l.status] || "bg-gray-500";
-                
+
                 let dur = "";
                 if(l.endTime || now) {
                     const d = Math.floor(((l.endTime || now) - l.startTime)/60000);
@@ -513,12 +586,29 @@
                     ? `<div class="gps-pill bg-green-50 text-green-700 border border-green-200 mt-1"><i class="fas fa-map-marker-alt"></i>${formatGps(l.gps)}</div>`
                     : `<div class="gps-pill bg-gray-50 text-gray-400 border border-gray-200 mt-1"><i class="fas fa-map-marker-alt"></i>Sin GPS</div>`;
 
+                const obsNote = l.observation && l.observation.trim()
+                    ? `<div class="text-[11px] text-orange-700 bg-orange-50 border border-orange-100 rounded px-2 py-1 mt-1 flex items-start gap-1"><i class="fas fa-sticky-note mt-0.5"></i><span>${escapeHtml(l.observation.trim())}</span></div>`
+                    : "";
+
                 list.innerHTML += `<div class="p-3 border-b flex justify-between items-start gap-3">
-                    <div><span class="dot-status ${cls}"></span><b>${stName}</b> <span class="text-xs text-gray-400">${s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>${gpsBadge}</div>
+                    <div><span class="dot-status ${cls}"></span><b>${stName}</b> <span class="text-xs text-gray-400">${s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>${gpsBadge}${obsNote}</div>
                     <div class="text-xs font-mono text-gray-500 whitespace-nowrap">${dur}</div>
                 </div>`;
             });
-            
+
+            const countBadge = document.getElementById('logCountBadge');
+            if (countBadge) {
+                countBadge.textContent = `${logs.length}/${MAX_LOGS_SYNC}`;
+                countBadge.classList.remove('text-gray-400', 'text-yellow-600', 'text-red-600', 'font-bold');
+                if (logs.length >= MAX_LOGS_SYNC) {
+                    countBadge.classList.add('text-red-600', 'font-bold');
+                } else if (logs.length >= MAX_LOGS_SYNC * 0.9) {
+                    countBadge.classList.add('text-yellow-600', 'font-bold');
+                } else {
+                    countBadge.classList.add('text-gray-400');
+                }
+            }
+
             // Total Manejo 24h
             const limit = now - (24 * 60 * 60 * 1000);
             let driveMins = 0;
@@ -623,7 +713,26 @@
         });
         window.clearSig = (k) => { const p = pads[k]; if(p && p.c) p.ctx.clearRect(0,0,p.c.width,p.c.height); };
         
-        function resizeC() { const r = Math.max(window.devicePixelRatio||1, 1); Object.values(pads).forEach(p=>{ if(p.c) { p.c.width=p.c.offsetWidth*r; p.c.height=p.c.offsetHeight*r; p.ctx.scale(r,r); } }); }
+        function resizeC() {
+            const r = Math.max(window.devicePixelRatio||1, 1);
+            Object.values(pads).forEach(p => {
+                if (!p.c) return;
+                const newW = Math.round(p.c.offsetWidth * r);
+                const newH = Math.round(p.c.offsetHeight * r);
+                if (p.c.width === newW && p.c.height === newH) return; // ya está al tamaño correcto, no perder la firma
+                // Redimensionar un <canvas> borra su contenido; se respalda antes de tocarlo
+                // para que rotar o cambiar el tamaño de la pantalla no borre una firma ya capturada.
+                let previous = null;
+                try { previous = p.c.width > 0 && p.c.height > 0 ? p.c.toDataURL('image/png') : null; } catch (e) { previous = null; }
+                p.c.width = newW; p.c.height = newH;
+                p.ctx.scale(r, r);
+                if (previous) {
+                    const img = new Image();
+                    img.onload = () => p.ctx.drawImage(img, 0, 0, newW / r, newH / r);
+                    img.src = previous;
+                }
+            });
+        }
         window.addEventListener("resize", resizeC); setTimeout(resizeC, 500);
 
         // --- GENERADOR PDF ---
@@ -638,7 +747,7 @@
             const naranja = [242, 139, 0]; 
             const azulOficial = [0, 51, 153]; // Azul para trazos legales
             
-            const folio = document.getElementById('folio').value || "SF";
+            const folio = document.getElementById('folio').value || "S/F";
 
             // --- LÓGICA DE CORTE 48 HORAS ---
             // El turno inicia a las SHIFT_START_HOUR. El Día 2 comienza a esa hora del siguiente día calendario.
@@ -949,7 +1058,7 @@
             doc.setFontSize(4); doc.setTextColor(120);
             doc.text("Este documento es un resumen informativo. Consulte la NOM-087-SCT-2-2017 completa publicada en el DOF para el texto íntegro de la norma.", 105, 280, {align:"center"});
 
-            doc.save(`Bitacora_${folio}.pdf`);
+            doc.save(`Bitacora_${folio.replace(/[\\/]/g, '-')}.pdf`);
         };
 
         // --- GENERADOR QR ---
@@ -1043,6 +1152,21 @@
             return missing;
         }
 
+        // El servidor (/api/store-bitacora) rechaza payloads con más de MAX_LOGS_SYNC
+        // registros. Se detecta aquí para avisar con tiempo en vez de que el intento
+        // de sincronización falle sin quedar en la cola offline (no es un error de red).
+        function exceedsSyncLimit(payload) {
+            return Array.isArray(payload.logs) && payload.logs.length > MAX_LOGS_SYNC;
+        }
+
+        function alertSyncLimitExceeded(payload) {
+            alert(
+                `⚠️ Esta bitácora ya tiene ${payload.logs.length} registros, más de los ${MAX_LOGS_SYNC} que acepta la sincronización en la nube.\n\n` +
+                `Genera el PDF ahora (botón PDF) como respaldo y usa "TERMINAR GRÁFICA 48H Y NUEVO TURNO" para continuar en un folio nuevo. ` +
+                `De lo contrario, esta bitácora no podrá subirse a la nube.`
+            );
+        }
+
         function showQueuedQrState(folio, detailText) {
             showOfflineQrFallback(folio, "⚠️ Guardado offline — pendiente de sincronizar", detailText);
             setOfflineSyncStatus("Bitácora guardada offline. Se enviará automáticamente cuando regrese la señal.");
@@ -1066,6 +1190,10 @@
         window.intentarSubirNube = async function() {
             const btn = document.getElementById('saveBtn');
             const payload = buildBitacoraPayload();
+            if (exceedsSyncLimit(payload)) {
+                alertSyncLimitExceeded(payload);
+                return;
+            }
             const missing = validateBitacoraPayload(payload);
             if (missing.length > 0) {
                 alert(`⚠️ Completa: ${missing.join(", ")} antes de sincronizar.`);
@@ -1120,6 +1248,16 @@
                 document.getElementById('qrModal').classList.remove('hidden');
 
                 const payload = buildBitacoraPayload();
+
+                if (exceedsSyncLimit(payload)) {
+                    showOfflineQrFallback(
+                        folio,
+                        "⚠️ Demasiados registros — QR local",
+                        `Esta bitácora tiene ${payload.logs.length} registros (máx ${MAX_LOGS_SYNC} para sincronizar). Genera el PDF y termina el turno para continuar en un folio nuevo.`
+                    );
+                    return;
+                }
+
                 const missing = validateBitacoraPayload(payload);
 
                 if (missing.length > 0) {
