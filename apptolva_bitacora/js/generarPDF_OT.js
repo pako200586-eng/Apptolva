@@ -104,6 +104,19 @@
     const sistema = pick('sistema');
     const falla = pick('descripcion_falla', 'descripcion', 'observaciones') || 'Sin descripción';
 
+    // OT consolidada: si el payload trae el arreglo de fallas, se listan todas.
+    const fallasLista = Array.isArray(payload.fallas) ? payload.fallas.filter((f) => f && typeof f === 'object') : [];
+    const descripcion = fallasLista.length
+      ? fallasLista.map((f) => {
+          const comp = texto(f.componente) || 'TRACTOCAMIÓN';
+          const sist = texto(f.sistema || f.categoria);
+          const desc = texto(f.descripcion || f.falla) || 'Sin descripción';
+          return `• ${comp}${sist ? ` | ${sist}` : ''}: ${desc}`;
+        }).join('\n')
+      : (falla.includes('\n')
+          ? falla.split('\n').map((linea) => `• ${linea.trim()}`).join('\n')
+          : `${componente}${sistema ? ` | ${sistema}` : ''}: ${falla}`);
+
     return {
       folioOT: ordenData.folio_ot ? `OT-${ordenData.folio_ot}` : (pick('folio') || 'S/F'),
       unidad: pick('unidad'),
@@ -118,7 +131,7 @@
       fechaRealizacion: formatearFechaCorta(pick('fecha_realizacion')),
       kilometraje: pick('kilometraje', 'km'),
       supervisor: pick('supervisor_mantenimiento') || SUPERVISOR_DEFAULT,
-      descripcion: `${componente}${sistema ? ` | ${sistema}` : ''}: ${falla}`,
+      descripcion,
       comentariosEjecutor: pick('comentarios_ejecutor'),
       comentariosOperador: pick('comentarios_operador')
     };
@@ -263,8 +276,10 @@
     valor('', X3, f6.y, XF - X3, f6.h);
 
     // SECCIONES DESCRIPTIVAS (etiqueta gris a la izquierda y línea gruesa inferior)
+    // Con varias fallas listadas, la descripción usa letra más chica para que quepan todas.
+    const lineasDescripcion = String(datos.descripcion || '').split('\n').length;
     const secciones = [
-      { titulo: 'DESCRIPCIÓN DEL TRABAJO', contenido: datos.descripcion, y: 84.6, h: 13.8 },
+      { titulo: 'DESCRIPCIÓN DEL TRABAJO', contenido: datos.descripcion, y: 84.6, h: 13.8, tamano: lineasDescripcion > 4 ? 5 : 7 },
       { titulo: 'COMENTARIOS DEL EJECUTOR', contenido: datos.comentariosEjecutor, y: 99.0, h: 11.2 },
       { titulo: 'COMENTARIOS DEL OPERADOR', contenido: datos.comentariosOperador, y: 110.7, h: 18.3 }
     ];
@@ -273,7 +288,7 @@
       setColor('setFillColor', COLORES.etiqueta);
       doc.rect(X0, seccion.y, X1 - X0, seccion.h, 'F');
       escribir(seccion.titulo, X0, seccion.y, X1 - X0, seccion.h, { negrita: true, tamano: 4.6, align: 'center' });
-      escribir(seccion.contenido, X1 + 1, seccion.y, XF - X1 - 1, seccion.h, { negrita: true, tamano: 7, vAlign: 'top' });
+      escribir(seccion.contenido, X1 + 1, seccion.y, XF - X1 - 1, seccion.h, { negrita: true, tamano: seccion.tamano || 7, vAlign: 'top' });
       setColor('setDrawColor', COLORES.negro);
       doc.setLineWidth(0.5);
       doc.line(X0, seccion.y + seccion.h, XF, seccion.y + seccion.h);

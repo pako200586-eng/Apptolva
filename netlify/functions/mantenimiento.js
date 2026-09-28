@@ -106,20 +106,25 @@ export default async (req) => {
         });
       }
 
+      // Solo reportes con fallas oficiales (ticketsFallas) que aún NO tienen OT:
+      // al generar la OT, el reporte desaparece de "Fallas Detectadas".
       const result = await database.pool.query(`
-        SELECT 
-          id AS reporte_id, 
-          folio, 
-          unit_id AS unidad, 
-          driver_name AS operador, 
-          created_at AS fecha,
-          payload->'ticketsFallas' AS detalles_falla,
-          payload->>'observaciones' AS observaciones 
-        FROM bitacora_reports
-        WHERE payload->'ticketsFallas' IS NOT NULL
-          AND jsonb_typeof(payload->'ticketsFallas') = 'array'
-          AND jsonb_array_length(payload->'ticketsFallas') > 0
-        ORDER BY created_at DESC
+        SELECT
+          b.id AS reporte_id,
+          b.folio,
+          b.unit_id AS unidad,
+          b.driver_name AS operador,
+          b.created_at AS fecha,
+          b.payload->'ticketsFallas' AS detalles_falla,
+          b.payload->>'observaciones' AS observaciones
+        FROM bitacora_reports b
+        WHERE b.payload->'ticketsFallas' IS NOT NULL
+          AND jsonb_typeof(b.payload->'ticketsFallas') = 'array'
+          AND jsonb_array_length(b.payload->'ticketsFallas') > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM ordenes_trabajo o WHERE o.reporte_id = b.id
+          )
+        ORDER BY b.created_at DESC
       `);
 
       return new Response(JSON.stringify({ success: true, fallas: result.rows }), {
@@ -194,70 +199,86 @@ export default async (req) => {
         return jsonResponse(200, { success: true, orden: orden.rows[0] }, corsHeaders);
       }
 
-      const unidad = body.unidad || 'N/A';
-      const componente = body.componente || 'TRACTOCAMIÓN';
-      const descripcion = body.descripcion || body.observaciones || 'Falla sin detalle';
-      const sistema = body.sistema || 'GENERAL / REVISIÓN';
+      // Creación de OT consolidada: UNA sola OT por reporte de checklist (por unidad),
+      // que agrupa todas las fallas oficiales detectadas (payload.ticketsFallas).
+      const reporteId = String(body.reporte_id || '').trim();
+      if (!reporteId) {
+        return jsonResponse(400, { error: "Falta el reporte_id: la OT debe generarse desde un reporte del checklist" }, corsHeaders);
+      }
 
-      const otExistente = await database.pool.query(`
-        SELECT id, folio_ot, recurrencia
-        FROM ordenes_trabajo
-        WHERE unidad = $1
-          AND componente = $2
-          AND descripcion_falla = $3
-          AND estatus IN ('NUEVA', 'ASIGNADA', 'PENDIENTE', 'EN PROCESO', 'EN_PROCESO', 'PENDIENTE REFACCION')
-        LIMIT 1
-      `, [unidad, componente, descripcion]);
+      // Validación de duplicados por reporte_id: si el reporte ya tiene OT,
+      // no se crea otra; se devuelve la existente para abrirla en el panel.
+      const otExistente = await database.pool.query(
+        `${ORDEN_CON_BITACORA_SQL} WHERE o.reporte_id = $1 ORDER BY o.fecha_apertura ASC LIMIT 1`,
+        [reporteId],
+      );
 
       if (otExistente.rows.length > 0) {
-        const actual = otExistente.rows[0];
-        const nuevaRecurrencia = (Number(actual.recurrencia) || 1) + 1;
-
-        await database.pool.query(`
-          UPDATE ordenes_trabajo
-          SET recurrencia = $1, updated_at = NOW()
-          WHERE id = $2
-        `, [nuevaRecurrencia, actual.id]);
-
-        await database.pool.query(`
-          INSERT INTO ot_seguimiento (id, ot_id, accion, usuario, comentario)
-          VALUES ($1, $2, $3, $4, $5)
-        `, [
-          crypto.randomUUID().replace(/-/g, ""),
-          actual.id,
-          'RECURRENCIA_SUMADA',
-          'Sistema AppTolva',
-          `Falla reiterada en reporte ${body.folio_bitacora || body.reporte_id || 'N/A'}. Contador de recurrencia: ${nuevaRecurrencia}`
-        ]);
-
-        return new Response(JSON.stringify({
+        return jsonResponse(200, {
           success: true,
-          reiterada: true,
-          folio_ot: actual.folio_ot,
-          recurrencia: nuevaRecurrencia
-        }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
+          duplicada: true,
+          mensaje: "Esta Orden de Trabajo ya fue creada",
+          orden: otExistente.rows[0],
+        }, corsHeaders);
       }
+
+      const limpiar = (valor) => String(valor || '').trim();
+      const fallasRecibidas = Array.isArray(body.fallas) ? body.fallas.filter((f) => f && typeof f === 'object') : [];
+      const listaFallas = fallasRecibidas.length
+        ? fallasRecibidas
+        : [{
+            componente: body.componente || 'TRACTOCAMIÓN',
+            sistema: body.sistema || 'GENERAL / REVISIÓN',
+            descripcion: body.descripcion || body.observaciones || 'Falla sin detalle',
+          }];
+
+      const unicos = (valores) => [...new Set(valores.map(limpiar).filter(Boolean))];
+      const componente = unicos(listaFallas.map((f) => f.componente)).join(', ') || 'TRACTOCAMIÓN';
+      const sistema = unicos(listaFallas.map((f) => f.sistema || f.categoria)).join(', ') || 'GENERAL / REVISIÓN';
+      const descripcion = listaFallas.map((f) => {
+        const comp = limpiar(f.componente) || 'TRACTOCAMIÓN';
+        const sist = limpiar(f.sistema || f.categoria);
+        const desc = limpiar(f.descripcion || f.falla) || 'Falla sin detalle';
+        return `${comp}${sist ? ` | ${sist}` : ''}: ${desc}`;
+      }).join('\n');
+      const observaciones = limpiar(body.observaciones).slice(0, 2000);
 
       const otId = crypto.randomUUID().replace(/-/g, "");
       const seguimientoId = crypto.randomUUID().replace(/-/g, "");
 
-      const result = await database.pool.query(`
-        INSERT INTO ordenes_trabajo (id, reporte_id, unidad, operador, componente, sistema, descripcion_falla, payload, recurrencia)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, 1)
-        RETURNING id, folio_ot, unidad, operador, componente, sistema, descripcion_falla, estatus, fecha_apertura, recurrencia
+      // Inserción condicionada: si otra petición simultánea ya creó la OT del
+      // reporte (doble clic o dos supervisores), no se inserta un duplicado.
+      const insercion = await database.pool.query(`
+        INSERT INTO ordenes_trabajo (id, reporte_id, unidad, operador, componente, sistema, descripcion_falla, comentarios_operador, payload, recurrencia)
+        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, 1
+        WHERE NOT EXISTS (SELECT 1 FROM ordenes_trabajo WHERE reporte_id = $2)
       `, [
         otId,
-        body.reporte_id || null,
-        body.unidad,
+        reporteId,
+        body.unidad || 'N/A',
         body.operador || 'No especificado',
         componente,
         sistema,
         descripcion,
-        JSON.stringify(body)
+        observaciones || null,
+        JSON.stringify({ ...body, fallas: listaFallas })
       ]);
 
+      if (!insercion.rowCount) {
+        const otGanadora = await database.pool.query(
+          `${ORDEN_CON_BITACORA_SQL} WHERE o.reporte_id = $1 ORDER BY o.fecha_apertura ASC LIMIT 1`,
+          [reporteId],
+        );
+        return jsonResponse(200, {
+          success: true,
+          duplicada: true,
+          mensaje: "Esta Orden de Trabajo ya fue creada",
+          orden: otGanadora.rows[0] || null,
+        }, corsHeaders);
+      }
+
       const creada = await database.pool.query(`${ORDEN_CON_BITACORA_SQL} WHERE o.id = $1`, [otId]);
-      const nuevaOT = creada.rows[0] || result.rows[0];
+      const nuevaOT = creada.rows[0];
 
       await database.pool.query(`
         INSERT INTO ot_seguimiento (id, ot_id, accion, usuario, comentario)
@@ -267,7 +288,7 @@ export default async (req) => {
         otId,
         'CREACIÓN',
         'Sistema AppTolva',
-        'OT generada para componente específico.'
+        `OT generada con ${listaFallas.length} falla(s) del reporte ${body.folio_bitacora || reporteId}.`
       ]);
 
       return new Response(JSON.stringify({ success: true, orden: nuevaOT }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
