@@ -146,31 +146,16 @@
           <div id="emptyState" class="hidden px-4 py-10 text-center text-sm font-bold text-slate-500">No hay reportes para los filtros seleccionados.</div>
         </section>
 
-        <!-- VISTA: FALLAS DETECTADAS -->
+        <!-- VISTA: FALLAS DETECTADAS (tarjetas agrupadas por unidad/reporte) -->
         <section id="vista-fallas" class="panel-card overflow-hidden rounded-lg hidden">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
             <h2 class="font-black text-[#7c2d12]">Fallas Pendientes de Asignación</h2>
+            <p class="text-xs font-bold text-slate-500">Una tarjeta por unidad · al generar la OT, la tarjeta pasa a Órdenes de Trabajo</p>
           </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-orange-100 text-sm">
-              <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
-                <tr>
-                  <th class="px-4 py-3">Folio</th>
-                  <th class="px-4 py-3">Unidad</th>
-                  <th class="px-4 py-3">Operador</th>
-                  <th class="px-4 py-3">Falla Reportada</th>
-                  <th class="px-4 py-3">Observaciones</th>
-                  <th class="px-4 py-3 text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody id="tabla-fallas-body" class="divide-y divide-orange-50">
-                <tr>
-                  <td colspan="6" class="px-4 py-6 text-center font-bold text-slate-500">
-                    Haz clic en la pestaña para cargar las fallas pendientes.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div id="fallas-cards" class="grid gap-4 p-4 sm:grid-cols-2">
+            <p class="col-span-full py-6 text-center font-bold text-slate-500">
+              Haz clic en la pestaña para cargar las fallas pendientes.
+            </p>
           </div>
         </section>
 
@@ -185,14 +170,17 @@
                 <tr>
                   <th class="px-4 py-3">OT</th>
                   <th class="px-4 py-3">Unidad</th>
+                  <th class="px-4 py-3">Operador</th>
                   <th class="px-4 py-3">Fecha</th>
+                  <th class="px-4 py-3">Responsable</th>
+                  <th class="px-4 py-3">Taller</th>
                   <th class="px-4 py-3">Estatus</th>
                   <th class="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody id="tabla-ordenes-body" class="divide-y divide-orange-50">
                 <tr>
-                  <td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">
+                  <td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">
                     Haz clic en la pestaña para cargar las órdenes de trabajo.
                   </td>
                 </tr>
@@ -209,6 +197,14 @@
               <p class="text-xs text-slate-500">Fallas marcadas en los checklist filtrados. <strong>Realizadas</strong> = fallas atendidas en OT terminadas o cerradas; el resto se considera pendiente.</p>
             </div>
             <span id="dashEstado" class="text-xs font-bold uppercase tracking-wide text-slate-500"></span>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Checklists hoy</p><strong id="kpiChecklistHoy" class="text-3xl text-slate-800">0</strong></div>
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Fallas nuevas</p><strong id="kpiFallasNuevas" class="text-3xl text-[#7c2d12]">0</strong><p class="text-[10px] font-bold text-slate-400">Sin OT generada</p></div>
+            <div class="panel-card rounded-lg border-red-200 p-4 text-center"><p class="text-xs font-bold uppercase text-red-700">OT abiertas</p><strong id="kpiOtAbiertas" class="text-3xl text-red-600">0</strong></div>
+            <div class="panel-card rounded-lg border-green-200 p-4 text-center"><p class="text-xs font-bold uppercase text-green-700">OT cerradas</p><strong id="kpiOtCerradas" class="text-3xl text-green-700">0</strong></div>
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Unidades detenidas</p><strong id="kpiUnidadesDetenidas" class="text-3xl text-[#294936]">0</strong><p class="text-[10px] font-bold text-slate-400">Con OT abierta</p></div>
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -806,46 +802,19 @@
       if (btnOrdenes) btnOrdenes.click();
     }
 
-    function normalizarFallaDesdeReporte(reporte) {
-      const fallasNormalizadas = window.normalizarObservaciones
-        ? window.normalizarObservaciones(reporte)
-        : [];
-
-      if (fallasNormalizadas.length) {
-        return fallasNormalizadas;
-      }
-
-      return [
-        {
-          reporte_id: reporte?.reporte_id || '',
-          folio_bitacora: reporte?.folio || '',
-          unidad: reporte?.unidad || '',
-          operador: reporte?.operador || '',
-          fecha: reporte?.fecha || '',
-          componente: 'TRACTOCAMIÓN',
-          sistema: 'GENERAL / REVISIÓN',
-          descripcion: 'Falla no clasificada por el operador',
-          origen: 'FALLA GENERICA'
-        }
-      ];
-    }
-
-    async function crearOTDesdeFalla(itemFalla) {
+    async function crearOTDesdeReporte(reporte, fallas, observaciones) {
       try {
         const response = await fetch('/api/mantenimiento', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...await authHeaders() },
           body: JSON.stringify({
-            reporte_id: itemFalla.reporte_id,
-            folio_bitacora: itemFalla.folio_bitacora,
-            unidad: itemFalla.unidad,
-            operador: itemFalla.operador,
-            componente: itemFalla.componente,
-            sistema: itemFalla.sistema,
-            descripcion: itemFalla.descripcion,
-            fecha: itemFalla.fecha,
-            origen: itemFalla.origen,
-            observaciones: itemFalla.descripcion,
+            reporte_id: reporte.reporte_id,
+            folio_bitacora: reporte.folio,
+            unidad: reporte.unidad,
+            operador: reporte.operador,
+            fecha: reporte.fecha,
+            fallas,
+            observaciones: observaciones.map((obs) => `${obs.componente}: ${obs.texto}`).join('\n'),
           })
         });
 
@@ -856,88 +825,107 @@
 
         const data = await response.json();
 
-        if (data.success) {
-          if (data.reiterada) {
-            alert(`La falla en ${itemFalla.componente} ya tenía OT abierta. Se incrementó la recurrencia a: ${data.recurrencia}`);
-          } else {
-            alert(`OT generada con éxito. Folio autogenerado: ${data.orden.folio_ot}`);
-            await generarPDFOT(data.orden);
-          }
-          mostrarVistaOrdenes();
-        } else {
+        if (!data.success) {
           showToast('Error al generar la OT: ' + (data.error || 'Desconocido'));
+          return;
         }
+
+        if (data.duplicada) {
+          alert(data.mensaje || 'Esta Orden de Trabajo ya fue creada');
+          mostrarVistaOrdenes();
+          if (data.orden) abrirSeguimiento(data.orden);
+          return;
+        }
+
+        alert(`OT generada con éxito. Folio: OT-${data.orden.folio_ot}\nIncluye ${fallas.length} falla(s) de la unidad ${reporte.unidad}.`);
+        await generarPDFOT(data.orden);
+        cargarFallas();
+        mostrarVistaOrdenes();
       } catch (error) {
         console.error('Error POST:', error);
         showToast(error.message || 'Error de comunicación con el servidor.');
       }
     }
 
+    function tarjetaFallaHtml(reporte, fallas, observaciones) {
+      const inc = `INC-${String(reporte.reporte_id || '').slice(0, 6).toUpperCase() || 'S/N'}`;
+      const fecha = reporte.fecha ? new Date(reporte.fecha).toLocaleDateString('es-MX') : 'Sin fecha';
+
+      const listaFallas = fallas.map((falla) => `
+        <li class="flex items-start gap-2 text-sm">
+          <i class="fas fa-check mt-0.5 text-red-600"></i>
+          <span><strong class="text-slate-700">${escapeHtml(falla.componente)} · ${escapeHtml(falla.sistema)}</strong>: ${escapeHtml(falla.descripcion)}</span>
+        </li>`).join('');
+
+      const bloqueObs = observaciones.length ? `
+        <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Observaciones del operador (solo contexto)</p>
+          ${observaciones.map((obs) => `<p class="mt-1 text-xs italic text-slate-600"><strong>${escapeHtml(obs.componente)}:</strong> “${escapeHtml(obs.texto)}”</p>`).join('')}
+        </div>` : '';
+
+      return `
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <p class="text-xs font-black text-slate-400">${escapeHtml(inc)} · Folio ${escapeHtml(reporte.folio || 'S/F')}</p>
+            <h3 class="text-lg font-black text-[#7c2d12]">Unidad ${escapeHtml(reporte.unidad || 'N/A')}</h3>
+            <p class="text-xs font-bold text-slate-500">Operador: ${escapeHtml(reporte.operador || 'N/A')} · ${escapeHtml(fecha)}</p>
+          </div>
+          <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>
+        </div>
+        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Fallas detectadas (${fallas.length})</p>
+        <ul class="space-y-1">${listaFallas}</ul>
+        ${bloqueObs}
+        <button class="btn-generar-ot w-full rounded-md bg-[#294936] px-3 py-2 text-sm font-black text-white shadow hover:bg-[#203b2b] disabled:cursor-wait disabled:opacity-60">
+          GENERAR OT
+        </button>`;
+    }
+
     async function cargarFallas() {
-      const tbody = $('tabla-fallas-body');
-      if (!tbody) return;
-      
-      tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Buscando fallas en la base de datos...</td></tr>';
+      const contenedor = $('fallas-cards');
+      if (!contenedor) return;
+
+      contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Buscando fallas en la base de datos...</p>';
 
       try {
-        // Hacemos GET al nuevo endpoint que creaste
         const response = await fetch('/api/mantenimiento', { headers: await authHeaders() });
         if (!response.ok) throw new Error('Error al consultar el servidor');
-        
+
         const data = await response.json();
+        const reportes = (data.success && Array.isArray(data.fallas)) ? data.fallas : [];
+        contenedor.innerHTML = '';
 
-        if (data.success && data.fallas && data.fallas.length > 0) {
-          tbody.innerHTML = '';
+        reportes.forEach((reporte) => {
+          // Fallas oficiales: únicamente payload.ticketsFallas del checklist.
+          // Las observaciones coloquiales del operador solo se muestran como contexto.
+          const { fallas, observaciones } = window.procesarReporteFallas
+            ? window.procesarReporteFallas(reporte)
+            : { fallas: [], observaciones: [] };
 
-          data.fallas.forEach((reporte) => {
-            const fallasNormalizadas = normalizarFallaDesdeReporte(reporte);
+          if (!fallas.length) return;
 
-            fallasNormalizadas.forEach((falla) => {
-              const fila = document.createElement('tr');
-              fila.className = 'hover:bg-orange-50/70 transition-colors align-top';
+          const tarjeta = document.createElement('article');
+          tarjeta.className = 'flex flex-col gap-3 rounded-lg border border-orange-100 bg-white p-4 shadow-sm';
+          tarjeta.innerHTML = tarjetaFallaHtml(reporte, fallas, observaciones);
 
-              fila.innerHTML = `
-                <td class="px-4 py-3 font-bold text-slate-700">${escapeHtml(falla.folio_bitacora || reporte.folio)}</td>
-                <td class="px-4 py-3">${escapeHtml(falla.unidad || reporte.unidad)}</td>
-                <td class="px-4 py-3 truncate max-w-[150px]">${escapeHtml(falla.operador || reporte.operador)}</td>
-                <td class="px-4 py-3">
-                  <span class="rounded-md bg-red-100 px-2 py-1 text-[10px] font-black text-red-800 uppercase">
-                    ${escapeHtml(falla.componente || 'TRACTOCAMIÓN')}
-                  </span>
-                  <div class="mt-1 text-[10px] font-bold text-slate-500">${escapeHtml(falla.sistema || 'GENERAL / REVISIÓN')}</div>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-600 max-w-[220px]">${escapeHtml(falla.descripcion || 'Sin observaciones registradas por el operador')}</td>
-                <td class="px-4 py-3 text-right">
-                  <button data-falla='${encodeURIComponent(JSON.stringify(falla))}' class="btn-generar-ot rounded-md bg-[#294936] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#203b2b]">
-                    GENERAR OT
-                  </button>
-                </td>
-              `;
-
-              const boton = fila.querySelector('.btn-generar-ot');
-              if (boton) {
-                boton.addEventListener('click', async () => {
-                  if (boton.disabled) return;
-                  boton.disabled = true;
-                  try {
-                    const itemFalla = JSON.parse(decodeURIComponent(boton.dataset.falla));
-                    await crearOTDesdeFalla(itemFalla);
-                  } catch (error) {
-                    console.error('No se pudo convertir la falla:', error);
-                  } finally {
-                    boton.disabled = false;
-                  }
-                });
-              }
-
-              tbody.appendChild(fila);
-            });
+          const boton = tarjeta.querySelector('.btn-generar-ot');
+          boton.addEventListener('click', async () => {
+            if (boton.disabled) return;
+            boton.disabled = true;
+            try {
+              await crearOTDesdeReporte(reporte, fallas, observaciones);
+            } finally {
+              boton.disabled = false;
+            }
           });
-        } else {
-          tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center font-bold text-slate-500">No hay fallas pendientes de atención.</td></tr>';
+
+          contenedor.appendChild(tarjeta);
+        });
+
+        if (!contenedor.children.length) {
+          contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500">No hay fallas pendientes de atención. Las fallas con OT generada se consultan en Órdenes de Trabajo.</p>';
         }
       } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center font-bold text-red-700">Error de comunicación: ${escapeHtml(error.message)}</td></tr>`;
+        contenedor.innerHTML = `<p class="col-span-full py-6 text-center font-bold text-red-700">Error de comunicación: ${escapeHtml(error.message)}</p>`;
       }
     }
 
@@ -945,7 +933,7 @@
       const tbody = $('tabla-ordenes-body');
       if (!tbody) return;
 
-      tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando órdenes de trabajo...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando órdenes de trabajo...</td></tr>';
 
       try {
         const response = await fetch('/api/mantenimiento?tipo=ordenes', { headers: await authHeaders() });
@@ -955,7 +943,7 @@
         const ordenes = Array.isArray(data?.ordenes) ? data.ordenes : [];
 
         if (!ordenes.length) {
-          tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">No hay órdenes de trabajo registradas.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">No hay órdenes de trabajo registradas.</td></tr>';
           return;
         }
 
@@ -967,13 +955,19 @@
 
           const folioOt = orden?.folio_ot || 'N/A';
           const unidad = orden?.unidad || 'N/A';
+          const operador = orden?.operador || 'N/A';
           const fecha = orden?.fecha_apertura ? new Date(orden.fecha_apertura).toLocaleDateString('es-MX') : 'Sin fecha';
+          const responsable = orden?.electromecanico || orden?.supervisor_mantenimiento || 'Sin asignar';
+          const taller = orden?.proveedor_externo || 'Taller interno';
           const estatus = orden?.estatus || 'NUEVA';
 
           fila.innerHTML = `
             <td class="px-4 py-3 font-black text-[#7c2d12]">${escapeHtml(String(folioOt))}</td>
             <td class="px-4 py-3">${escapeHtml(String(unidad))}</td>
+            <td class="px-4 py-3 truncate max-w-[150px]">${escapeHtml(String(operador))}</td>
             <td class="px-4 py-3">${escapeHtml(String(fecha))}</td>
+            <td class="px-4 py-3 truncate max-w-[150px]">${escapeHtml(String(responsable))}</td>
+            <td class="px-4 py-3 truncate max-w-[130px]">${escapeHtml(String(taller))}</td>
             <td class="px-4 py-3">
               <select data-ot-id="${escapeHtml(String(orden.id || ''))}" class="ot-status-select rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-[#7c2d12]">
                 <option value="NUEVA" ${estatus === 'NUEVA' ? 'selected' : ''}>NUEVA</option>
@@ -1036,7 +1030,7 @@
           tbody.appendChild(fila);
         });
       } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-red-700">Error de comunicación: ${escapeHtml(error.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error de comunicación: ${escapeHtml(error.message)}</td></tr>`;
       }
     }
 
@@ -1074,7 +1068,7 @@
       ordenEnSeguimiento = orden;
       const form = $('segForm');
       $('segTitulo').textContent = `Seguimiento de OT-${orden?.folio_ot ?? ''}`;
-      $('segResumen').innerHTML = `<strong>Unidad:</strong> ${escapeHtml(orden?.unidad || 'N/A')} · <strong>Componente:</strong> ${escapeHtml(orden?.componente || '')} · <strong>Sistema:</strong> ${escapeHtml(orden?.sistema || '')}<br>${escapeHtml(orden?.descripcion_falla || '')}`;
+      $('segResumen').innerHTML = `<strong>Unidad:</strong> ${escapeHtml(orden?.unidad || 'N/A')} · <strong>Componente:</strong> ${escapeHtml(orden?.componente || '')} · <strong>Sistema:</strong> ${escapeHtml(orden?.sistema || '')}<br>${escapeHtml(orden?.descripcion_falla || '').replace(/\n/g, '<br>')}`;
       CAMPOS_SEGUIMIENTO.forEach((campo) => {
         form.elements[campo].value = orden?.[campo] || '';
       });
@@ -1341,6 +1335,31 @@
       $('kpiPendientes').textContent = pendientes;
       $('kpiRealizadas').textContent = realizadas;
       $('kpiTasa').textContent = fmtPct(pct(realizadas, reportadas));
+
+      // KPIs operativos: checklists de hoy, fallas sin OT, OT abiertas/cerradas y unidades detenidas.
+      const hoy = new Date();
+      const esHoy = (valor) => {
+        const fecha = new Date(valor);
+        return !Number.isNaN(fecha.getTime())
+          && fecha.getFullYear() === hoy.getFullYear()
+          && fecha.getMonth() === hoy.getMonth()
+          && fecha.getDate() === hoy.getDate();
+      };
+      const ordenes = ordenesFiltradas();
+      const otAbiertas = ordenes.filter((orden) => !ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)));
+      const reportesConOT = new Set((dashState.ordenes || []).map((orden) => orden.reporte_id).filter(Boolean));
+      let fallasNuevas = 0;
+      checklists.forEach((report) => {
+        if (reportesConOT.has(report.id)) return;
+        const porComp = fallasPorComponente(report);
+        COMPONENTES.forEach(({ key }) => { fallasNuevas += porComp[key].length; });
+      });
+
+      $('kpiChecklistHoy').textContent = checklists.filter((report) => esHoy(report.createdAt)).length;
+      $('kpiFallasNuevas').textContent = fallasNuevas;
+      $('kpiOtAbiertas').textContent = otAbiertas.length;
+      $('kpiOtCerradas').textContent = ordenes.filter((orden) => sinAcentos(orden.estatus) === 'CERRADA').length;
+      $('kpiUnidadesDetenidas').textContent = new Set(otAbiertas.map((orden) => String(orden.unidad || '').trim()).filter(Boolean)).size;
 
       $('chartEstatus').innerHTML = chartDona([
         { label: 'Pendiente', value: pendientes, color: COLOR_PENDIENTE },
