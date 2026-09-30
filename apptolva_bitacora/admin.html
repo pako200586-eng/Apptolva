@@ -26,6 +26,7 @@
     .status-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
     .toast { transform: translateY(-12px); opacity: 0; pointer-events: none; transition: .25s ease; }
     .toast.show { transform: translateY(0); opacity: 1; }
+    #deleteSelected:disabled { display: none; }
   </style>
 </head>
 <body>
@@ -358,7 +359,7 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
-    const state = { user: null, reports: [], allReports: [], lastTotal: 0, selected: new Set(), tableSignature: '' };
+    const state = { user: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, selected: new Set(), tableSignature: '' };
     const $ = (id) => document.getElementById(id);
 
     async function authHeaders() {
@@ -375,6 +376,23 @@
           if (value) params.set(key, value);
         });
       return params;
+    }
+
+    function filtrosAplicados() {
+      return new URLSearchParams(Object.entries(state.appliedFilters).filter(([, value]) => value));
+    }
+
+    function coincideFiltroGlobal(record, fields) {
+      const { from, to, unit, operator } = state.appliedFilters;
+      if (unit && !String(record[fields.unit] || '').toLowerCase().includes(unit.toLowerCase())) return false;
+      if (operator && !String(record[fields.operator] || '').toLowerCase().includes(operator.toLowerCase())) return false;
+      if (from || to) {
+        const date = new Date(record[fields.date]);
+        if (Number.isNaN(date.getTime())) return false;
+        if (from && date < new Date(`${from}T00:00:00`)) return false;
+        if (to && date > new Date(`${to}T23:59:59.999`)) return false;
+      }
+      return true;
     }
 
     function formatDate(value) {
@@ -483,9 +501,9 @@
         : '<p class="text-sm text-slate-500">Sin pendientes detectados en este navegador.</p>';
     }
 
-    async function cargarDatos(params, options = {}) {
+    async function cargarDatos(params = filtrosAplicados(), options = {}) {
       if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
-      const query = (params || filters()).toString();
+      const query = (params || filtrosAplicados()).toString();
       if (!options.silent) {
         $('syncState').textContent = 'Consultando reportes...';$('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
       }
@@ -521,7 +539,20 @@
 
     $('logoutBtn').addEventListener('click', () => signOut(auth));
 
-    $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));$('applyFilters').addEventListener('click', () => cargarDatos(filters()).catch((error) => showToast(error.message)));
+    $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));
+    $('applyFilters').addEventListener('click', () => {
+      const params = filters();
+      state.appliedFilters = {
+        from: params.get('from') || '',
+        to: params.get('to') || '',
+        unit: params.get('unit') || '',
+        operator: params.get('operator') || '',
+        type: params.get('type') || 'todos'
+      };
+      Promise.all([cargarDatos(params), cargarFallas(), cargarOrdenes()])
+        .then(renderDashboard)
+        .catch((error) => showToast(error.message));
+    });
 
     $('tabla-datos').addEventListener('change', (event) => {
       const checkbox = event.target.closest('.row-check');
@@ -543,7 +574,7 @@
 
     $('deleteSelected').addEventListener('click', async () => {
       const ids = [...state.selected];
-      if (!ids.length) return;
+      if (!ids.length || $('deleteSelected').disabled) return;
       if (!confirm(`¿Eliminar ${ids.length} reporte(s) seleccionado(s)? Esta acción no se puede deshacer.`)) return;
 
       $('deleteSelected').disabled = true;
@@ -562,7 +593,7 @@
         state.selected.clear();
         state.lastTotal = 0; 
         showToast(`${result.deleted || 0} reporte(s) eliminado(s)`);
-        await cargarDatos(filters()).catch(() => {});
+        await cargarDatos().catch(() => {});
       } catch (error) {
         showToast(error.message);
         syncSelectionUI();
@@ -764,7 +795,7 @@
 
     setInterval(() => {
       if (state.user && document.visibilityState === 'visible') {
-        cargarDatos(filters(), { silent: true }).catch(() => {});
+        cargarDatos(filtrosAplicados(), { silent: true }).catch(() => {});
       }
     }, 180000);
 
@@ -777,7 +808,7 @@
           showToast('Reporte guardado offline pendiente de sincronizar');
         }
         if (event.data?.type === 'REPORT_SYNCED') {
-          if (state.user) cargarDatos(filters(), { silent: true }).catch(() => {});
+          if (state.user) cargarDatos(filtrosAplicados(), { silent: true }).catch(() => {});
           showToast('Service worker sincronizó un reporte');
         }
       });
@@ -892,9 +923,12 @@
 
         const data = await response.json();
         const reportes = (data.success && Array.isArray(data.fallas)) ? data.fallas : [];
+        const reportesFiltrados = reportes.filter((reporte) => coincideFiltroGlobal(reporte, {
+          unit: 'unidad', operator: 'operador', date: 'fecha'
+        }));
         contenedor.innerHTML = '';
 
-        reportes.forEach((reporte) => {
+        reportesFiltrados.forEach((reporte) => {
           // Fallas oficiales: únicamente payload.ticketsFallas del checklist.
           // Las observaciones coloquiales del operador solo se muestran como contexto.
           const { fallas, observaciones } = window.procesarReporteFallas
@@ -940,7 +974,9 @@
         if (!response.ok) throw new Error('Error al consultar las órdenes');
 
         const data = await response.json();
-        const ordenes = Array.isArray(data?.ordenes) ? data.ordenes : [];
+        const ordenes = (Array.isArray(data?.ordenes) ? data.ordenes : []).filter((orden) => coincideFiltroGlobal(orden, {
+          unit: 'unidad', operator: 'operador', date: 'fecha_apertura'
+        }));
 
         if (!ordenes.length) {
           tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">No hay órdenes de trabajo registradas.</td></tr>';
@@ -1269,18 +1305,10 @@
       }).join('')}</svg>`;
     }
 
-    // Aplica a las OT los mismos filtros de fecha y unidad del panel.
     function ordenesFiltradas() {
-      const desde = $('fromFilter').value;
-      const hasta = $('toFilter').value;
-      const unidad = $('unitFilter').value.trim().toLowerCase();
-      return (dashState.ordenes || []).filter((orden) => {
-        const fecha = orden.fecha_apertura ? new Date(orden.fecha_apertura) : null;
-        if (desde && fecha && fecha < new Date(desde)) return false;
-        if (hasta && fecha && fecha > new Date(`${hasta}T23:59:59.999Z`)) return false;
-        if (unidad && !String(orden.unidad || '').toLowerCase().includes(unidad)) return false;
-        return true;
-      });
+      return (dashState.ordenes || []).filter((orden) => coincideFiltroGlobal(orden, {
+        unit: 'unidad', operator: 'operador', date: 'fecha_apertura'
+      }));
     }
 
     function calcularMetricas() {
