@@ -1,7 +1,7 @@
 import { getDatabase } from "@netlify/database";
 import { authorizeRequest } from "../lib/firebase-auth.js";
 
-const ALLOWED_METHODS = "GET, DELETE, OPTIONS";
+const ALLOWED_METHODS = "GET, OPTIONS";
 const ALLOWED_HEADERS = "Content-Type, Authorization";
 const ID_PATTERN = /^[a-f0-9]{32}$/i;
 const MAX_DELETE_IDS = 200;
@@ -97,34 +97,7 @@ export default async (req) => {
   if (authorizationError) return authorizationError;
 
   if (req.method === "DELETE") {
-    let body = {};
-    try {
-      body = await req.json();
-    } catch {
-      return jsonResponse(400, { error: "Cuerpo JSON inválido" }, corsHeaders);
-    }
-
-    const ids = Array.isArray(body?.ids)
-      ? [...new Set(body.ids.filter((id) => typeof id === "string" && ID_PATTERN.test(id)))]
-      : [];
-
-    if (!ids.length) {
-      return jsonResponse(400, { error: "No se recibieron reportes válidos para eliminar" }, corsHeaders);
-    }
-    if (ids.length > MAX_DELETE_IDS) {
-      return jsonResponse(400, { error: `No se pueden eliminar más de ${MAX_DELETE_IDS} reportes a la vez` }, corsHeaders);
-    }
-
-    const database = getDatabase();
-    try {
-      const result = await database.pool.query(
-        "DELETE FROM bitacora_reports WHERE id = ANY($1::text[])",
-        [ids],
-      );
-      return jsonResponse(200, { deleted: result.rowCount || 0 }, corsHeaders);
-    } catch (error) {
-      return jsonResponse(500, { error: error.message }, corsHeaders);
-    }
+    return jsonResponse(403, { error: "La eliminación de reportes ha sido deshabilitada para proteger los registros de la empresa." }, corsHeaders);
   }
 
   if (req.method !== "GET") {
