@@ -26,7 +26,6 @@
     .status-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
     .toast { transform: translateY(-12px); opacity: 0; pointer-events: none; transition: .25s ease; }
     .toast.show { transform: translateY(0); opacity: 1; }
-    #deleteSelected:disabled { display: none; }
   </style>
 </head>
 <body>
@@ -119,18 +118,11 @@
         <section id="vista-reportes" class="panel-card overflow-hidden rounded-lg block">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3">
             <h2 class="font-black text-[#7c2d12]">Checklist y bitácoras recibidas</h2>
-            <button id="deleteSelected" disabled
-              class="inline-flex items-center gap-2 rounded-md bg-red-700 px-3 py-2 text-sm font-black text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
-              <i class="fas fa-trash-can"></i>Eliminar (<span id="selectedCount">0</span>)
-            </button>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-orange-100 text-sm">
               <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
                 <tr>
-                  <th class="px-4 py-3">
-                    <input id="selectAll" type="checkbox" class="h-4 w-4 cursor-pointer accent-[#7c2d12]" aria-label="Seleccionar todo">
-                  </th>
                   <th class="px-4 py-3">Folio</th>
                   <th class="px-4 py-3">Tipo</th>
                   <th class="px-4 py-3">Unidad</th>
@@ -204,7 +196,7 @@
             <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Checklists hoy</p><strong id="kpiChecklistHoy" class="text-3xl text-slate-800">0</strong></div>
             <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Fallas nuevas</p><strong id="kpiFallasNuevas" class="text-3xl text-[#7c2d12]">0</strong><p class="text-[10px] font-bold text-slate-400">Sin OT generada</p></div>
             <div class="panel-card rounded-lg border-red-200 p-4 text-center"><p class="text-xs font-bold uppercase text-red-700">OT abiertas</p><strong id="kpiOtAbiertas" class="text-3xl text-red-600">0</strong></div>
-            <div class="panel-card rounded-lg border-green-200 p-4 text-center"><p class="text-xs font-bold uppercase text-green-700">OT cerradas</p><strong id="kpiOtCerradas" class="text-3xl text-green-700">0</strong></div>
+            <div class="panel-card rounded-lg border-green-200 p-4 text-center"><p class="text-xs font-bold uppercase text-green-700">OT terminadas / cerradas</p><strong id="kpiOtCerradas" class="text-3xl text-green-700">0</strong></div>
             <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Unidades detenidas</p><strong id="kpiUnidadesDetenidas" class="text-3xl text-[#294936]">0</strong><p class="text-[10px] font-bold text-slate-400">Con OT abierta</p></div>
           </div>
 
@@ -359,7 +351,7 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
-    const state = { user: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, selected: new Set(), tableSignature: '' };
+    const state = { user: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '' };
     const $ = (id) => document.getElementById(id);
 
     async function authHeaders() {
@@ -417,12 +409,8 @@
     }
 
     function reportRowHtml(report) {
-      const checked = state.selected.has(report.id) ? 'checked' : '';
       return `
         <tr class="hover:bg-orange-50/70">
-          <td class="px-4 py-3">
-            <input type="checkbox" class="row-check h-4 w-4 cursor-pointer accent-[#7c2d12]" data-id="${escapeHtml(report.id)}" ${checked} aria-label="Seleccionar folio ${escapeHtml(report.folio)}">
-          </td>
           <td class="px-4 py-3 font-black text-[#7c2d12]">${escapeHtml(report.folio)}</td>
           <td class="px-4 py-3 capitalize">${escapeHtml(report.type)}</td>
           <td class="px-4 py-3">${escapeHtml(report.unitId)}</td>
@@ -458,14 +446,6 @@
       $('topUnidades').innerHTML = rows(tally('unitId'));$('topOperadores').innerHTML = rows(tally('driverName'));
     }
 
-    function syncSelectionUI() {
-      const count = state.selected.size;
-      $('selectedCount').textContent = count;
-      $('deleteSelected').disabled = count === 0;
-      const checks = [...document.querySelectorAll('.row-check')];
-      $('selectAll').checked = checks.length > 0 && checks.every((cb) => cb.checked);
-    }
-
     function render(data, options = {}) {
       const summary = data.summary || {};
       $('statTotal').textContent = summary.total || 0;
@@ -482,9 +462,6 @@
       state.reports = data.reports || [];
       if (!data.filtered) state.allReports = state.reports;
 
-      const presentIds = new Set(state.reports.map((report) => report.id));
-      state.selected.forEach((id) => { if (!presentIds.has(id)) state.selected.delete(id); });
-
       const signature = state.reports.map((report) => `${report.id}:${report.syncStatus}`).join('|');
       if (!(options.silent && signature === state.tableSignature)) {
         state.tableSignature = signature;
@@ -492,7 +469,6 @@
         renderResumen();
         renderDashboard();
       }
-      syncSelectionUI();
 
       const pending = JSON.parse(localStorage.getItem('apptolvaPendingNotices') || '[]');
       $('pendingCount').textContent = pending.length;
@@ -505,7 +481,7 @@
       if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
       const query = (params || filtrosAplicados()).toString();
       if (!options.silent) {
-        $('syncState').textContent = 'Consultando reportes...';$('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
+        $('syncState').textContent = 'Consultando reportes...';$('tabla-datos').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
       }
 
       const response = await fetch(`/api/admin-reports${query ? `?${query}` : ''}`, { headers: await authHeaders() });
@@ -539,7 +515,10 @@
 
     $('logoutBtn').addEventListener('click', () => signOut(auth));
 
-    $('refreshBtn').addEventListener('click', () => cargarDatos().catch((error) => showToast(error.message)));
+    $('refreshBtn').addEventListener('click', () => {
+      cargarDatos().catch((error) => showToast(error.message));
+      cargarDashboard(true).catch(() => {});
+    });
     $('applyFilters').addEventListener('click', () => {
       const params = filters();
       state.appliedFilters = {
@@ -552,52 +531,6 @@
       Promise.all([cargarDatos(params), cargarFallas(), cargarOrdenes()])
         .then(renderDashboard)
         .catch((error) => showToast(error.message));
-    });
-
-    $('tabla-datos').addEventListener('change', (event) => {
-      const checkbox = event.target.closest('.row-check');
-      if (!checkbox) return;
-      if (checkbox.checked) state.selected.add(checkbox.dataset.id);
-      else state.selected.delete(checkbox.dataset.id);
-      syncSelectionUI();
-    });
-
-    $('selectAll').addEventListener('change', (event) => {
-      const check = event.target.checked;
-      document.querySelectorAll('.row-check').forEach((checkbox) => {
-        checkbox.checked = check;
-        if (check) state.selected.add(checkbox.dataset.id);
-        else state.selected.delete(checkbox.dataset.id);
-      });
-      syncSelectionUI();
-    });
-
-    $('deleteSelected').addEventListener('click', async () => {
-      const ids = [...state.selected];
-      if (!ids.length || $('deleteSelected').disabled) return;
-      if (!confirm(`¿Eliminar ${ids.length} reporte(s) seleccionado(s)? Esta acción no se puede deshacer.`)) return;
-
-      $('deleteSelected').disabled = true;
-      try {
-        const response = await fetch('/api/admin-reports', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', ...await authHeaders() },
-          body: JSON.stringify({ ids }),
-        });
-        if (response.status === 401) throw new Error('La sesión venció o no es válida');
-        if (!response.ok) {
-          const detail = await response.json().catch(() => ({}));
-          throw new Error(detail.error || 'No se pudieron eliminar los reportes');
-        }
-        const result = await response.json();
-        state.selected.clear();
-        state.lastTotal = 0; 
-        showToast(`${result.deleted || 0} reporte(s) eliminado(s)`);
-        await cargarDatos().catch(() => {});
-      } catch (error) {
-        showToast(error.message);
-        syncSelectionUI();
-      }
     });
 
     $('forceSyncBtn').addEventListener('click', async () => {
@@ -779,16 +712,17 @@
       if (!authenticatedUser) {
         state.reports = [];
         state.allReports = [];
-        state.selected.clear();
         state.lastTotal = 0;
+        dashState.ordenes = null;
         return;
       }
 
       $('loginMsg').classList.add('hidden');
       try {
         await cargarDatos();
+        cargarDashboard().catch(() => {});
       } catch (error) {
-        $('tabla-datos').innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
+        $('tabla-datos').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
         showToast(error.message);
       }
     });
@@ -796,6 +730,7 @@
     setInterval(() => {
       if (state.user && document.visibilityState === 'visible') {
         cargarDatos(filtrosAplicados(), { silent: true }).catch(() => {});
+        cargarDashboard().catch(() => {});
       }
     }, 180000);
 
@@ -869,6 +804,12 @@
         }
 
         alert(`OT generada con éxito. Folio: OT-${data.orden.folio_ot}\nIncluye ${fallas.length} falla(s) de la unidad ${reporte.unidad}.`);
+        if (data.orden) {
+          if (Array.isArray(dashState.ordenes)) {
+            dashState.ordenes.unshift(data.orden);
+          }
+          renderDashboard();
+        }
         await generarPDFOT(data.orden);
         cargarFallas();
         mostrarVistaOrdenes();
@@ -1043,21 +984,33 @@
           const statusSelect = fila.querySelector('.ot-status-select');
           if (statusSelect) {
             statusSelect.addEventListener('change', async (event) => {
-              try {
-                const nuevoEstatus = event.target.value;
-                const otId = event.target.dataset.otId;
-                if (!otId) return;
+              const nuevoEstatus = event.target.value;
+              const otId = event.target.dataset.otId;
+              if (!otId) return;
+              const estatusAnterior = orden.estatus;
 
+              try {
                 const response = await fetch('/api/mantenimiento', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', ...await authHeaders() },
                   body: JSON.stringify({ accion: 'actualizar_estatus', ot_id: otId, estatus: nuevoEstatus })
                 });
 
-                if (!response.ok) throw new Error('No se pudo actualizar el estatus');
+                if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({}));
+                  throw new Error(errorData.error || 'No se pudo actualizar el estatus');
+                }
+
+                orden.estatus = nuevoEstatus;
+                if (Array.isArray(dashState.ordenes)) {
+                  const enDash = dashState.ordenes.find((o) => String(o.id) === String(otId));
+                  if (enDash) enDash.estatus = nuevoEstatus;
+                }
+                renderDashboard();
                 showToast(`Estatus actualizado a ${nuevoEstatus}`);
               } catch (error) {
                 console.error('Error al cambiar estatus:', error);
+                event.target.value = estatusAnterior || 'NUEVA';
                 showToast(error.message || 'No se pudo actualizar');
               }
             });
@@ -1139,6 +1092,11 @@
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo guardar el seguimiento');
         showToast(`OT-${data.orden?.folio_ot ?? ''} actualizada`);
+        if (data.orden && Array.isArray(dashState.ordenes)) {
+          const idx = dashState.ordenes.findIndex((o) => String(o.id) === String(data.orden.id));
+          if (idx !== -1) dashState.ordenes[idx] = data.orden;
+          renderDashboard();
+        }
         if (generarPdf) await generarPDFOT(data.orden);
         cerrarSeguimiento();
         cargarOrdenes();
@@ -1317,35 +1275,66 @@
       const porUnidad = new Map();
       const porDia = new Map();
 
+      // Mapear órdenes de trabajo por reporte_id para asociar exactamente cada checklist con su OT
+      const ordenesList = dashState.ordenes || [];
+      const otPorReporte = new Map();
+      ordenesList.forEach((orden) => {
+        if (orden.reporte_id) {
+          otPorReporte.set(String(orden.reporte_id), orden);
+        }
+      });
+
       checklists.forEach((report) => {
         const fallas = fallasPorComponente(report);
         const numeros = numerosEconomicos(report);
         const dia = new Date(report.createdAt);
         const claveDia = Number.isNaN(dia.getTime()) ? 'Sin fecha' : `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
-        const registroDia = porDia.get(claveDia) || { value: 0, checklists: 0 };
+        const registroDia = porDia.get(claveDia) || { value: 0, checklists: 0, realizadas: 0 };
         registroDia.checklists += 1;
+
+        const otAsociada = otPorReporte.get(String(report.id));
+        const estaRealizada = Boolean(otAsociada && ESTATUS_REALIZADA.has(sinAcentos(otAsociada.estatus)));
+
         COMPONENTES.forEach(({ key }) => {
           fallas[key].forEach(({ categoria }) => {
             const cat = categoriaKey(categoria);
             const id = `${key}|${cat}`;
             const celda = celdas.get(id) || { componente: key, categoria: cat, label: String(categoria).toUpperCase(), reportadas: 0, realizadas: 0 };
             celda.reportadas += 1;
+            if (estaRealizada) {
+              celda.realizadas += 1;
+            }
             celdas.set(id, celda);
             if (numeros[key] !== 'S/N') porUnidad.set(numeros[key], (porUnidad.get(numeros[key]) || 0) + 1);
             registroDia.value += 1;
+            if (estaRealizada) registroDia.realizadas = (registroDia.realizadas || 0) + 1;
           });
         });
         porDia.set(claveDia, registroDia);
       });
 
-      // Fallas atendidas: OT terminadas/cerradas (su recurrencia agrupa reportes repetidos de la misma falla).
-      const atendidas = new Map();
+      // Considerar también órdenes de trabajo atendidas que no hayan sido vinculadas directamente a los checklists actuales
       ordenesFiltradas().forEach((orden) => {
         if (!ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) return;
-        const id = `${componenteKey(orden.componente)}|${categoriaKey(orden.sistema)}`;
-        atendidas.set(id, (atendidas.get(id) || 0) + Math.max(1, Number(orden.recurrencia) || 1));
+        if (orden.reporte_id && otPorReporte.has(String(orden.reporte_id))) return;
+
+        if (Array.isArray(orden.payload?.fallas) && orden.payload.fallas.length) {
+          orden.payload.fallas.forEach((f) => {
+            const cKey = componenteKey(f.componente);
+            const cat = categoriaKey(f.sistema || f.categoria);
+            const id = `${cKey}|${cat}`;
+            const celda = celdas.get(id);
+            if (celda && celda.realizadas < celda.reportadas) {
+              celda.realizadas += 1;
+            }
+          });
+        }
       });
-      celdas.forEach((celda, id) => { celda.realizadas = Math.min(celda.reportadas, atendidas.get(id) || 0); });
+
+      // Asegurar que realizadas nunca exceda reportadas
+      celdas.forEach((celda) => {
+        celda.realizadas = Math.min(celda.reportadas, celda.realizadas);
+      });
 
       return { checklists, celdas: [...celdas.values()], porUnidad, porDia };
     }
@@ -1375,10 +1364,11 @@
       };
       const ordenes = ordenesFiltradas();
       const otAbiertas = ordenes.filter((orden) => !ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)));
-      const reportesConOT = new Set((dashState.ordenes || []).map((orden) => orden.reporte_id).filter(Boolean));
+      const otCerradas = ordenes.filter((orden) => ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)));
+      const reportesConOT = new Set((dashState.ordenes || []).map((orden) => String(orden.reporte_id || '')).filter(Boolean));
       let fallasNuevas = 0;
       checklists.forEach((report) => {
-        if (reportesConOT.has(report.id)) return;
+        if (reportesConOT.has(String(report.id))) return;
         const porComp = fallasPorComponente(report);
         COMPONENTES.forEach(({ key }) => { fallasNuevas += porComp[key].length; });
       });
@@ -1386,7 +1376,7 @@
       $('kpiChecklistHoy').textContent = checklists.filter((report) => esHoy(report.createdAt)).length;
       $('kpiFallasNuevas').textContent = fallasNuevas;
       $('kpiOtAbiertas').textContent = otAbiertas.length;
-      $('kpiOtCerradas').textContent = ordenes.filter((orden) => sinAcentos(orden.estatus) === 'CERRADA').length;
+      $('kpiOtCerradas').textContent = otCerradas.length;
       $('kpiUnidadesDetenidas').textContent = new Set(otAbiertas.map((orden) => String(orden.unidad || '').trim()).filter(Boolean)).size;
 
       $('chartEstatus').innerHTML = chartDona([
@@ -1449,10 +1439,10 @@
         : 'Sin datos de OT: solo se muestran fallas reportadas';
     }
 
-    async function cargarDashboard() {
+    async function cargarDashboard(forzar = false) {
       $('dashEstado').textContent = 'Cargando métricas...';
       renderDashboard();
-      if (!dashState.cargando) {
+      if (!dashState.cargando || forzar) {
         dashState.cargando = fetch('/api/mantenimiento?tipo=ordenes', { headers: await authHeaders() })
           .then((response) => (response.ok ? response.json() : Promise.reject(new Error('No se pudieron cargar las OT'))))
           .then((data) => { dashState.ordenes = Array.isArray(data?.ordenes) ? data.ordenes : []; })
@@ -1501,7 +1491,7 @@
           // El dashboard usa todo el ancho: se oculta el panel lateral.
           $('panelLateral').classList.toggle('hidden', id === 'vista-dashboard');
           if (id === 'vista-dashboard') {
-            cargarDashboard();
+            cargarDashboard(true);
           }
         });
       }
