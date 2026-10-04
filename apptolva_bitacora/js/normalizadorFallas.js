@@ -1,79 +1,213 @@
 (function () {
-  const CATALOGO_SISTEMAS = [
-    { sistema: 'SUSPENSIÓN', palabrasClave: ['bujes', 'muelles', 'tirantes', 'amortiguador', 'bolsa de aire', 'lanza', 'tacones'] },
-    { sistema: 'FRENOS / AIRE', palabrasClave: ['freno', 'balata', 'matraca', 'camara', 'manguera', 'fuga de aire', 'siroco', 'valvula', 'presion'] },
-    { sistema: 'LLANTAS Y RINES', palabrasClave: ['llanta', 'ponchada', 'chipote', 'rin', 'birlo', 'tuerca', 'cambiar llantas', 'desgaste'] },
-    { sistema: 'CARROCERÍA / CHASIS', palabrasClave: ['parabrisas', 'golpe', 'defensa', 'cofre', 'puerta', 'manija', 'espejo', 'ganchos', 'cadena', 'plafonera'] },
-    { sistema: 'ELÉCTRICO / LUCES', palabrasClave: ['plafon', 'foco', 'calavera', 'faros', 'bateria', 'marcha', 'alternador', 'testigos', 'espias'] },
-    { sistema: 'QUINTA RUEDA', palabrasClave: ['quinta', 'mordaza', 'plato', 'juego de quinta'] },
-    { sistema: 'CLIMATIZACIÓN', palabrasClave: ['a/c', 'aire acondicionado', 'clima', 'compresor'] }
-  ];
-
-  const TEXTOS_INVALIDOS = ['ok', 'bien', 'sin novedad', 'sin falla', 'ninguna', 'n/a', 'limpio', 'normal', 'todo bien', ''];
-
   const COMPONENTES = [
-    { key: 'tracto', nombre: 'TRACTOCAMIÓN' },
-    { key: 'tolva1', nombre: 'TOLVA 1' },
-    { key: 'dolly', nombre: 'DOLLY' },
-    { key: 'tolva2', nombre: 'TOLVA 2' }
+    { key: 'tracto', nombre: 'TRACTOCAMIÓN', catKey: 'TRACTO' },
+    { key: 'tolva1', nombre: '1ra TOLVA', catKey: 'TOLVAS' },
+    { key: 'dolly', nombre: 'DOLLY', catKey: 'DOLLY' },
+    { key: 'tolva2', nombre: '2da TOLVA', catKey: 'TOLVAS' }
   ];
 
-  // Regla de negocio: las fallas OFICIALES vienen únicamente de payload.ticketsFallas
-  // (detalles_falla en el panel). Las observaciones en lenguaje coloquial del operador
-  // NUNCA se convierten en fallas: se devuelven aparte, solo como contexto.
-  function procesarReporteFallas(reporte) {
-    const fallas = [];
+  const TEXTOS_DESCARTABLES = [
+    'ok', 'bien', 'sin observaciones', 'sin novedad', 'ninguna', 'n/a',
+    'limpio', 'normal', 'todo bien', 'correcto', 's/n', 'nada', 'sin fallas'
+  ];
 
-    if (Array.isArray(reporte?.detalles_falla)) {
-      reporte.detalles_falla.forEach((item) => {
-        if (!item || typeof item !== 'object') return;
-        fallas.push({
-          componente: item.componente || 'TRACTOCAMIÓN',
-          sistema: item.categoria || item.sistema || 'CHECKLIST',
-          descripcion: item.falla || item.nombre || item.descripcion || 'Falla marcada en checklist',
-          origen: 'CHECKLIST'
-        });
-      });
-    }
-
-    return { fallas, observaciones: extraerObservaciones(reporte) };
+  function normalizarTexto(texto) {
+    return String(texto || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
   }
 
-  function extraerObservaciones(reporte) {
-    const observacionesRaw = reporte?.observaciones;
-    let obsObj = {};
+  function resolverCatalogo(catKey) {
+    const maestro = (typeof window !== 'undefined' && window.CATALOGO_MAESTRO_BACHOCO)
+      || globalThis.CATALOGO_MAESTRO_BACHOCO
+      || {};
+    return maestro[catKey] || [];
+  }
 
-    if (typeof observacionesRaw === 'string') {
-      try {
-        obsObj = JSON.parse(observacionesRaw);
-      } catch (error) {
-        obsObj = { tracto: observacionesRaw };
+  function clasificarTexto(frase, catalogo) {
+    const fraseNorm = normalizarTexto(frase);
+
+    for (const regla of catalogo) {
+      const terminos = Array.isArray(regla.terminosTaller) ? regla.terminosTaller : [];
+      const match = terminos.some((termino) => fraseNorm.includes(normalizarTexto(termino)));
+      if (match) {
+        return { categoria: regla.categoria, itemOficial: regla.itemOficial };
       }
-    } else if (observacionesRaw && typeof observacionesRaw === 'object') {
-      obsObj = observacionesRaw;
     }
 
-    const observaciones = [];
+    return { categoria: 'GENERAL / REVISIÓN TALLER', itemOficial: frase };
+  }
 
-    COMPONENTES.forEach((comp) => {
-      const texto = String(obsObj?.[comp.key] || '').trim();
-      const textoLimpio = texto.toLowerCase();
-      const esInvalido = TEXTOS_INVALIDOS.includes(textoLimpio) || textoLimpio.length < 3;
-      if (!esInvalido) {
-        observaciones.push({ componente: comp.nombre, texto });
+  function extraerObservacionesPorComponente(reporte) {
+    const obsRaw = reporte?.payload?.observaciones || reporte?.observaciones;
+    let obsMap = {};
+
+    if (typeof obsRaw === 'string') {
+      try {
+        obsMap = JSON.parse(obsRaw) || {};
+      } catch {
+        obsMap = { tracto: obsRaw };
       }
+    } else if (obsRaw && typeof obsRaw === 'object') {
+      obsMap = obsRaw;
+    }
+
+    return obsMap;
+  }
+
+  function extraerFallasChecklist(reporte) {
+    const p = reporte?.payload || reporte || {};
+    const fallasPorComp = { tracto: [], tolva1: [], dolly: [], tolva2: [] };
+
+    const mapearCompKey = (texto) => {
+      const t = normalizarTexto(texto);
+      if (t.includes('dolly')) return 'dolly';
+      if (/tolva\s*2|tolva2|2da\s*tolva/.test(t)) return 'tolva2';
+      if (/tolva\s*1|tolva1|1ra\s*tolva/.test(t)) return 'tolva1';
+      return 'tracto';
+    };
+
+    if (Array.isArray(p.checklistData) && p.checklistData.length) {
+      p.checklistData.forEach((seccion) => {
+        const cKey = fallasPorComp[seccion?.id] ? seccion.id : mapearCompKey(seccion?.titulo);
+
+        (seccion?.categorias || []).forEach((cat) => {
+          (cat?.items || []).forEach((it) => {
+            if (String(it?.estado || '').toUpperCase() === 'MAL') {
+              fallasPorComp[cKey].push({
+                item: it.item || it.nombre || 'Falla de inspección',
+                categoriaSugerida: cat.cat || cat.nombre || 'GENERAL'
+              });
+            }
+          });
+        });
+      });
+
+      return fallasPorComp;
+    }
+
+    const listaFallas = Array.isArray(p.detalles_falla)
+      ? p.detalles_falla
+      : (Array.isArray(p.ticketsFallas) ? p.ticketsFallas : []);
+
+    if (listaFallas.length) {
+      listaFallas.forEach((falla) => {
+        if (!falla || typeof falla !== 'object') return;
+        const cKey = mapearCompKey(falla.componente);
+        fallasPorComp[cKey].push({
+          item: falla.falla || falla.item || falla.nombre || falla.descripcion || 'Falla de inspección',
+          categoriaSugerida: falla.categoria || falla.sistema || 'GENERAL'
+        });
+      });
+
+      return fallasPorComp;
+    }
+
+    const marcadas = Array.isArray(p.checklist)
+      ? p.checklist.filter((item) => String(item?.estado || '').toUpperCase() === 'MAL').map((item) => item.item)
+      : (Array.isArray(p.fallas) ? p.fallas : []);
+
+    marcadas.forEach((clave) => {
+      const [comp, ...resto] = String(clave || '').split('-');
+      const cKey = fallasPorComp[comp] ? comp : 'tracto';
+      fallasPorComp[cKey].push({
+        item: resto.length ? resto.join(' ') : clave,
+        categoriaSugerida: 'GENERAL'
+      });
     });
 
-    return observaciones;
+    return fallasPorComp;
+  }
+
+  function procesarReporteFallas(reporte) {
+    const obsMap = extraerObservacionesPorComponente(reporte);
+    const fallasChecklist = extraerFallasChecklist(reporte);
+    const fallasOficiales = [];
+    const observacionesContexto = [];
+
+    COMPONENTES.forEach((comp) => {
+      const catalogo = resolverCatalogo(comp.catKey);
+      const textoNota = String(obsMap[comp.key] || '').trim();
+      const textoNorm = normalizarTexto(textoNota);
+      const tieneNotaValida = !TEXTOS_DESCARTABLES.includes(textoNorm) && textoNorm.length >= 3;
+
+      if (tieneNotaValida) {
+        observacionesContexto.push({ componente: comp.nombre, texto: textoNota });
+      }
+
+      const frasesNota = tieneNotaValida
+        ? textoNota.split(/[,;\n]+/)
+          .map((frase) => frase.trim())
+          .filter((frase) => frase.length >= 3 && !TEXTOS_DESCARTABLES.includes(normalizarTexto(frase)))
+        : [];
+
+      const fallasDelCheck = fallasChecklist[comp.key] || [];
+
+      fallasDelCheck.forEach((itemCheck) => {
+        const clasificacion = clasificarTexto(itemCheck.item, catalogo);
+        const categoriaFinal = clasificacion.categoria !== 'GENERAL / REVISIÓN TALLER'
+          ? clasificacion.categoria
+          : (String(itemCheck.categoriaSugerida || 'GENERAL').toUpperCase());
+
+        const fraseCoincidente = frasesNota.find((frase) => {
+          const fNorm = normalizarTexto(frase);
+          return fNorm.includes(normalizarTexto(itemCheck.item)) || fNorm.includes(normalizarTexto(categoriaFinal));
+        });
+
+        const descripcion = fraseCoincidente
+          ? `${clasificacion.itemOficial} (Detalle operador: "${fraseCoincidente}")`
+          : (clasificacion.itemOficial || itemCheck.item);
+
+        fallasOficiales.push({
+          componente: comp.nombre,
+          componenteKey: comp.key,
+          sistema: categoriaFinal,
+          categoria: categoriaFinal,
+          descripcion,
+          itemOficial: clasificacion.itemOficial,
+          origen: fraseCoincidente ? 'CHECKLIST + OBSERVACIÓN' : 'CHECKLIST'
+        });
+      });
+
+      frasesNota.forEach((frase) => {
+        const clasificacion = clasificarTexto(frase, catalogo);
+        const yaExisteEnChecklist = fallasOficiales.some((falla) => (
+          falla.componenteKey === comp.key
+          && (
+            normalizarTexto(falla.descripcion).includes(normalizarTexto(frase))
+            || falla.itemOficial === clasificacion.itemOficial
+          )
+        ));
+
+        if (!yaExisteEnChecklist) {
+          fallasOficiales.push({
+            componente: comp.nombre,
+            componenteKey: comp.key,
+            sistema: clasificacion.categoria,
+            categoria: clasificacion.categoria,
+            descripcion: `${clasificacion.itemOficial} (Reportado en nota: "${frase}")`,
+            itemOficial: clasificacion.itemOficial,
+            origen: 'OBSERVACIÓN OPERADOR'
+          });
+        }
+      });
+    });
+
+    return {
+      fallas: fallasOficiales,
+      observaciones: observacionesContexto
+    };
   }
 
   if (typeof window !== 'undefined') {
-    window.CATALOGO_SISTEMAS = CATALOGO_SISTEMAS;
     window.procesarReporteFallas = procesarReporteFallas;
+    window.clasificarFallasInspeccion = procesarReporteFallas;
   }
 
   if (typeof globalThis !== 'undefined') {
-    globalThis.CATALOGO_SISTEMAS = CATALOGO_SISTEMAS;
     globalThis.procesarReporteFallas = procesarReporteFallas;
+    globalThis.clasificarFallasInspeccion = procesarReporteFallas;
   }
 })();

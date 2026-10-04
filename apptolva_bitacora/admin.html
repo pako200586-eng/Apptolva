@@ -197,7 +197,7 @@
             <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Fallas nuevas</p><strong id="kpiFallasNuevas" class="text-3xl text-[#7c2d12]">0</strong><p class="text-[10px] font-bold text-slate-400">Sin OT generada</p></div>
             <div class="panel-card rounded-lg border-red-200 p-4 text-center"><p class="text-xs font-bold uppercase text-red-700">OT abiertas</p><strong id="kpiOtAbiertas" class="text-3xl text-red-600">0</strong></div>
             <div class="panel-card rounded-lg border-green-200 p-4 text-center"><p class="text-xs font-bold uppercase text-green-700">OT terminadas / cerradas</p><strong id="kpiOtCerradas" class="text-3xl text-green-700">0</strong></div>
-            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Unidades detenidas</p><strong id="kpiUnidadesDetenidas" class="text-3xl text-[#294936]">0</strong><p class="text-[10px] font-bold text-slate-400">Con OT abierta</p></div>
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Unidades en atención</p><strong id="kpiUnidadesDetenidas" class="text-3xl text-[#294936]">0</strong><p class="text-[10px] font-bold text-slate-400">Con OT abierta en taller</p></div>
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -831,7 +831,7 @@
 
       const bloqueObs = observaciones.length ? `
         <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Observaciones del operador (solo contexto)</p>
+          <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Observaciones del operador</p>
           ${observaciones.map((obs) => `<p class="mt-1 text-xs italic text-slate-600"><strong>${escapeHtml(obs.componente)}:</strong> “${escapeHtml(obs.texto)}”</p>`).join('')}
         </div>` : '';
 
@@ -870,8 +870,6 @@
         contenedor.innerHTML = '';
 
         reportesFiltrados.forEach((reporte) => {
-          // Fallas oficiales: únicamente payload.ticketsFallas del checklist.
-          // Las observaciones coloquiales del operador solo se muestran como contexto.
           const { fallas, observaciones } = window.procesarReporteFallas
             ? window.procesarReporteFallas(reporte)
             : { fallas: [], observaciones: [] };
@@ -1275,12 +1273,17 @@
       const porUnidad = new Map();
       const porDia = new Map();
 
-      // Mapear órdenes de trabajo por reporte_id para asociar exactamente cada checklist con su OT
       const ordenesList = dashState.ordenes || [];
       const otPorReporte = new Map();
+      const reparacionesCerradas = new Set();
+
       ordenesList.forEach((orden) => {
-        if (orden.reporte_id) {
-          otPorReporte.set(String(orden.reporte_id), orden);
+        if (orden.reporte_id) otPorReporte.set(String(orden.reporte_id), orden);
+
+        if (ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) {
+          const unidad = String(orden.unidad || '').toUpperCase().trim();
+          const categoria = categoriaKey(orden.sistema || orden.categoria || '');
+          reparacionesCerradas.add(`${unidad}|${categoria}`);
         }
       });
 
@@ -1293,45 +1296,35 @@
         registroDia.checklists += 1;
 
         const otAsociada = otPorReporte.get(String(report.id));
-        const estaRealizada = Boolean(otAsociada && ESTATUS_REALIZADA.has(sinAcentos(otAsociada.estatus)));
+        const tieneOTTerminadaDirecta = Boolean(
+          otAsociada && ESTATUS_REALIZADA.has(sinAcentos(otAsociada.estatus))
+        );
 
         COMPONENTES.forEach(({ key }) => {
+          const numUnidad = numeros[key];
           fallas[key].forEach(({ categoria }) => {
             const cat = categoriaKey(categoria);
             const id = `${key}|${cat}`;
             const celda = celdas.get(id) || { componente: key, categoria: cat, label: String(categoria).toUpperCase(), reportadas: 0, realizadas: 0 };
             celda.reportadas += 1;
+
+            const claveReparacion = `${String(numUnidad).toUpperCase().trim()}|${cat}`;
+            const estaRealizada = tieneOTTerminadaDirecta || reparacionesCerradas.has(claveReparacion);
             if (estaRealizada) {
               celda.realizadas += 1;
+              registroDia.realizadas = (registroDia.realizadas || 0) + 1;
             }
+
             celdas.set(id, celda);
-            if (numeros[key] !== 'S/N') porUnidad.set(numeros[key], (porUnidad.get(numeros[key]) || 0) + 1);
+            if (numUnidad !== 'S/N' && key === 'tracto') {
+              porUnidad.set(numUnidad, (porUnidad.get(numUnidad) || 0) + 1);
+            }
             registroDia.value += 1;
-            if (estaRealizada) registroDia.realizadas = (registroDia.realizadas || 0) + 1;
           });
         });
         porDia.set(claveDia, registroDia);
       });
 
-      // Considerar también órdenes de trabajo atendidas que no hayan sido vinculadas directamente a los checklists actuales
-      ordenesFiltradas().forEach((orden) => {
-        if (!ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) return;
-        if (orden.reporte_id && otPorReporte.has(String(orden.reporte_id))) return;
-
-        if (Array.isArray(orden.payload?.fallas) && orden.payload.fallas.length) {
-          orden.payload.fallas.forEach((f) => {
-            const cKey = componenteKey(f.componente);
-            const cat = categoriaKey(f.sistema || f.categoria);
-            const id = `${cKey}|${cat}`;
-            const celda = celdas.get(id);
-            if (celda && celda.realizadas < celda.reportadas) {
-              celda.realizadas += 1;
-            }
-          });
-        }
-      });
-
-      // Asegurar que realizadas nunca exceda reportadas
       celdas.forEach((celda) => {
         celda.realizadas = Math.min(celda.reportadas, celda.realizadas);
       });
