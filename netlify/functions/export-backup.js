@@ -9,7 +9,6 @@ export default async (req) => {
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
-  // Descarga directa con clave secreta en la URL (?clave=tolva123)
   const url = new URL(req.url);
   if (url.searchParams.get("clave") !== "tolva123") {
     return new Response(JSON.stringify({ error: "Clave no válida. Usa ?clave=tolva123" }), {
@@ -18,37 +17,45 @@ export default async (req) => {
     });
   }
 
+  // Permite descargar en partes de 500 registros para no superar los 6 MB
+  const parte = parseInt(url.searchParams.get("parte") || "1", 10);
+  const limite = 500;
+  const offset = (parte - 1) * limite;
+
   const database = getDatabase();
   const client = await database.pool.connect();
 
   try {
-    // 1. Extraer los 1,161 reportes completos de la base de datos
-    const reportsRes = await client.query(`SELECT * FROM bitacora_reports ORDER BY created_at ASC`);
+    const reportsRes = await client.query(
+      `SELECT * FROM bitacora_reports ORDER BY created_at ASC LIMIT $1 OFFSET $2`,
+      [limite, offset]
+    );
 
-    // 2. Extraer todas las Órdenes de Trabajo
-    const ordenesRes = await client.query(`SELECT * FROM ordenes_trabajo ORDER BY fecha_apertura ASC`);
+    let ordenes = [];
+    let seguimiento = [];
 
-    // 3. Extraer todo el Historial de Seguimiento
-    const seguimientoRes = await client.query(`SELECT * FROM ot_seguimiento ORDER BY fecha ASC`);
+    // En la parte 3 (o final) se incluyen también las Órdenes de Trabajo y su Seguimiento
+    if (parte >= 3 || reportsRes.rows.length < limite) {
+      const ordenesRes = await client.query(`SELECT * FROM ordenes_trabajo ORDER BY fecha_apertura ASC`);
+      const seguimientoRes = await client.query(`SELECT * FROM ot_seguimiento ORDER BY fecha ASC`);
+      ordenes = ordenesRes.rows;
+      seguimiento = seguimientoRes.rows;
+    }
 
-    const backupCompleto = {
+    const backupParte = {
       sistema: "AppTolva Bachoco",
-      fecha_exportacion: new Date().toISOString(),
-      totales: {
-        reportes: reportsRes.rows.length,
-        ordenes: ordenesRes.rows.length,
-        seguimientos: seguimientoRes.rows.length,
-      },
+      parte,
+      total_en_esta_parte: reportsRes.rows.length,
       bitacora_reports: reportsRes.rows,
-      ordenes_trabajo: ordenesRes.rows,
-      ot_seguimiento: seguimientoRes.rows,
+      ordenes_trabajo: ordenes,
+      ot_seguimiento: seguimiento,
     };
 
-    return new Response(JSON.stringify(backupCompleto, null, 2), {
+    return new Response(JSON.stringify(backupParte, null, 2), {
       status: 200,
       headers: {
         "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": `attachment; filename=apptolva_backup_${new Date().toISOString().slice(0, 10)}.json`,
+        "Content-Disposition": `attachment; filename=apptolva_backup_parte${parte}.json`,
         ...corsHeaders,
       },
     });
