@@ -1,22 +1,28 @@
 import { getDatabase } from "@netlify/database";
+import { authorizeRequest } from "../lib/firebase-auth.js";
 
 export default async (req) => {
+  const requestOrigin = req.headers.get("origin");
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": requestOrigin || "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Vary": "Origin",
   };
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
-  const url = new URL(req.url);
-  if (url.searchParams.get("clave") !== "tolva123") {
-    return new Response(JSON.stringify({ error: "Clave no válida. Usa ?clave=tolva123" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", ...corsHeaders }
+  const authorizationError = await authorizeRequest(req, corsHeaders);
+  if (authorizationError) return authorizationError;
+
+  if (req.method !== "GET") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
 
+  const url = new URL(req.url);
   // Permite descargar en partes de 500 registros para no superar los 6 MB
   const parte = parseInt(url.searchParams.get("parte") || "1", 10);
   const limite = 500;
