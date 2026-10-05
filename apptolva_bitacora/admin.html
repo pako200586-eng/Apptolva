@@ -9,7 +9,6 @@
   <script src="./js/jspdf.min.js"></script>
   <script src="./js/catalogoBachoco.js"></script>
   <script src="./js/normalizadorFallas.js"></script>
-  <script src="./js/procesadorInspeccion.js"></script>
   <script src="./js/generarPDF_OT.js"></script>
   <link rel="stylesheet" href="./css/fontawesome.min.css">
   <style>
@@ -94,7 +93,7 @@
         <div class="mt-3 flex flex-wrap gap-2">
           <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv mr-2"></i>Excel CSV (Resumen checklist)</button>
           <button id="exportPdf" class="rounded-md border border-[#7c2d12] px-3 py-2 text-sm font-bold text-[#7c2d12]"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
-          <span id="syncState" class="ml-auto text-xs font-bold uppercase tracking-wide text-slate-500">Esperando datos</span>
+          <span id="syncState" class="ml-auto text-xs font-bold uppercase tracking-wide text-slate-500">Conectado a Firebase Firestore</span>
         </div>
       </div>
 
@@ -265,17 +264,6 @@
 
         <aside id="panelLateral" class="space-y-5">
           <section class="panel-card rounded-lg p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="font-black text-[#7c2d12]">Pendientes offline</h2>
-              <span id="pendingCount" class="rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-[#7c2d12]">0</span>
-            </div>
-            <div id="pendingList" class="mt-3 space-y-2 text-sm text-slate-700"></div>
-            <button id="forceSyncBtn" class="mt-3 w-full rounded-md bg-[#294936] px-4 py-2 text-sm font-black text-white hover:bg-[#203b2b]">
-              <i class="fas fa-rotate mr-2"></i>Forzar sincronización
-            </button>
-          </section>
-
-          <section class="panel-card rounded-lg p-4">
             <h2 class="font-black text-[#7c2d12]">Resumen operativo</h2>
             <p class="mt-1 text-xs text-slate-500">Actividad de la flota según los reportes filtrados.</p>
             <div class="mt-3">
@@ -338,6 +326,19 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      query as fsQuery,
+      where as fsWhere,
+      orderBy as fsOrderBy,
+      limit as fsLimit,
+      getDocs,
+      doc,
+      setDoc,
+      updateDoc,
+      runTransaction
+    } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "__FIREBASE_API_KEY__",
@@ -351,14 +352,10 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
+
     const state = { user: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '' };
     const $ = (id) => document.getElementById(id);
-
-    async function authHeaders() {
-      if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
-      const idToken = await state.user.getIdToken();
-      return { Authorization: `Bearer ${idToken}` };
-    }
 
     function filters() {
       const params = new URLSearchParams();
@@ -375,7 +372,8 @@
     }
 
     function coincideFiltroGlobal(record, fields) {
-      const { from, to, unit, operator } = state.appliedFilters;
+      const { from, to, unit, operator, type } = state.appliedFilters;
+      if (type && type !== 'todos' && String(record.type || '').toLowerCase() !== type.toLowerCase()) return false;
       if (unit && !String(record[fields.unit] || '').toLowerCase().includes(unit.toLowerCase())) return false;
       if (operator && !String(record[fields.operator] || '').toLowerCase().includes(operator.toLowerCase())) return false;
       if (from || to) {
@@ -443,7 +441,8 @@
               <span class="rounded-full bg-white px-2 py-1 text-xs font-black text-[#7c2d12]">${count}</span>
             </div>`).join('')
         : '<p class="text-sm text-slate-500">Sin datos con los filtros actuales.</p>';
-      $('topUnidades').innerHTML = rows(tally('unitId'));$('topOperadores').innerHTML = rows(tally('driverName'));
+      $('topUnidades').innerHTML = rows(tally('unitId'));
+      $('topOperadores').innerHTML = rows(tally('driverName'));
     }
 
     function render(data, options = {}) {
@@ -454,10 +453,10 @@
       $('statHoy').textContent = summary.hoy || 0;
       $('statOperadores').textContent = summary.operadores || 0;
       $('statUnidades').textContent = summary.unidades || 0;
-      $('syncState').textContent = `Actualizado ${formatDate(data.generatedAt)}`;
+      $('syncState').textContent = `Firebase Firestore · ${formatDate(data.generatedAt)}`;
 
       const total = Number(summary.total || 0);
-      if (state.lastTotal && total > state.lastTotal) showToast(`${total - state.lastTotal} reporte(s) nuevo(s) sincronizado(s)`);
+      if (state.lastTotal && total > state.lastTotal) showToast(`${total - state.lastTotal} reporte(s) nuevo(s) en Firebase`);
       state.lastTotal = total;
       state.reports = data.reports || [];
       if (!data.filtered) state.allReports = state.reports;
@@ -465,31 +464,76 @@
       const signature = state.reports.map((report) => `${report.id}:${report.syncStatus}`).join('|');
       if (!(options.silent && signature === state.tableSignature)) {
         state.tableSignature = signature;
-        $('tabla-datos').innerHTML = state.reports.map(reportRowHtml).join('');$('emptyState').classList.toggle('hidden', state.reports.length > 0);
+        $('tabla-datos').innerHTML = state.reports.map(reportRowHtml).join('');
+        $('emptyState').classList.toggle('hidden', state.reports.length > 0);
         renderResumen();
         renderDashboard();
       }
-
-      const pending = JSON.parse(localStorage.getItem('apptolvaPendingNotices') || '[]');
-      $('pendingCount').textContent = pending.length;
-      $('pendingList').innerHTML = pending.length
-        ? pending.slice(-6).reverse().map((item) => `<div class="rounded-md bg-orange-50 p-3 font-bold">Reporte pendiente del operador ${escapeHtml(item.operator || 'sin nombre')}<br><span class="text-xs text-slate-500">${escapeHtml(item.folio || item.id)}</span></div>`).join('')
-        : '<p class="text-sm text-slate-500">Sin pendientes detectados en este navegador.</p>';
     }
 
+    // CARGA DIRECTA DESDE FIREBASE FIRESTORE (Costo $0 en Netlify)
     async function cargarDatos(params = filtrosAplicados(), options = {}) {
       if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
-      const query = (params || filtrosAplicados()).toString();
       if (!options.silent) {
-        $('syncState').textContent = 'Consultando reportes...';$('tabla-datos').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes...</td></tr>';
+        $('syncState').textContent = 'Consultando Firebase Firestore...';
+        $('tabla-datos').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">Cargando reportes desde Firebase...</td></tr>';
       }
 
-      const response = await fetch(`/api/admin-reports${query ? `?${query}` : ''}`, { headers: await authHeaders() });
-      if (response.status === 401) throw new Error('La sesión venció o no es válida');
-      if (!response.ok) throw new Error('No se pudieron cargar los reportes');
+      try {
+        const reportsCol = collection(db, 'bitacora_reports');
+        const q = fsQuery(reportsCol, fsOrderBy('created_at', 'desc'), fsLimit(1500));
+        const snapshot = await getDocs(q);
 
-      const data = await response.json();
-      render({ ...data, filtered: Boolean(query) }, options);
+        const rawReports = [];
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data();
+          const p = d.payload || {};
+          rawReports.push({
+            id: docSnap.id,
+            folio: d.folio || p.folio || '',
+            type: d.report_type || p.reportType || 'checklist',
+            unitId: d.unit_id || p.unitId || '',
+            driverName: d.driver_name || p.driverName || '',
+            employeeNumber: p.employeeNumber || p.numeroEmpleado || '',
+            license: d.license || '',
+            priority: d.priority || 'baja',
+            syncStatus: d.sync_status || 'sincronizado',
+            createdAt: d.created_at || p.fecha || new Date().toISOString(),
+            payload: p
+          });
+        });
+
+        const filteredReports = rawReports.filter((rep) =>
+          coincideFiltroGlobal(rep, { unit: 'unitId', operator: 'driverName', date: 'createdAt' })
+        );
+
+        const hoy = new Date();
+        const esHoy = (valor) => {
+          const f = new Date(valor);
+          return !isNaN(f.getTime()) && f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth() && f.getDate() === hoy.getDate();
+        };
+
+        const summary = {
+          total: rawReports.length,
+          checklist: rawReports.filter((r) => r.type === 'checklist').length,
+          bitacoras: rawReports.filter((r) => r.type === 'bitacora').length,
+          hoy: rawReports.filter((r) => esHoy(r.createdAt)).length,
+          operadores: new Set(rawReports.map((r) => r.driverName).filter(Boolean)).size,
+          unidades: new Set(rawReports.map((r) => r.unitId).filter(Boolean)).size
+        };
+
+        render({
+          summary,
+          reports: filteredReports,
+          generatedAt: new Date().toISOString(),
+          filtered: Boolean(state.appliedFilters.from || state.appliedFilters.to || state.appliedFilters.unit || state.appliedFilters.operator || (state.appliedFilters.type && state.appliedFilters.type !== 'todos'))
+        }, options);
+
+      } catch (error) {
+        console.error('Error al consultar Firestore:', error);
+        $('tabla-datos').innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error al consultar Firestore: ${escapeHtml(error.message)}</td></tr>`;
+        showToast(error.message);
+      }
     }
 
     function loginErrorMessage(error) {
@@ -502,12 +546,16 @@
       return messages[error.code] || 'No se pudo iniciar sesión. Verifica tus datos.';
     }
 
-    $('loginForm').addEventListener('submit', async (event) => {       event.preventDefault();$('loginBtn').disabled = true;
+    $('loginForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      $('loginBtn').disabled = true;
       $('loginMsg').classList.add('hidden');
       try {
-        await signInWithEmailAndPassword(auth, $('adminEmail').value.trim(), $('adminPassword').value);$('adminPassword').value = '';
+        await signInWithEmailAndPassword(auth, $('adminEmail').value.trim(), $('adminPassword').value);
+        $('adminPassword').value = '';
       } catch (error) {
-        $('loginMsg').textContent = loginErrorMessage(error);$('loginMsg').classList.remove('hidden');
+        $('loginMsg').textContent = loginErrorMessage(error);
+        $('loginMsg').classList.remove('hidden');
       } finally {
         $('loginBtn').disabled = false;
       }
@@ -519,6 +567,7 @@
       cargarDatos().catch((error) => showToast(error.message));
       cargarDashboard(true).catch(() => {});
     });
+
     $('applyFilters').addEventListener('click', () => {
       const params = filters();
       state.appliedFilters = {
@@ -533,25 +582,6 @@
         .catch((error) => showToast(error.message));
     });
 
-    $('forceSyncBtn').addEventListener('click', async () => {
-      try {
-        const registration = await navigator.serviceWorker?.ready;
-        if (registration?.active) {
-          registration.active.postMessage({ type: 'SYNC_NOW' });
-          if ('sync' in registration) {
-            registration.sync.register('sync-reportes').catch(() => {});
-          }
-          showToast('Sincronización forzada: enviando reportes pendientes...');
-        } else {
-          showToast('Service worker no disponible en este dispositivo');
-        }
-      } catch (error) {
-        showToast('No se pudo forzar la sincronización');
-      }
-      setTimeout(() => cargarDatos().catch(() => {}), 2500);
-    });
-
-    // ===== Resumen técnico del checklist (mismo formato que la hoja "RESUMENES DE CHECK LIST") =====
     const COMPONENTES = [
       { key: 'tracto', nombre: 'Tracto' },
       { key: 'tolva1', nombre: 'Tolva 1' },
@@ -567,7 +597,6 @@
       return 'tracto';
     }
 
-    // Número económico de cada componente (S/N si el operador no lo capturó).
     function numerosEconomicos(report) {
       const p = report.payload || {};
       const limpio = (valor) => String(valor ?? '').trim() || 'S/N';
@@ -579,37 +608,19 @@
       };
     }
 
-    // Fallas (ítems marcados MAL) agrupadas por componente, conservando su categoría.
     function fallasPorComponente(report) {
-      const p = report.payload || {};
       const resultado = { tracto: [], tolva1: [], dolly: [], tolva2: [] };
+      if (typeof window.procesarReporteFallas !== 'function') return resultado;
 
-      if (Array.isArray(p.checklistData) && p.checklistData.length) {
-        p.checklistData.forEach((seccion) => {
-          const destino = resultado[seccion?.id] || resultado[componenteKey(seccion?.titulo)];
-          (seccion?.categorias || []).forEach((cat) => {
-            (cat?.items || []).forEach((it) => {
-              if (it?.estado === 'MAL') destino.push({ categoria: cat.cat || 'GENERAL', item: it.item });
-            });
+      const { fallas } = window.procesarReporteFallas(report);
+      fallas.forEach((f) => {
+        const key = f.componenteKey || 'tracto';
+        if (resultado[key]) {
+          resultado[key].push({
+            categoria: f.categoria || f.sistema || 'GENERAL',
+            item: f.descripcion || f.itemOficial
           });
-        });
-        return resultado;
-      }
-
-      if (Array.isArray(p.ticketsFallas) && p.ticketsFallas.length) {
-        p.ticketsFallas.forEach((t) => {
-          resultado[componenteKey(t?.componente)].push({ categoria: t?.categoria || 'GENERAL', item: t?.falla || '' });
-        });
-        return resultado;
-      }
-
-      const marcadas = Array.isArray(p.checklist)
-        ? p.checklist.filter((c) => c?.estado === 'MAL').map((c) => c.item)
-        : (Array.isArray(p.fallas) ? p.fallas : []);
-      marcadas.forEach((clave) => {
-        const [comp, ...resto] = String(clave || '').split('-');
-        const destino = resultado[comp] ? comp : 'tracto';
-        resultado[destino].push({ categoria: 'GENERAL', item: resultado[comp] ? resto.join('-') : clave });
+        }
       });
       return resultado;
     }
@@ -653,7 +664,6 @@
       if (!checklists.length) return showToast('No hay checklist para exportar con los filtros actuales');
 
       const header = ['Fecha', 'Operador', 'Unidad', 'Fallas Tracto', 'Fallas Tolva 1', 'Fallas Dolly', 'Fallas Tolva 2', 'Notas Tracto', 'Notas Tolva 1', 'Notas Dolly', 'Notas Tolva 2'];
-      // Orden cronológico ascendente, igual que la bitácora de taller.
       const lines = [...checklists]
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
         .map((report) => {
@@ -667,8 +677,7 @@
           ].map((value) => `"${String(value ?? '').replace(/\r?\n/g, ' ').replaceAll('"', '""').trim()}"`).join(',');
         });
 
-      // BOM UTF-8 para que Excel respete acentos (ELÉCTRICO, CARROCERÍA...).
-      const blob = new Blob(['﻿' + [header.join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob(['\uFEFF' + [header.join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -706,8 +715,10 @@
         : null;
 
       state.user = authenticatedUser;
-      $('loginPanel').classList.toggle('hidden', Boolean(authenticatedUser));$('dashboard').classList.toggle('hidden', !authenticatedUser);
-      $('logoutBtn').classList.toggle('hidden', !authenticatedUser);$('refreshBtn').disabled = !authenticatedUser;
+      $('loginPanel').classList.toggle('hidden', Boolean(authenticatedUser));
+      $('dashboard').classList.toggle('hidden', !authenticatedUser);
+      $('logoutBtn').classList.toggle('hidden', !authenticatedUser);
+      $('refreshBtn').disabled = !authenticatedUser;
 
       if (!authenticatedUser) {
         state.reports = [];
@@ -722,32 +733,9 @@
         await cargarDatos();
         cargarDashboard().catch(() => {});
       } catch (error) {
-        $('tabla-datos').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error al cargar los datos</td></tr>';
         showToast(error.message);
       }
     });
-
-    setInterval(() => {
-      if (state.user && document.visibilityState === 'visible') {
-        cargarDatos(filtrosAplicados(), { silent: true }).catch(() => {});
-        cargarDashboard().catch(() => {});
-      }
-    }, 180000);
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data?.type === 'REPORT_QUEUED') {
-          const pending = JSON.parse(localStorage.getItem('apptolvaPendingNotices') || '[]');
-          pending.push({ id: event.data.id, folio: event.data.folio, operator: event.data.operator });
-          localStorage.setItem('apptolvaPendingNotices', JSON.stringify(pending.slice(-20)));
-          showToast('Reporte guardado offline pendiente de sincronizar');
-        }
-        if (event.data?.type === 'REPORT_SYNCED') {
-          if (state.user) cargarDatos(filtrosAplicados(), { silent: true }).catch(() => {});
-          showToast('Service worker sincronizó un reporte');
-        }
-      });
-    }
 
     async function generarPDFOT(orden) {
       if (typeof window.imprimirOT_Bachoco !== 'function') {
@@ -768,60 +756,142 @@
       if (btnOrdenes) btnOrdenes.click();
     }
 
+    // CREACIÓN DIRECTA DE OT EN FIRESTORE
     async function crearOTDesdeReporte(reporte, fallas, observaciones) {
       try {
-        const response = await fetch('/api/mantenimiento', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...await authHeaders() },
-          body: JSON.stringify({
-            reporte_id: reporte.reporte_id,
-            folio_bitacora: reporte.folio,
-            unidad: reporte.unidad,
-            operador: reporte.operador,
-            fecha: reporte.fecha,
-            fallas,
-            observaciones: observaciones.map((obs) => `${obs.componente}: ${obs.texto}`).join('\n'),
-          })
+        const reporteId = String(reporte.id || reporte.reporte_id || '').trim();
+        if (!reporteId) throw new Error('Falta el identificador del reporte para generar la OT.');
+
+        // Validar si ya existe OT para este reporte
+        if (Array.isArray(dashState.ordenes)) {
+          const existente = dashState.ordenes.find((o) => String(o.reporte_id) === reporteId);
+          if (existente) {
+            alert('Esta Orden de Trabajo ya fue creada anteriormente.');
+            mostrarVistaOrdenes();
+            abrirSeguimiento(existente);
+            return;
+          }
+        }
+        const existentes = await getDocs(fsQuery(
+          collection(db, 'ordenes_trabajo'),
+          fsWhere('reporte_id', '==', reporteId)
+        ));
+        if (!existentes.empty) {
+          const existenteSnap = existentes.docs[0];
+          const existente = { id: existenteSnap.id, ...existenteSnap.data() };
+          if (Array.isArray(dashState.ordenes)) dashState.ordenes.unshift(existente);
+          alert('Esta Orden de Trabajo ya fue creada anteriormente.');
+          mostrarVistaOrdenes();
+          abrirSeguimiento(existente);
+          return;
+        }
+
+        const otId = crypto.randomUUID().replace(/-/g, '');
+        const segId = crypto.randomUUID().replace(/-/g, '');
+        const fechaActual = new Date().toISOString();
+        const unicos = (arr) => [...new Set(arr.filter(Boolean))];
+        const componente = unicos(fallas.map((f) => f.componente)).join(', ') || 'TRACTOCAMIÓN';
+        const sistema = unicos(fallas.map((f) => f.sistema || f.categoria)).join(', ') || 'GENERAL';
+        const descripcion = fallas.map((f) => `${f.componente} | ${f.sistema || f.categoria}: ${f.descripcion || f.itemOficial}`).join('\n');
+        const obsTexto = observaciones.map((o) => `${o.componente}: ${o.texto}`).join('\n');
+
+        const refCandado = doc(db, 'ot_por_reporte', reporteId);
+        const refContador = doc(db, 'sistema', 'contadores');
+        const refOT = doc(db, 'ordenes_trabajo', otId);
+        const refSeguimiento = doc(db, 'ot_seguimiento', segId);
+
+        const nuevaOT = await runTransaction(db, async (transaction) => {
+          const snapCandado = await transaction.get(refCandado);
+
+          if (snapCandado.exists()) {
+            let existente = null;
+            const otIdExistente = snapCandado.data().ot_id;
+            if (otIdExistente) {
+              const snapshotOT = await transaction.get(doc(db, 'ordenes_trabajo', otIdExistente));
+              if (snapshotOT.exists()) {
+                existente = { id: snapshotOT.id, ...snapshotOT.data() };
+              }
+            }
+            return { creada: false, orden: existente };
+          }
+
+          const snapContador = await transaction.get(refContador);
+          const maxFolioLocal = (dashState.ordenes || []).reduce((max, orden) => {
+            const folio = Number.parseInt(orden.folio_ot, 10);
+            return Number.isFinite(folio) ? Math.max(max, folio) : max;
+          }, 164);
+          const folioGuardado = Number(snapContador.data()?.folio_ot_actual) || 164;
+          const nuevoFolio = Math.max(maxFolioLocal, folioGuardado) + 1;
+
+          const datosOT = {
+            id: otId,
+            folio_ot: nuevoFolio,
+            reporte_id: reporteId,
+            unidad: reporte.unitId || reporte.unidad || 'N/A',
+            operador: reporte.driverName || reporte.operador || 'No especificado',
+            componente,
+            sistema,
+            descripcion_falla: descripcion,
+            comentarios_operador: obsTexto || null,
+            estatus: 'NUEVA',
+            fecha_apertura: fechaActual,
+            updated_at: fechaActual,
+            recurrencia: 1,
+            electromecanico: '',
+            proveedor_externo: '',
+            supervisor_mantenimiento: '',
+            fecha_realizacion: null,
+            kilometraje: reporte.payload?.km || '',
+            comentarios_ejecutor: '',
+            payload: { ...reporte.payload, fallas }
+          };
+
+          transaction.set(refCandado, { ot_id: otId, folio_ot: nuevoFolio, fecha: fechaActual });
+          transaction.set(refContador, { folio_ot_actual: nuevoFolio }, { merge: true });
+          transaction.set(refOT, datosOT);
+          transaction.set(refSeguimiento, {
+            id: segId,
+            ot_id: otId,
+            accion: 'CREACIÓN',
+            usuario: state.user?.email || 'Supervisor (panel)',
+            comentario: `OT generada con ${fallas.length} falla(s) del reporte ${reporte.folio || reporteId}.`,
+            fecha: fechaActual
+          });
+
+          return { creada: true, orden: datosOT };
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'No se pudo generar la OT');
-        }
-
-        const data = await response.json();
-
-        if (!data.success) {
-          showToast('Error al generar la OT: ' + (data.error || 'Desconocido'));
-          return;
-        }
-
-        if (data.duplicada) {
-          alert(data.mensaje || 'Esta Orden de Trabajo ya fue creada');
-          mostrarVistaOrdenes();
-          if (data.orden) abrirSeguimiento(data.orden);
-          return;
-        }
-
-        alert(`OT generada con éxito. Folio: OT-${data.orden.folio_ot}\nIncluye ${fallas.length} falla(s) de la unidad ${reporte.unidad}.`);
-        if (data.orden) {
-          if (Array.isArray(dashState.ordenes)) {
-            dashState.ordenes.unshift(data.orden);
+        if (!nuevaOT.creada) {
+          if (nuevaOT.orden && Array.isArray(dashState.ordenes)) {
+            dashState.ordenes = [
+              nuevaOT.orden,
+              ...dashState.ordenes.filter((orden) => orden.id !== nuevaOT.orden.id)
+            ];
+            mostrarVistaOrdenes();
+            abrirSeguimiento(nuevaOT.orden);
           }
-          renderDashboard();
+          alert('Esta Orden de Trabajo ya fue creada por otro supervisor.');
+          return;
         }
-        await generarPDFOT(data.orden);
+        const ordenCreada = nuevaOT.orden;
+        alert(`OT generada con éxito en Firebase. Folio: OT-${ordenCreada.folio_ot}\nIncluye ${fallas.length} falla(s) de la unidad ${ordenCreada.unidad}.`);
+
+        if (Array.isArray(dashState.ordenes)) {
+          dashState.ordenes.unshift(ordenCreada);
+        }
+        renderDashboard();
+        await generarPDFOT(ordenCreada);
         cargarFallas();
         mostrarVistaOrdenes();
       } catch (error) {
-        console.error('Error POST:', error);
-        showToast(error.message || 'Error de comunicación con el servidor.');
+        console.error('Error al crear OT:', error);
+        showToast(error.message || 'Error al guardar la OT en Firebase');
       }
     }
 
     function tarjetaFallaHtml(reporte, fallas, observaciones) {
-      const inc = `INC-${String(reporte.reporte_id || '').slice(0, 6).toUpperCase() || 'S/N'}`;
-      const fecha = reporte.fecha ? new Date(reporte.fecha).toLocaleDateString('es-MX') : 'Sin fecha';
+      const inc = `INC-${String(reporte.id || '').slice(0, 6).toUpperCase() || 'S/N'}`;
+      const fecha = reporte.createdAt ? new Date(reporte.createdAt).toLocaleDateString('es-MX') : 'Sin fecha';
 
       const listaFallas = fallas.map((falla) => `
         <li class="flex items-start gap-2 text-sm">
@@ -839,8 +909,8 @@
         <div class="flex items-start justify-between gap-2">
           <div>
             <p class="text-xs font-black text-slate-400">${escapeHtml(inc)} · Folio ${escapeHtml(reporte.folio || 'S/F')}</p>
-            <h3 class="text-lg font-black text-[#7c2d12]">Unidad ${escapeHtml(reporte.unidad || 'N/A')}</h3>
-            <p class="text-xs font-bold text-slate-500">Operador: ${escapeHtml(reporte.operador || 'N/A')} · ${escapeHtml(fecha)}</p>
+            <h3 class="text-lg font-black text-[#7c2d12]">Unidad ${escapeHtml(reporte.unitId || 'N/A')}</h3>
+            <p class="text-xs font-bold text-slate-500">Operador: ${escapeHtml(reporte.driverName || 'N/A')} · ${escapeHtml(fecha)}</p>
           </div>
           <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>
         </div>
@@ -852,21 +922,28 @@
         </button>`;
     }
 
+    // CARGA DE FALLAS DESDE FIRESTORE
     async function cargarFallas() {
       const contenedor = $('fallas-cards');
       if (!contenedor) return;
-
-      contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Buscando fallas en la base de datos...</p>';
+      contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Buscando fallas en Firebase...</p>';
 
       try {
-        const response = await fetch('/api/mantenimiento', { headers: await authHeaders() });
-        if (!response.ok) throw new Error('Error al consultar el servidor');
+        if (!dashState.ordenes) {
+          const oSnap = await getDocs(fsQuery(collection(db, 'ordenes_trabajo'), fsOrderBy('fecha_apertura', 'desc')));
+          dashState.ordenes = [];
+          oSnap.forEach((d) => dashState.ordenes.push({ id: d.id, ...d.data() }));
+        }
 
-        const data = await response.json();
-        const reportes = (data.success && Array.isArray(data.fallas)) ? data.fallas : [];
-        const reportesFiltrados = reportes.filter((reporte) => coincideFiltroGlobal(reporte, {
-          unit: 'unidad', operator: 'operador', date: 'fecha'
-        }));
+        const otReporteIds = new Set((dashState.ordenes || []).map((o) => String(o.reporte_id || '')).filter(Boolean));
+
+        const reportesFiltrados = state.reports.filter((reporte) => {
+          if (reporte.type !== 'checklist') return false;
+          if (otReporteIds.has(String(reporte.id))) return false;
+          const { fallas } = window.procesarReporteFallas ? window.procesarReporteFallas(reporte) : { fallas: [] };
+          return fallas.length > 0;
+        });
+
         contenedor.innerHTML = '';
 
         reportesFiltrados.forEach((reporte) => {
@@ -898,33 +975,34 @@
           contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500">No hay fallas pendientes de atención. Las fallas con OT generada se consultan en Órdenes de Trabajo.</p>';
         }
       } catch (error) {
-        contenedor.innerHTML = `<p class="col-span-full py-6 text-center font-bold text-red-700">Error de comunicación: ${escapeHtml(error.message)}</p>`;
+        contenedor.innerHTML = `<p class="col-span-full py-6 text-center font-bold text-red-700">Error: ${escapeHtml(error.message)}</p>`;
       }
     }
 
+    // CARGA DE ÓRDENES DE TRABAJO DESDE FIRESTORE
     async function cargarOrdenes() {
       const tbody = $('tabla-ordenes-body');
       if (!tbody) return;
-
-      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando órdenes de trabajo...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando órdenes de trabajo desde Firebase...</td></tr>';
 
       try {
-        const response = await fetch('/api/mantenimiento?tipo=ordenes', { headers: await authHeaders() });
-        if (!response.ok) throw new Error('Error al consultar las órdenes');
+        const oSnap = await getDocs(fsQuery(collection(db, 'ordenes_trabajo'), fsOrderBy('fecha_apertura', 'desc')));
+        const ordenes = [];
+        oSnap.forEach((d) => ordenes.push({ id: d.id, ...d.data() }));
+        dashState.ordenes = ordenes;
 
-        const data = await response.json();
-        const ordenes = (Array.isArray(data?.ordenes) ? data.ordenes : []).filter((orden) => coincideFiltroGlobal(orden, {
+        const ordenesFiltradas = ordenes.filter((orden) => coincideFiltroGlobal(orden, {
           unit: 'unidad', operator: 'operador', date: 'fecha_apertura'
         }));
 
-        if (!ordenes.length) {
+        if (!ordenesFiltradas.length) {
           tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">No hay órdenes de trabajo registradas.</td></tr>';
           return;
         }
 
         tbody.innerHTML = '';
 
-        ordenes.forEach((orden) => {
+        ordenesFiltradas.forEach((orden) => {
           const fila = document.createElement('tr');
           fila.className = 'hover:bg-orange-50/70';
 
@@ -988,24 +1066,24 @@
               const estatusAnterior = orden.estatus;
 
               try {
-                const response = await fetch('/api/mantenimiento', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', ...await authHeaders() },
-                  body: JSON.stringify({ accion: 'actualizar_estatus', ot_id: otId, estatus: nuevoEstatus })
+                await updateDoc(doc(db, 'ordenes_trabajo', otId), {
+                  estatus: nuevoEstatus,
+                  updated_at: new Date().toISOString()
                 });
 
-                if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({}));
-                  throw new Error(errorData.error || 'No se pudo actualizar el estatus');
-                }
+                const segId = crypto.randomUUID().replace(/-/g, '');
+                await setDoc(doc(db, 'ot_seguimiento', segId), {
+                  id: segId,
+                  ot_id: otId,
+                  accion: 'CAMBIO_ESTATUS',
+                  usuario: 'Supervisor (panel)',
+                  comentario: `Estatus actualizado a ${nuevoEstatus}`,
+                  fecha: new Date().toISOString()
+                });
 
                 orden.estatus = nuevoEstatus;
-                if (Array.isArray(dashState.ordenes)) {
-                  const enDash = dashState.ordenes.find((o) => String(o.id) === String(otId));
-                  if (enDash) enDash.estatus = nuevoEstatus;
-                }
                 renderDashboard();
-                showToast(`Estatus actualizado a ${nuevoEstatus}`);
+                showToast(`Estatus actualizado a ${nuevoEstatus} en Firebase`);
               } catch (error) {
                 console.error('Error al cambiar estatus:', error);
                 event.target.value = estatusAnterior || 'NUEVA';
@@ -1017,7 +1095,7 @@
           tbody.appendChild(fila);
         });
       } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error de comunicación: ${escapeHtml(error.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error: ${escapeHtml(error.message)}</td></tr>`;
       }
     }
 
@@ -1030,14 +1108,19 @@
       ordenEnSeguimiento = null;
     }
 
+    // CARGA DE HISTORIAL DE SEGUIMIENTO DESDE FIRESTORE
     async function cargarHistorialOT(otId) {
       const contenedor = $('segHistorial');
       contenedor.innerHTML = '<p class="text-slate-500">Cargando historial...</p>';
       try {
-        const response = await fetch(`/api/mantenimiento?tipo=seguimiento&ot_id=${encodeURIComponent(otId)}`, { headers: await authHeaders() });
-        if (!response.ok) throw new Error('No se pudo cargar el historial');
-        const data = await response.json();
-        const eventos = Array.isArray(data?.seguimiento) ? data.seguimiento : [];
+        const segCol = collection(db, 'ot_seguimiento');
+        const q = fsQuery(segCol, fsWhere('ot_id', '==', otId));
+        const snapshot = await getDocs(q);
+
+        const eventos = [];
+        snapshot.forEach((d) => eventos.push(d.data()));
+        eventos.sort((a, b) => (Date.parse(b.fecha) || 0) - (Date.parse(a.fecha) || 0));
+
         contenedor.innerHTML = eventos.length
           ? eventos.map((evento) => `
               <div class="rounded-md bg-orange-50 px-3 py-2">
@@ -1079,23 +1162,32 @@
       const form = event.target;
       const botones = [...form.querySelectorAll('button[type="submit"]')];
       botones.forEach((boton) => { boton.disabled = true; });
+
       try {
-        const cuerpo = { accion: 'actualizar_detalle', ot_id: ordenEnSeguimiento.id };
-        CAMPOS_SEGUIMIENTO.forEach((campo) => { cuerpo[campo] = form.elements[campo].value; });
-        const response = await fetch('/api/mantenimiento', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...await authHeaders() },
-          body: JSON.stringify(cuerpo)
+        const datosActualizados = { updated_at: new Date().toISOString() };
+        CAMPOS_SEGUIMIENTO.forEach((campo) => {
+          datosActualizados[campo] = form.elements[campo].value.trim() || null;
         });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.success) throw new Error(data.error || 'No se pudo guardar el seguimiento');
-        showToast(`OT-${data.orden?.folio_ot ?? ''} actualizada`);
-        if (data.orden && Array.isArray(dashState.ordenes)) {
-          const idx = dashState.ordenes.findIndex((o) => String(o.id) === String(data.orden.id));
-          if (idx !== -1) dashState.ordenes[idx] = data.orden;
-          renderDashboard();
-        }
-        if (generarPdf) await generarPDFOT(data.orden);
+
+        // Actualizar en Firestore
+        await updateDoc(doc(db, 'ordenes_trabajo', ordenEnSeguimiento.id), datosActualizados);
+
+        // Guardar en seguimiento
+        const segId = crypto.randomUUID().replace(/-/g, '');
+        await setDoc(doc(db, 'ot_seguimiento', segId), {
+          id: segId,
+          ot_id: ordenEnSeguimiento.id,
+          accion: 'ACTUALIZACIÓN',
+          usuario: 'Supervisor (panel)',
+          comentario: 'Datos de ejecución de la OT actualizados.',
+          fecha: new Date().toISOString()
+        });
+
+        Object.assign(ordenEnSeguimiento, datosActualizados);
+        showToast(`OT-${ordenEnSeguimiento?.folio_ot ?? ''} actualizada en Firebase`);
+
+        renderDashboard();
+        if (generarPdf) await generarPDFOT(ordenEnSeguimiento);
         cerrarSeguimiento();
         cargarOrdenes();
       } catch (error) {
@@ -1105,16 +1197,15 @@
       }
     });
 
-    // ===== Dashboard de métricas (gráficas SVG sin librerías externas) =====
+    // ===== Dashboard de métricas =====
     const COLOR_PENDIENTE = '#dc2626';
     const COLOR_REALIZADA = '#16a34a';
     const COLOR_BARRA = '#1e5a96';
     const COLOR_MARCA = '#7c2d12';
     const ESTATUS_REALIZADA = new Set(['TERMINADA', 'CERRADA']);
-    const dashState = { ordenes: null, cargando: null };
+    const dashState = { ordenes: null };
 
     const sinAcentos = (texto) => String(texto || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-    // "FRENOS / AIRE" y "FRENOS" cuentan como la misma categoría.
     const categoriaKey = (texto) => sinAcentos(texto).split('/')[0].trim() || 'GENERAL';
     const pct = (parte, total) => (total ? (parte / total) * 100 : 0);
     const fmtPct = (valor) => `${valor.toFixed(1)}%`;
@@ -1143,7 +1234,7 @@
         <div class="space-y-2 text-sm">${segmentos.map((x) => `
           <div class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:${x.color}"></span>
             <span class="font-bold text-slate-700">${escapeHtml(x.label)}</span>
-            <span class="text-slate-500">${x.value} · ${fmtPct(pct(x.value, total))}</span></div>`).join('')}</div></div>`;
+            <span class="text-slate-500">${x.value} ·${fmtPct(pct(x.value, total))}</span></div>`).join('')}</div></div>`;
     }
 
     function chartBarras100(filas) {
@@ -1236,7 +1327,7 @@
         const y = top + i * (alto + gap);
         const w = Math.max(2, (f.value / max) * ancho);
         return `<text x="${izq - 6}" y="${y + alto / 2 + 4}" text-anchor="end" font-size="11" font-weight="700" fill="#334155">${escapeHtml(corto(f.label, 10))}</text>
-          <rect x="${izq}" y="${y}" width="${w}" height="${alto}" rx="3" fill="${color}"><title>${escapeHtml(f.label)}: ${f.value}</title></rect>
+          <rect x="${izq}" y="${y}" width="${w}" height="${alto}" rx="3" fill="${color}"><title>${escapeHtml(f.label)}:${f.value}</title></rect>
           <text x="${izq + w + 5}" y="${y + alto / 2 + 4}" font-size="11" fill="#334155">${f.value}</text>`;
       }).join('')}</svg>`;
     }
@@ -1257,7 +1348,7 @@
         const x = izq + i * banda + (banda - barra) / 2;
         const etiqueta = i % cadaCuanto === 0
           ? `<text x="${x + barra / 2}" y="${H - abajo + 14}" text-anchor="middle" font-size="10" fill="#64748b">${escapeHtml(f.label)}</text>` : '';
-        return `<rect x="${x}" y="${y(f.value)}" width="${barra}" height="${y(0) - y(f.value)}" fill="${COLOR_MARCA}"><title>${escapeHtml(f.label)}: ${f.value} fallas · ${f.checklists} checklist</title></rect>${etiqueta}`;
+        return `<rect x="${x}" y="${y(f.value)}" width="${barra}" height="${y(0) - y(f.value)}" fill="${COLOR_MARCA}"><title>${escapeHtml(f.label)}:${f.value} fallas · ${f.checklists} checklist</title></rect>${etiqueta}`;
       }).join('')}</svg>`;
     }
 
@@ -1269,7 +1360,7 @@
 
     function calcularMetricas() {
       const checklists = state.reports.filter((report) => report.type === 'checklist');
-      const celdas = new Map(); // `${componente}|${categoria}` -> { componente, categoria, label, reportadas, realizadas }
+      const celdas = new Map();
       const porUnidad = new Map();
       const porDia = new Map();
 
@@ -1279,7 +1370,6 @@
 
       ordenesList.forEach((orden) => {
         if (orden.reporte_id) otPorReporte.set(String(orden.reporte_id), orden);
-
         if (ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) {
           const unidad = String(orden.unidad || '').toUpperCase().trim();
           const categoria = categoriaKey(orden.sistema || orden.categoria || '');
@@ -1346,7 +1436,6 @@
       $('kpiRealizadas').textContent = realizadas;
       $('kpiTasa').textContent = fmtPct(pct(realizadas, reportadas));
 
-      // KPIs operativos: checklists de hoy, fallas sin OT, OT abiertas/cerradas y unidades detenidas.
       const hoy = new Date();
       const esHoy = (valor) => {
         const fecha = new Date(valor);
@@ -1433,22 +1522,23 @@
     }
 
     async function cargarDashboard(forzar = false) {
-      $('dashEstado').textContent = 'Cargando métricas...';
+      $('dashEstado').textContent = 'Cargando métricas de Firebase...';
       renderDashboard();
-      if (!dashState.cargando || forzar) {
-        dashState.cargando = fetch('/api/mantenimiento?tipo=ordenes', { headers: await authHeaders() })
-          .then((response) => (response.ok ? response.json() : Promise.reject(new Error('No se pudieron cargar las OT'))))
-          .then((data) => { dashState.ordenes = Array.isArray(data?.ordenes) ? data.ordenes : []; })
-          .catch((error) => showToast(error.message))
-          .finally(() => { dashState.cargando = null; });
+      if (!dashState.ordenes || forzar) {
+        try {
+          const oSnap = await getDocs(fsQuery(collection(db, 'ordenes_trabajo'), fsOrderBy('fecha_apertura', 'desc')));
+          const ordenes = [];
+          oSnap.forEach((d) => ordenes.push({ id: d.id, ...d.data() }));
+          dashState.ordenes = ordenes;
+        } catch (error) {
+          showToast(error.message);
+        }
       }
-      await dashState.cargando;
       renderDashboard();
     }
 
     $('paretoComponente').addEventListener('change', renderDashboard);
 
-    // Lógica de navegación de Mantenimiento
     const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes', 'vista-dashboard'];
     
     vistasMantenimiento.forEach(id => {
@@ -1481,7 +1571,6 @@
             cargarOrdenes();
           }
 
-          // El dashboard usa todo el ancho: se oculta el panel lateral.
           $('panelLateral').classList.toggle('hidden', id === 'vista-dashboard');
           if (id === 'vista-dashboard') {
             cargarDashboard(true);

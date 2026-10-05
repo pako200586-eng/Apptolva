@@ -344,10 +344,9 @@
     <script>
         // --- CONSTANTE GLOBAL DE TURNO ---
         const SHIFT_START_HOUR = 8; // Los turnos inician a las 08:00 a.m.
-        const OFFLINE_SYNC_TAG = "sync-reportes";
         const GPS_TIMEOUT_MS = 8000;
-        const MAX_LOGS_SYNC = 300; // Límite aceptado por /api/store-bitacora; debe coincidir con el servidor.
         const LICENSE_EXP_WARNING_DAYS = 15;
+        const FIRESTORE_PENDING_IDS_KEY = "nom087_firestore_pending_ids";
 
         // --- 1. LÓGICA DE DATOS LOCALES ---
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
@@ -598,15 +597,9 @@
 
             const countBadge = document.getElementById('logCountBadge');
             if (countBadge) {
-                countBadge.textContent = `${logs.length}/${MAX_LOGS_SYNC}`;
-                countBadge.classList.remove('text-gray-400', 'text-yellow-600', 'text-red-600', 'font-bold');
-                if (logs.length >= MAX_LOGS_SYNC) {
-                    countBadge.classList.add('text-red-600', 'font-bold');
-                } else if (logs.length >= MAX_LOGS_SYNC * 0.9) {
-                    countBadge.classList.add('text-yellow-600', 'font-bold');
-                } else {
-                    countBadge.classList.add('text-gray-400');
-                }
+                countBadge.textContent = String(logs.length);
+                countBadge.classList.remove('text-yellow-600', 'text-red-600', 'font-bold');
+                countBadge.classList.add('text-gray-400');
             }
 
             // Total Manejo 24h
@@ -1091,16 +1084,6 @@
             }
         }
 
-        async function triggerOfflineSync() {
-            if (!('serviceWorker' in navigator)) return;
-            const registration = await navigator.serviceWorker.ready;
-            if ('sync' in registration) {
-                await registration.sync.register(OFFLINE_SYNC_TAG);
-            } else if (registration.active) {
-                registration.active.postMessage({ type: "SYNC_NOW" });
-            }
-        }
-
         function buildBitacoraPayload() {
             const rawFolio = document.getElementById('folio').value || "S/F";
             const folio = rawFolio.trim();
@@ -1113,7 +1096,6 @@
             } catch (e) { /* ignore if pads are not ready */ }
 
             return {
-                offlineQueueId: `bitacora-${folio || Date.now()}`,
                 folio,
                 reportType: "bitacora",
                 fecha: new Date().toLocaleDateString(),
@@ -1152,37 +1134,26 @@
             return missing;
         }
 
-        // El servidor (/api/store-bitacora) rechaza payloads con más de MAX_LOGS_SYNC
-        // registros. Se detecta aquí para avisar con tiempo en vez de que el intento
-        // de sincronización falle sin quedar en la cola offline (no es un error de red).
-        function exceedsSyncLimit(payload) {
-            return Array.isArray(payload.logs) && payload.logs.length > MAX_LOGS_SYNC;
-        }
-
-        function alertSyncLimitExceeded(payload) {
-            alert(
-                `⚠️ Esta bitácora ya tiene ${payload.logs.length} registros, más de los ${MAX_LOGS_SYNC} que acepta la sincronización en la nube.\n\n` +
-                `Genera el PDF ahora (botón PDF) como respaldo y usa "TERMINAR GRÁFICA 48H Y NUEVO TURNO" para continuar en un folio nuevo. ` +
-                `De lo contrario, esta bitácora no podrá subirse a la nube.`
-            );
+        function exceedsFirestoreSizeLimit(payload) {
+            return new Blob([JSON.stringify(payload)]).size > 800000;
         }
 
         function showQueuedQrState(folio, detailText) {
             showOfflineQrFallback(folio, "⚠️ Guardado offline — pendiente de sincronizar", detailText);
-            setOfflineSyncStatus("Bitácora guardada offline. Se enviará automáticamente cuando regrese la señal.");
+            setOfflineSyncStatus("Bitácora guardada en este dispositivo. Firebase la sincronizará cuando regrese la conexión.");
         }
 
         async function syncBitacoraPayload(payload) {
-            const response = await fetch('/api/store-bitacora', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(result.error || ('Error del servidor: ' + response.status));
-            if (result.offline || result.queued) {
-                await triggerOfflineSync().catch(() => {});
-                return { queued: true, localId: result.localId, message: result.message };
+            if (typeof window.guardarBitacoraEnFirestore !== "function") {
+                throw new Error("El módulo de guardado en Firebase no está inicializado.");
+            }
+            const result = await window.guardarBitacoraEnFirestore(payload);
+            if (result.status === "pending") {
+                return {
+                    queued: true,
+                    localId: result.id,
+                    message: "Bitácora guardada localmente y pendiente de sincronizar con Firebase."
+                };
             }
             return { queued: false, result };
         }
@@ -1190,8 +1161,8 @@
         window.intentarSubirNube = async function() {
             const btn = document.getElementById('saveBtn');
             const payload = buildBitacoraPayload();
-            if (exceedsSyncLimit(payload)) {
-                alertSyncLimitExceeded(payload);
+            if (exceedsFirestoreSizeLimit(payload)) {
+                alert("⚠️ El reporte excede el tamaño permitido por Firestore (800 KB). Reduce el tamaño de las firmas antes de guardarlo.");
                 return;
             }
             const missing = validateBitacoraPayload(payload);
@@ -1204,7 +1175,7 @@
             try {
                 const syncResult = await syncBitacoraPayload(payload);
                 if (syncResult.queued) {
-                    setOfflineSyncStatus("Bitácora guardada offline. Se enviará cuando vuelva la señal.");
+                    setOfflineSyncStatus("Bitácora guardada en este dispositivo. Firebase la sincronizará cuando vuelva la señal.");
                     alert("⚠️ Sin conexión: bitácora guardada en este dispositivo para sincronización automática.");
                 } else {
                     setOfflineSyncStatus("Bitácora sincronizada correctamente.", "success");
@@ -1244,16 +1215,16 @@
                 document.getElementById('qrcode').innerHTML =
                     '<div style="width:36px;height:36px;border:4px solid #FFF0DB;border-top-color:#F28B00;border-radius:50%;animation:qr-spin .8s linear infinite"></div>';
                 document.getElementById('qrTextContent').innerHTML =
-                    '<span style="color:#F28B00;font-weight:bold">⏳ Subiendo bitácora al servidor…</span>';
+                    '<span style="color:#F28B00;font-weight:bold">⏳ Guardando bitácora en Firebase…</span>';
                 document.getElementById('qrModal').classList.remove('hidden');
 
                 const payload = buildBitacoraPayload();
 
-                if (exceedsSyncLimit(payload)) {
+                if (exceedsFirestoreSizeLimit(payload)) {
                     showOfflineQrFallback(
                         folio,
-                        "⚠️ Demasiados registros — QR local",
-                        `Esta bitácora tiene ${payload.logs.length} registros (máx ${MAX_LOGS_SYNC} para sincronizar). Genera el PDF y termina el turno para continuar en un folio nuevo.`
+                        "⚠️ Reporte demasiado grande — QR local",
+                        "El reporte excede el tamaño permitido por Firestore. Genera el PDF como respaldo."
                     );
                     return;
                 }
@@ -1264,7 +1235,7 @@
                     showOfflineQrFallback(
                         folio,
                         "⚠️ Datos incompletos — QR local",
-                        `Completa: ${missing.join(", ")} para generar QR verificable en servidor.`
+                        `Completa: ${missing.join(", ")} para generar un QR verificable.`
                     );
                     return;
                 }
@@ -1277,9 +1248,6 @@
 
                 const result = syncResult.result;
                 const viewerUrl = result.url;
-                const expiryText = result.expiresAt
-                    ? new Date(result.expiresAt).toLocaleString()
-                    : "24 horas";
 
                 // Generate QR with the viewer URL
                 document.getElementById('qrcode').innerHTML = "";
@@ -1292,7 +1260,7 @@
                 document.getElementById('qrTextContent').innerHTML =
                     `<span style="color:#16a34a;font-weight:bold">✅ Listo — escanea para ver el PDF</span><br>` +
                     `<span id="qrViewerUrl" style="word-break:break-all;font-size:10px;color:#6b7280"></span><br>` +
-                    `<span style="color:#9ca3af;font-size:10px">⏱ Expira: ${expiryText} · FOLIO: <span id="qrFolio"></span></span>`;
+                    `<span style="color:#9ca3af;font-size:10px">FOLIO: <span id="qrFolio"></span></span>`;
                 const qrViewerUrlEl = document.getElementById('qrViewerUrl');
                 if (qrViewerUrlEl) qrViewerUrlEl.textContent = viewerUrl;
                 const qrFolioEl = document.getElementById('qrFolio');
@@ -1329,8 +1297,35 @@
         updateUI(); 
 
         window.addEventListener('online', () => {
-            setOfflineSyncStatus("Conexión recuperada. Intentando sincronizar pendientes...");
-            triggerOfflineSync().catch(() => {});
+            setOfflineSyncStatus("Conexión recuperada. Firebase está sincronizando los reportes pendientes...");
+        });
+
+        window.addEventListener('bitacora-firestore-synced', (event) => {
+            const { folio, url } = event.detail || {};
+            setOfflineSyncStatus(`Bitácora ${folio || ""} sincronizada correctamente con Firebase.`, "success");
+
+            const qrModal = document.getElementById('qrModal');
+            const currentFolio = document.getElementById('folio').value.trim();
+            if (!qrModal || qrModal.classList.contains('hidden') || !url || folio !== currentFolio) return;
+
+            document.getElementById('qrcode').innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), {
+                text: url,
+                width: 200,
+                height: 200,
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            document.getElementById('qrTextContent').innerHTML =
+                '<span style="color:#16a34a;font-weight:bold">✅ Sincronizado — escanea para ver el PDF</span><br>' +
+                '<span id="qrViewerUrl" style="word-break:break-all;font-size:10px;color:#6b7280"></span><br>' +
+                '<span style="color:#9ca3af;font-size:10px">FOLIO: <span id="qrFolio"></span></span>';
+            document.getElementById('qrViewerUrl').textContent = url;
+            document.getElementById('qrFolio').textContent = folio || "";
+        });
+
+        window.addEventListener('bitacora-firestore-sync-error', (event) => {
+            const { message } = event.detail || {};
+            setOfflineSyncStatus(`Error al sincronizar con Firebase: ${message || "Error desconocido"}`);
         });
 
         if ('serviceWorker' in navigator) {
@@ -1349,7 +1344,15 @@
     <!-- FIREBASE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+        import {
+            doc,
+            initializeFirestore,
+            onSnapshot,
+            persistentLocalCache,
+            persistentMultipleTabManager,
+            runTransaction,
+            setDoc
+        } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
       
         const firebaseConfig = {
@@ -1371,9 +1374,97 @@
             window.addEventListener('load', () => window.generarFolioFirebase());
         } else {
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager()
+            })
+        });
         const auth = getAuth(app);
 
+        let signInPromise = null;
+        function iniciarSesionAnonima() {
+            if (!signInPromise) {
+                signInPromise = signInAnonymously(auth)
+                    .then((credential) => credential.user)
+                    .finally(() => { signInPromise = null; });
+            }
+            return signInPromise;
+        }
+
+        function esperarAuthListo() {
+            if (auth.currentUser) return Promise.resolve(auth.currentUser);
+            return new Promise((resolve, reject) => {
+                let unsubscribe = () => {};
+                let timeout;
+                let finished = false;
+                let signInStarted = false;
+                const finish = (callback, value) => {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(timeout);
+                    unsubscribe();
+                    callback(value);
+                };
+                timeout = setTimeout(() => {
+                    finish(reject, new Error("Tiempo de espera agotado al conectar con Firebase Authentication."));
+                }, 10000);
+                unsubscribe = onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        finish(resolve, user);
+                    } else if (!signInStarted) {
+                        signInStarted = true;
+                        iniciarSesionAnonima().then(
+                            (authenticatedUser) => finish(resolve, authenticatedUser),
+                            (error) => finish(reject, error)
+                        );
+                    }
+                }, (error) => finish(reject, error));
+            });
+        }
+
+        const reportObservers = new Map();
+        function readPendingReportIds() {
+            try {
+                const ids = JSON.parse(localStorage.getItem(FIRESTORE_PENDING_IDS_KEY) || "[]");
+                return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+            } catch (error) {
+                console.error("No se pudieron leer los reportes pendientes de Firebase:", error);
+                return [];
+            }
+        }
+
+        function writePendingReportIds(ids) {
+            localStorage.setItem(FIRESTORE_PENDING_IDS_KEY, JSON.stringify([...new Set(ids)]));
+        }
+
+        function observePendingReport(id) {
+            if (reportObservers.has(id)) return;
+            const reportRef = doc(db, "bitacora_reports", id);
+            const unsubscribe = onSnapshot(reportRef, { includeMetadataChanges: true }, (snapshot) => {
+                if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache || !snapshot.exists()) return;
+                writePendingReportIds(readPendingReportIds().filter((pendingId) => pendingId !== id));
+                unsubscribe();
+                reportObservers.delete(id);
+                window.dispatchEvent(new CustomEvent("bitacora-firestore-synced", {
+                    detail: {
+                        id,
+                        folio: snapshot.data().folio || "",
+                        url: new URL(`./viewer.html?id=${id}`, window.location.href).href
+                    }
+                }));
+            }, (error) => {
+                unsubscribe();
+                reportObservers.delete(id);
+                window.dispatchEvent(new CustomEvent("bitacora-firestore-sync-error", {
+                    detail: { id, message: error.message }
+                }));
+            });
+            reportObservers.set(id, unsubscribe);
+        }
+
+        esperarAuthListo()
+            .then(() => readPendingReportIds().forEach(observePendingReport))
+            .catch((error) => console.error("No se pudieron reanudar reportes pendientes:", error));
 
 // EL ESCÁNER PERMANENTE: Revisa si ya hay pase o si necesita uno nuevo
 onAuthStateChanged(auth, (user) => {
@@ -1392,7 +1483,7 @@ onAuthStateChanged(auth, (user) => {
     } else {
         // SI NO TIENE PASE, LO CREAMOS INMEDIATAMENTE
         console.log("Sin gafete. Solicitando uno nuevo...");
-        signInAnonymously(auth).catch((error) => {
+        iniciarSesionAnonima().catch((error) => {
             console.error("Error crítico al dar gafete:", error);
         });
     }
@@ -1423,6 +1514,74 @@ onAuthStateChanged(auth, (user) => {
             if (typeof window.intentarSubirNube === "function") {
                 return window.intentarSubirNube();
             }
+        };
+
+        window.guardarBitacoraEnFirestore = async function(payload) {
+            await esperarAuthListo();
+
+            const reportIdKey = `nom087_firestore_report_${encodeURIComponent(payload.folio)}`;
+            let reportId = localStorage.getItem(reportIdKey);
+            if (!reportId) {
+                reportId = crypto.randomUUID().replace(/-/g, "");
+                localStorage.setItem(reportIdKey, reportId);
+            }
+
+            const reportRef = doc(db, "bitacora_reports", reportId);
+            const data = {
+                id: reportId,
+                folio: payload.folio || "",
+                report_type: "bitacora",
+                unit_id: payload.unitId || "",
+                driver_name: payload.driverName || "",
+                license: payload.license || "",
+                priority: "baja",
+                sync_status: "sincronizado",
+                payload,
+                created_at: new Date().toISOString()
+            };
+            const payloadBytes = new Blob([JSON.stringify(data)]).size;
+            if (payloadBytes > 800000) {
+                throw new Error(`La bitácora excede el tamaño permitido por Firestore (${Math.round(payloadBytes / 1024)} KB). Reduce el tamaño de las firmas.`);
+            }
+
+            let writing = false;
+            let unsubscribePendingWrite = () => {};
+            const pendingLocalWrite = new Promise((resolve, reject) => {
+                unsubscribePendingWrite = onSnapshot(
+                    reportRef,
+                    { includeMetadataChanges: true },
+                    (snapshot) => {
+                        if (!writing || !snapshot.exists() || !snapshot.metadata.hasPendingWrites) return;
+
+                        const pendingIds = readPendingReportIds();
+                        if (!pendingIds.includes(reportId)) {
+                            pendingIds.push(reportId);
+                            writePendingReportIds(pendingIds);
+                        }
+                        observePendingReport(reportId);
+                        resolve();
+                    },
+                    reject
+                );
+            });
+
+            writing = true;
+            const writePromise = setDoc(reportRef, data);
+            let status;
+            try {
+                status = await Promise.race([
+                    writePromise.then(() => "synced"),
+                    pendingLocalWrite.then(() => "pending")
+                ]);
+            } finally {
+                unsubscribePendingWrite();
+            }
+
+            return {
+                id: reportId,
+                url: new URL(`./viewer.html?id=${reportId}`, window.location.href).href,
+                status
+            };
         };
 
         window.addEventListener('load', () => { if(navigator.onLine) window.generarFolioFirebase(false); });

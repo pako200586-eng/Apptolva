@@ -8,11 +8,11 @@ if [ -z "$FIREBASE_API_KEY" ]; then
   exit 1
 fi
 
-for archivo in index.html bitacora_master.html admin.html; do
+for archivo in index.html bitacora_master.html admin.html viewer.html; do
   sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" "$archivo"
 done
 
-if grep -q "__FIREBASE_API_KEY__" index.html bitacora_master.html admin.html; then
+if grep -q "__FIREBASE_API_KEY__" index.html bitacora_master.html admin.html viewer.html; then
   echo "Error: quedaron marcadores __FIREBASE_API_KEY__ sin reemplazar." >&2
   exit 1
 fi

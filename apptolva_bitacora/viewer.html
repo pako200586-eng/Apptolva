@@ -679,6 +679,80 @@
             pdfDoc.save(`${prefijo}_${folio}.pdf`);
         }
 
+        const firebaseConfig = {
+            apiKey: "__FIREBASE_API_KEY__",
+            authDomain: "gen-lang-client-0015118308.firebaseapp.com",
+            projectId: "gen-lang-client-0015118308",
+            storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
+            messagingSenderId: "228375512926",
+            appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
+            measurementId: "G-SK8TYXT3JD"
+        };
+
+        async function obtenerReporteFirestore(id) {
+            if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
+                throw new Error("La configuración de Firebase no está disponible.");
+            }
+
+            const [{ initializeApp }, { getAuth, signInAnonymously }, { getFirestore, doc, getDoc }] = await Promise.all([
+                import("https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js"),
+                import("https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js"),
+                import("https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js")
+            ]);
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            if (!auth.currentUser) await signInAnonymously(auth);
+
+            const db = getFirestore(app);
+            const snapshot = await getDoc(doc(db, "bitacora_reports", id));
+            if (!snapshot.exists()) return null;
+
+            const stored = snapshot.data();
+            const payload = stored.payload && typeof stored.payload === "object" ? stored.payload : stored;
+            return {
+                ...payload,
+                folio: stored.folio || payload.folio,
+                reportType: stored.report_type || payload.reportType || payload.tipo,
+                unitId: stored.unit_id || payload.unitId,
+                driverName: stored.driver_name || payload.driverName
+            };
+        }
+
+        async function obtenerReporteNetlify(id) {
+            const resp = await fetch(`/api/store-bitacora?id=${encodeURIComponent(id)}`);
+            if (resp.ok) return resp.json();
+
+            const errorData = await resp.json().catch(() => ({}));
+            if (resp.status === 404) return null;
+            throw new Error(errorData.error || `Error del servidor (${resp.status})`);
+        }
+
+        async function obtenerDatosReporte(id) {
+            let errorFirestore = null;
+            try {
+                const reporte = await obtenerReporteFirestore(id);
+                if (reporte) return reporte;
+            } catch (error) {
+                errorFirestore = error;
+                console.warn("No se pudo cargar el reporte desde Firestore; se intentará el respaldo de Netlify.", error);
+            }
+
+            try {
+                const reporte = await obtenerReporteNetlify(id);
+                if (reporte) return reporte;
+            } catch (errorNetlify) {
+                if (errorFirestore) {
+                    throw new Error(`Firestore: ${errorFirestore.message} Netlify: ${errorNetlify.message}`);
+                }
+                throw errorNetlify;
+            }
+
+            if (errorFirestore) {
+                throw new Error(`No se encontró el reporte en Netlify y Firestore no está disponible: ${errorFirestore.message}`);
+            }
+            return null;
+        }
+
         async function cargarBitacora() {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('id');
@@ -689,18 +763,11 @@
             }
 
             try {
-                const resp = await fetch(`/api/store-bitacora?id=${encodeURIComponent(id)}`);
-                if (!resp.ok) {
-                    const err = await resp.json().catch(() => ({}));
-                    if (resp.status === 404) {
-                        showError("El reporte no fue encontrado. Pide al operador que vuelva a generarlo.");
-                    } else {
-                        showError("Error al cargar el reporte: " + (err.error || resp.statusText));
-                    }
+                const data = await obtenerDatosReporte(id);
+                if (!data) {
+                    showError("El reporte no fue encontrado en Firestore ni en el respaldo histórico de Netlify.");
                     return;
                 }
-
-                const data = await resp.json();
                 const tipo = detectarTipo(data);
 
                 // Ajustar encabezado y título según el tipo de documento.
@@ -744,7 +811,7 @@
                 }, 2000);
 
             } catch (err) {
-                showError("Error de red: " + err.message + ". Verifica tu conexión a internet.");
+                showError("No se pudo cargar el reporte: " + err.message);
             }
         }
 
@@ -759,6 +826,7 @@
             document.getElementById('viewer-info').style.display = 'none';
         }
 
+        window.descargarPDF = descargarPDF;
         cargarBitacora();
     </script>
 </body>

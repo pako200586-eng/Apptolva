@@ -400,6 +400,8 @@
     <script>
         // --- VARIABLES GLOBALES Y CLAVES ---
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
+        const FIRESTORE_PENDING_REPORT_ID_KEY = 'apptolva_pending_firestore_report_id';
+        const FIRESTORE_PENDING_REPORT_DRAFT_KEY = 'apptolva_pending_firestore_report_draft';
         
         // --- 1. INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', function() {
@@ -464,6 +466,8 @@
         function borrarDatosLocales() {
             if(confirm("¿Seguro que quieres borrar todos los datos guardados y empezar de cero?")) {
                 localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
+                localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
                 location.reload();
             }
         }
@@ -1182,9 +1186,9 @@ const originalText = btn.innerHTML;
 
                 doc.save('REPORTE_' + u + '_' + opNombre + '.pdf');
 
-                // 4. ENVÍO AUTOMÁTICO AL SERVIDOR CENTRAL (sin WhatsApp)
+                // 4. PREPARACIÓN DEL REPORTE PARA FIRESTORE
                 msg.classList.remove('hidden');
-                msg.innerText = '📡 Enviando reporte al servidor central...';
+                msg.innerText = '📡 Guardando reporte en Firebase...';
 
                 const checklistArr = Object.entries(revResults).map(([item, estado]) => ({ item, estado }));
                 const fallasDetectadas = Object.keys(revResults).filter((k) => revResults[k] === 'MAL');
@@ -1195,70 +1199,7 @@ const originalText = btn.innerHTML;
                     dolly: dolly,
                     tolva2: t2
                 };
-                // --- MODIFICACIÓN 2: Fallas agrupadas por categoría (sección HTML) dentro de cada componente ---
-                // 1. Estructura por componente que conserva a qué categoría/sección pertenece cada falla,
-                //    respetando el orden de aparición en el checklist.
-                //    Ej.: { tracto: { "ELÉCTRICO": ["Luces", "Estado de los cables"], "FRENOS": ["Mangueras"] }, ... }
-                const fallasPorCategoria = {
-                    tracto: {},
-                    tolva1: {},
-                    dolly: {},
-                    tolva2: {}
-                };
-
-                // 2. Recorremos el checklist detectando la categoría (cat.cat) de cada falla marcada como 'MAL'
-                //    y la agrupamos dentro de su componente.
-                Object.keys(fallasPorCategoria).forEach((compId) => {
-                    (revData[compId] || []).forEach((cat) => {
-                        cat.i.forEach((item) => {
-                            if (revResults[compId + '-' + item] === 'MAL') {
-                                if (!fallasPorCategoria[compId][cat.cat]) {
-                                    fallasPorCategoria[compId][cat.cat] = [];
-                                }
-                                fallasPorCategoria[compId][cat.cat].push(item);
-                            }
-                        });
-                    });
-                });
-
-                // 3. Convertimos cada componente en una cadena con el número económico y las fallas agrupadas.
-                //    Formato: "14123: [ELÉCTRICO]: Luces, Cables | [MECÁNICO]: Fugas, Bandas".
-                //    Sin fallas: "14123: Sin fallas".
-                const formatearFallas = (compId) => {
-                    const numero = numeroPorComponente[compId] || 'S/N';
-                    const categorias = fallasPorCategoria[compId];
-                    const nombresCat = Object.keys(categorias);
-                    if (!nombresCat.length) {
-                        return numero + ': Sin fallas';
-                    }
-                    const bloques = nombresCat.map((nombreCat) =>
-                        '[' + nombreCat + ']: ' + categorias[nombreCat].join(', ')
-                    );
-                    return numero + ': ' + bloques.join(' | ');
-                };
-                const fallasTracto = formatearFallas('tracto');
-                const fallasTolva1 = formatearFallas('tolva1');
-                const fallasDolly = formatearFallas('dolly');
-                const fallasTolva2 = formatearFallas('tolva2');
-
-                // --- MODIFICACIÓN 1: Notas separadas por componente con número económico ---
-                // 1. Leemos el textarea de notas de cada componente (reflejado en obsData).
-                // 2. Prefijamos con su número económico. 3. Una variable independiente por componente.
-                //    Formato: "14123: Fuga en manguera"  |  vacío: "14123: Sin observaciones".
-                const formatearNota = (compId) => {
-                    const numero = numeroPorComponente[compId] || 'S/N';
-                    const texto = (obsData[compId] || '').trim();
-                    return numero + ': ' + (texto ? texto : 'Sin observaciones');
-                };
-                const notasTracto = formatearNota('tracto');
-                const notasTolva1 = formatearNota('tolva1');
-                const notasDolly = formatearNota('dolly');
-                const notasTolva2 = formatearNota('tolva2');
-
-                // --- MODIFICACIÓN 3: Tickets individuales por cada falla detectada ---
-                // 1. Arreglo vacío que acumulará un objeto por cada input marcado como falla ('MAL').
-                // 2. Recorremos el checklist y, por cada falla, hacemos push de un ticket con:
-                //    componente (nombre legible), numeroEconomico, categoria (sección HTML) y falla (nombre del ítem).
+                // Tickets individuales por cada falla detectada.
                 const ticketsFallas = [];
                 const nombresComponente = {
                     tracto: 'Tracto',
@@ -1320,49 +1261,31 @@ const originalText = btn.innerHTML;
                     priority: fallasDetectadas.length ? "alta" : "baja"
                 };
 
-                const resp = await fetch('/api/store-bitacora', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reportePayload)
-                });
-                const data = await resp.json().catch(() => ({}));
-                const envioOffline = resp.status === 202 || data.queued === true || data.offline === true;
-                const reporteUrl = data.url || "";
-
-                if (!resp.ok || envioOffline) {
-                    throw new Error(data.error || data.message || 'No se pudo guardar el reporte en la base de datos.');
+                // GUARDADO DIRECTO EN FIREBASE FIRESTORE
+                if (typeof window.guardarReporteEnFirestore === 'function') {
+                    let reporteId = localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY);
+                    if (!reporteId) {
+                        reporteId = crypto.randomUUID().replace(/-/g, "");
+                        localStorage.setItem(FIRESTORE_PENDING_REPORT_ID_KEY, reporteId);
+                        localStorage.setItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY, localStorage.getItem(STORAGE_KEY) || "");
+                    }
+                    const resFirestore = await window.guardarReporteEnFirestore(reportePayload, reporteId);
+                    if (resFirestore.status === 'pending') {
+                        msg.innerText = '📴 Reporte guardado localmente. Se sincronizará automáticamente al recuperar conexión.';
+                        btn.disabled = true;
+                        btn.textContent = 'Reporte pendiente de sincronización';
+                        alert("📴 El reporte quedó guardado localmente y se sincronizará con Firebase al recuperar conexión. Mantén esta página abierta para confirmar la sincronización.");
+                        return;
+                    }
+                } else {
+                    throw new Error('El módulo de guardado en Firebase no está inicializado.');
                 }
-
-                const datosGoogleSheets = {
-                    ...reportePayload,
-                    fechaEnvio: new Date().toISOString(),
-                    operador: opNombre,
-                    numeroEmpleado: numeroEmpleado,
-                    vehiculo: u,
-                    status: fallasDetectadas.length ? "CON FALLAS" : "OK",
-                    urlPdf: reporteUrl,
-                    fallasTracto: fallasTracto,
-                    fallasTolva1: fallasTolva1,
-                    fallasDolly: fallasDolly,
-                    fallasTolva2: fallasTolva2,
-                    notasTracto: notasTracto,
-                    notasTolva1: notasTolva1,
-                    notasDolly: notasDolly,
-                    notasTolva2: notasTolva2
-                };
-                const urlWebhook = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
-                await fetch(urlWebhook, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: {
-                        "Content-Type": "text/plain;charset=utf-8"
-                    },
-                    body: JSON.stringify(datosGoogleSheets)
-                });
 
                 // LIMPIEZA POST-REPORTE
                 localStorage.removeItem(STORAGE_KEY);
-                alert("✅ REPORTE ENVIADO AUTOMÁTICAMENTE\n\nFolio: " + folio + "\n\nEl reporte llegó al panel de supervisión y a Google Sheets. El PDF se descargó en tu dispositivo.");
+                localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
+                localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
+                alert("✅ REPORTE GUARDADO EN FIREBASE\n\nFolio: " + folio + "\n\nEl reporte está disponible en el panel de supervisión. El PDF se descargó en tu dispositivo.");
                 location.reload();
 
             } catch (error) {
@@ -1378,6 +1301,41 @@ const originalText = btn.innerHTML;
             btn.classList.remove('opacity-75');
             msg.classList.add('hidden');
         }
+
+        window.addEventListener('firestore-report-synced', (event) => {
+            const { id } = event.detail || {};
+            if (!id || localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY) !== id) return;
+
+            const pendingDraft = localStorage.getItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY) || "";
+            const currentDraft = localStorage.getItem(STORAGE_KEY) || "";
+            const draftChangedWhilePending = currentDraft !== pendingDraft;
+            if (!draftChangedWhilePending) localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
+            localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
+            alert(draftChangedWhilePending
+                ? "✅ REPORTE SINCRONIZADO CON FIREBASE\n\nEl reporte está en el panel. También conservé los cambios nuevos del borrador."
+                : "✅ REPORTE SINCRONIZADO CON FIREBASE\n\nYa está disponible en el panel de supervisión.");
+            location.reload();
+        });
+
+        window.addEventListener('firestore-report-sync-error', (event) => {
+            const { id, message: errorMessage } = event.detail || {};
+            if (!id || localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY) !== id) return;
+
+            const btn = document.getElementById('btnFinal');
+            const msg = document.getElementById('statusMsg');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Reintentar sincronización';
+                btn.classList.remove('opacity-75');
+            }
+            if (msg) {
+                msg.innerText = 'No se confirmó la sincronización con Firebase. El borrador sigue guardado en este dispositivo.';
+                msg.classList.remove('hidden');
+            }
+            console.error("Error al sincronizar reporte pendiente:", errorMessage);
+            alert("⚠️ Firebase no confirmó el reporte: " + (errorMessage || "Error desconocido") + "\n\nEl borrador se conservó. Revisa la conexión e intenta de nuevo.");
+        });
 
         // --- IA CON VOZ ---
         async function sendAI() {
@@ -2053,7 +2011,15 @@ const originalText = btn.innerHTML;
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-        import { getFirestore, doc, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+        import {
+            doc,
+            initializeFirestore,
+            onSnapshot,
+            persistentLocalCache,
+            persistentMultipleTabManager,
+            runTransaction,
+            setDoc
+        } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
        
        
@@ -2070,16 +2036,70 @@ const originalText = btn.innerHTML;
 
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
             console.warn("Firebase: API key no configurada. Funciones de nube deshabilitadas.");
-            // Deja la función de nube sin configurar para que el flujo existente use el modo offline.
+            // Sin configuración, los reportes permanecen en el borrador local hasta reintentar.
             window.reservarFolioCloud = null;
         } else {
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager()
+            })
+        });
 
 // --- BLOQUE DE SEGURIDAD NUEVO ---
             
             const auth = getAuth(app);
+
+            let signInPromise = null;
+
+            function iniciarSesionAnonima() {
+                if (!signInPromise) {
+                    signInPromise = signInAnonymously(auth)
+                        .then((credential) => credential.user)
+                        .finally(() => {
+                            signInPromise = null;
+                        });
+                }
+                return signInPromise;
+            }
+
+            function esperarAuthListo() {
+                if (auth.currentUser) return Promise.resolve(auth.currentUser);
+
+                return new Promise((resolve, reject) => {
+                    let detenerObservacion = () => {};
+                    let timeout;
+                    let inicioSesionEnCurso = false;
+                    let finalizado = false;
+
+                    const terminar = (callback, value) => {
+                        if (finalizado) return;
+                        finalizado = true;
+                        clearTimeout(timeout);
+                        detenerObservacion();
+                        callback(value);
+                    };
+
+                    timeout = setTimeout(() => {
+                        terminar(reject, new Error("Tiempo de espera agotado al conectar con Firebase Authentication."));
+                    }, 10000);
+
+                    detenerObservacion = onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            terminar(resolve, user);
+                            return;
+                        }
+                        if (inicioSesionEnCurso) return;
+
+                        inicioSesionEnCurso = true;
+                        iniciarSesionAnonima().then(
+                            (user) => terminar(resolve, user),
+                            (error) => terminar(reject, error)
+                        );
+                    }, (error) => terminar(reject, error));
+                });
+            }
 
 // EL ESCÁNER PERMANENTE: Revisa si ya hay pase o si necesita uno nuevo
 onAuthStateChanged(auth, (user) => {
@@ -2098,11 +2118,44 @@ onAuthStateChanged(auth, (user) => {
     } else {
         // SI NO TIENE PASE, LO CREAMOS INMEDIATAMENTE
         console.log("Sin gafete. Solicitando uno nuevo...");
-        signInAnonymously(auth).catch((error) => {
+        iniciarSesionAnonima().catch((error) => {
             console.error("Error crítico al dar gafete:", error);
         });
     }
 });
+
+        const pendingReportIdKey = "apptolva_pending_firestore_report_id";
+        const observersByReportId = new Map();
+
+        function observarSincronizacionReporte(id) {
+            if (observersByReportId.has(id)) return;
+
+            const reportRef = doc(db, "bitacora_reports", id);
+            const unsubscribe = onSnapshot(reportRef, { includeMetadataChanges: true }, (snapshot) => {
+                if (!snapshot.exists()) return;
+                if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
+
+                unsubscribe();
+                observersByReportId.delete(id);
+                window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
+            }, (error) => {
+                unsubscribe();
+                observersByReportId.delete(id);
+                window.dispatchEvent(new CustomEvent("firestore-report-sync-error", {
+                    detail: { id, message: error.message }
+                }));
+            });
+            observersByReportId.set(id, unsubscribe);
+        }
+
+        const pendingReportId = localStorage.getItem(pendingReportIdKey);
+        if (pendingReportId) {
+            esperarAuthListo().then(() => observarSincronizacionReporte(pendingReportId)).catch((error) => {
+                window.dispatchEvent(new CustomEvent("firestore-report-sync-error", {
+                    detail: { id: pendingReportId, message: error.message }
+                }));
+            });
+        }
 
         // FUNCIÓN INTERNA PARA RESERVAR FOLIO AL MOMENTO DE GUARDAR
         window.reservarFolioCloud = async function() {
@@ -2117,6 +2170,65 @@ onAuthStateChanged(auth, (user) => {
                 return siguiente;
             });
         }
+
+        // Guarda con un ID estable para que un reintento no cree otro reporte.
+        window.guardarReporteEnFirestore = async function(reportePayload, id) {
+            await esperarAuthListo();
+            if (!id) throw new Error("Falta el identificador estable del reporte.");
+
+            const docRef = doc(db, "bitacora_reports", id);
+            const data = {
+                id: id,
+                folio: reportePayload.folio || "",
+                report_type: reportePayload.reportType || "checklist",
+                unit_id: reportePayload.unitId || "",
+                driver_name: reportePayload.driverName || "",
+                license: reportePayload.license || "",
+                priority: reportePayload.priority || "baja",
+                payload: reportePayload,
+                created_at: new Date().toISOString()
+            };
+            const payloadBytes = new Blob([JSON.stringify(data)]).size;
+            if (payloadBytes > 800000) {
+                throw new Error(`El reporte excede el tamaño permitido (${Math.round(payloadBytes / 1024)} KB). Reduce el tamaño de las firmas.`);
+            }
+
+            let unsubscribePendingSnapshot = () => {};
+            const writePendingLocally = new Promise((resolve, reject) => {
+                unsubscribePendingSnapshot = onSnapshot(
+                    docRef,
+                    { includeMetadataChanges: true },
+                    (snapshot) => {
+                        if (snapshot.exists() && snapshot.metadata.hasPendingWrites) {
+                            unsubscribePendingSnapshot();
+                            resolve();
+                        }
+                    },
+                    (error) => {
+                        unsubscribePendingSnapshot();
+                        reject(error);
+                    }
+                );
+            });
+
+            const writePromise = setDoc(docRef, data);
+            let writeResult;
+            try {
+                writeResult = await Promise.race([
+                    writePromise.then(() => "synced"),
+                    writePendingLocally.then(() => "pending")
+                ]);
+            } finally {
+                unsubscribePendingSnapshot();
+            }
+
+            if (writeResult === "pending") {
+                observarSincronizacionReporte(id);
+                return { id, url: `./viewer.html?id=${id}`, status: "pending" };
+            }
+
+            return { id, url: `./viewer.html?id=${id}`, status: "synced" };
+        };
         
         console.log("Sistema Nube: Listo para asignar folios bajo demanda.");
         } // end else (Firebase configurado)
