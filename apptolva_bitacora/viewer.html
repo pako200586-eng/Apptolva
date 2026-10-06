@@ -143,6 +143,24 @@
             return `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}${precision}`;
         }
 
+        function getActivityStatus(log) {
+            const rawStatus = log?.status ?? log?.estado ?? log?.activity ?? log?.actividad;
+            if (typeof rawStatus === "number" && Number.isInteger(rawStatus) && rawStatus >= 1 && rawStatus <= 5) {
+                return rawStatus;
+            }
+
+            const value = String(rawStatus ?? "").trim();
+            if (/^[1-5]$/.test(value)) return Number(value);
+
+            const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+            if (/PAUSA|BREAK|COMIDA|DESCANSO CORTO/.test(normalized)) return 2;
+            if (/DESCANSO|REST/.test(normalized)) return 1;
+            if (/MANEJ|CONDUC|EN RUTA|DRIVING/.test(normalized)) return 3;
+            if (/SERVICIO|AUXILIAR|CARGA|DESCARGA|SERVICE/.test(normalized)) return 4;
+            if (/EXCEPCION|EMERGENCIA|EXCEPTION/.test(normalized)) return 5;
+            return null;
+        }
+
         // ===================================================================
         //  BITÁCORA DE HORAS DE SERVICIO (NOM-087) — idéntica a la del operador
         // ===================================================================
@@ -249,6 +267,10 @@
                     const mapSt = { 3: 0, 2: 1, 4: 2, 5: 3, 1: 4 };
 
                     dayLogs.forEach((l, i) => {
+                        const status = getActivityStatus(l);
+                        const rIdx = mapSt[status];
+                        if (rIdx === undefined) return;
+
                         let ds = new Date(l.startTime);
                         let de = l.endTime ? new Date(l.endTime) : new Date();
 
@@ -260,7 +282,6 @@
 
                         const cruzaLimiteTurno = (de > ds) && (x2 < x1);
 
-                        let rIdx = mapSt[l.status] !== undefined ? mapSt[l.status] : 4;
                         let yLine = gy + (rIdx * rowH) + (rowH / 2);
 
                         if (cruzaLimiteTurno) {
@@ -276,7 +297,9 @@
 
                         if (i > 0) {
                             let prev = dayLogs[i - 1];
-                            let prevR = mapSt[prev.status] !== undefined ? mapSt[prev.status] : 4;
+                            const prevStatus = getActivityStatus(prev);
+                            const prevR = mapSt[prevStatus];
+                            if (prevR === undefined) return;
                             let prevY = gy + (prevR * rowH) + (rowH / 2);
                             let prevEnd = new Date(prev.endTime);
                             let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStart + 24) % 24;
@@ -320,7 +343,7 @@
                     doc.setFont("helvetica", "normal");
                 }
 
-                const stName = ["", "DESCANSO", "PAUSA", "MANEJANDO", "SERVICIO", "EXCEPCIÓN"][l.status] || "OTRO";
+                const stName = ["", "DESCANSO", "PAUSA", "MANEJANDO", "SERVICIO", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
                 const dur = Math.floor((e - s) / 60000);
