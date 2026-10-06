@@ -374,7 +374,8 @@
 
     function coincideFiltroGlobal(record, fields) {
       const { from, to, unit, operator, type } = state.appliedFilters;
-      if (type && type !== 'todos' && String(record.type || '').toLowerCase() !== type.toLowerCase()) return false;
+      if (fields.type && type && type !== 'todos'
+        && String(record[fields.type] || '').toLowerCase() !== type.toLowerCase()) return false;
       if (unit && !String(record[fields.unit] || '').toLowerCase().includes(unit.toLowerCase())) return false;
       if (operator && !String(record[fields.operator] || '').toLowerCase().includes(operator.toLowerCase())) return false;
       if (from || to) {
@@ -515,7 +516,7 @@
         });
 
         const filteredReports = rawReports.filter((rep) =>
-          coincideFiltroGlobal(rep, { unit: 'unitId', operator: 'driverName', date: 'createdAt' })
+          coincideFiltroGlobal(rep, { unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type' })
         );
 
         const hoy = new Date();
@@ -575,11 +576,11 @@
     $('logoutBtn').addEventListener('click', () => signOut(auth));
 
     $('refreshBtn').addEventListener('click', () => {
-      cargarDatos().catch((error) => showToast(error.message));
-      cargarDashboard(true).catch(() => {});
+      Promise.all([cargarDatos(), cargarDashboard(true), cargarOrdenes(true)])
+        .catch((error) => showToast(error.message));
     });
 
-    $('applyFilters').addEventListener('click', () => {
+    $('applyFilters').addEventListener('click', async () => {
       const params = filters();
       state.appliedFilters = {
         from: params.get('from') || '',
@@ -588,9 +589,44 @@
         operator: params.get('operator') || '',
         type: params.get('type') || 'todos'
       };
-      Promise.all([cargarDatos(params), cargarFallas(), cargarOrdenes()])
-        .then(renderDashboard)
-        .catch((error) => showToast(error.message));
+
+      try {
+        if (!state.allReports) await cargarDatos();
+        if (!state.allReports) throw new Error('No se pudieron cargar los reportes para aplicar los filtros.');
+        if (!dashState.ordenes) await obtenerOrdenes();
+
+        const rawReports = state.allReports || [];
+        const filteredReports = rawReports.filter((report) =>
+          coincideFiltroGlobal(report, {
+            unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type'
+          })
+        );
+        const hoy = new Date();
+        const esHoy = (value) => {
+          const fecha = new Date(value);
+          return !Number.isNaN(fecha.getTime())
+            && fecha.getFullYear() === hoy.getFullYear()
+            && fecha.getMonth() === hoy.getMonth()
+            && fecha.getDate() === hoy.getDate();
+        };
+        render({
+          summary: {
+            total: rawReports.length,
+            checklist: rawReports.filter((report) => report.type === 'checklist').length,
+            bitacoras: rawReports.filter((report) => report.type === 'bitacora').length,
+            hoy: rawReports.filter((report) => esHoy(report.createdAt)).length,
+            operadores: new Set(rawReports.map((report) => report.driverName).filter(Boolean)).size,
+            unidades: new Set(rawReports.map((report) => report.unitId).filter(Boolean)).size
+          },
+          reports: filteredReports,
+          generatedAt: new Date().toISOString(),
+          filtered: true
+        });
+        await Promise.all([cargarFallas(), cargarOrdenes()]);
+        renderDashboard();
+      } catch (error) {
+        showToast(error.message);
+      }
     });
 
     const COMPONENTES = [
@@ -619,11 +655,21 @@
       };
     }
 
+    const procesadosReportes = new WeakMap();
+    function obtenerFallasReporte(report) {
+      if (procesadosReportes.has(report)) return procesadosReportes.get(report);
+      const resultado = typeof window.procesarReporteFallas === 'function'
+        ? window.procesarReporteFallas(report)
+        : { fallas: [], observaciones: [] };
+      procesadosReportes.set(report, resultado);
+      return resultado;
+    }
+
     function fallasPorComponente(report) {
       const resultado = { tracto: [], tolva1: [], dolly: [], tolva2: [] };
       if (typeof window.procesarReporteFallas !== 'function') return resultado;
 
-      const { fallas } = window.procesarReporteFallas(report);
+      const { fallas } = obtenerFallasReporte(report);
       fallas.forEach((f) => {
         const key = f.componenteKey || 'tracto';
         if (resultado[key]) {
@@ -990,6 +1036,28 @@
         </button>`;
     }
 
+    async function obtenerOrdenes(forzar = false) {
+      if (Array.isArray(dashState.ordenes) && !forzar) return dashState.ordenes;
+      if (!ordenesLoadPromise) {
+        ordenesLoadPromise = (async () => {
+          const snapshot = await getDocs(fsQuery(
+            collection(db, 'ordenes_trabajo'),
+            fsOrderBy('fecha_apertura', 'desc')
+          ));
+          const ordenes = [];
+          snapshot.forEach((documento) => ordenes.push({ id: documento.id, ...documento.data() }));
+          dashState.ordenes = ordenes;
+          return ordenes;
+        })();
+      }
+
+      try {
+        return await ordenesLoadPromise;
+      } finally {
+        ordenesLoadPromise = null;
+      }
+    }
+
     // CARGA DE FALLAS DESDE FIRESTORE
     async function cargarFallas() {
       const contenedor = $('fallas-cards');
@@ -997,27 +1065,21 @@
       contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Buscando fallas en Firebase...</p>';
 
       try {
-        if (!dashState.ordenes) {
-          const oSnap = await getDocs(fsQuery(collection(db, 'ordenes_trabajo'), fsOrderBy('fecha_apertura', 'desc')));
-          dashState.ordenes = [];
-          oSnap.forEach((d) => dashState.ordenes.push({ id: d.id, ...d.data() }));
-        }
+        await obtenerOrdenes();
 
         const otReporteIds = new Set((dashState.ordenes || []).map((o) => String(o.reporte_id || '')).filter(Boolean));
 
         const reportesFiltrados = state.reports.filter((reporte) => {
           if (reporte.type !== 'checklist') return false;
           if (otReporteIds.has(String(reporte.id))) return false;
-          const { fallas } = window.procesarReporteFallas ? window.procesarReporteFallas(reporte) : { fallas: [] };
+          const { fallas } = obtenerFallasReporte(reporte);
           return fallas.length > 0;
         });
 
         contenedor.innerHTML = '';
 
         reportesFiltrados.forEach((reporte) => {
-          const { fallas, observaciones } = window.procesarReporteFallas
-            ? window.procesarReporteFallas(reporte)
-            : { fallas: [], observaciones: [] };
+          const { fallas, observaciones } = obtenerFallasReporte(reporte);
 
           if (!fallas.length) return;
 
@@ -1048,16 +1110,15 @@
     }
 
     // CARGA DE ÓRDENES DE TRABAJO DESDE FIRESTORE
-    async function cargarOrdenes() {
+    async function cargarOrdenes(forzar = false) {
       const tbody = $('tabla-ordenes-body');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando órdenes de trabajo desde Firebase...</td></tr>';
+      if (forzar || !Array.isArray(dashState.ordenes)) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando órdenes de trabajo desde Firebase...</td></tr>';
+      }
 
       try {
-        const oSnap = await getDocs(fsQuery(collection(db, 'ordenes_trabajo'), fsOrderBy('fecha_apertura', 'desc')));
-        const ordenes = [];
-        oSnap.forEach((d) => ordenes.push({ id: d.id, ...d.data() }));
-        dashState.ordenes = ordenes;
+        const ordenes = await obtenerOrdenes(forzar);
 
         const ordenesFiltradas = ordenes.filter((orden) => coincideFiltroGlobal(orden, {
           unit: 'unidad', operator: 'operador', date: 'fecha_apertura'
@@ -1288,6 +1349,7 @@
     const COLOR_MARCA = '#7c2d12';
     const ESTATUS_REALIZADA = new Set(['TERMINADA', 'CERRADA']);
     const dashState = { ordenes: null };
+    let ordenesLoadPromise = null;
 
     const sinAcentos = (texto) => String(texto || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
     const categoriaKey = (texto) => sinAcentos(texto).split('/')[0].trim() || 'GENERAL';
@@ -1608,15 +1670,10 @@
     async function cargarDashboard(forzar = false) {
       $('dashEstado').textContent = 'Cargando métricas de Firebase...';
       renderDashboard();
-      if (!dashState.ordenes || forzar) {
-        try {
-          const oSnap = await getDocs(fsQuery(collection(db, 'ordenes_trabajo'), fsOrderBy('fecha_apertura', 'desc')));
-          const ordenes = [];
-          oSnap.forEach((d) => ordenes.push({ id: d.id, ...d.data() }));
-          dashState.ordenes = ordenes;
-        } catch (error) {
-          showToast(error.message);
-        }
+      try {
+        await obtenerOrdenes(forzar);
+      } catch (error) {
+        showToast(error.message);
       }
       renderDashboard();
     }
