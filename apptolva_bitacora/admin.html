@@ -325,7 +325,7 @@
 
   <script type="module">
     import { initializeApp } from "./js/firebase-sdk.js";
-    import { getAuth, getIdTokenResult, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "./js/firebase-sdk.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "./js/firebase-sdk.js";
     import {
       getFirestore,
       collection,
@@ -728,16 +728,13 @@
       let accessError = null;
       if (user?.email && user.providerData.some((provider) => provider.providerId === 'password')) {
         try {
-          const token = await getIdTokenResult(user);
-          if (token.claims.admin === true) {
-            const email = user.email.toLowerCase().trim();
-            const userSnapshot = await getDoc(doc(db, 'usuarios', email));
-            if (userSnapshot.exists()) {
-              const role = userSnapshot.data()?.rol;
-              if (role === 'admin' || role === 'lectura') {
-                authenticatedUser = user;
-                userRole = role;
-              }
+          const email = user.email.toLowerCase().trim();
+          const userSnapshot = await getDoc(doc(db, 'usuarios', email));
+          if (userSnapshot.exists()) {
+            const role = userSnapshot.data()?.rol;
+            if (role === 'admin' || role === 'lectura') {
+              authenticatedUser = user;
+              userRole = role;
             }
           }
         } catch (error) {

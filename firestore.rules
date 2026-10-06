@@ -10,10 +10,19 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    function isSupervisor() {
+    function getUserRole() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email.lower())).data.rol;
+    }
+
+    function isPanelUser() {
       return signedIn()
         && request.auth.token.firebase.sign_in_provider == 'password'
-        && request.auth.token.admin == true;
+        && request.auth.token.email is string
+        && getUserRole() in ['admin', 'lectura'];
+    }
+
+    function isAdmin() {
+      return isPanelUser() && getUserRole() == 'admin';
     }
 
     match /sistema/contadores {
@@ -22,7 +31,7 @@ service cloud.firestore {
 
       // Operators may initialize only the public folio fields. Seed this
       // document with the current production values before publishing the rules.
-      allow create: if isSupervisor()
+      allow create: if isAdmin()
         || (isAnonymousOperator()
           && (
             (request.resource.data.keys().hasOnly(['folio_bitacora'])
@@ -31,7 +40,7 @@ service cloud.firestore {
               && request.resource.data.folio_actual == 1001)
           ));
 
-      allow update: if isSupervisor()
+      allow update: if isAdmin()
         || (isAnonymousOperator()
           && (
             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['folio_bitacora'])
@@ -55,10 +64,10 @@ service cloud.firestore {
 
     match /bitacora_reports/{reportId} {
       // QR links intentionally allow fetching one known report; the viewer
-      // authenticates anonymously. Collection queries remain supervisor-only.
+      // authenticates anonymously. Collection queries are for panel users.
       allow get: if signedIn();
-      allow list: if isSupervisor();
-      allow create: if isAnonymousOperator() || isSupervisor();
+      allow list: if isPanelUser();
+      allow create: if isAnonymousOperator() || isAdmin();
       allow update, delete: if false;
     }
 
@@ -67,20 +76,23 @@ service cloud.firestore {
       // restricted to trusted administrative tooling (Admin SDK / Console).
       allow get: if signedIn()
         && request.auth.token.firebase.sign_in_provider == 'password'
-        && request.auth.token.email == email;
+        && request.auth.token.email.lower() == email;
       allow list, create, update, delete: if false;
     }
 
     match /ordenes_trabajo/{otId} {
-      allow read, write: if isSupervisor();
+      allow read: if isPanelUser();
+      allow write: if isAdmin();
     }
 
     match /ot_seguimiento/{segId} {
-      allow read, write: if isSupervisor();
+      allow read: if isPanelUser();
+      allow write: if isAdmin();
     }
 
     match /ot_por_reporte/{reportId} {
-      allow read, write: if isSupervisor();
+      allow read: if isPanelUser();
+      allow write: if isAdmin();
     }
 
     match /{document=**} {
