@@ -62,6 +62,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /usuarios/{email} {
+      // Panel users can read only their own role record. Role writes remain
+      // restricted to trusted administrative tooling (Admin SDK / Console).
+      allow get: if signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email == email;
+      allow list, create, update, delete: if false;
+    }
+
     match /ordenes_trabajo/{otId} {
       allow read, write: if isSupervisor();
     }
