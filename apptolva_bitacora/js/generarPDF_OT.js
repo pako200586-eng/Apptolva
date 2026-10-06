@@ -126,7 +126,7 @@
       tolva1: pick('tolva1'),
       tolva2: pick('tolva2'),
       dolly: pick('dolly'),
-      folioCheckList: pick('folio_bitacora', 'folio_checklist') || texto(ordenData.reporte_id),
+      folioCheckList: pick('folio_bitacora', 'folio_checklist', 'reporte_folio') || 'S/F',
       fechaSolicitud: formatearFecha(ordenData.fecha_apertura || payload.fecha),
       fechaRealizacion: formatearFechaCorta(pick('fecha_realizacion')),
       kilometraje: pick('kilometraje', 'km'),

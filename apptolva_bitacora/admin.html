@@ -782,8 +782,33 @@
         return;
       }
       try {
+        const esFolioLegible = (valor) => {
+          const folio = String(valor || '').trim();
+          return folio && folio.length <= 20 ? folio : '';
+        };
+        let folioChecklist = [
+          orden.folio_checklist,
+          orden.reporte_folio,
+          orden.folio_bitacora
+        ].map(esFolioLegible).find(Boolean) || '';
+        if (!folioChecklist && orden.reporte_id) {
+          const reporte = [...(state.reports || []), ...(state.allReports || [])]
+            .find((item) => String(item.id) === String(orden.reporte_id));
+          folioChecklist = esFolioLegible(reporte?.folio || reporte?.payload?.folio);
+          if (!folioChecklist) {
+            const reporteSnapshot = await getDoc(doc(db, 'bitacora_reports', String(orden.reporte_id)));
+            if (reporteSnapshot.exists()) {
+              const datosReporte = reporteSnapshot.data();
+              folioChecklist = esFolioLegible(datosReporte.folio || datosReporte.payload?.folio);
+            }
+          }
+        }
+        const ordenParaImprimir = {
+          ...orden,
+          folio_checklist: folioChecklist || ''
+        };
         showToast(`Generando PDF de OT-${orden?.folio_ot ?? ''}...`);
-        await window.imprimirOT_Bachoco(orden);
+        await window.imprimirOT_Bachoco(ordenParaImprimir);
       } catch (error) {
         console.error('Error al generar PDF:', error);
         showToast('No se pudo generar el PDF de la OT.');
@@ -834,6 +859,7 @@
         const sistema = unicos(fallas.map((f) => f.sistema || f.categoria)).join(', ') || 'GENERAL';
         const descripcion = fallas.map((f) => `${f.componente} | ${f.sistema || f.categoria}: ${f.descripcion || f.itemOficial}`).join('\n');
         const obsTexto = observaciones.map((o) => `${o.componente}: ${o.texto}`).join('\n');
+        const reporteFolio = String(reporte.folio || reporte.payload?.folio || '').trim();
 
         const refCandado = doc(db, 'ot_por_reporte', reporteId);
         const refContador = doc(db, 'sistema', 'contadores');
@@ -867,6 +893,8 @@
             id: otId,
             folio_ot: nuevoFolio,
             reporte_id: reporteId,
+            folio_checklist: reporteFolio,
+            reporte_folio: reporteFolio,
             unidad: reporte.unitId || reporte.unidad || 'N/A',
             operador: reporte.driverName || reporte.operador || 'No especificado',
             componente,
