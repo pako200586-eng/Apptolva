@@ -8,6 +8,13 @@ if [ -z "$FIREBASE_API_KEY" ]; then
   exit 1
 fi
 
+../node_modules/.bin/esbuild js/firebase-sdk-entry.js \
+  --bundle \
+  --format=esm \
+  --target=es2020 \
+  --minify \
+  --outfile=js/firebase-sdk.js
+
 for archivo in index.html bitacora_master.html admin.html viewer.html; do
   sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" "$archivo"
 done

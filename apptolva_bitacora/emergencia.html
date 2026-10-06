@@ -60,6 +60,39 @@ const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvc
 let fallaFotoBase64 = null;
 let fallaUbicacion = null;
 
+async function solicitarSincronizacionPendiente() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        const worker = navigator.serviceWorker.controller || registration.active;
+        worker?.postMessage({ type: 'SYNC_NOW' });
+    } catch (error) {
+        console.error('No se pudo reintentar el envío de emergencias pendientes:', error);
+    }
+}
+
+window.addEventListener('online', solicitarSincronizacionPendiente);
+window.addEventListener('load', () => {
+    if (navigator.onLine) solicitarSincronizacionPendiente();
+});
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.kind !== 'emergencia') return;
+
+        const status = document.getElementById('fallaSaveStatus');
+        if (!status) return;
+
+        if (event.data.type === 'REPORT_SYNCED') {
+            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-green-100 text-green-700';
+            status.textContent = '✓ Emergencia sincronizada correctamente.';
+        } else if (event.data.type === 'REPORT_SYNC_WAITING') {
+            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-amber-100 text-amber-700';
+            status.textContent = 'Emergencia pendiente; se reintentará cuando haya conexión.';
+        }
+    });
+}
+
 function iniciarCapturaFalla() {
     const status = document.getElementById('fallaGpsStatus');
     if (!navigator.geolocation) {

@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAnonymousOperator() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isSupervisor() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.admin == true;
+    }
+
+    match /sistema/contadores {
+      allow read: if signedIn();
+      allow delete: if false;
+
+      // Operators may initialize only the public folio fields. Seed this
+      // document with the current production values before publishing the rules.
+      allow create: if isSupervisor()
+        || (isAnonymousOperator()
+          && (
+            (request.resource.data.keys().hasOnly(['folio_bitacora'])
+              && request.resource.data.folio_bitacora == 1001)
+            || (request.resource.data.keys().hasOnly(['folio_actual'])
+              && request.resource.data.folio_actual == 1001)
+          ));
+
+      allow update: if isSupervisor()
+        || (isAnonymousOperator()
+          && (
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['folio_bitacora'])
+              && request.resource.data.folio_bitacora is int
+              && request.resource.data.folio_bitacora == resource.data.get('folio_bitacora', 1000) + 1)
+            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['folio_actual'])
+              && request.resource.data.folio_actual is int
+              && request.resource.data.folio_actual == resource.data.get('folio_actual', 1000) + 1)
+          ));
+    }
+
+    match /contadores/solicitudServicio {
+      allow read, update: if true;
+      allow create, delete: if false;
+    }
+
+    match /bitacoras_087/{folio} {
+      allow read, create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    match /bitacora_reports/{reportId} {
+      // QR links intentionally allow fetching one known report; the viewer
+      // authenticates anonymously. Collection queries remain supervisor-only.
+      allow get: if signedIn();
+      allow list: if isSupervisor();
+      allow create: if isAnonymousOperator() || isSupervisor();
+      allow update, delete: if false;
+    }
+
+    match /ordenes_trabajo/{otId} {
+      allow read, write: if isSupervisor();
+    }
+
+    match /ot_seguimiento/{segId} {
+      allow read, write: if isSupervisor();
+    }
+
+    match /ot_por_reporte/{reportId} {
+      allow read, write: if isSupervisor();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

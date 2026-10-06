@@ -1298,7 +1298,19 @@
 
         window.addEventListener('online', () => {
             setOfflineSyncStatus("Conexión recuperada. Firebase está sincronizando los reportes pendientes...");
+            solicitarSincronizacionPendiente();
         });
+
+        async function solicitarSincronizacionPendiente() {
+            if (!('serviceWorker' in navigator)) return;
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const worker = navigator.serviceWorker.controller || registration.active;
+                worker?.postMessage({ type: "SYNC_NOW" });
+            } catch (error) {
+                console.error("No se pudo reintentar la sincronización pendiente:", error);
+            }
+        }
 
         window.addEventListener('bitacora-firestore-synced', (event) => {
             const { folio, url } = event.detail || {};
@@ -1343,7 +1355,7 @@
 
     <!-- FIREBASE -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+        import { initializeApp } from "./js/firebase-sdk.js";
         import {
             doc,
             initializeFirestore,
@@ -1352,8 +1364,8 @@
             persistentMultipleTabManager,
             runTransaction,
             setDoc
-        } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        } from "./js/firebase-sdk.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
       
         const firebaseConfig = {
             apiKey: "__FIREBASE_API_KEY__",

@@ -324,8 +324,8 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { initializeApp } from "./js/firebase-sdk.js";
+    import { getAuth, getIdTokenResult, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "./js/firebase-sdk.js";
     import {
       getFirestore,
       collection,
@@ -338,7 +338,7 @@
       setDoc,
       updateDoc,
       runTransaction
-    } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    } from "./js/firebase-sdk.js";
 
     const firebaseConfig = {
       apiKey: "__FIREBASE_API_KEY__",
@@ -709,10 +709,20 @@
       doc.save('apptolva-reportes.pdf');
     });
 
+    let authStateVersion = 0;
     onAuthStateChanged(auth, async (user) => {
-      const authenticatedUser = user?.email && user.providerData.some((provider) => provider.providerId === 'password')
-        ? user
-        : null;
+      const currentAuthStateVersion = ++authStateVersion;
+      let authenticatedUser = null;
+      if (user?.email && user.providerData.some((provider) => provider.providerId === 'password')) {
+        try {
+          const token = await getIdTokenResult(user);
+          if (token.claims.admin === true) authenticatedUser = user;
+        } catch (error) {
+          console.error('No se pudo comprobar el rol del supervisor:', error);
+          showToast('No se pudo verificar el acceso de supervisor.');
+        }
+      }
+      if (currentAuthStateVersion !== authStateVersion) return;
 
       state.user = authenticatedUser;
       $('loginPanel').classList.toggle('hidden', Boolean(authenticatedUser));
@@ -725,6 +735,10 @@
         state.allReports = [];
         state.lastTotal = 0;
         dashState.ordenes = null;
+        if (user) {
+          $('loginMsg').textContent = 'Esta cuenta no tiene el rol de supervisor autorizado.';
+          $('loginMsg').classList.remove('hidden');
+        }
         return;
       }
 

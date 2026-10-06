@@ -1302,6 +1302,19 @@ const originalText = btn.innerHTML;
             msg.classList.add('hidden');
         }
 
+        async function solicitarSincronizacionPendiente() {
+            if (!('serviceWorker' in navigator)) return;
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const worker = navigator.serviceWorker.controller || registration.active;
+                worker?.postMessage({ type: "SYNC_NOW" });
+            } catch (error) {
+                console.error("No se pudo reintentar la sincronización pendiente:", error);
+            }
+        }
+
+        window.addEventListener('online', solicitarSincronizacionPendiente);
+
         window.addEventListener('firestore-report-synced', (event) => {
             const { id } = event.detail || {};
             if (!id || localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY) !== id) return;
@@ -2010,7 +2023,7 @@ const originalText = btn.innerHTML;
     </script>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+        import { initializeApp } from "./js/firebase-sdk.js";
         import {
             doc,
             initializeFirestore,
@@ -2019,8 +2032,8 @@ const originalText = btn.innerHTML;
             persistentMultipleTabManager,
             runTransaction,
             setDoc
-        } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        } from "./js/firebase-sdk.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
        
        
        // CONFIGURACIÓN OFICIAL

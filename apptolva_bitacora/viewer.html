@@ -694,11 +694,10 @@
                 throw new Error("La configuración de Firebase no está disponible.");
             }
 
-            const [{ initializeApp }, { getAuth, signInAnonymously }, { getFirestore, doc, getDoc }] = await Promise.all([
-                import("https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js"),
-                import("https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js"),
-                import("https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js")
-            ]);
+            const firebaseSdk = await import("./js/firebase-sdk.js");
+            const { initializeApp } = firebaseSdk;
+            const { getAuth, signInAnonymously } = firebaseSdk;
+            const { getFirestore, doc, getDoc } = firebaseSdk;
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             if (!auth.currentUser) await signInAnonymously(auth);

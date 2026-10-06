@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v49";
+const CACHE_VERSION = "v50";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -27,6 +27,7 @@ const OFFLINE_URLS = [
   "./js/tailwindcss.js",
   "./js/signature_pad.min.js",
   "./js/jspdf.min.js",
+  "./js/firebase-sdk.js",
   "./js/qrcode.min.js",
   "./js/confetti.min.js",
   "./js/catalogoBachoco.js",
@@ -159,6 +160,10 @@ async function precacheOfflineUrls() {
   const failed = results.filter((result) => result.status === "rejected");
   if (failed.length) {
     console.warn("Service worker: algunos recursos offline no se precargaron.", failed);
+    const firebaseSdkIndex = OFFLINE_URLS.indexOf("./js/firebase-sdk.js");
+    if (firebaseSdkIndex >= 0 && results[firebaseSdkIndex].status === "rejected") {
+      throw new Error("No se pudo precargar el SDK local de Firebase; el modo offline no está listo.");
+    }
   }
 }
 
@@ -171,7 +176,7 @@ async function cacheStaticRequest(request) {
     return fetch(request); // ignora extensiones y otros esquemas
   }
 
-  const cached = await caches.match(request, { ignoreSearch: true });
+  const cached = await caches.match(request);
   if (cached) return cached;
 
   const response = await fetch(request);
@@ -199,10 +204,19 @@ async function networkFirstRequest(request) {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(request, { ignoreSearch: true });
+    const cached = await caches.match(request);
     if (cached) return cached;
     throw error;
   }
+}
+
+async function offlineNavigationFallback(request) {
+  const url = new URL(request.url);
+  const pageUrl = new URL(url.pathname, url.origin);
+  const page = await caches.match(pageUrl);
+  if (page) return page;
+
+  return caches.match(new URL("./index.html", self.location.href));
 }
 
 async function queueBitacoraRequest(request) {
@@ -372,10 +386,7 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      networkFirstRequest(event.request).catch(async () =>
-        (await caches.match(event.request, { ignoreSearch: true })) ||
-        caches.match("./index.html", { ignoreSearch: true })
-      )
+      networkFirstRequest(event.request).catch(() => offlineNavigationFallback(event.request))
     );
     return;
   }

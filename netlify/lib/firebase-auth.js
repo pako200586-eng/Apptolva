@@ -166,6 +166,7 @@ async function hasAdminAccess(req) {
     return Boolean(
       decodedToken.email
       && decodedToken.firebase?.sign_in_provider === "password"
+      && decodedToken.admin === true
       && isAllowedAdminEmail(decodedToken.email),
     );
   } catch (error) {
