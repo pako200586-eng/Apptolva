@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Migrador a Firebase | AppTolva</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#f4f1ec] text-slate-800 p-6 min-h-screen flex items-center justify-center font-sans">
+  <div class="max-w-xl w-full bg-white p-6 rounded-xl shadow-lg border border-orange-100">
+    <div class="border-b border-orange-100 pb-4 mb-4">
+      <p class="text-xs font-black uppercase tracking-wider text-[#7c2d12]">AppTolva · Utilidad de Migración</p>
+      <h1 class="text-2xl font-black text-slate-900 mt-1">Cargar Respaldo en Firebase Firestore</h1>
+      <p class="text-sm text-slate-500 mt-1">Sube tus archivos JSON descargados (órdenes y reportes recientes).</p>
+    </div>
+
+    <div class="space-y-4">
+      <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg space-y-2">
+        <label class="block text-xs font-bold uppercase text-slate-700">1. Credenciales de Administrador (Frank)</label>
+        <input id="adminEmail" type="email" value="frank@apptolva.com" class="w-full border border-slate-300 rounded p-2 text-xs">
+        <input id="adminPassword" type="password" placeholder="Tu contraseña de supervisor" class="w-full border border-slate-300 rounded p-2 text-xs">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase text-slate-700 mb-1">2. Selecciona el archivo JSON descargado</label>
+        <input type="file" id="archivoBackup" accept=".json" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+      </div>
+
+      <div id="infoArchivo" class="hidden p-3 bg-slate-50 rounded-lg text-xs space-y-1 text-slate-700"></div>
+
+      <button id="btnIniciar" disabled class="w-full bg-[#294936] text-white font-bold py-3 rounded-lg hover:bg-[#203b2b] transition disabled:opacity-40 disabled:cursor-not-allowed">
+        Iniciar Migración a Firestore
+      </button>
+
+      <div id="progresoContainer" class="hidden space-y-2">
+        <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+          <div id="barraProgreso" class="bg-[#7c2d12] h-full transition-all duration-200" style="width: 0%"></div>
+        </div>
+        <p id="textoProgreso" class="text-xs font-bold text-center text-slate-600">0% completado</p>
+      </div>
+
+      <div id="logEstado" class="text-xs font-mono bg-slate-900 text-green-400 p-3 rounded-lg h-40 overflow-y-auto hidden"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, writeBatch, doc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB-zX1PF3_Ei567UgYoYozOCttCN75PwO4",
+      authDomain: "gen-lang-client-0015118308.firebaseapp.com",
+      projectId: "gen-lang-client-0015118308",
+      storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
+      messagingSenderId: "228375512926",
+      appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const input = document.getElementById('archivoBackup');
+    const btn = document.getElementById('btnIniciar');
+    const info = document.getElementById('infoArchivo');
+    const log = document.getElementById('logEstado');
+    const progresoBox = document.getElementById('progresoContainer');
+    const barra = document.getElementById('barraProgreso');
+    const textoProgreso = document.getElementById('textoProgreso');
+
+    let datosCargados = null;
+
+    function agregarLog(mensaje) {
+      log.classList.remove('hidden');
+      const linea = document.createElement('div');
+      linea.textContent = `[${new Date().toLocaleTimeString()}] ${mensaje}`;
+      log.appendChild(linea);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    input.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        datosCargados = JSON.parse(text);
+        const reportes = datosCargados.bitacora_reports?.length || 0;
+        const ordenes = datosCargados.ordenes_trabajo?.length || 0;
+        const seguimientos = datosCargados.ot_seguimiento?.length || 0;
+
+        info.classList.remove('hidden');
+        info.innerHTML = `<strong>Contenido detectado:</strong><br>• Reportes: ${reportes}<br>• Órdenes: ${ordenes}<br>• Seguimientos: ${seguimientos}`;
+        btn.disabled = false;
+      } catch (err) {
+        alert('Archivo JSON no válido');
+        btn.disabled = true;
+      }
+    });
+
+    btn.addEventListener('click', async () => {
+      if (!datosCargados) return;
+      const pass = document.getElementById('adminPassword').value;
+      if (!pass) return alert('Por favor escribe tu contraseña de supervisor');
+
+      btn.disabled = true;
+      input.disabled = true;
+      progresoBox.classList.remove('hidden');
+
+      try {
+        agregarLog('Autenticando en Firebase con frank@apptolva.com...');
+        await signInWithEmailAndPassword(auth, document.getElementById('adminEmail').value.trim(), pass);
+        agregarLog('✓ Autenticado como supervisor.');
+
+        const reportes = datosCargados.bitacora_reports || [];
+        const ordenes = datosCargados.ordenes_trabajo || [];
+        const seguimientos = datosCargados.ot_seguimiento || [];
+
+        const totalItems = reportes.length + ordenes.length + seguimientos.length;
+        let procesados = 0;
+
+        function actualizarProgreso(cantidad = 1) {
+          procesados += cantidad;
+          const pct = Math.min(100, Math.round((procesados / totalItems) * 100));
+          barra.style.width = `${pct}%`;
+          textoProgreso.textContent = `${pct}% completado (${procesados}/${totalItems})`;
+        }
+
+        const LOTE_SIZE = 50;
+
+        if (ordenes.length > 0) {
+          agregarLog(`Guardando ${ordenes.length} Órdenes de Trabajo...`);
+          for (let i = 0; i < ordenes.length; i += LOTE_SIZE) {
+            const batch = writeBatch(db);
+            const lote = ordenes.slice(i, i + LOTE_SIZE);
+            lote.forEach((ot) => batch.set(doc(db, 'ordenes_trabajo', String(ot.id)), ot));
+            await batch.commit();
+            actualizarProgreso(lote.length);
+          }
+        }
+
+        if (seguimientos.length > 0) {
+          agregarLog(`Guardando ${seguimientos.length} Seguimientos...`);
+          for (let i = 0; i < seguimientos.length; i += LOTE_SIZE) {
+            const batch = writeBatch(db);
+            const lote = seguimientos.slice(i, i + LOTE_SIZE);
+            lote.forEach((seg) => batch.set(doc(db, 'ot_seguimiento', String(seg.id)), seg));
+            await batch.commit();
+            actualizarProgreso(lote.length);
+          }
+        }
+
+        if (reportes.length > 0) {
+          agregarLog(`Guardando ${reportes.length} Reportes...`);
+          for (let i = 0; i < reportes.length; i += LOTE_SIZE) {
+            const batch = writeBatch(db);
+            const lote = reportes.slice(i, i + LOTE_SIZE);
+            lote.forEach((rep) => batch.set(doc(db, 'bitacora_reports', String(rep.id)), rep));
+            await batch.commit();
+            actualizarProgreso(lote.length);
+          }
+        }
+
+        agregarLog('✓ ¡MIGRACIÓN COMPLETADA EXITOSAMENTE!');
+        alert('¡Datos subidos exitosamente a Firebase Firestore!');
+      } catch (err) {
+        agregarLog(`ERROR: ${err.message}`);
+        alert('Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        input.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
