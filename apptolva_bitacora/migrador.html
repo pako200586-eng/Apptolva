@@ -11,7 +11,7 @@
     <div class="border-b border-orange-100 pb-4 mb-4">
       <p class="text-xs font-black uppercase tracking-wider text-[#7c2d12]">AppTolva · Utilidad de Migración</p>
       <h1 class="text-2xl font-black text-slate-900 mt-1">Cargar Respaldo en Firebase Firestore</h1>
-      <p class="text-sm text-slate-500 mt-1">Sube tus archivos JSON descargados (órdenes y reportes recientes).</p>
+      <p class="text-sm text-slate-500 mt-1">Sube tus archivos JSON con compatibilidad total de campos.</p>
     </div>
 
     <div class="space-y-4">
@@ -85,8 +85,8 @@
       try {
         const text = await file.text();
         datosCargados = JSON.parse(text);
-        const reportes = datosCargados.bitacora_reports?.length || 0;
-        const ordenes = datosCargados.ordenes_trabajo?.length || 0;
+        const reportes = datosCargados.bitacora_reports?.length || datosCargados.reports?.length || (Array.isArray(datosCargados) ? datosCargados.length : 0);
+        const ordenes = datosCargados.ordenes_trabajo?.length || datosCargados.ordenes?.length || 0;
         const seguimientos = datosCargados.ot_seguimiento?.length || 0;
 
         info.classList.remove('hidden');
@@ -112,8 +112,8 @@
         await signInWithEmailAndPassword(auth, document.getElementById('adminEmail').value.trim(), pass);
         agregarLog('✓ Autenticado como supervisor.');
 
-        const reportes = datosCargados.bitacora_reports || [];
-        const ordenes = datosCargados.ordenes_trabajo || [];
+        const reportes = datosCargados.bitacora_reports || datosCargados.reports || (Array.isArray(datosCargados) && datosCargados[0]?.unitId ? datosCargados : []);
+        const ordenes = datosCargados.ordenes_trabajo || datosCargados.ordenes || [];
         const seguimientos = datosCargados.ot_seguimiento || [];
 
         const totalItems = reportes.length + ordenes.length + seguimientos.length;
@@ -133,36 +133,36 @@
           for (let i = 0; i < ordenes.length; i += LOTE_SIZE) {
             const batch = writeBatch(db);
             const lote = ordenes.slice(i, i + LOTE_SIZE);
-            lote.forEach((ot) => batch.set(doc(db, 'ordenes_trabajo', String(ot.id)), ot));
-            await batch.commit();
-            actualizarProgreso(lote.length);
-          }
-        }
-
-        if (seguimientos.length > 0) {
-          agregarLog(`Guardando ${seguimientos.length} Seguimientos...`);
-          for (let i = 0; i < seguimientos.length; i += LOTE_SIZE) {
-            const batch = writeBatch(db);
-            const lote = seguimientos.slice(i, i + LOTE_SIZE);
-            lote.forEach((seg) => batch.set(doc(db, 'ot_seguimiento', String(seg.id)), seg));
+            lote.forEach((ot) => batch.set(doc(db, 'ordenes_trabajo', String(ot.id)), ot, { merge: true }));
             await batch.commit();
             actualizarProgreso(lote.length);
           }
         }
 
         if (reportes.length > 0) {
-          agregarLog(`Guardando ${reportes.length} Reportes...`);
+          agregarLog(`Normalizando y guardando ${reportes.length} Reportes con created_at...`);
           for (let i = 0; i < reportes.length; i += LOTE_SIZE) {
             const batch = writeBatch(db);
             const lote = reportes.slice(i, i + LOTE_SIZE);
-            lote.forEach((rep) => batch.set(doc(db, 'bitacora_reports', String(rep.id)), rep));
+            lote.forEach((rep) => {
+              const docData = {
+                ...rep,
+                created_at: rep.created_at || rep.createdAt || rep.payload?.fecha || new Date().toISOString(),
+                driver_name: rep.driver_name || rep.driverName || '',
+                unit_id: rep.unit_id || rep.unitId || '',
+                report_type: rep.report_type || rep.type || 'checklist',
+                sync_status: rep.sync_status || rep.syncStatus || 'sincronizado',
+                folio: rep.folio || ''
+              };
+              batch.set(doc(db, 'bitacora_reports', String(rep.id)), docData, { merge: true });
+            });
             await batch.commit();
             actualizarProgreso(lote.length);
           }
         }
 
         agregarLog('✓ ¡MIGRACIÓN COMPLETADA EXITOSAMENTE!');
-        alert('¡Datos subidos exitosamente a Firebase Firestore!');
+        alert('¡Reportes normalizados y guardados exitosamente en Firestore!');
       } catch (err) {
         agregarLog(`ERROR: ${err.message}`);
         alert('Error: ' + err.message);
