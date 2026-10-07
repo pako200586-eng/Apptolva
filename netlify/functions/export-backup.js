@@ -1,9 +1,30 @@
 import { getDatabase } from "@netlify/database";
 import { getStore } from "@netlify/blobs";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { authorizeRequest } from "../lib/firebase-auth.js";
 
 const SIGNATURE_FIELDS = ["firmaOp", "firmaOp2", "firmaSup", "signatureOp", "signatureSup"];
 const BLOB_PREFIX = "blob:";
+const BACKUP_TOKEN_ENV = "BACKUP_EXPORT_TOKEN";
+
+function getBackupToken() {
+  return globalThis.Netlify?.env?.get(BACKUP_TOKEN_ENV)
+    || process.env[BACKUP_TOKEN_ENV]
+    || "";
+}
+
+function hasValidBackupToken(req) {
+  const expectedToken = getBackupToken();
+  if (!expectedToken) return false;
+  if (expectedToken.length < 32) {
+    throw new Error(`${BACKUP_TOKEN_ENV} must contain at least 32 characters`);
+  }
+
+  const providedToken = req.headers.get("x-backup-token") || "";
+  const expectedDigest = createHash("sha256").update(expectedToken).digest();
+  const providedDigest = createHash("sha256").update(providedToken).digest();
+  return timingSafeEqual(expectedDigest, providedDigest);
+}
 
 async function rehidratarFirmas(data, store) {
   if (!data || typeof data !== "object") return data;
@@ -29,18 +50,29 @@ export default async (req) => {
   const corsHeaders = {
     "Access-Control-Allow-Origin": requestOrigin || "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Backup-Token",
     "Vary": "Origin",
   };
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
-  const authorizationError = await authorizeRequest(req, corsHeaders);
-  if (authorizationError) return authorizationError;
-
   if (req.method !== "GET") {
     return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
       status: 405,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+  try {
+    if (!hasValidBackupToken(req)) {
+      const authorizationError = await authorizeRequest(req, corsHeaders);
+      if (authorizationError) return authorizationError;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Backup export authentication is misconfigured:", message);
+    return new Response(JSON.stringify({ error: "Backup export authentication is misconfigured" }), {
+      status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
