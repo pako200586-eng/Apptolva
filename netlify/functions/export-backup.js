@@ -78,18 +78,76 @@ export default async (req) => {
   }
 
   const database = getDatabase();
-  const store = getStore("firmas");
   const client = await database.pool.connect();
 
   try {
-    const reportsRes = await client.query(
-      "SELECT * FROM bitacora_reports ORDER BY created_at ASC",
+    const url = new URL(req.url);
+    const tipo = url.searchParams.get("tipo") || "todos";
+    if (!["todos", "ordenes", "recientes"].includes(tipo)) {
+      return new Response(JSON.stringify({ error: "Tipo inválido. Usa todos, ordenes o recientes." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json; charset=utf-8", ...corsHeaders },
+      });
+    }
+
+    if (tipo === "ordenes") {
+      const [ordenesRes, seguimientoRes] = await Promise.all([
+        client.query("SELECT * FROM ordenes_trabajo ORDER BY folio_ot ASC"),
+        client.query("SELECT * FROM ot_seguimiento ORDER BY fecha ASC"),
+      ]);
+      const backupOrdenes = {
+        sistema: "AppTolva Bachoco",
+        fecha_exportacion: new Date().toISOString(),
+        totales: {
+          ordenes: ordenesRes.rows.length,
+          seguimientos: seguimientoRes.rows.length,
+        },
+        ordenes_trabajo: ordenesRes.rows,
+        ot_seguimiento: seguimientoRes.rows,
+      };
+      return new Response(JSON.stringify(backupOrdenes, null, 2), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Content-Disposition": `attachment; filename=apptolva_ordenes_${new Date().toISOString().slice(0, 10)}.json`,
+          ...corsHeaders,
+        },
+      });
+    }
+
+    const store = getStore("firmas");
+    const reportsRes = tipo === "recientes"
+      ? await client.query(
+        "SELECT * FROM bitacora_reports WHERE created_at >= $1 ORDER BY created_at DESC",
+        ["2026-10-01"],
+      )
+      : await client.query(
+        "SELECT * FROM bitacora_reports ORDER BY created_at ASC",
+      );
+
+    const reportesCompletos = await Promise.all(
+      reportsRes.rows.map(async (row) => ({
+        ...row,
+        payload: await rehidratarFirmas(row.payload, store),
+      })),
     );
 
-    const reportesCompletos = [];
-    for (const row of reportsRes.rows) {
-      const payload = await rehidratarFirmas(row.payload, store);
-      reportesCompletos.push({ ...row, payload });
+    if (tipo === "recientes") {
+      const backupRecientes = {
+        sistema: "AppTolva Bachoco",
+        fecha_exportacion: new Date().toISOString(),
+        criterio: { created_at_desde: "2026-10-01" },
+        totales: { reportes: reportesCompletos.length },
+        bitacora_reports: reportesCompletos,
+      };
+      return new Response(JSON.stringify(backupRecientes, null, 2), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Content-Disposition": `attachment; filename=apptolva_recientes_${new Date().toISOString().slice(0, 10)}.json`,
+          ...corsHeaders,
+        },
+      });
     }
 
     const ordenesRes = await client.query(
