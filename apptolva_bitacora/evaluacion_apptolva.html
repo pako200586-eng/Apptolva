@@ -3203,6 +3203,8 @@
     filtrarHistorial();
   }
 
+  let filtrosAuditoriaInicializados = false;
+
   function poblarFiltrosAuditoria(list) {
     const anioSelect = document.getElementById('filterAnio');
     const masterSelect = document.getElementById('filterMaster');
@@ -3210,6 +3212,9 @@
 
     const currentAnio = anioSelect.value;
     const currentMaster = masterSelect.value;
+    const selectedYear = currentAnio || (
+      filtrosAuditoriaInicializados ? '' : new Date().getFullYear().toString()
+    );
 
     const anios = new Set();
     const masters = new Set();
@@ -3229,9 +3234,10 @@
     const sortedAnios = Array.from(anios).sort().reverse();
     let optAnios = '<option value="">📅 Todos los años</option>';
     sortedAnios.forEach(y => {
-      optAnios += `<option value="${y}" ${y === currentAnio ? 'selected' : ''}>Año ${y}</option>`;
+      optAnios += `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>Año ${y}</option>`;
     });
     anioSelect.innerHTML = optAnios;
+    filtrosAuditoriaInicializados = true;
 
     const sortedMasters = Array.from(masters).sort();
     let optMasters = '<option value="">👷‍♂️ Todos los Másters</option>';
@@ -3542,7 +3548,7 @@
      ========================================================= */
   function exportarCSV() {
     if (window.evaluationAccessRole !== 'admin') return;
-    const list = ultimaListaFiltrada.length > 0 ? ultimaListaFiltrada : obtenerHistorial();
+    const list = ultimaListaFiltrada;
     if (list.length === 0) {
       alert("No hay evaluaciones para exportar con los filtros seleccionados.");
       return;
@@ -3658,6 +3664,7 @@
     limit,
     orderBy,
     query,
+    startAfter,
     setDoc
   } from "./js/firebase-sdk.js";
 
@@ -3675,6 +3682,7 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
   const evaluationsCollection = collection(db, "evaluaciones_operador_master");
+  const openAdminPanel = new URLSearchParams(window.location.search).get("panel") === "admin";
   const loginForm = document.getElementById("evalLoginForm");
   const loginButton = document.getElementById("evalLoginButton");
   const loginError = document.getElementById("evalAccessError");
@@ -3721,8 +3729,20 @@
 
   async function loadEvaluationsHistory() {
     if (accessRole !== "admin") throw new Error("Solo la cuenta administradora puede consultar el historial.");
-    const result = await getDocs(query(evaluationsCollection, orderBy("timestamp", "desc"), limit(500)));
-    const records = result.docs.map(snapshot => ({ ...snapshot.data(), id: snapshot.id }));
+    const records = [];
+    let lastDocument = null;
+    while (true) {
+      const pageQuery = query(
+        evaluationsCollection,
+        orderBy("timestamp", "desc"),
+        limit(500),
+        ...(lastDocument ? [startAfter(lastDocument)] : [])
+      );
+      const result = await getDocs(pageQuery);
+      records.push(...result.docs.map(snapshot => ({ ...snapshot.data(), id: snapshot.id })));
+      if (result.docs.length < 500) break;
+      lastDocument = result.docs[result.docs.length - 1];
+    }
     window.actualizarHistorialFirebase(records);
   }
 
@@ -3811,6 +3831,7 @@
     if (role === "admin") {
       try {
         await loadEvaluationsHistory();
+        if (openAdminPanel) cambiarPestana("history");
       } catch (error) {
         console.error("No se pudo cargar el historial de evaluaciones:", error);
         alert(`No se pudo cargar el historial de Firebase: ${error.message}`);

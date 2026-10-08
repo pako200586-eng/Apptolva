@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v56";
+const CACHE_VERSION = "v57";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";

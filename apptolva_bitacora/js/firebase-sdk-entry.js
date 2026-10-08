@@ -23,6 +23,7 @@ export {
   persistentMultipleTabManager,
   query,
   runTransaction,
+  startAfter,
   setDoc,
   updateDoc,
   where,

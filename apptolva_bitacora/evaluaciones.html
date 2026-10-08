@@ -75,8 +75,15 @@
                 <a href="./evaluacion_apptolva.html" class="menu-btn bg-white p-5 rounded-xl shadow-md border-l-4 border-green-700 flex items-center gap-4 text-left transform transition hover:scale-[1.02]">
                     <i class="fas fa-clipboard-check text-3xl text-green-700 w-10 text-center"></i>
                     <div>
-                        <span class="font-bold text-gray-800 block text-sm">Evaluación AppTolva para Operador Máster</span>
-                        <span class="text-[11px] text-gray-500">Evaluación detallada, formato oficial, firmas e historial</span>
+                        <span class="font-bold text-gray-800 block text-sm">Evaluación de Conducción Bachoco</span>
+                        <span class="text-[11px] text-gray-500">Evaluación detallada, formato oficial y firmas</span>
+                    </div>
+                </a>
+                <a id="adminEvalPanelCard" href="./evaluacion_apptolva.html?panel=admin" style="display:none" class="menu-btn bg-white p-5 rounded-xl shadow-md border-l-4 border-blue-700 flex items-center gap-4 text-left transform transition hover:scale-[1.02]">
+                    <i class="fas fa-chart-column text-3xl text-blue-700 w-10 text-center"></i>
+                    <div>
+                        <span class="font-bold text-gray-800 block text-sm">Mini Panel Administrativo de Evaluaciones</span>
+                        <span class="text-[11px] text-gray-500">Historial, filtros anuales y por Máster, Excel y formatos PDF</span>
                     </div>
                 </a>
             </div>
@@ -687,6 +694,7 @@
 
             document.getElementById("evalAccessOverlay").classList.toggle("hidden", Boolean(role));
             document.getElementById("evaluationApp").classList.toggle("hidden", !role);
+            document.getElementById("adminEvalPanelCard").style.display = role === "admin" ? "flex" : "none";
             if (role) {
                 accessError.classList.add("hidden");
                 volverEvalMenu();
