@@ -1028,17 +1028,11 @@
 <body>
 
 <div id="evalAccessOverlay" style="position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.82);display:flex;align-items:center;justify-content:center;padding:16px;">
-  <form id="evalLoginForm" style="width:100%;max-width:380px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);">
+  <div style="width:100%;max-width:380px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);">
     <h2 style="margin:0 0 6px;color:#0f172a;font-size:20px;">Acceso a Evaluaciones</h2>
-    <p id="evalAccessMessage" style="margin:0 0 16px;color:#475569;font-size:13px;">Escribe tu correo autorizado y te enviaremos un enlace para ingresar.</p>
-    <label for="evalAccessEmail" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Correo</label>
-    <input id="evalAccessEmail" type="email" autocomplete="email" required aria-label="Correo" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;">
-    <p id="evalAccessError" role="alert" style="display:none;color:#b91c1c;font-size:12px;margin:0 0 10px;"></p>
-    <div style="display:flex;gap:8px;">
-      <a href="./evaluaciones.html" style="flex:1;text-align:center;padding:11px;background:#f1f5f9;border-radius:6px;color:#334155;text-decoration:none;font-weight:700;">Volver</a>
-      <button id="evalLoginButton" type="submit" style="flex:1;padding:11px;background:#ea580c;border:0;border-radius:6px;color:#fff;font-weight:700;cursor:pointer;">Enviar enlace</button>
-    </div>
-  </form>
+    <p style="margin:0 0 16px;color:#475569;font-size:13px;">Comprueba tu sesión para continuar.</p>
+    <a href="./evaluaciones.html" style="display:block;text-align:center;padding:11px;background:#f1f5f9;border-radius:6px;color:#334155;text-decoration:none;font-weight:700;">Ir al acceso de Evaluaciones</a>
+  </div>
 </div>
 <div id="evalAppContent" style="display:none;">
 
@@ -3638,14 +3632,7 @@
 </script>
 <script type="module">
   import { initializeApp } from "./js/firebase-sdk.js";
-  import {
-    getAuth,
-    isSignInWithEmailLink,
-    onAuthStateChanged,
-    sendSignInLinkToEmail,
-    signInWithEmailLink,
-    signOut
-  } from "./js/firebase-sdk.js";
+  import { getAuth, onAuthStateChanged, signOut } from "./js/firebase-sdk.js";
   import {
     collection,
     deleteDoc,
@@ -3673,67 +3660,8 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
   const evaluationsCollection = collection(db, "evaluaciones_operador_master");
-  const loginForm = document.getElementById("evalLoginForm");
-  const loginButton = document.getElementById("evalLoginButton");
-  const loginError = document.getElementById("evalAccessError");
-  const loginMessage = document.getElementById("evalAccessMessage");
-  const emailInput = document.getElementById("evalAccessEmail");
-  const EMAIL_FOR_SIGN_IN_KEY = "apptolva_eval_signin_email";
-  const currentPageUrl = `${window.location.origin}${window.location.pathname}`;
   let accessRole = null;
   let authStateVersion = 0;
-
-  function showLoginError(message) {
-    loginError.textContent = message;
-    loginError.style.display = "block";
-  }
-
-  function loginErrorMessage(error) {
-    const messages = {
-      "auth/invalid-email": "Escribe un correo válido.",
-      "auth/expired-action-code": "El enlace ya venció. Solicita uno nuevo.",
-      "auth/invalid-action-code": "El enlace no es válido o ya fue utilizado. Solicita uno nuevo.",
-      "auth/too-many-requests": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
-      "auth/network-request-failed": "No se pudo conectar con Firebase Authentication.",
-      "auth/unauthorized-continue-uri": "Este dominio no está autorizado en Firebase Authentication."
-    };
-    return messages[error.code] || `No se pudo iniciar sesión: ${error.message}`;
-  }
-
-  async function completeEmailLinkSignIn(email) {
-    await signInWithEmailLink(auth, email, window.location.href);
-    try {
-      localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
-    } catch (error) {
-      console.error("No se pudo borrar el correo recordado para el acceso:", error);
-    }
-    window.history.replaceState({}, document.title, currentPageUrl);
-  }
-
-  async function finishEmailLinkSignIn() {
-    if (!isSignInWithEmailLink(auth, window.location.href)) return;
-    let savedEmail = null;
-    try {
-      savedEmail = localStorage.getItem(EMAIL_FOR_SIGN_IN_KEY);
-    } catch (error) {
-      console.error("No se pudo leer el correo recordado para el acceso:", error);
-    }
-    if (!savedEmail) {
-      loginMessage.textContent = "Abre el enlace en este dispositivo o escribe el mismo correo al que se envió para confirmar el acceso.";
-      loginButton.textContent = "Confirmar acceso";
-      return;
-    }
-
-    loginButton.disabled = true;
-    try {
-      await completeEmailLinkSignIn(savedEmail);
-    } catch (error) {
-      console.error("No se pudo completar el acceso con enlace:", error);
-      showLoginError(loginErrorMessage(error));
-    } finally {
-      loginButton.disabled = false;
-    }
-  }
 
   async function loadEvaluationsHistory() {
     if (accessRole !== "admin") throw new Error("Solo la cuenta administradora puede consultar el historial.");
@@ -3764,39 +3692,6 @@
     }
     await deleteDoc(doc(evaluationsCollection, id));
   };
-
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    loginButton.disabled = true;
-    loginError.style.display = "none";
-    try {
-      const email = emailInput.value.trim().toLowerCase();
-      if (isSignInWithEmailLink(auth, window.location.href)) {
-        await completeEmailLinkSignIn(email);
-      } else {
-        let emailRemembered = true;
-        try {
-          localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, email);
-        } catch (error) {
-          emailRemembered = false;
-          console.error("No se pudo recordar el correo para completar el acceso:", error);
-        }
-        await sendSignInLinkToEmail(auth, email, {
-          url: currentPageUrl,
-          handleCodeInApp: true
-        });
-        loginMessage.textContent = emailRemembered
-          ? `Enviamos un enlace de acceso a ${email}. Revisa tu correo y abre el enlace para continuar.`
-          : `Enviamos un enlace de acceso a ${email}. Al abrirlo, vuelve a escribir este mismo correo para confirmar.`;
-        loginButton.textContent = "Enviar otro enlace";
-      }
-    } catch (error) {
-      console.error("No se pudo procesar el acceso a evaluaciones:", error);
-      showLoginError(loginErrorMessage(error));
-    } finally {
-      loginButton.disabled = false;
-    }
-  });
 
   document.getElementById("evalLogoutButton").addEventListener("click", async () => {
     try {
@@ -3835,14 +3730,18 @@
 
     if (!authorized) {
       window.limpiarHistorialFirebase();
-      if (user && !accessError) showLoginError("Esta cuenta no tiene permiso para usar el módulo de evaluaciones.");
-      else if (accessError) showLoginError(`No se pudo comprobar el permiso: ${accessError.message}`);
-      if (user) await signOut(auth);
+      if (accessError) console.error("No se pudo comprobar el permiso del módulo de evaluaciones:", accessError);
+      if (user) {
+        try {
+          await signOut(auth);
+        } catch (error) {
+          console.error("No se pudo cerrar la sesión sin permiso de evaluaciones:", error);
+        }
+      }
+      window.location.replace("./evaluaciones.html");
       return;
     }
 
-    document.getElementById("evalAccessError").style.display = "none";
-    emailInput.value = "";
     const evaluationUiAlreadyInitialized = Boolean(window.evaluationUIInitialized);
     window.separarBorradorEvaluacionPorUsuario(user.email.toLowerCase(), role);
     if (evaluationUiAlreadyInitialized) window.cargarBorradorEvaluacion();
@@ -3861,7 +3760,6 @@
     }
   });
 
-  finishEmailLinkSignIn();
 </script>
 </body>
 </html>

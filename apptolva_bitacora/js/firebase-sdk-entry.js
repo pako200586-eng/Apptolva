@@ -2,12 +2,9 @@ export { initializeApp } from "firebase/app";
 export {
   getAuth,
   getIdTokenResult,
-  isSignInWithEmailLink,
   onAuthStateChanged,
-  sendSignInLinkToEmail,
   signInAnonymously,
   signInWithEmailAndPassword,
-  signInWithEmailLink,
   signOut,
 } from "firebase/auth";
 export {

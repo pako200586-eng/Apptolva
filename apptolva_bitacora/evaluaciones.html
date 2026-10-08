@@ -35,13 +35,15 @@
                 </div>
             </div>
             <form id="evalLoginForm" class="p-5">
-                <p id="evalAccessMessage" class="text-sm text-gray-600 mb-4">Escribe tu correo y te enviaremos un enlace para entrar al módulo.</p>
+                <p class="text-sm text-gray-600 mb-4">Usa tu cuenta autorizada de AppTolva.</p>
                 <label for="evalAccessEmail" class="block text-sm font-bold text-gray-700 mb-2">Correo</label>
                 <input id="evalAccessEmail" type="email" autocomplete="email" required class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-[#ea5808] focus:outline-none">
+                <label for="evalAccessPassword" class="block text-sm font-bold text-gray-700 mt-3 mb-2">Contraseña</label>
+                <input id="evalAccessPassword" type="password" autocomplete="current-password" required class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-[#ea5808] focus:outline-none">
                 <p id="evalAccessError" role="alert" class="hidden text-red-600 text-xs font-bold mt-2"></p>
                 <div class="flex gap-2 mt-4">
                     <a href="./index.html" class="flex-1 text-center bg-gray-100 text-gray-600 font-bold py-3 rounded-lg hover:bg-gray-200 transition">Volver</a>
-                    <button id="evalLoginButton" type="submit" class="flex-1 bg-[#ea580c] text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition">Enviar enlace</button>
+                    <button id="evalLoginButton" type="submit" class="flex-1 bg-[#ea580c] text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition">Ingresar</button>
                 </div>
             </form>
         </div>
@@ -601,10 +603,8 @@
         import { initializeApp } from "./js/firebase-sdk.js";
         import {
             getAuth,
-            isSignInWithEmailLink,
             onAuthStateChanged,
-            sendSignInLinkToEmail,
-            signInWithEmailLink,
+            signInWithEmailAndPassword,
             signOut
         } from "./js/firebase-sdk.js";
         import { doc, getDoc, getFirestore } from "./js/firebase-sdk.js";
@@ -625,10 +625,8 @@
         const loginForm = document.getElementById("evalLoginForm");
         const loginButton = document.getElementById("evalLoginButton");
         const emailInput = document.getElementById("evalAccessEmail");
+        const passwordInput = document.getElementById("evalAccessPassword");
         const accessError = document.getElementById("evalAccessError");
-        const accessMessage = document.getElementById("evalAccessMessage");
-        const signInEmailKey = "apptolva_eval_signin_email";
-        const currentPageUrl = `${window.location.origin}${window.location.pathname}`;
         let authStateVersion = 0;
 
         function showAccessError(message) {
@@ -638,24 +636,16 @@
 
         function describeAuthError(error) {
             const messages = {
+                "auth/invalid-credential": "Correo o contraseña incorrectos.",
+                "auth/invalid-login-credentials": "Correo o contraseña incorrectos.",
+                "auth/user-not-found": "No existe una cuenta con ese correo en Firebase Authentication.",
+                "auth/wrong-password": "Correo o contraseña incorrectos.",
                 "auth/invalid-email": "Escribe un correo válido.",
-                "auth/expired-action-code": "El enlace venció. Solicita uno nuevo.",
-                "auth/invalid-action-code": "El enlace no es válido o ya se utilizó. Solicita uno nuevo.",
+                "auth/user-disabled": "Esta cuenta está deshabilitada.",
                 "auth/too-many-requests": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
-                "auth/network-request-failed": "No se pudo conectar con Firebase Authentication.",
-                "auth/unauthorized-continue-uri": "Este dominio no está autorizado en Firebase Authentication."
+                "auth/network-request-failed": "No se pudo conectar con Firebase Authentication."
             };
-            return messages[error.code] || `No se pudo completar el acceso: ${error.message}`;
-        }
-
-        async function completeEmailLinkSignIn(email) {
-            await signInWithEmailLink(auth, email, window.location.href);
-            try {
-                localStorage.removeItem(signInEmailKey);
-            } catch (error) {
-                console.error("No se pudo borrar el correo recordado para el acceso:", error);
-            }
-            window.history.replaceState({}, document.title, currentPageUrl);
+            return messages[error.code] || `No se pudo iniciar sesión: ${error.message}`;
         }
 
         loginForm.addEventListener("submit", async (event) => {
@@ -664,27 +654,10 @@
             accessError.classList.add("hidden");
             const email = emailInput.value.trim().toLowerCase();
             try {
-                if (isSignInWithEmailLink(auth, window.location.href)) {
-                    await completeEmailLinkSignIn(email);
-                    return;
-                }
-                let emailRemembered = true;
-                try {
-                    localStorage.setItem(signInEmailKey, email);
-                } catch (error) {
-                    emailRemembered = false;
-                    console.error("No se pudo recordar el correo para completar el acceso:", error);
-                }
-                await sendSignInLinkToEmail(auth, email, {
-                    url: currentPageUrl,
-                    handleCodeInApp: true
-                });
-                accessMessage.textContent = emailRemembered
-                    ? `Enviamos un enlace a ${email}. Ábrelo desde este dispositivo para ingresar.`
-                    : `Enviamos un enlace a ${email}. Al abrirlo, vuelve a escribir este mismo correo para confirmar.`;
-                loginButton.textContent = "Enviar otro enlace";
+                await signInWithEmailAndPassword(auth, email, passwordInput.value);
+                passwordInput.value = "";
             } catch (error) {
-                console.error("No se pudo procesar el acceso al módulo de evaluaciones:", error);
+                console.error("No se pudo iniciar sesión en el módulo de evaluaciones:", error);
                 showAccessError(describeAuthError(error));
             } finally {
                 loginButton.disabled = false;
@@ -727,26 +700,6 @@
             }
         });
 
-        if (isSignInWithEmailLink(auth, window.location.href)) {
-            let savedEmail = null;
-            try {
-                savedEmail = localStorage.getItem(signInEmailKey);
-            } catch (error) {
-                console.error("No se pudo leer el correo recordado para el acceso:", error);
-            }
-            if (savedEmail) {
-                loginButton.disabled = true;
-                completeEmailLinkSignIn(savedEmail).catch((error) => {
-                    console.error("No se pudo completar el acceso con enlace:", error);
-                    showAccessError(describeAuthError(error));
-                }).finally(() => {
-                    loginButton.disabled = false;
-                });
-            } else {
-                accessMessage.textContent = "Escribe el mismo correo al que enviamos el enlace para confirmar el acceso.";
-                loginButton.textContent = "Confirmar acceso";
-            }
-        }
     </script>
 </body>
 </html>
