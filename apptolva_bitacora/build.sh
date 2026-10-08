@@ -15,11 +15,11 @@ fi
   --minify \
   --outfile=js/firebase-sdk.js
 
-for archivo in index.html bitacora_master.html admin.html viewer.html evaluacion_apptolva.html; do
+for archivo in index.html bitacora_master.html admin.html viewer.html evaluaciones.html evaluacion_apptolva.html; do
   sed -i "s|__FIREBASE_API_KEY__|$FIREBASE_API_KEY|g" "$archivo"
 done
 
-if grep -q "__FIREBASE_API_KEY__" index.html bitacora_master.html admin.html viewer.html evaluacion_apptolva.html; then
+if grep -q "__FIREBASE_API_KEY__" index.html bitacora_master.html admin.html viewer.html evaluaciones.html evaluacion_apptolva.html; then
   echo "Error: quedaron marcadores __FIREBASE_API_KEY__ sin reemplazar." >&2
   exit 1
 fi
