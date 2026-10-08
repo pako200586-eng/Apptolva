@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v51";
+const CACHE_VERSION = "v53";
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -10,6 +10,8 @@ const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvc
 const OFFLINE_URLS = [
   "./",
   "./index.html",
+  "./evaluaciones.html",
+  "./evaluacion_apptolva.html",
   "./emergencia.html",
   "./bitacora_master.html",
   "./admin.html",

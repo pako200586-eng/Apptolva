@@ -1,0 +1,3804 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AppTolva - Módulo de Evaluación de Conducción | Grupo Bachoco</title>
+<style>
+  /* =========================================================
+     ESTILOS BASE Y VARIABLES CORPORATIVAS (AppTolva / Bachoco)
+     ========================================================= */
+  :root {
+    --primary: #ea580c;           /* Naranja Bachoco */
+    --primary-dark: #c2410c;
+    --primary-light: #ffedd5;
+    --bachoco-green: #82d130;     /* Verde Oficial Réplica (#82d130) */
+    --bachoco-green-text: #235749;/* Texto Verde Oscuro Petróleo Oficial */
+    --slate-900: #0f172a;
+    --slate-800: #1e293b;
+    --slate-700: #334155;
+    --slate-600: #475569;
+    --slate-200: #e2e8f0;
+    --slate-100: #f1f5f9;
+    --slate-50: #f8fafc;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  }
+
+  * {
+    box-sizing: border-box;
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #f1f5f9;
+    color: #1f2937;
+    min-height: 100vh;
+  }
+
+  /* =========================================================
+     BARRA SUPERIOR CORPORATIVA (AppTolva)
+     ========================================================= */
+  .app-header {
+    background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+    color: white;
+    padding: 10px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .app-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .app-badge-b {
+    background: var(--primary);
+    color: white;
+    font-weight: 900;
+    font-size: 16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(234, 88, 12, 0.4);
+  }
+
+  .app-title-box h1 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .app-title-box .app-subtitle {
+    margin: 0;
+    font-size: 10.5px;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .badge-master {
+    background-color: var(--bachoco-green);
+    color: var(--bachoco-green-text);
+    font-weight: 900;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .app-tabs-nav {
+    background: var(--slate-800);
+    padding: 4px 8px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--slate-700);
+    position: sticky;
+    top: 52px;
+    z-index: 99;
+  }
+
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .tab-btn.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 2px 6px rgba(234, 88, 12, 0.35);
+  }
+
+  .tab-btn:hover:not(.active) {
+    background: rgba(255,255,255,0.06);
+    color: white;
+  }
+
+  /* BARRA RÁPIDA DE ESTADO / ACCIONES (MÓVIL) */
+  .mobile-score-bar {
+    background: white;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--slate-200);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .score-badge-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .score-num {
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--slate-900);
+  }
+
+  .status-pill {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+  .status-pill.apto {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+  }
+  .status-pill.no-apto {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+  }
+  .status-pill.pend {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+  }
+
+  .top-action-btns {
+    display: flex;
+    gap: 6px;
+  }
+
+  .btn-sm-action {
+    background: var(--slate-100);
+    border: 1px solid var(--slate-200);
+    color: var(--slate-700);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .btn-sm-action.primary {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+    color: white;
+  }
+  .btn-sm-action.green {
+    background: var(--bachoco-green);
+    border-color: #65a30d;
+    color: var(--bachoco-green-text);
+  }
+
+  /* =========================================================
+     CONTENIDO DE LAS PESTAÑAS
+     ========================================================= */
+  .tab-content {
+    display: none;
+    padding: 12px;
+    max-width: 900px;
+    margin: 0 auto 60px auto;
+  }
+  .tab-content.active {
+    display: block;
+  }
+
+  /* =========================================================
+     MODO MÓVIL: FORMULARIO ASISTIDO Y TÁCTIL (MÁSTER)
+     ========================================================= */
+  .mobile-card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 12px;
+    border: 1px solid var(--slate-200);
+    overflow: hidden;
+  }
+
+  .mobile-card-header {
+    background: #f8fafc;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--slate-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .mobile-card-header h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--slate-800);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mobile-card-header .header-meta {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--bachoco-green-text);
+    background: #d9f99d;
+    padding: 2px 7px;
+    border-radius: 12px;
+  }
+
+  .mobile-card-body {
+    padding: 14px;
+  }
+
+  .form-group-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  @media(min-width: 600px) {
+    .form-group-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .m-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .m-field label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--slate-700);
+  }
+
+  .m-input, .m-select {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .m-input:focus, .m-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
+  }
+
+  /* LISTADO TÁCTIL DE VERIFICACIONES (ITEMS CON TOQUE FÁCIL) */
+  .touch-item-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .touch-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+
+  .touch-item:hover {
+    border-color: #cbd5e1;
+  }
+
+  .touch-item.checked {
+    background: #f0fdf4;
+    border-color: #86efac;
+  }
+
+  .touch-item-text {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--slate-800);
+    padding-right: 10px;
+    flex: 1;
+    line-height: 1.35;
+  }
+
+  .touch-item.checked .touch-item-text {
+    color: #14532d;
+  }
+
+  .touch-check-pill {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 8px;
+    border: 2px solid #94a3b8;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 16px;
+    color: transparent;
+    transition: all 0.15s ease;
+  }
+
+  .touch-item.checked .touch-check-pill {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+  }
+
+  .batch-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    background: #f1f5f9;
+    padding: 8px 12px;
+    border-radius: 6px;
+  }
+
+  .btn-batch {
+    background: white;
+    border: 1px solid #cbd5e1;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--slate-700);
+  }
+  .btn-batch:hover {
+    background: #e2e8f0;
+  }
+
+  /* CRONÓMETRO Y MANIOBRAS EN PATIO */
+  .maneuver-mobile-card {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: #ffffff;
+  }
+
+  .maneuver-title-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .maneuver-timer-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: bold;
+  }
+
+  .btn-timer {
+    background: var(--slate-800);
+    color: white;
+    border: none;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  /* FIRMA DIGITAL MODAL */
+  .sig-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+  }
+  .sig-modal.open {
+    display: flex;
+  }
+  .sig-modal-content {
+    background: white;
+    width: 100%;
+    max-width: 520px;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--shadow-lg);
+  }
+  .sig-modal-canvas-wrap {
+    width: 100%;
+    height: 220px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    margin: 12px 0;
+    background: #fafafa;
+    position: relative;
+    touch-action: none;
+  }
+  .sig-modal-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+  }
+
+  /* =========================================================
+     MÓDULO DE CONTROL / HISTORIAL DE EVALUACIONES (AppTolva)
+     ========================================================= */
+  .history-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  @media(min-width: 600px) {
+    .history-stats-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid var(--slate-200);
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+  }
+  .stat-card .stat-val {
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--slate-900);
+  }
+  .stat-card .stat-label {
+    font-size: 10.5px;
+    color: var(--slate-600);
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .history-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+    justify-content: space-between;
+  }
+
+  .history-search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .history-table-wrap {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid var(--slate-200);
+    overflow-x: auto;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .app-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    text-align: left;
+  }
+
+  .app-table th {
+    background: #f8fafc;
+    padding: 10px 12px;
+    border-bottom: 1.5px solid #cbd5e1;
+    font-weight: 800;
+    color: var(--slate-700);
+  }
+
+  .app-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    color: var(--slate-800);
+    vertical-align: middle;
+  }
+
+  .app-table tr:hover {
+    background: #f8fafc;
+  }
+
+  .btn-table-action {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-right: 4px;
+  }
+  .btn-table-action:hover {
+    background: #e2e8f0;
+  }
+  .btn-table-action.danger {
+    color: var(--danger);
+  }
+
+  /* =========================================================
+     ESTILOS DEL FORMATO OFICIAL (RÉPLICA EXACTA BACHOCO)
+     Basado fielmente en el formato institucional escaneado
+     ========================================================= */
+  @page {
+    size: letter portrait;
+    margin: 8mm 10mm;
+  }
+
+  .document-container {
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  .page {
+    background: #ffffff;
+    width: 100%;
+    min-height: 1050px;
+    padding: 20px 24px;
+    margin-bottom: 25px;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    position: relative;
+    page-break-after: always;
+    break-after: page;
+  }
+  .page:last-child {
+    page-break-after: avoid;
+  }
+
+  .header-main-title {
+    text-align: center;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    color: #111;
+  }
+
+  .header-card {
+    width: 100%;
+    border: 2px solid #ea580c;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+  }
+  .header-card td {
+    vertical-align: middle;
+    padding: 4px 8px;
+  }
+
+  table.grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+  }
+  table.grid-table th, table.grid-table td {
+    border: 1px solid #222;
+    padding: 2.5px 5px;
+    font-size: 8.5px;
+    vertical-align: middle;
+  }
+
+  /* BARRA DE SECCIÓN: COLOR VERDE OFICIAL RÉPLICA (#82d130 / #235749) */
+  .section-bar {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: var(--bachoco-green);
+    color: var(--bachoco-green-text);
+    font-weight: 900;
+    font-size: 9.5px;
+    text-align: center;
+    padding: 4px 4px;
+    border: 1.5px solid #222;
+    border-bottom: none;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+
+  .instruction-bar {
+    background-color: #ffffff;
+    border: 1.5px solid #222;
+    border-bottom: none;
+    padding: 2.5px 6px;
+    font-size: 7.5px;
+    font-style: italic;
+    color: #111;
+  }
+
+  .chk-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #222;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 10px;
+    color: #000;
+    user-select: none;
+    vertical-align: middle;
+  }
+  .chk-item {
+    display: flex;
+    align-items: center;
+    font-size: 8.5px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+  }
+
+  .paper-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 9px;
+    font-weight: 600;
+    color: #111;
+    padding: 1px 2px;
+    outline: none;
+  }
+  .paper-input:focus {
+    background-color: #f1f5f9;
+  }
+  .paper-textarea {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 8.5px;
+    font-weight: 500;
+    color: #111;
+    padding: 2px;
+    outline: none;
+    resize: none;
+  }
+  .paper-textarea:focus {
+    background-color: #f1f5f9;
+  }
+
+  .field-label {
+    font-size: 7px;
+    font-weight: bold;
+    color: #333;
+    display: block;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .maneuver-wrapper {
+    border: 1px solid #222;
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 6px;
+  }
+  .maneuver-wrapper th, .maneuver-wrapper td {
+    border: 1px solid #222;
+  }
+  .maneuver-header {
+    background: #f1f5f9;
+    padding: 3px 6px;
+    font-size: 8.5px;
+    font-weight: bold;
+  }
+  .maneuver-diagram {
+    width: 65%;
+    height: 130px;
+    background: #ffffff;
+    position: relative;
+    padding: 8px;
+    vertical-align: top;
+  }
+  .maneuver-obs {
+    width: 35%;
+    vertical-align: top;
+    padding: 6px;
+    font-size: 8px;
+    background: #fafafa;
+  }
+
+  /* =========================================================
+     DISEÑO EXACTO PÁGINA 3 (RÉPLICA FOTO REAL)
+     ========================================================= */
+  table.official-scoring-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 12px 8px;
+    margin-top: 6px;
+    margin-bottom: 10px;
+  }
+
+  .scoring-card-box {
+    border: 1.5px solid #222;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 0px;
+    height: 62px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .scoring-card-title {
+    font-size: 8.5px;
+    font-weight: 800;
+    text-align: center;
+    color: #000;
+    margin-bottom: 4px;
+  }
+
+  .scoring-card-row {
+    display: flex;
+    align-items: center;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #000;
+  }
+
+  .under-line-val {
+    border-bottom: 1.5px solid #000;
+    display: inline-block;
+    min-width: 34px;
+    text-align: center;
+    font-weight: 800;
+    padding: 0 4px;
+    margin: 0 4px;
+  }
+
+  /* CALIFICACIÓN FINAL BOX Y DICTAMEN DERECHO */
+  .final-score-box {
+    border: 1.5px solid #222;
+    background: #fff;
+    height: 62px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+  }
+
+  .apto-group-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+    height: 62px;
+  }
+
+  .apto-pill-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .apto-pill-label {
+    border: 1.5px solid #222;
+    padding: 4px 8px;
+    font-size: 7.5px;
+    font-weight: 900;
+    color: #000;
+    min-width: 110px;
+    text-align: center;
+    background: #fff;
+  }
+
+  .apto-check-square {
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid #222;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  /* TABLA DE FIRMAS RÉPLICA EXACTA */
+  .sig-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    margin-bottom: 10px;
+    border: 1.5px solid #222;
+  }
+  .sig-table td {
+    border: 1.5px solid #222;
+    width: 33.33%;
+    height: 80px;
+    vertical-align: top;
+    padding: 4px;
+    position: relative;
+    background: #fff;
+  }
+
+  .sig-cell-header {
+    text-align: center;
+    font-size: 8px;
+    font-weight: 900;
+    color: #000;
+    margin-bottom: 2px;
+    line-height: 1.15;
+  }
+
+  .sig-cell-footer {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    text-align: center;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #000;
+  }
+
+  .sig-cell-content {
+    position: absolute;
+    top: 22px;
+    left: 4px;
+    right: 4px;
+    bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .sig-canvas {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    cursor: crosshair;
+  }
+  .sig-img-preview {
+    max-width: 95%;
+    max-height: 95%;
+    object-fit: contain;
+    display: none;
+  }
+  .sig-buttons {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: flex;
+    gap: 3px;
+    z-index: 5;
+  }
+  .btn-sig-tool {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    font-size: 8px;
+    padding: 1px 4px;
+    cursor: pointer;
+  }
+  .btn-sig-tool:hover { background: #e2e8f0; }
+
+  /* OBSERVACIONES EN PÁGINA 3 */
+  .observaciones-box-p3 {
+    border: 1.5px solid #222;
+    border-top: none;
+    min-height: 70px;
+    padding: 6px;
+    background: #fff;
+    margin-bottom: 10px;
+  }
+
+  /* OBSERVACIONES Y RECOMENDACIONES (4 LÍNEAS REGLADAS) */
+  .ruled-line {
+    display: flex;
+    align-items: center;
+    border-bottom: 1.5px solid #222;
+    height: 22px;
+    margin-bottom: 2px;
+  }
+  .check-icon {
+    color: #000;
+    font-weight: 900;
+    font-size: 13px;
+    margin-right: 8px;
+    user-select: none;
+  }
+
+  /* =========================================================
+     COMPORTAMIENTO DE IMPRESIÓN (PRINT MEDIA)
+     Garantiza réplica exacta de 3 páginas oficiales limpias
+     ========================================================= */
+  @media print {
+    body {
+      padding: 0 !important;
+      background: #fff !important;
+    }
+    .app-header, .app-tabs-nav, .mobile-score-bar, #tabMobile, #tabHistory, .sig-buttons, .no-print {
+      display: none !important;
+    }
+    #tabOfficial {
+      display: block !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: 100% !important;
+    }
+    .document-container {
+      max-width: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+    }
+    .page {
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      height: 258mm !important;
+      min-height: 258mm !important;
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    .page:last-child {
+      page-break-after: avoid !important;
+    }
+    .section-bar {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+      background-color: #82d130 !important;
+      color: #235749 !important;
+    }
+    .paper-input, .paper-textarea {
+      color: #000 !important;
+      font-family: Arial, Helvetica, sans-serif !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="evalAccessOverlay" style="position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.82);display:flex;align-items:center;justify-content:center;padding:16px;">
+  <form id="evalLoginForm" style="width:100%;max-width:380px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);">
+    <h2 style="margin:0 0 6px;color:#0f172a;font-size:20px;">Acceso a Evaluaciones</h2>
+    <p style="margin:0 0 16px;color:#475569;font-size:13px;">Ingresa con tu cuenta autorizada de AppTolva.</p>
+    <label for="evalAccessEmail" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Correo</label>
+    <input id="evalAccessEmail" type="email" autocomplete="username" required aria-label="Correo" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;">
+    <label for="evalAccessPassword" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Contraseña</label>
+    <input id="evalAccessPassword" type="password" autocomplete="current-password" required aria-label="Contraseña" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:10px;">
+    <p id="evalAccessError" role="alert" style="display:none;color:#b91c1c;font-size:12px;margin:0 0 10px;"></p>
+    <div style="display:flex;gap:8px;">
+      <a href="./evaluaciones.html" style="flex:1;text-align:center;padding:11px;background:#f1f5f9;border-radius:6px;color:#334155;text-decoration:none;font-weight:700;">Volver</a>
+      <button id="evalLoginButton" type="submit" style="flex:1;padding:11px;background:#ea580c;border:0;border-radius:6px;color:#fff;font-weight:700;cursor:pointer;">Ingresar</button>
+    </div>
+  </form>
+</div>
+<div id="evalAppContent" style="display:none;">
+
+<!-- ENCABEZADO SUPERIOR AppTolva -->
+<header class="app-header no-print">
+  <div class="app-brand">
+    <div class="app-badge-b">B</div>
+    <div class="app-title-box">
+      <h1>AppTolva <span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">| Módulo Evaluación</span></h1>
+      <div class="app-subtitle">
+        <span>Bachoco Transporte</span> • <span class="badge-master">Operador Máster</span>
+      </div>
+    </div>
+  </div>
+  <div class="top-action-btns">
+    <a href="./evaluaciones.html" class="btn-sm-action" style="text-decoration:none;">← Evaluaciones</a>
+    <span id="evalSignedInUser" style="font-size:11px;color:#cbd5e1;"></span>
+    <button id="evalLogoutButton" type="button" class="btn-sm-action">Cerrar sesión</button>
+    <button type="button" class="btn-sm-action primary" onclick="guardarEnHistorial()">
+      💾 Guardar
+    </button>
+    <button type="button" class="btn-sm-action green" onclick="imprimirFormatoOficial()">
+      🖨️ PDF Oficial
+    </button>
+  </div>
+</header>
+
+<!-- BARRA DE PESTAÑAS (MÓVIL / FORMATO OFICIAL / HISTORIAL) -->
+<nav class="app-tabs-nav no-print">
+  <button type="button" class="tab-btn active" id="btnTabMobile" onclick="cambiarPestana('mobile')">
+    📱 Modo Celular (Llenado Rápido)
+  </button>
+  <button type="button" class="tab-btn" id="btnTabOfficial" onclick="cambiarPestana('official')">
+    📄 Formato Oficial (3 Páginas)
+  </button>
+  <button type="button" class="tab-btn" id="btnTabHistory" onclick="cambiarPestana('history')">
+    📊 Historial y Control (<span id="historyCountBadge">0</span>)
+  </button>
+</nav>
+
+<!-- BARRA DE CALIFICACIÓN Y ESTADO EN VIVO -->
+<div class="mobile-score-bar no-print">
+  <div class="score-badge-live">
+    <div>
+      <span style="font-size: 10px; color: #64748b; font-weight: bold; display: block;">PROMEDIO</span>
+      <span class="score-num" id="liveScoreNum">--</span>
+    </div>
+    <span class="status-pill pend" id="liveStatusPill">PENDIENTE</span>
+  </div>
+  <div style="font-size: 11px; text-align: right; color: #475569;">
+    <strong>Aspirante:</strong> <span id="liveAspiranteName">Sin asignar</span><br>
+    <span style="font-size: 9.5px; color: #64748b;" id="liveFechaHoy">--/--/----</span>
+  </div>
+</div>
+
+</div>
+
+<!-- ===================================================================
+     PESTAÑA 1: MODO CELULAR (ASISTENTE FÁCIL DE LLENAR PARA MÁSTERS)
+     =================================================================== -->
+<div class="tab-content active" id="tabMobile">
+
+  <!-- 1. DATOS GENERALES -->
+  <div class="mobile-card">
+    <div class="mobile-card-header" onclick="toggleAccordion('bodyGen')">
+      <h2>👤 1. Datos del Aspirante y Op. Máster</h2>
+      <span class="header-meta">Requerido</span>
+    </div>
+    <div class="mobile-card-body" id="bodyGen">
+      <div class="form-group-grid">
+        <div class="m-field">
+          <label>Nombre del Op. Máster que Evalúa</label>
+          <input type="text" class="m-input" id="m_master_nombre" value="Francisco Alberto Ambrosio Solis" oninput="syncToPaper('master_nombre', this.value)">
+        </div>
+        <div class="m-field">
+          <label>Nombre Completo del Aspirante</label>
+          <input type="text" class="m-input" id="m_nombre" placeholder="Ej. Juan Pérez López" oninput="syncToPaper('nombre', this.value)">
+        </div>
+        <div class="m-field">
+          <label>Centro de Trabajo</label>
+          <input type="text" class="m-input" id="m_centro" placeholder="Ej. Planta Veracruz / Tolvas" oninput="syncToPaper('centro', this.value)">
+        </div>
+        <div class="m-field">
+          <label>Unidad de Negocio</label>
+          <input type="text" class="m-input" id="m_unidad_neg" placeholder="Ej. Alimento Balanceado" oninput="syncToPaper('unidad_neg', this.value)">
+        </div>
+        <div class="m-field">
+          <label>Fecha de Evaluación</label>
+          <input type="date" class="m-input" id="m_fecha" onchange="syncFecha(this.value)">
+        </div>
+        <div class="m-field">
+          <label>No. Licencia y Tipo</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" class="m-input" id="m_licencia" placeholder="No. Licencia" style="flex: 2;" oninput="syncToPaper('licencia', this.value)">
+            <input type="text" class="m-input" id="m_lic_tipo" placeholder="Tipo" style="flex: 1;" oninput="syncToPaper('lic_tipo', this.value)">
+          </div>
+        </div>
+        <div class="m-field">
+          <label>Modalidad de Licencia</label>
+          <div style="display: flex; gap: 10px; margin-top: 5px;">
+            <label style="display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600; cursor:pointer;">
+              <input type="radio" name="m_modalidad" value="FED" onchange="syncModalidad('FED')"> Federal (FED)
+            </label>
+            <label style="display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600; cursor:pointer;">
+              <input type="radio" name="m_modalidad" value="EST" onchange="syncModalidad('EST')"> Estatal (EST)
+            </label>
+          </div>
+        </div>
+        <div class="m-field">
+          <label>Vigencia y Antigüedad Licencia</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" class="m-input" id="m_lic_vig" placeholder="Vigencia" oninput="syncToPaper('lic_vig', this.value)">
+            <input type="text" class="m-input" id="m_lic_ant" placeholder="Antigüedad" oninput="syncToPaper('lic_ant', this.value)">
+          </div>
+        </div>
+        <div class="m-field">
+          <label>No. Expediente Apto Médico y Vigencia</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" class="m-input" id="m_apto_med" placeholder="Expediente médico" oninput="syncToPaper('apto_med', this.value)">
+            <input type="text" class="m-input" id="m_apto_vig" placeholder="Vigencia médico" oninput="syncToPaper('apto_vig', this.value)">
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+        <span style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase;">Experiencia y Configuración de Prueba</span>
+        <div class="form-group-grid" style="margin-top: 8px;">
+          <div class="m-field">
+            <label>Ruta más larga conducida</label>
+            <input type="text" class="m-input" id="m_ruta" placeholder="Ej. México - Mérida" oninput="syncToPaper('ruta', this.value)">
+          </div>
+          <div class="m-field">
+            <label>Vehículos que opera y tiempo manejando</label>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" class="m-input" id="m_veh_opera" placeholder="Vehículos" oninput="syncToPaper('veh_opera', this.value)">
+              <input type="text" class="m-input" id="m_tiempo_man" placeholder="Años / tiempo" oninput="syncToPaper('tiempo_man', this.value)">
+            </div>
+          </div>
+          <div class="m-field">
+            <label>Configuración Vehículo de Prueba</label>
+            <select class="m-select" id="m_cfg_veh" onchange="syncSingleCheckGroup('cfg_veh', this.value)">
+              <option value="">-- Seleccionar --</option>
+              <option value="Unitario Ligero">Unitario Ligero</option>
+              <option value="Articulado">Articulado (Sencillo)</option>
+              <option value="Unitario Pesado">Unitario Pesado</option>
+              <option value="Doble Articulado">Doble Articulado (Full)</option>
+            </select>
+          </div>
+          <div class="m-field">
+            <label>Motor</label>
+            <select class="m-select" id="m_motor" onchange="syncSingleCheckGroup('motor', this.value)">
+              <option value="">-- Seleccionar --</option>
+              <option value="DD13">DD13</option>
+              <option value="DD15">DD15</option>
+              <option value="DD16">DD16</option>
+              <option value="OM926">OM926</option>
+            </select>
+          </div>
+          <div class="m-field">
+            <label>Transmisión</label>
+            <select class="m-select" id="m_trans" onchange="syncSingleCheckGroup('trans', this.value)">
+              <option value="">-- Seleccionar --</option>
+              <option value="RTLO18918B">RTLO18918B</option>
+              <option value="RTLO20918B">RTLO20918B</option>
+              <option value="Ultrashift Plus">Ultrashift Plus (Automatizada)</option>
+              <option value="FR14210B">FR14210B</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. REVISIÓN INICIAL (12 PUNTOS) -->
+  <div class="mobile-card">
+    <div class="mobile-card-header" onclick="toggleAccordion('bodySec1')">
+      <h2>🔍 2. Revisión Previa al Vehículo</h2>
+      <span class="header-meta"><span id="m_count_sec1">0</span> / 12 pts</span>
+    </div>
+    <div class="mobile-card-body" id="bodySec1">
+      <div class="batch-actions-bar">
+        <span style="font-size: 11px; color: #64748b;">Fluidos, motor, cabina, luces y remolques</span>
+        <div>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec1', true)">Marcar Todos</button>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec1', false)">Desmarcar</button>
+        </div>
+      </div>
+      <div class="touch-item-list" id="list_sec1"></div>
+    </div>
+  </div>
+
+  <!-- 3. ENGANCHE Y DESACOPLE (24 PUNTOS) -->
+  <div class="mobile-card">
+    <div class="mobile-card-header" onclick="toggleAccordion('bodySec2')">
+      <h2>🔗 3. Enganche y Desacople de Semirremolques</h2>
+      <span class="header-meta"><span id="m_count_sec2">0</span> / 24 pts</span>
+    </div>
+    <div class="mobile-card-body" id="bodySec2">
+      <div class="batch-actions-bar">
+        <span style="font-size: 11px; color: #64748b;">Pasos consecutivos (11 Desacople + 13 Enganche)</span>
+        <div>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec2', true)">Marcar Todos</button>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec2', false)">Desmarcar</button>
+        </div>
+      </div>
+
+      <div style="font-size: 12px; font-weight: 800; color: #ea580c; margin: 10px 0 6px 0; text-transform: uppercase;">
+        A) Desacople (11 pasos)
+      </div>
+      <div class="touch-item-list" id="list_sec2_desacople"></div>
+
+      <div style="font-size: 12px; font-weight: 800; color: #ea580c; margin: 16px 0 6px 0; text-transform: uppercase;">
+        B) Enganche (13 pasos)
+      </div>
+      <div class="touch-item-list" id="list_sec2_enganche"></div>
+    </div>
+  </div>
+
+  <!-- 4. MANIOBRAS EN PATIO (3 PUNTOS) -->
+  <div class="mobile-card">
+    <div class="mobile-card-header" onclick="toggleAccordion('bodySec3')">
+      <h2>🅿️ 4. Maniobras en Patio Abierto</h2>
+      <span class="header-meta"><span id="m_count_sec3">0</span> / 3 pts</span>
+    </div>
+    <div class="mobile-card-body" id="bodySec3">
+
+      <!-- Maniobra 1 -->
+      <div class="maneuver-mobile-card">
+        <div class="maneuver-title-bar">
+          <div>
+            <strong style="font-size: 12.5px;">1. Maniobra en reversa</strong>
+            <div style="font-size: 10px; color: #64748b;">Retroceso recto ≥30 metros (Límite: 8 min)</div>
+          </div>
+          <div class="maneuver-timer-box">
+            <span id="timerDisplay1">08:00</span>
+            <button type="button" class="btn-timer" id="btnTimer1" onclick="toggleTimer(1, 480)">⏱️ Iniciar</button>
+          </div>
+        </div>
+        <div class="touch-item" id="m_chk_man1" onclick="toggleMobileItem('man1', 'sec3')">
+          <span class="touch-item-text">Maniobra completada correctamente en tiempo y forma</span>
+          <div class="touch-check-pill" id="pill_man1">✓</div>
+        </div>
+        <div class="m-field" style="margin-top: 8px;">
+          <label>Observaciones de la maniobra en reversa</label>
+          <input type="text" class="m-input" id="m_obs_man1" placeholder="Detalles de alineación, espejeo, etc." oninput="syncToPaper('obs_man1', this.value)">
+        </div>
+      </div>
+
+      <!-- Maniobra 2 -->
+      <div class="maneuver-mobile-card">
+        <div class="maneuver-title-bar">
+          <div>
+            <strong style="font-size: 12.5px;">2. Entre dos vehículos</strong>
+            <div style="font-size: 10px; color: #64748b;">Estacionamiento entre 2 unidades (Límite: 8 min)</div>
+          </div>
+          <div class="maneuver-timer-box">
+            <span id="timerDisplay2">08:00</span>
+            <button type="button" class="btn-timer" id="btnTimer2" onclick="toggleTimer(2, 480)">⏱️ Iniciar</button>
+          </div>
+        </div>
+        <div class="touch-item" id="m_chk_man2" onclick="toggleMobileItem('man2', 'sec3')">
+          <span class="touch-item-text">Maniobra completada correctamente entre dos vehículos</span>
+          <div class="touch-check-pill" id="pill_man2">✓</div>
+        </div>
+        <div class="m-field" style="margin-top: 8px;">
+          <label>Observaciones estacionamiento entre vehículos</label>
+          <input type="text" class="m-input" id="m_obs_man2" placeholder="Distancias, cálculo de espacio..." oninput="syncToPaper('obs_man2', this.value)">
+        </div>
+      </div>
+
+      <!-- Maniobra 3 -->
+      <div class="maneuver-mobile-card">
+        <div class="maneuver-title-bar">
+          <div>
+            <strong style="font-size: 12.5px;">3. Maniobra en L</strong>
+            <div style="font-size: 10px; color: #64748b;">Estacionamiento lado ciego (Límite: 10 min)</div>
+          </div>
+          <div class="maneuver-timer-box">
+            <span id="timerDisplay3">10:00</span>
+            <button type="button" class="btn-timer" id="btnTimer3" onclick="toggleTimer(3, 600)">⏱️ Iniciar</button>
+          </div>
+        </div>
+        <div class="touch-item" id="m_chk_man3" onclick="toggleMobileItem('man3', 'sec3')">
+          <span class="touch-item-text">Maniobra en L completada correctamente</span>
+          <div class="touch-check-pill" id="pill_man3">✓</div>
+        </div>
+        <div class="m-field" style="margin-top: 8px;">
+          <label>Observaciones de maniobra en L</label>
+          <input type="text" class="m-input" id="m_obs_man3" placeholder="Control del ángulo, uso de espejos..." oninput="syncToPaper('obs_man3', this.value)">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 5. MANEJO TÉCNICO-ECONÓMICO (23 PUNTOS) -->
+  <div class="mobile-card">
+    <div class="mobile-card-header" onclick="toggleAccordion('bodySec4')">
+      <h2>🛣️ 5. Manejo Técnico - Económico en Carretera</h2>
+      <span class="header-meta"><span id="m_count_sec4">0</span> / 23 pts</span>
+    </div>
+    <div class="mobile-card-body" id="bodySec4">
+      <div class="batch-actions-bar">
+        <span style="font-size: 11px; color: #64748b;">23 criterios de operación en ruta</span>
+        <div>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec4', true)">Marcar Todos</button>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec4', false)">Desmarcar</button>
+        </div>
+      </div>
+      <div class="touch-item-list" id="list_sec4"></div>
+
+      <div class="m-field" style="margin-top: 12px;">
+        <label>Observaciones Manejo Técnico - Económico</label>
+        <textarea class="m-input" rows="2" id="m_obs_tec" placeholder="Comentarios sobre RPM, cambios de velocidad, torque..." oninput="syncToPaper('obs_tec', this.value)"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. EDUCACIÓN VIAL Y MANEJO DEFENSIVO (17 PUNTOS) -->
+  <div class="mobile-card">
+    <div class="mobile-card-header" onclick="toggleAccordion('bodySec5')">
+      <h2>🛡️ 6. Educación Vial y Manejo Defensivo</h2>
+      <span class="header-meta"><span id="m_count_sec5">0</span> / 17 pts</span>
+    </div>
+    <div class="mobile-card-body" id="bodySec5">
+      <div class="batch-actions-bar">
+        <span style="font-size: 11px; color: #64748b;">17 criterios de seguridad y cortesía</span>
+        <div>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec5', true)">Marcar Todos</button>
+          <button type="button" class="btn-batch" onclick="marcarGrupo('sec5', false)">Desmarcar</button>
+        </div>
+      </div>
+      <div class="touch-item-list" id="list_sec5"></div>
+
+      <div class="m-field" style="margin-top: 12px;">
+        <label>Observaciones Manejo Defensivo</label>
+        <textarea class="m-input" rows="2" id="m_obs_def" placeholder="Comentarios sobre actitud, anticipación, velocidad..." oninput="syncToPaper('obs_def', this.value)"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. RESUMEN DE PUNTUACIÓN, FIRMAS Y DICTAMEN -->
+  <div class="mobile-card">
+    <div class="mobile-card-header">
+      <h2>🏆 7. Sumatoria, Dictamen y Firmas</h2>
+      <span class="header-meta">Mínimo 80% Aprobatorio</span>
+    </div>
+    <div class="mobile-card-body">
+
+      <!-- TARJETA DE RESULTADO -->
+      <div style="background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; margin-bottom: 16px;" id="dictamenCard">
+        <div style="font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase;">Calificación Final Ponderada</div>
+        <div style="font-size: 34px; font-weight: 900; margin: 4px 0; color: #0f172a;" id="m_final_score">--</div>
+        <div style="font-size: 13px; font-weight: 900; padding: 4px 12px; border-radius: 20px; display: inline-block;" id="m_final_badge">
+          PENDIENTE DE EVALUAR
+        </div>
+      </div>
+
+      <!-- DESGLOSE DE PUNTOS POR SECCIÓN -->
+      <div style="font-size: 11.5px; font-weight: bold; margin-bottom: 8px; color: #334155;">Desglose por Segmento Evaluado:</div>
+      <div style="display: grid; grid-template-columns: 1fr; gap: 6px; font-size: 11.5px; margin-bottom: 16px;">
+        <div style="display:flex; justify-content:space-between; padding:6px 10px; background:#f1f5f9; border-radius:4px;">
+          <span>1. Check List y Revisión previa al vehículo:</span>
+          <strong><span id="m_row_pts1">0</span>/12 (<span id="m_row_cal1">0.0</span>%)</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 10px; background:#f1f5f9; border-radius:4px;">
+          <span>2. Manejo Técnico Económico:</span>
+          <strong><span id="m_row_pts2">0</span>/23 (<span id="m_row_cal2">0.0</span>%)</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 10px; background:#f1f5f9; border-radius:4px;">
+          <span>3. Enganche y desacople de remolques:</span>
+          <strong><span id="m_row_pts3">0</span>/24 (<span id="m_row_cal3">0.0</span>%)</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 10px; background:#f1f5f9; border-radius:4px;">
+          <span>4. Educación vial y manejo defensivo:</span>
+          <strong><span id="m_row_pts4">0</span>/17 (<span id="m_row_cal4">0.0</span>%)</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 10px; background:#f1f5f9; border-radius:4px;">
+          <span>5. Maniobras en patio:</span>
+          <strong><span id="m_row_pts5">0</span>/3 (<span id="m_row_cal5">0.0</span>%)</strong>
+        </div>
+      </div>
+
+      <!-- FIRMAS DIGITALES TÁCTILES -->
+      <div style="font-size: 11.5px; font-weight: bold; margin-bottom: 8px; color: #334155;">Firmas Digitales (Captura con Dedo en Celular):</div>
+      <div style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px;">
+
+        <div style="border:1px solid #cbd5e1; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size: 12px; font-weight: 800;">1. Op. Máster que realiza la prueba</div>
+            <div style="font-size: 10.5px; color:#475569;" id="sigMasterNameDisplay">Francisco Alberto Ambrosio Solis</div>
+            <div style="font-size: 10px; color:#64748b;" id="sigStatusLabel1">Sin firmar</div>
+          </div>
+          <button type="button" class="btn-sm-action primary" onclick="abrirModalFirma(1, 'Firma del Op. Máster')">✍️ Firmar</button>
+        </div>
+
+        <div style="border:1px solid #cbd5e1; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size: 12px; font-weight: 800;">2. Operador Evaluado</div>
+            <div style="font-size: 10px; color:#64748b;" id="sigStatusLabel2">Sin firmar</div>
+          </div>
+          <button type="button" class="btn-sm-action primary" onclick="abrirModalFirma(2, 'Firma del Operador Evaluado')">✍️ Firmar</button>
+        </div>
+
+        <div style="border:1px solid #cbd5e1; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size: 12px; font-weight: 800;">3. Vo.Bo. / Sello (Opcional)</div>
+            <div style="font-size: 10px; color:#64748b;" id="sigStatusLabel3">Espacio libre para sello o firma</div>
+          </div>
+          <button type="button" class="btn-sm-action" onclick="abrirModalFirma(3, 'Vo.Bo. / Firma Adicional')">✍️ Firmar</button>
+        </div>
+
+      </div>
+
+      <!-- OBSERVACIONES Y RECOMENDACIONES -->
+      <div class="m-field">
+        <label>Observaciones y Recomendaciones Finales</label>
+        <input type="text" class="m-input" style="margin-bottom: 4px;" id="m_rec1" placeholder="Recomendación 1..." oninput="syncToPaper('rec1', this.value)">
+        <input type="text" class="m-input" style="margin-bottom: 4px;" id="m_rec2" placeholder="Recomendación 2..." oninput="syncToPaper('rec2', this.value)">
+        <input type="text" class="m-input" style="margin-bottom: 4px;" id="m_rec3" placeholder="Recomendación 3..." oninput="syncToPaper('rec3', this.value)">
+        <input type="text" class="m-input" id="m_rec4" placeholder="Recomendación 4..." oninput="syncToPaper('rec4', this.value)">
+      </div>
+
+      <!-- BOTONES DE ACCIÓN FINAL -->
+      <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+        <button type="button" class="btn-sm-action primary" style="justify-content: center; padding: 12px; font-size: 14px;" onclick="guardarEnHistorial()">
+          💾 Guardar Evaluación en AppTolva
+        </button>
+        <button type="button" class="btn-sm-action green" style="justify-content: center; padding: 10px; font-size: 13px;" onclick="imprimirFormatoOficial()">
+          🖨️ Ver y Generar PDF Oficial Bachoco
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ===================================================================
+     PESTAÑA 2: FORMATO OFICIAL (RÉPLICA EXACTA DE 3 PÁGINAS)
+     =================================================================== -->
+<div class="tab-content" id="tabOfficial">
+
+  <div class="no-print" style="max-width: 820px; margin: 0 auto 12px auto; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 14px; border-radius: 8px; border: 1px solid #cbd5e1;">
+    <div style="font-size: 12px; font-weight: bold; color: #1e293b;">
+      📄 Réplica Oficial Exacta (Formato institucional de 3 páginas con firmas)
+    </div>
+    <div style="display: flex; gap: 6px;">
+      <button type="button" class="btn-sm-action green" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+      <button type="button" class="btn-sm-action" onclick="limpiarTodo()">🧹 Limpiar</button>
+    </div>
+  </div>
+
+  <div class="document-container">
+
+    <!-- ==================== PÁGINA 1 ==================== -->
+    <div class="page" id="page1">
+      <div>
+        <div class="header-main-title">CENTRO DE ENTRENAMIENTO Y DESARROLLO PARA OPERADORES</div>
+
+        <table class="header-card">
+          <tr>
+            <td style="width: 20%; text-align: left;">
+              <strong style="color: #ea580c; font-size: 14pt;">B</strong> <strong>GRUPO BACHOCO</strong>
+            </td>
+            <td style="width: 60%; text-align: center;">
+              <div style="font-size: 11px; font-weight: 900; line-height: 1.25; color: #111;">
+                EVALUACIÓN DE CONDUCCIÓN PARA VEHÍCULOS UNITARIOS<br>
+                ARTICULADOS Y DOBLEMENTE ARTICULADOS.
+              </div>
+            </td>
+            <td style="width: 20%; text-align: right;">
+              <strong style="color: var(--bachoco-green); font-size: 11pt;">OPERADOR</strong><br>
+              <span style="font-size: 8px; color: #666;">MASTER</span>
+            </td>
+          </tr>
+        </table>
+
+        <table class="grid-table">
+          <tr>
+            <td colspan="4" style="width: 44%;">
+              <span class="field-label">Nombre del Aspirante</span>
+              <input type="text" class="paper-input" id="p_nombre" placeholder="Nombre completo..." oninput="syncFromPaper('nombre', this.value)">
+            </td>
+            <td style="width: 20%;">
+              <span class="field-label">Centro de trabajo</span>
+              <input type="text" class="paper-input" id="p_centro" oninput="syncFromPaper('centro', this.value)">
+            </td>
+            <td style="width: 20%;">
+              <span class="field-label">Unidad de negocio</span>
+              <input type="text" class="paper-input" id="p_unidad_neg" oninput="syncFromPaper('unidad_neg', this.value)">
+            </td>
+            <td style="width: 5%; text-align: center;">
+              <span class="field-label">Dia</span>
+              <input type="text" class="paper-input" style="text-align: center;" id="p_dia" maxlength="2">
+            </td>
+            <td style="width: 5%; text-align: center;">
+              <span class="field-label">Mes</span>
+              <input type="text" class="paper-input" style="text-align: center;" id="p_mes" maxlength="2">
+            </td>
+            <td style="width: 6%; text-align: center;">
+              <span class="field-label">Año</span>
+              <input type="text" class="paper-input" style="text-align: center;" id="p_anio" maxlength="4">
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="width: 25%;">
+              <span class="field-label">Licencia No.</span>
+              <input type="text" class="paper-input" id="p_licencia" oninput="syncFromPaper('licencia', this.value)">
+            </td>
+            <td style="width: 8%;">
+              <span class="field-label">Tipo:</span>
+              <input type="text" class="paper-input" style="text-align: center;" id="p_lic_tipo" oninput="syncFromPaper('lic_tipo', this.value)">
+            </td>
+            <td colspan="2" style="width: 25%;">
+              <span class="field-label">Modalidad:</span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span>FED ( <span class="chk-box" id="chk_mod_fed" onclick="togglePaperCheck('mod_fed')"></span> )</span>
+                <span>EST ( <span class="chk-box" id="chk_mod_est" onclick="togglePaperCheck('mod_est')"></span> )</span>
+              </div>
+            </td>
+            <td colspan="2" style="width: 22%;">
+              <span class="field-label">Vigencia:</span>
+              <input type="text" class="paper-input" id="p_lic_vig" oninput="syncFromPaper('lic_vig', this.value)">
+            </td>
+            <td colspan="2" style="width: 20%;">
+              <span class="field-label">Antigüedad</span>
+              <input type="text" class="paper-input" id="p_lic_ant" oninput="syncFromPaper('lic_ant', this.value)">
+            </td>
+          </tr>
+          <tr>
+            <td colspan="5">
+              <span class="field-label">No. Expediente Apto Medico:</span>
+              <input type="text" class="paper-input" id="p_apto_med" oninput="syncFromPaper('apto_med', this.value)">
+            </td>
+            <td colspan="4">
+              <span class="field-label">Vigencia:</span>
+              <input type="text" class="paper-input" id="p_apto_vig" oninput="syncFromPaper('apto_vig', this.value)">
+            </td>
+          </tr>
+        </table>
+
+        <div class="section-bar">Experiencia en conducción y SPEC Vehículo</div>
+        <table class="grid-table" style="border-top: none;">
+          <tr>
+            <td style="width: 35%;">
+              <span class="field-label">Ruta mas larga que a conducido</span>
+              <input type="text" class="paper-input" id="p_ruta" oninput="syncFromPaper('ruta', this.value)">
+            </td>
+            <td style="width: 40%;">
+              <span class="field-label">Vehículos que sabe operar</span>
+              <input type="text" class="paper-input" id="p_veh_opera" oninput="syncFromPaper('veh_opera', this.value)">
+            </td>
+            <td style="width: 25%;">
+              <span class="field-label">Tiempo manejando</span>
+              <input type="text" class="paper-input" id="p_tiempo_man" oninput="syncFromPaper('tiempo_man', this.value)">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="field-label">Configuración de vehículo de prueba:</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
+                <span class="chk-item"><span class="chk-box" id="chk_cfg_ul" onclick="togglePaperCheck('cfg_ul')"></span> Unitario Ligero</span>
+                <span class="chk-item"><span class="chk-box" id="chk_cfg_art" onclick="togglePaperCheck('cfg_art')"></span> Articulado</span>
+                <span class="chk-item"><span class="chk-box" id="chk_cfg_up" onclick="togglePaperCheck('cfg_up')"></span> Unitario Pesado</span>
+                <span class="chk-item"><span class="chk-box" id="chk_cfg_da" onclick="togglePaperCheck('cfg_da')"></span> Doble Articulado</span>
+              </div>
+            </td>
+            <td>
+              <span class="field-label">Motor:</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
+                <span class="chk-item"><span class="chk-box" id="chk_mot_dd13" onclick="togglePaperCheck('mot_dd13')"></span> DD13</span>
+                <span class="chk-item"><span class="chk-box" id="chk_mot_dd16" onclick="togglePaperCheck('mot_dd16')"></span> DD16</span>
+                <span class="chk-item"><span class="chk-box" id="chk_mot_dd15" onclick="togglePaperCheck('mot_dd15')"></span> DD15</span>
+                <span class="chk-item"><span class="chk-box" id="chk_mot_om926" onclick="togglePaperCheck('mot_om926')"></span> OM926</span>
+              </div>
+            </td>
+            <td>
+              <span class="field-label">Transmisión:</span>
+              <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 2px;">
+                <span class="chk-item"><span class="chk-box" id="chk_trn_rtlo18" onclick="togglePaperCheck('trn_rtlo18')"></span> RTLO18918B</span>
+                <span class="chk-item"><span class="chk-box" id="chk_trn_ultra" onclick="togglePaperCheck('trn_ultra')"></span> Ultrashift Plus</span>
+                <span class="chk-item"><span class="chk-box" id="chk_trn_rtlo20" onclick="togglePaperCheck('trn_rtlo20')"></span> RTLO20918B</span>
+                <span class="chk-item"><span class="chk-box" id="chk_trn_fr14" onclick="togglePaperCheck('trn_fr14')"></span> FR14210B</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <div class="section-bar">INICIO ( Revisión fluidos, motor, cabina, luces y remolques )</div>
+        <div class="instruction-bar">Instrucciones: Marque con una X los elementos revisados</div>
+        <table class="grid-table" style="border-top: none;" id="paper_sec1_table">
+          <tr>
+            <td style="width: 25%;"><div class="chk-item"><span class="chk-box" id="p_chk_sec1_0" onclick="togglePaperCheckIndex('sec1', 0)"></span> Aceite motor</div></td>
+            <td style="width: 25%;"><div class="chk-item"><span class="chk-box" id="p_chk_sec1_1" onclick="togglePaperCheckIndex('sec1', 1)"></span> Anticongelante</div></td>
+            <td style="width: 25%;"><div class="chk-item"><span class="chk-box" id="p_chk_sec1_2" onclick="togglePaperCheckIndex('sec1', 2)"></span> Carrocería</div></td>
+            <td style="width: 25%;"><div class="chk-item"><span class="chk-box" id="p_chk_sec1_3" onclick="togglePaperCheckIndex('sec1', 3)"></span> Presencia fugas fluidos</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_4" onclick="togglePaperCheckIndex('sec1', 4)"></span> Aceite dirección</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_5" onclick="togglePaperCheckIndex('sec1', 5)"></span> Estado bandas</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_6" onclick="togglePaperCheckIndex('sec1', 6)"></span> Doc. del vehículo</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_7" onclick="togglePaperCheckIndex('sec1', 7)"></span> Presencia fugas aire</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_8" onclick="togglePaperCheckIndex('sec1', 8)"></span> Liquido embrague</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_9" onclick="togglePaperCheckIndex('sec1', 9)"></span> Estado mangueras</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_10" onclick="togglePaperCheckIndex('sec1', 10)"></span> Neumáticos</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec1_11" onclick="togglePaperCheckIndex('sec1', 11)"></span> Estado remolque (s)</div></td>
+          </tr>
+        </table>
+
+        <div class="section-bar">ENGANCHE Y DESACOPLE DE SEMIRREMOLQUES</div>
+        <div class="instruction-bar">Instrucciones: Por cada acción realizada marque con una x el espacio designado para ello, los pasos son consecutivos.</div>
+        <table class="grid-table" style="border-top: none;">
+          <thead>
+            <tr style="background-color: #f97316; color: white;">
+              <th style="width: 50%; font-size: 8.5px; padding: 3px;">DESACOPLE</th>
+              <th style="width: 50%; font-size: 8.5px; padding: 3px;">ENGANCHE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_0" onclick="togglePaperCheckIndex('sec2', 0)"></span> Enciende intermitentes</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_11" onclick="togglePaperCheckIndex('sec2', 11)"></span> Enciende intermitentes</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_1" onclick="togglePaperCheckIndex('sec2', 1)"></span> Realiza acción en suelo firme</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_12" onclick="togglePaperCheckIndex('sec2', 12)"></span> Realiza acción en suelo firme</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_2" onclick="togglePaperCheckIndex('sec2', 2)"></span> Verifica zona segura</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_13" onclick="togglePaperCheckIndex('sec2', 13)"></span> Verifica zona segura</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_3" onclick="togglePaperCheckIndex('sec2', 3)"></span> Usa tres puntos apoyo para ascenso y descenso cabina</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_14" onclick="togglePaperCheckIndex('sec2', 14)"></span> Usa tres puntos apoyo para ascenso y descenso a la cabina</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_4" onclick="togglePaperCheckIndex('sec2', 4)"></span> Usa dos manos para hacer descender patines</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_15" onclick="togglePaperCheckIndex('sec2', 15)"></span> Retrocede lentamente hasta semirremolque</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_5" onclick="togglePaperCheckIndex('sec2', 5)"></span> Patines están firmes en el piso</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_16" onclick="togglePaperCheckIndex('sec2', 16)"></span> Presenta quinta rueda en plancha antes de enganchar</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_6" onclick="togglePaperCheckIndex('sec2', 6)"></span> Jala gancho 5ta rueda</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_17" onclick="togglePaperCheckIndex('sec2', 17)"></span> Verifica que semirremolque y tracto camión estén alineados</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_7" onclick="togglePaperCheckIndex('sec2', 7)"></span> Desconecta mangueras de servicio y emergencia</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_18" onclick="togglePaperCheckIndex('sec2', 18)"></span> Perno rey alineado a quinta rueda</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_8" onclick="togglePaperCheckIndex('sec2', 8)"></span> Desconecta cable 7 vías</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_19" onclick="togglePaperCheckIndex('sec2', 19)"></span> Acople suave, no golpea elementos de arrastre</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_9" onclick="togglePaperCheckIndex('sec2', 9)"></span> Ajusta altura suspensión del tracto</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_20" onclick="togglePaperCheckIndex('sec2', 20)"></span> Verifica cierre de seguros de quinta rueda de forma visual</div></td>
+            </tr>
+            <tr>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_10" onclick="togglePaperCheckIndex('sec2', 10)"></span> Avanza lentamente para desacople</div></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_21" onclick="togglePaperCheckIndex('sec2', 21)"></span> Verifica cierre de seguros de quinta rueda "jalón"</div></td>
+            </tr>
+            <tr>
+              <td style="border-bottom: 1px solid #222;"></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_22" onclick="togglePaperCheckIndex('sec2', 22)"></span> Levanta patines a distancia segura antes de comprobar cierre</div></td>
+            </tr>
+            <tr>
+              <td style="border-bottom: 1px solid #222;"></td>
+              <td><div class="chk-item"><span class="chk-box" id="p_chk_sec2_23" onclick="togglePaperCheckIndex('sec2', 23)"></span> Conecta mangueras de servicio y emergencia</div></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="section-bar">MANIOBRAS EN PATIO</div>
+        <div class="instruction-bar">INSTRUCCIONES: Solicite a aspirante realizar las siguientes maniobras en patio abierto</div>
+        <table class="maneuver-wrapper" style="border-top: none;">
+          <tr>
+            <td class="maneuver-header" style="width: 65%;">
+              <strong>Maniobra en reversa</strong> &nbsp;&nbsp; (retroceder el vehículo al menos 30 metros en reversa recta)
+            </td>
+            <td class="maneuver-header" style="width: 35%; text-align: right;">
+              Maniobra completada: ( <span class="chk-box" id="p_chk_man1" onclick="togglePaperCheck('man1')"></span> )
+            </td>
+          </tr>
+          <tr>
+            <td class="maneuver-diagram">
+              <div style="font-size: 8px; font-weight: bold; margin-bottom: 15px;">Tiempo limite: 8 minutos</div>
+              <div style="display: flex; align-items: center; justify-content: center; gap: 20px; height: 75px;">
+                <svg width="100" height="24" viewBox="0 0 100 24">
+                  <defs>
+                    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                      <polygon points="0 0, 8 3, 0 6" fill="#1e40af" />
+                    </marker>
+                  </defs>
+                  <line x1="10" y1="12" x2="88" y2="12" stroke="#1e40af" stroke-width="8" marker-end="url(#arrowhead)" />
+                </svg>
+                <div style="border: 2px solid #555; background: #eee; padding: 10px 25px; border-radius: 4px; font-weight: bold; font-size: 10px;">
+                  🚛 TRACTOCAMIÓN
+                </div>
+              </div>
+            </td>
+            <td class="maneuver-obs">
+              <strong>Observaciones:</strong>
+              <textarea rows="6" class="paper-textarea" id="p_obs_man1" oninput="syncFromPaper('obs_man1', this.value)"></textarea>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div style="text-align: right; font-size: 7.5px; color: #666;">Página 1 de 3</div>
+    </div>
+
+
+    <!-- ==================== PÁGINA 2 ==================== -->
+    <div class="page" id="page2">
+      <div>
+        <div class="header-main-title">CENTRO DE ENTRENAMIENTO Y DESARROLLO PARA OPERADORES</div>
+        <div class="section-bar">MANIOBRAS EN PATIO</div>
+
+        <table class="maneuver-wrapper" style="border-top: none;">
+          <tr>
+            <td class="maneuver-header" style="width: 65%;">
+              <strong>Maniobra entre dos vehículos</strong> &nbsp;&nbsp; (estacionamiento entre dos vehículos)
+            </td>
+            <td class="maneuver-header" style="width: 35%; text-align: right;">
+              Maniobra completada: ( <span class="chk-box" id="p_chk_man2" onclick="togglePaperCheck('man2')"></span> )
+            </td>
+          </tr>
+          <tr>
+            <td class="maneuver-diagram" style="height: 155px;">
+              <div style="font-size: 8px; font-weight: bold; margin-bottom: 5px;">Tiempo limite: 8 minutos</div>
+              <div style="position: relative; height: 130px; width: 100%; display: flex; align-items: center; justify-content: space-around;">
+                <div style="width: 30px; height: 100px; background: #e2e8f0; border: 2px solid #475569; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; writing-mode: vertical-rl;">
+                  TRACTO
+                </div>
+                <svg width="24" height="90" viewBox="0 0 24 90">
+                  <defs>
+                    <marker id="arrDown1" markerWidth="8" markerHeight="6" refX="3" refY="7" orient="auto">
+                      <polygon points="0 0, 6 0, 3 8" fill="#1e40af" />
+                    </marker>
+                  </defs>
+                  <line x1="12" y1="5" x2="12" y2="78" stroke="#1e40af" stroke-width="8" marker-end="url(#arrDown1)" />
+                </svg>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                  <div style="width: 26px; height: 60px; background: #cbd5e1; border: 1.5px solid #64748b; border-radius: 2px;"></div>
+                  <div style="width: 26px; height: 60px; background: #cbd5e1; border: 1.5px solid #64748b; border-radius: 2px;"></div>
+                </div>
+              </div>
+            </td>
+            <td class="maneuver-obs">
+              <strong>Observaciones:</strong>
+              <textarea rows="8" class="paper-textarea" id="p_obs_man2" oninput="syncFromPaper('obs_man2', this.value)"></textarea>
+            </td>
+          </tr>
+        </table>
+
+        <table class="maneuver-wrapper">
+          <tr>
+            <td class="maneuver-header" style="width: 65%;">
+              <strong>Maniobra en L</strong> &nbsp;&nbsp; (estacionamiento entre dos vehículos lado ciego)
+            </td>
+            <td class="maneuver-header" style="width: 35%; text-align: right;">
+              Maniobra completada: ( <span class="chk-box" id="p_chk_man3" onclick="togglePaperCheck('man3')"></span> )
+            </td>
+          </tr>
+          <tr>
+            <td class="maneuver-diagram" style="height: 165px;">
+              <div style="font-size: 8px; font-weight: bold; margin-bottom: 5px;">Tiempo limite: 10 minutos</div>
+              <div style="position: relative; height: 140px; width: 100%;">
+                <svg width="80" height="20" viewBox="0 0 80 20" style="position: absolute; left: 40px; top: 0px;">
+                  <defs>
+                    <marker id="arrRight1" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                      <polygon points="0 0, 8 3, 0 6" fill="#1e40af" />
+                    </marker>
+                  </defs>
+                  <line x1="5" y1="10" x2="70" y2="10" stroke="#1e40af" stroke-width="7" marker-end="url(#arrRight1)" />
+                </svg>
+
+                <div style="width: 26px; height: 95px; background: #e2e8f0; border: 2px solid #475569; position: absolute; left: 55px; top: 22px; border-radius: 2px;"></div>
+
+                <svg width="22" height="75" viewBox="0 0 22 75" style="position: absolute; left: 118px; top: 30px;">
+                  <defs>
+                    <marker id="arrDown2" markerWidth="8" markerHeight="6" refX="3" refY="7" orient="auto">
+                      <polygon points="0 0, 6 0, 3 8" fill="#1e40af" />
+                    </marker>
+                  </defs>
+                  <line x1="11" y1="5" x2="11" y2="65" stroke="#1e40af" stroke-width="7" marker-end="url(#arrDown2)" />
+                </svg>
+
+                <div style="width: 26px; height: 75px; background: #cbd5e1; border: 1.5px solid #64748b; position: absolute; left: 155px; top: 48px; border-radius: 2px;"></div>
+              </div>
+            </td>
+            <td class="maneuver-obs">
+              <strong>Observaciones:</strong>
+              <textarea rows="9" class="paper-textarea" id="p_obs_man3" oninput="syncFromPaper('obs_man3', this.value)"></textarea>
+            </td>
+          </tr>
+        </table>
+
+        <div class="section-bar" style="margin-top: 4px;">CONDUCCIÓN EN CARRETERA ( MANEJO TÉCNICO- ECONÓMICO)</div>
+        <div class="instruction-bar">Instrucciones: Rellene los campos solicitados con una x cuando el operador realice acción</div>
+        <table class="grid-table" style="border-top: none;">
+          <tr>
+            <td style="width: 50%;"><div class="chk-item"><span class="chk-box" id="p_chk_sec4_0" onclick="togglePaperCheckIndex('sec4', 0)"></span> Permite barrido de agujas en tablero</div></td>
+            <td style="width: 50%;"><div class="chk-item"><span class="chk-box" id="p_chk_sec4_1" onclick="togglePaperCheckIndex('sec4', 1)"></span> Permite aumento de temperatura de motor normal (no acelera el vehículo)</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_2" onclick="togglePaperCheckIndex('sec4', 2)"></span> Pisa pedal de embrague para encender</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_3" onclick="togglePaperCheckIndex('sec4', 3)"></span> No mantiene pie en pedal de embrague</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_4" onclick="togglePaperCheckIndex('sec4', 4)"></span> Neutral en transmisión antes de arrancar</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_5" onclick="togglePaperCheckIndex('sec4', 5)"></span> Libera válvulas de estacionamiento antes de avanzar</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_6" onclick="togglePaperCheckIndex('sec4', 6)"></span> Uso correcto de multiplicador</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_7" onclick="togglePaperCheckIndex('sec4', 7)"></span> No excede el limite de velocidad establecido</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_8" onclick="togglePaperCheckIndex('sec4', 8)"></span> Uso correcto de selector de rango</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_9" onclick="togglePaperCheckIndex('sec4', 9)"></span> Utiliza freno de motor en pendientes descendentes</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_10" onclick="togglePaperCheckIndex('sec4', 10)"></span> No hace ruido al cambiar velocidad</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_11" onclick="togglePaperCheckIndex('sec4', 11)"></span> No realiza cambios innecesarios en transmisión</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_12" onclick="togglePaperCheckIndex('sec4', 12)"></span> Uso de embrague correcto</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_13" onclick="togglePaperCheckIndex('sec4', 13)"></span> Manejo torque en pendientes ascendentes</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_14" onclick="togglePaperCheckIndex('sec4', 14)"></span> Manejo en zona de confort</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_15" onclick="togglePaperCheckIndex('sec4', 15)"></span> Reduce cambios de manera efectiva</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_16" onclick="togglePaperCheckIndex('sec4', 16)"></span> Aceleración suave</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_17" onclick="togglePaperCheckIndex('sec4', 17)"></span> Cambios progresivos</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_18" onclick="togglePaperCheckIndex('sec4', 18)"></span> Arranca en primera velocidad</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_19" onclick="togglePaperCheckIndex('sec4', 19)"></span> Verifica parámetros en tablero</div></td>
+          </tr>
+          <tr>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_20" onclick="togglePaperCheckIndex('sec4', 20)"></span> No realiza frenadas bruscas</div></td>
+            <td><div class="chk-item"><span class="chk-box" id="p_chk_sec4_21" onclick="togglePaperCheckIndex('sec4', 21)"></span> Tironea al arrancar</div></td>
+          </tr>
+          <tr>
+            <td colspan="2"><div class="chk-item"><span class="chk-box" id="p_chk_sec4_22" onclick="togglePaperCheckIndex('sec4', 22)"></span> Utiliza inercia del vehículo al avanzar</div></td>
+          </tr>
+        </table>
+
+        <table class="grid-table" style="margin-top: 2px;">
+          <tr>
+            <td style="height: 40px; vertical-align: top;">
+              <strong style="font-size: 8px;">OBSERVACIONES:</strong>
+              <textarea rows="2" class="paper-textarea" id="p_obs_tec" oninput="syncFromPaper('obs_tec', this.value)"></textarea>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div style="text-align: right; font-size: 7.5px; color: #666;">Página 2 de 3</div>
+    </div>
+
+
+    <!-- ==================== PÁGINA 3 (RÉPLICA FIEL EXACTA) ==================== -->
+    <div class="page" id="page3">
+      <div>
+        <div class="header-main-title">CENTRO DE ENTRENAMIENTO Y DESARROLLO PARA OPERADORES</div>
+
+        <!-- BARRA VERDE OFICIAL RÉPLICA -->
+        <div class="section-bar">CONDUCCIÓN EN CARRETERA (Educación Vial y Manejo Defensivo)</div>
+        <div class="instruction-bar">Instrucciones: Rellene los Campos Solicitados con una "X" Cuando el Operador Realice las Acciones Siguientes.</div>
+        
+        <!-- TABLA RÉPLICA CON CASILLAS INDIVIDUALES EN COLUMNAS -->
+        <table class="grid-table" style="border-top: none; margin-bottom: 0;">
+          <tbody>
+            <tr>
+              <td style="width: 22px; text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_0" onclick="togglePaperCheckIndex('sec5', 0)"></span></td>
+              <td style="width: 47%; font-weight: 600;">Utiliza los Espejos Laterales.</td>
+              <td style="width: 22px; text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_1" onclick="togglePaperCheckIndex('sec5', 1)"></span></td>
+              <td style="width: 47%; font-weight: 600;">Mantiene Distancia de Seguridad entre Vehículos.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_2" onclick="togglePaperCheckIndex('sec5', 2)"></span></td>
+              <td style="font-weight: 600;">Alto Total en Vías de Tren.</td>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_3" onclick="togglePaperCheckIndex('sec5', 3)"></span></td>
+              <td style="font-weight: 600;">Uso de Cinturón de Seguridad antes de Ponerse en Marcha.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_4" onclick="togglePaperCheckIndex('sec5', 4)"></span></td>
+              <td style="font-weight: 600;">Respeta los Señalamientos.</td>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_5" onclick="togglePaperCheckIndex('sec5', 5)"></span></td>
+              <td style="font-weight: 600;">Mantiene una Buena Postura al Conducir.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_6" onclick="togglePaperCheckIndex('sec5', 6)"></span></td>
+              <td style="font-weight: 600;">Cortesía con Vehículos.</td>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_7" onclick="togglePaperCheckIndex('sec5', 7)"></span></td>
+              <td style="font-weight: 600;">Uso de Intermitentes Cuando es Requerido.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_8" onclick="togglePaperCheckIndex('sec5', 8)"></span></td>
+              <td style="font-weight: 600;">Cede el Paso al Peatón.</td>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_9" onclick="togglePaperCheckIndex('sec5', 9)"></span></td>
+              <td style="font-weight: 600;">Sujeta el Volante con las dos Manos.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_10" onclick="togglePaperCheckIndex('sec5', 10)"></span></td>
+              <td style="font-weight: 600;">No se Distrae al Volante.</td>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_11" onclick="togglePaperCheckIndex('sec5', 11)"></span></td>
+              <td style="font-weight: 600;">Uso de Claxon Adecuado.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_12" onclick="togglePaperCheckIndex('sec5', 12)"></span></td>
+              <td style="font-weight: 600;">Rebasa de Forma Adecuada.</td>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_13" onclick="togglePaperCheckIndex('sec5', 13)"></span></td>
+              <td style="font-weight: 600;">Conoce los Señalamientos.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_14" onclick="togglePaperCheckIndex('sec5', 14)"></span></td>
+              <td style="font-weight: 600;">No Utiliza Celular.</td>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_15" onclick="togglePaperCheckIndex('sec5', 15)"></span></td>
+              <td style="font-weight: 600;">Circula por el Carril Adecuado.</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding: 2px;"><span class="chk-box" id="p_chk_sec5_16" onclick="togglePaperCheckIndex('sec5', 16)"></span></td>
+              <td style="font-weight: 600;">Uso de las Direccionales.</td>
+              <td colspan="2" style="background: #fafafa;"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- RECUADRO OBSERVACIONES PÁGINA 3 -->
+        <div style="border: 1.5px solid #222; border-top: none; padding: 4px 6px; margin-bottom: 8px;">
+          <strong style="font-size: 8.5px; font-weight: 900; display: block; margin-bottom: 2px;">OBSERVACIONES</strong>
+          <textarea rows="4" class="paper-textarea" id="p_obs_def" placeholder="" oninput="syncFromPaper('obs_def', this.value)"></textarea>
+        </div>
+
+        <!-- BARRA VERDE SUMATORIA PUNTUACIÓN -->
+        <div class="section-bar">SUMATORIA PUNTUACIÓN</div>
+        <div class="instruction-bar">Instrucciones: Realice la Sumatoria de los Segmentos Evaluados, Promedio Mínimo para Aprobar es de 80.</div>
+
+        <!-- RECUADROS INDIVIDUALES DE SUMATORIA (RÉPLICA EXACTA) -->
+        <div style="border: 1.5px solid #222; border-top: none; padding: 8px; background: #fff; margin-bottom: 8px;">
+          
+          <!-- FILA 1 -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+            <div class="scoring-card-box">
+              <div class="scoring-card-title">Check List y Revisión Previa al Vehículo</div>
+              <div class="scoring-card-row">
+                <span>Puntos</span>
+                <span class="under-line-val" id="pts1_disp">0</span>
+                <span>de</span>
+                <span class="under-line-val" style="border-bottom: 1.5px solid #000;">12</span>
+              </div>
+              <div class="scoring-card-row" style="margin-top: 2px;">
+                <span>Calificación:</span>
+                <span class="under-line-val" style="min-width: 55px;" id="cal1_disp">0.0</span>
+              </div>
+            </div>
+
+            <div class="scoring-card-box">
+              <div class="scoring-card-title">Manejo Técnico Económico</div>
+              <div class="scoring-card-row">
+                <span>Puntos</span>
+                <span class="under-line-val" id="pts2_disp">0</span>
+                <span>de</span>
+                <span class="under-line-val" style="border-bottom: 1.5px solid #000;">23</span>
+              </div>
+              <div class="scoring-card-row" style="margin-top: 2px;">
+                <span>Calificación:</span>
+                <span class="under-line-val" style="min-width: 55px;" id="cal2_disp">0.0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- FILA 2 -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+            <div class="scoring-card-box">
+              <div class="scoring-card-title">Enganche y Desacople de Remolques</div>
+              <div class="scoring-card-row">
+                <span>Puntos</span>
+                <span class="under-line-val" id="pts3_disp">0</span>
+                <span>de</span>
+                <span class="under-line-val" style="border-bottom: 1.5px solid #000;">24</span>
+              </div>
+              <div class="scoring-card-row" style="margin-top: 2px;">
+                <span>Calificación:</span>
+                <span class="under-line-val" style="min-width: 55px;" id="cal3_disp">0.0</span>
+              </div>
+            </div>
+
+            <div class="scoring-card-box">
+              <div class="scoring-card-title">Educación Vial y Manejo Defensivo</div>
+              <div class="scoring-card-row">
+                <span>Puntos:</span>
+                <span class="under-line-val" id="pts4_disp">0</span>
+                <span>de</span>
+                <span class="under-line-val" style="border-bottom: 1.5px solid #000;">17</span>
+              </div>
+              <div class="scoring-card-row" style="margin-top: 2px;">
+                <span>Calificación:</span>
+                <span class="under-line-val" style="min-width: 55px;" id="cal4_disp">0.0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- FILA 3: MANIOBRAS, CALIFICACIÓN FINAL Y APTO/NO APTO -->
+          <div style="display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 10px; align-items: stretch;">
+            <div class="scoring-card-box">
+              <div class="scoring-card-title">Maniobras en Patio</div>
+              <div class="scoring-card-row">
+                <span>Puntos</span>
+                <span class="under-line-val" id="pts5_disp">0</span>
+                <span>de</span>
+                <span class="under-line-val" style="border-bottom: 1.5px solid #000;">3</span>
+              </div>
+              <div class="scoring-card-row" style="margin-top: 2px;">
+                <span>Calificación:</span>
+                <span class="under-line-val" style="min-width: 55px;" id="cal5_disp">0.0</span>
+              </div>
+            </div>
+
+            <div class="final-score-box">
+              <div style="font-size: 8.5px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 2px;">CALIFICACIÓN FINAL</div>
+              <div style="font-size: 24px; font-weight: 900; color: #000;" id="finalScoreDisplay">--</div>
+            </div>
+
+            <div class="apto-group-box">
+              <div class="apto-pill-row">
+                <div class="apto-pill-label">CONDUCTOR APTO</div>
+                <div class="apto-check-square" id="boxApto" onclick="setAptoManual(true)"></div>
+              </div>
+              <div class="apto-pill-row">
+                <div class="apto-pill-label">CONDUCTOR NO APTO</div>
+                <div class="apto-check-square" id="boxNoApto" onclick="setAptoManual(false)"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- TABLA DE FIRMAS -->
+        <table class="sig-table">
+          <tr>
+            <!-- COLUMNA 1: OP. MÁSTER QUE REALIZA LA PRUEBA -->
+            <td id="sigCell1">
+              <div class="sig-cell-header">
+                OP. MÁSTER QUE REALIZA LA PRUEBA
+              </div>
+              <div class="sig-buttons">
+                <button type="button" class="btn-sig-tool" onclick="abrirModalFirma(1, 'Firma Op. Máster')">✍️</button>
+                <button type="button" class="btn-sig-tool" onclick="triggerSigUpload(1)">📁</button>
+                <button type="button" class="btn-sig-tool" onclick="clearSigCanvas(1)">🧹</button>
+              </div>
+              <div class="sig-cell-content">
+                <canvas class="sig-canvas" id="canvasSig1"></canvas>
+                <img class="sig-img-preview" id="imgSig1" alt="Firma Máster">
+                <input type="file" id="fileSig1" accept="image/*" style="display:none;" onchange="handleSigUpload(event, 1)">
+              </div>
+              <div class="sig-cell-footer">
+                <span id="p_master_nombre">Francisco Alberto Ambrosio Solis</span>
+              </div>
+            </td>
+
+            <!-- COLUMNA 2: OPERADOR EVALUADO -->
+            <td id="sigCell2">
+              <div class="sig-cell-header">
+                Operador Evaluado
+              </div>
+              <div class="sig-buttons">
+                <button type="button" class="btn-sig-tool" onclick="abrirModalFirma(2, 'Firma Conductor')">✍️</button>
+                <button type="button" class="btn-sig-tool" onclick="triggerSigUpload(2)">📁</button>
+                <button type="button" class="btn-sig-tool" onclick="clearSigCanvas(2)">🧹</button>
+              </div>
+              <div class="sig-cell-content">
+                <canvas class="sig-canvas" id="canvasSig2"></canvas>
+                <img class="sig-img-preview" id="imgSig2" alt="Firma Operador">
+                <input type="file" id="fileSig2" accept="image/*" style="display:none;" onchange="handleSigUpload(event, 2)">
+              </div>
+              <div class="sig-cell-footer">
+                <span id="p_operador_nombre"></span>
+              </div>
+            </td>
+
+            <!-- COLUMNA 3: RECUADRO LIBRE -->
+            <td id="sigCell3">
+              <div class="sig-cell-header">
+                &nbsp;
+              </div>
+              <div class="sig-buttons">
+                <button type="button" class="btn-sig-tool" onclick="abrirModalFirma(3, 'Firma Vo.Bo.')">✍️</button>
+                <button type="button" class="btn-sig-tool" onclick="triggerSigUpload(3)">📁</button>
+                <button type="button" class="btn-sig-tool" onclick="clearSigCanvas(3)">🧹</button>
+              </div>
+              <div class="sig-cell-content">
+                <canvas class="sig-canvas" id="canvasSig3"></canvas>
+                <img class="sig-img-preview" id="imgSig3" alt="Vo.Bo.">
+                <input type="file" id="fileSig3" accept="image/*" style="display:none;" onchange="handleSigUpload(event, 3)">
+              </div>
+              <div class="sig-cell-footer">
+                &nbsp;
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- BARRA VERDE OBSERVACIONES Y RECOMENDACIONES -->
+        <div class="section-bar" style="border-bottom: 1.5px solid #222;">OBSERVACIONES Y RECOMENDACIONES</div>
+        <div style="border: 1.5px solid #222; border-top: none; padding: 4px 10px; background: #fff;">
+          <div class="ruled-line"><span class="check-icon">✓</span><input type="text" class="paper-input" id="p_rec1" oninput="syncFromPaper('rec1', this.value)"></div>
+          <div class="ruled-line"><span class="check-icon">✓</span><input type="text" class="paper-input" id="p_rec2" oninput="syncFromPaper('rec2', this.value)"></div>
+          <div class="ruled-line"><span class="check-icon">✓</span><input type="text" class="paper-input" id="p_rec3" oninput="syncFromPaper('rec3', this.value)"></div>
+          <div class="ruled-line"><span class="check-icon">✓</span><input type="text" class="paper-input" id="p_rec4" oninput="syncFromPaper('rec4', this.value)"></div>
+        </div>
+
+      </div>
+      <div style="text-align: right; font-size: 7.5px; color: #666; margin-top: 10px;">Página 3 de 3</div>
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- ===================================================================
+     PESTAÑA 3: HISTORIAL Y CONTROL DE EVALUACIONES (AppTolva)
+     =================================================================== -->
+<div class="tab-content" id="tabHistory">
+
+  <!-- RESUMEN DE MÉTRICAS -->
+  
+  <!-- BANNER EXPLICATIVO DE ALMACENAMIENTO -->
+  <div style="background: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px;">
+    <span style="font-size: 20px;">🔒</span>
+    <div style="font-size: 11.5px; color: #065f46; line-height: 1.4;">
+      <strong>Historial privado del módulo de Operador Máster.</strong><br>
+      Las evaluaciones confirmadas se guardan en Firebase y solo las cuentas autorizadas como administradoras pueden consultar el historial. El borrador en curso permanece en este dispositivo hasta confirmar su guardado.
+    </div>
+  </div>
+
+  <div class="history-stats-grid">
+    <div class="stat-card">
+      <div class="stat-val" id="statTotal">0</div>
+      <div class="stat-label">Evaluaciones</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color: #16a34a;" id="statAptos">0</div>
+      <div class="stat-label">Aptos (Aprobados)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color: #dc2626;" id="statNoAptos">0</div>
+      <div class="stat-label">No Aptos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color: #2563eb;" id="statPromedio">--%</div>
+      <div class="stat-label">Promedio General</div>
+    </div>
+  </div>
+
+  <!-- BARRA DE HERRAMIENTAS Y FILTROS PARA AUDITORÍA -->
+  <div class="history-toolbar">
+    <input type="text" class="history-search-input" id="historySearch" placeholder="🔍 Buscar por aspirante, centro, folio..." oninput="filtrarHistorial()">
+    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+      <button type="button" class="btn-sm-action primary" onclick="nuevaEvaluacion()">➕ Nueva</button>
+      <button type="button" class="btn-sm-action" onclick="exportarCSV()">📊 Exportar Excel (Auditoría)</button>
+      <button type="button" class="btn-sm-action" onclick="respaldarJSON()">💾 Respaldar / Enviar</button>
+    </div>
+  </div>
+
+  <!-- FILTROS ESPECÍFICOS PARA AUDITORÍAS DE TRANSPORTE (POR AÑO Y MÁSTER) -->
+  <div style="background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+      <span style="font-size: 11px; font-weight: 800; color: #1e293b;">🎯 Filtros de Auditoría:</span>
+      
+      <!-- Filtro Año -->
+      <select id="filterAnio" class="m-select" style="width: auto; padding: 6px 10px; font-size: 12px;" onchange="filtrarHistorial()">
+        <option value="">📅 Todos los años</option>
+      </select>
+
+      <!-- Filtro Máster -->
+      <select id="filterMaster" class="m-select" style="width: auto; padding: 6px 10px; font-size: 12px;" onchange="filtrarHistorial()">
+        <option value="">👷‍♂️ Todos los Másters</option>
+      </select>
+
+      <!-- Filtro Resultado -->
+      <select id="filterApto" class="m-select" style="width: auto; padding: 6px 10px; font-size: 12px;" onchange="filtrarHistorial()">
+        <option value="">Todos los resultados</option>
+        <option value="APTO">Solo Conductor Apto (≥80%)</option>
+        <option value="NO_APTO">Solo Conductor No Apto (<80%)</option>
+      </select>
+    </div>
+
+    <div style="font-size: 11px; color: #475569; font-weight: 700;" id="auditFilterSummary">
+      Mostrando todas las evaluaciones
+    </div>
+  </div>
+
+  <!-- TABLA HISTORIAL -->
+  <div class="history-table-wrap">
+    <table class="app-table" id="tablaHistorial">
+      <thead>
+        <tr>
+          <th>Folio</th>
+          <th>Fecha</th>
+          <th>Aspirante</th>
+          <th>Op. Máster</th>
+          <th>Centro / Unidad</th>
+          <th>Calificación</th>
+          <th>Resultado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="historialTbody">
+        <!-- Renderizado dinámico -->
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+
+<!-- ===================================================================
+     MODAL PARA FIRMA TÁCTIL EN PANTALLA COMPLETA (MÓVIL / CELULAR)
+     =================================================================== -->
+<div class="sig-modal" id="sigModal">
+  <div class="sig-modal-content">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0; font-size: 14px; font-weight: 800;" id="sigModalTitle">Firma Digital</h3>
+      <button type="button" style="background:none; border:none; font-size: 18px; cursor: pointer;" onclick="cerrarModalFirma()">✕</button>
+    </div>
+    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+      Firme claramente dentro del recuadro usando su dedo o lápiz táctil.
+    </div>
+    <div class="sig-modal-canvas-wrap">
+      <canvas class="sig-modal-canvas" id="modalCanvas"></canvas>
+    </div>
+    <div style="display: flex; justify-content: space-between;">
+      <button type="button" class="btn-sm-action" onclick="limpiarModalCanvas()">🧹 Limpiar Trazo</button>
+      <div style="display: flex; gap: 6px;">
+        <button type="button" class="btn-sm-action" onclick="cerrarModalFirma()">Cancelar</button>
+        <button type="button" class="btn-sm-action primary" onclick="guardarFirmaDesdeModal()">Aceptar y Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================================================================
+     LÓGICA JAVASCRIPT: SINCRONIZACIÓN BIDIRECCIONAL, CÁLCULO Y CONTROL
+     =================================================================== -->
+<script>
+  // Definición de ítems por sección para sincronización y generación móvil
+  const SECTIONS_DEF = {
+    sec1: {
+      name: "Revisión Previa al Vehículo",
+      max: 12,
+      items: [
+        "Aceite motor", "Anticongelante", "Carrocería", "Presencia fugas fluidos",
+        "Aceite dirección", "Estado bandas", "Doc. del vehículo", "Presencia fugas aire",
+        "Liquido embrague", "Estado mangueras", "Neumáticos", "Estado remolque (s)"
+      ]
+    },
+    sec2: {
+      name: "Enganche y Desacople",
+      max: 24,
+      desacople: [
+        "Enciende intermitentes", "Realiza acción en suelo firme", "Verifica zona segura",
+        "Usa tres puntos apoyo para ascenso y descenso cabina", "Usa dos manos para hacer descender patines",
+        "Patines están firmes en el piso", "Jala gancho 5ta rueda", "Desconecta mangueras de servicio y emergencia",
+        "Desconecta cable 7 vías", "Ajusta altura suspensión del tracto", "Avanza lentamente para desacople"
+      ],
+      enganche: [
+        "Enciende intermitentes", "Realiza acción en suelo firme", "Verifica zona segura",
+        "Usa tres puntos apoyo para ascenso y descenso a la cabina", "Retrocede lentamente hasta semirremolque",
+        "Presenta quinta rueda en plancha antes de enganchar", "Verifica que semirremolque y tracto camión estén alineados",
+        "Perno rey alineado a quinta rueda", "Acople suave, no golpea elementos de arrastre",
+        "Verifica cierre de seguros de quinta rueda de forma visual", "Verifica cierre de seguros de quinta rueda \"jalón\"",
+        "Levanta patines a distancia segura antes de comprobar cierre", "Conecta mangueras de servicio y emergencia"
+      ]
+    },
+    sec4: {
+      name: "Manejo Técnico - Económico",
+      max: 23,
+      items: [
+        "Permite barrido de agujas en tablero", "Permite aumento de temperatura de motor normal (no acelera el vehículo)",
+        "Pisa pedal de embrague para encender", "No mantiene pie en pedal de embrague",
+        "Neutral en transmisión antes de arrancar", "Libera válvulas de estacionamiento antes de avanzar",
+        "Uso correcto de multiplicador", "No excede el limite de velocidad establecido",
+        "Uso correcto de selector de rango", "Utiliza freno de motor en pendientes descendentes",
+        "No hace ruido al cambiar velocidad", "No realiza cambios innecesarios en transmisión",
+        "Uso de embrague correcto", "Manejo torque en pendientes ascendentes",
+        "Manejo en zona de confort", "Reduce cambios de manera efectiva",
+        "Aceleración suave", "Cambios progresivos",
+        "Arranca en primera velocidad", "Verifica parámetros en tablero",
+        "No realiza frenadas bruscas", "Tironea al arrancar",
+        "Utiliza inercia del vehículo al avanzar"
+      ]
+    },
+    sec5: {
+      name: "Educación Vial y Manejo Defensivo",
+      max: 17,
+      items: [
+        "Utiliza los Espejos Laterales.", "Mantiene Distancia de Seguridad entre Vehículos.",
+        "Alto Total en Vías de Tren.", "Uso de Cinturón de Seguridad antes de Ponerse en Marcha.",
+        "Respeta los Señalamientos.", "Mantiene una Buena Postura al Conducir.",
+        "Cortesía con Vehículos.", "Uso de Intermitentes Cuando es Requerido.",
+        "Cede el Paso al Peatón.", "Sujeta el Volante con las dos Manos.",
+        "No se Distrae al Volante.", "Uso de Claxon Adecuado.",
+        "Rebasa de Forma Adecuada.", "Conoce los Señalamientos.",
+        "No Utiliza Celular.", "Circula por el Carril Adecuado.",
+        "Uso de las Direccionales."
+      ]
+    }
+  };
+
+  // Estado reactivo en memoria
+  let evalState = {
+    id: null,
+    fecha: new Date().toISOString().split('T')[0],
+    datos: {
+      master_nombre: 'Francisco Alberto Ambrosio Solis',
+      nombre: '', centro: '', unidad_neg: '',
+      dia: '', mes: '', anio: '',
+      licencia: '', lic_tipo: '', modalidad: '', lic_vig: '', lic_ant: '',
+      apto_med: '', apto_vig: '',
+      ruta: '', veh_opera: '', tiempo_man: '',
+      cfg_veh: '', motor: '', trans: '',
+      obs_man1: '', obs_man2: '', obs_man3: '',
+      obs_tec: '', obs_def: '',
+      rec1: '', rec2: '', rec3: '', rec4: ''
+    },
+    checks: {
+      sec1: new Array(12).fill(false),
+      sec2: new Array(24).fill(false),
+      man1: false,
+      man2: false,
+      man3: false,
+      sec4: new Array(23).fill(false),
+      sec5: new Array(17).fill(false),
+      // opciones directas
+      mod_fed: false, mod_est: false,
+      cfg_ul: false, cfg_art: false, cfg_up: false, cfg_da: false,
+      mot_dd13: false, mot_dd16: false, mot_dd15: false, mot_om926: false,
+      trn_rtlo18: false, trn_ultra: false, trn_rtlo20: false, trn_fr14: false
+    },
+    scores: {
+      p1: 0, c1: 0,
+      p2: 0, c2: 0,
+      p3: 0, c3: 0,
+      p4: 0, c4: 0,
+      p5: 0, c5: 0,
+      total: 0,
+      apto: false
+    },
+    firmas: {
+      sig1: null,
+      sig2: null,
+      sig3: null
+    }
+  };
+
+  // Clave en LocalStorage
+  const STORAGE_KEY_EVALS = "apptolva_evaluaciones_v1";
+  let STORAGE_KEY_DRAFT = "apptolva_eval_draft_v1";
+  let historialFirebase = [];
+
+  window.actualizarHistorialFirebase = (records) => {
+    historialFirebase = records;
+    actualizarTablaHistorial();
+  };
+  window.limpiarHistorialFirebase = () => {
+    historialFirebase = [];
+    document.getElementById("historialTbody").replaceChildren();
+  };
+
+  window.separarBorradorEvaluacionPorUsuario = (email, role) => {
+    STORAGE_KEY_DRAFT = role === "admin"
+      ? "apptolva_eval_draft_v1"
+      : `apptolva_eval_draft_v1_${encodeURIComponent(email)}`;
+  };
+  window.cargarBorradorEvaluacion = cargarBorradorOInciar;
+  window.asignarNombreEvaluadorSiFalta = (name) => {
+    const defaultMaster = "Francisco Alberto Ambrosio Solis";
+    if (!evalState.datos.master_nombre || evalState.datos.master_nombre === defaultMaster) {
+      syncToPaper("master_nombre", name);
+    }
+  };
+
+  /* =========================================================
+     INICIALIZACIÓN Y MONTAJE
+     ========================================================= */
+  function initializeEvaluationUI() {
+    if (window.evaluationUIInitialized) return;
+    window.evaluationUIInitialized = true;
+    initDateDefaults();
+    renderMobileChecklists();
+    initPaperCanvases();
+    initModalSignature();
+    cargarBorradorOInciar();
+  }
+
+  function initDateDefaults() {
+    const today = new Date();
+    const d = String(today.getDate()).padStart(2, '0');
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const y = String(today.getFullYear());
+    const isoDate = `${y}-${m}-${d}`;
+
+    document.getElementById('m_fecha').value = isoDate;
+    evalState.fecha = isoDate;
+    evalState.datos.dia = d;
+    evalState.datos.mes = m;
+    evalState.datos.anio = y;
+
+    document.getElementById('p_dia').value = d;
+    document.getElementById('p_mes').value = m;
+    document.getElementById('p_anio').value = y;
+    document.getElementById('liveFechaHoy').textContent = `${d}/${m}/${y}`;
+  }
+
+  function syncFecha(val) {
+    if (!val) return;
+    evalState.fecha = val;
+    const parts = val.split('-');
+    if (parts.length === 3) {
+      evalState.datos.anio = parts[0];
+      evalState.datos.mes = parts[1];
+      evalState.datos.dia = parts[2];
+      document.getElementById('p_anio').value = parts[0];
+      document.getElementById('p_mes').value = parts[1];
+      document.getElementById('p_dia').value = parts[2];
+      document.getElementById('liveFechaHoy').textContent = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    autoSaveDraft();
+  }
+
+  /* Render de listas móviles */
+  function renderMobileChecklists() {
+    // Sección 1 (Revisión previa)
+    const list1 = document.getElementById('list_sec1');
+    list1.innerHTML = SECTIONS_DEF.sec1.items.map((item, idx) => `
+      <div class="touch-item" id="m_item_sec1_${idx}" onclick="toggleMobileCheck('sec1', ${idx})">
+        <span class="touch-item-text">${idx + 1}. ${item}</span>
+        <div class="touch-check-pill" id="m_pill_sec1_${idx}">✓</div>
+      </div>
+    `).join('');
+
+    // Sección 2 Desacople (11)
+    const list2D = document.getElementById('list_sec2_desacople');
+    list2D.innerHTML = SECTIONS_DEF.sec2.desacople.map((item, idx) => `
+      <div class="touch-item" id="m_item_sec2_${idx}" onclick="toggleMobileCheck('sec2', ${idx})">
+        <span class="touch-item-text">${idx + 1}. ${item}</span>
+        <div class="touch-check-pill" id="m_pill_sec2_${idx}">✓</div>
+      </div>
+    `).join('');
+
+    // Sección 2 Enganche (13 -> offset 11)
+    const list2E = document.getElementById('list_sec2_enganche');
+    list2E.innerHTML = SECTIONS_DEF.sec2.enganche.map((item, idx) => {
+      const realIdx = idx + 11;
+      return `
+        <div class="touch-item" id="m_item_sec2_${realIdx}" onclick="toggleMobileCheck('sec2', ${realIdx})">
+          <span class="touch-item-text">${idx + 1}. ${item}</span>
+          <div class="touch-check-pill" id="m_pill_sec2_${realIdx}">✓</div>
+        </div>
+      `;
+    }).join('');
+
+    // Sección 4 (Técnico Económico)
+    const list4 = document.getElementById('list_sec4');
+    list4.innerHTML = SECTIONS_DEF.sec4.items.map((item, idx) => `
+      <div class="touch-item" id="m_item_sec4_${idx}" onclick="toggleMobileCheck('sec4', ${idx})">
+        <span class="touch-item-text">${idx + 1}. ${item}</span>
+        <div class="touch-check-pill" id="m_pill_sec4_${idx}">✓</div>
+      </div>
+    `).join('');
+
+    // Sección 5 (Manejo Defensivo)
+    const list5 = document.getElementById('list_sec5');
+    list5.innerHTML = SECTIONS_DEF.sec5.items.map((item, idx) => `
+      <div class="touch-item" id="m_item_sec5_${idx}" onclick="toggleMobileCheck('sec5', ${idx})">
+        <span class="touch-item-text">${idx + 1}. ${item}</span>
+        <div class="touch-check-pill" id="m_pill_sec5_${idx}">✓</div>
+      </div>
+    `).join('');
+  }
+
+  /* =========================================================
+     NAVEGACIÓN ENTRE PESTAÑAS (MÓVIL / OFICIAL / HISTORIAL)
+     ========================================================= */
+  function cambiarPestana(tabName) {
+    if (tabName === 'history' && window.evaluationAccessRole !== 'admin') return;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    if (tabName === 'mobile') {
+      document.getElementById('btnTabMobile').classList.add('active');
+      document.getElementById('tabMobile').classList.add('active');
+    } else if (tabName === 'official') {
+      document.getElementById('btnTabOfficial').classList.add('active');
+      document.getElementById('tabOfficial').classList.add('active');
+      setTimeout(redrawAllPaperCanvases, 50);
+    } else if (tabName === 'history') {
+      document.getElementById('btnTabHistory').classList.add('active');
+      document.getElementById('tabHistory').classList.add('active');
+      actualizarTablaHistorial();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function toggleAccordion(bodyId) {
+    const el = document.getElementById(bodyId);
+    if (!el) return;
+    el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+  }
+
+  /* =========================================================
+     SINCRONIZACIÓN DE CAMPOS DE TEXTO
+     ========================================================= */
+  function syncToPaper(fieldKey, value) {
+    evalState.datos[fieldKey] = value;
+    const paperEl = document.getElementById('p_' + fieldKey);
+    if (paperEl && paperEl.value !== undefined) {
+      if (paperEl.value !== value) paperEl.value = value;
+    } else if (paperEl) {
+      paperEl.textContent = value;
+    }
+
+    if (fieldKey === 'nombre') {
+      document.getElementById('liveAspiranteName').textContent = value.trim() ? value : 'Sin asignar';
+      const opNombre = document.getElementById('p_operador_nombre');
+      if (opNombre) opNombre.textContent = value;
+    } else if (fieldKey === 'master_nombre') {
+      const mastEl = document.getElementById('p_master_nombre');
+      if (mastEl) mastEl.textContent = value || 'Francisco Alberto Ambrosio Solis';
+      const dispEl = document.getElementById('sigMasterNameDisplay');
+      if (dispEl) dispEl.textContent = value || 'Francisco Alberto Ambrosio Solis';
+    }
+    autoSaveDraft();
+  }
+
+  function syncFromPaper(fieldKey, value) {
+    evalState.datos[fieldKey] = value;
+    const mobileEl = document.getElementById('m_' + fieldKey);
+    if (mobileEl && mobileEl.value !== value) {
+      mobileEl.value = value;
+    }
+    if (fieldKey === 'nombre') {
+      document.getElementById('liveAspiranteName').textContent = value.trim() ? value : 'Sin asignar';
+      const opNombre = document.getElementById('p_operador_nombre');
+      if (opNombre) opNombre.textContent = value;
+    }
+    autoSaveDraft();
+  }
+
+  function syncModalidad(mod) {
+    evalState.datos.modalidad = mod;
+    evalState.checks.mod_fed = (mod === 'FED');
+    evalState.checks.mod_est = (mod === 'EST');
+    document.getElementById('chk_mod_fed').textContent = evalState.checks.mod_fed ? 'X' : '';
+    document.getElementById('chk_mod_est').textContent = evalState.checks.mod_est ? 'X' : '';
+    autoSaveDraft();
+  }
+
+  function syncSingleCheckGroup(group, val) {
+    evalState.datos[group] = val;
+    if (group === 'cfg_veh') {
+      evalState.checks.cfg_ul = (val === 'Unitario Ligero');
+      evalState.checks.cfg_art = (val === 'Articulado');
+      evalState.checks.cfg_up = (val === 'Unitario Pesado');
+      evalState.checks.cfg_da = (val === 'Doble Articulado');
+      document.getElementById('chk_cfg_ul').textContent = evalState.checks.cfg_ul ? 'X' : '';
+      document.getElementById('chk_cfg_art').textContent = evalState.checks.cfg_art ? 'X' : '';
+      document.getElementById('chk_cfg_up').textContent = evalState.checks.cfg_up ? 'X' : '';
+      document.getElementById('chk_cfg_da').textContent = evalState.checks.cfg_da ? 'X' : '';
+    } else if (group === 'motor') {
+      evalState.checks.mot_dd13 = (val === 'DD13');
+      evalState.checks.mot_dd16 = (val === 'DD16');
+      evalState.checks.mot_dd15 = (val === 'DD15');
+      evalState.checks.mot_om926 = (val === 'OM926');
+      document.getElementById('chk_mot_dd13').textContent = evalState.checks.mot_dd13 ? 'X' : '';
+      document.getElementById('chk_mot_dd16').textContent = evalState.checks.mot_dd16 ? 'X' : '';
+      document.getElementById('chk_mot_dd15').textContent = evalState.checks.mot_dd15 ? 'X' : '';
+      document.getElementById('chk_mot_om926').textContent = evalState.checks.mot_om926 ? 'X' : '';
+    } else if (group === 'trans') {
+      evalState.checks.trn_rtlo18 = (val === 'RTLO18918B');
+      evalState.checks.trn_ultra = (val === 'Ultrashift Plus');
+      evalState.checks.trn_rtlo20 = (val === 'RTLO20918B');
+      evalState.checks.trn_fr14 = (val === 'FR14210B');
+      document.getElementById('chk_trn_rtlo18').textContent = evalState.checks.trn_rtlo18 ? 'X' : '';
+      document.getElementById('chk_trn_ultra').textContent = evalState.checks.trn_ultra ? 'X' : '';
+      document.getElementById('chk_trn_rtlo20').textContent = evalState.checks.trn_rtlo20 ? 'X' : '';
+      document.getElementById('chk_trn_fr14').textContent = evalState.checks.trn_fr14 ? 'X' : '';
+    }
+    autoSaveDraft();
+  }
+
+  /* =========================================================
+     TOGGLE DE CHECKBOXES (SINCRONIZACIÓN MÓVIL <-> OFICIAL)
+     ========================================================= */
+  function toggleMobileCheck(secKey, index) {
+    evalState.checks[secKey][index] = !evalState.checks[secKey][index];
+    applyCheckVisuals(secKey, index, evalState.checks[secKey][index]);
+    recalcularTodo();
+    autoSaveDraft();
+  }
+
+  function togglePaperCheckIndex(secKey, index) {
+    evalState.checks[secKey][index] = !evalState.checks[secKey][index];
+    applyCheckVisuals(secKey, index, evalState.checks[secKey][index]);
+    recalcularTodo();
+    autoSaveDraft();
+  }
+
+  function applyCheckVisuals(secKey, index, isChecked) {
+    // Móvil
+    const mItem = document.getElementById(`m_item_${secKey}_${index}`);
+    if (mItem) {
+      if (isChecked) mItem.classList.add('checked');
+      else mItem.classList.remove('checked');
+    }
+    // Papel
+    const pBox = document.getElementById(`p_chk_${secKey}_${index}`);
+    if (pBox) {
+      pBox.textContent = isChecked ? 'X' : '';
+    }
+  }
+
+  function toggleMobileItem(itemKey, secKey) {
+    evalState.checks[itemKey] = !evalState.checks[itemKey];
+    const isChecked = evalState.checks[itemKey];
+    const mCard = document.getElementById(`m_chk_${itemKey}`);
+    const pBox = document.getElementById(`p_chk_${itemKey}`);
+
+    if (isChecked) {
+      if (mCard) mCard.classList.add('checked');
+      if (pBox) pBox.textContent = 'X';
+    } else {
+      if (mCard) mCard.classList.remove('checked');
+      if (pBox) pBox.textContent = '';
+    }
+    recalcularTodo();
+    autoSaveDraft();
+  }
+
+  function togglePaperCheck(key) {
+    if (key.startsWith('man')) {
+      toggleMobileItem(key, 'sec3');
+      return;
+    }
+    evalState.checks[key] = !evalState.checks[key];
+    const pBox = document.getElementById(`chk_${key}`);
+    if (pBox) pBox.textContent = evalState.checks[key] ? 'X' : '';
+    autoSaveDraft();
+  }
+
+  function marcarGrupo(secKey, val) {
+    evalState.checks[secKey].forEach((_, idx) => {
+      evalState.checks[secKey][idx] = val;
+      applyCheckVisuals(secKey, idx, val);
+    });
+    recalcularTodo();
+    autoSaveDraft();
+  }
+
+  /* =========================================================
+     CÁLCULO AUTOMÁTICO DE PONDERACIONES Y DICTAMEN
+     ========================================================= */
+  function recalcularTodo() {
+    // 1. Conteo de puntos automáticos
+    const p1 = evalState.checks.sec1.filter(Boolean).length;
+    const p2 = evalState.checks.sec4.filter(Boolean).length; // Manejo Técnico (23)
+    const p3 = evalState.checks.sec2.filter(Boolean).length; // Enganche (24)
+    const p4 = evalState.checks.sec5.filter(Boolean).length; // Manejo Defensivo (17)
+    
+    let p5 = 0;
+    if (evalState.checks.man1) p5++;
+    if (evalState.checks.man2) p5++;
+    if (evalState.checks.man3) p5++;
+
+    // Actualizar contadores móviles de tarjeta
+    document.getElementById('m_count_sec1').textContent = p1;
+    document.getElementById('m_count_sec2').textContent = p3;
+    document.getElementById('m_count_sec3').textContent = p5;
+    document.getElementById('m_count_sec4').textContent = p2;
+    document.getElementById('m_count_sec5').textContent = p4;
+
+    // Actualizar recuadros réplica de Página 3
+    document.getElementById('pts1_disp').textContent = p1;
+    document.getElementById('pts2_disp').textContent = p2;
+    document.getElementById('pts3_disp').textContent = p3;
+    document.getElementById('pts4_disp').textContent = p4;
+    document.getElementById('pts5_disp').textContent = p5;
+
+    // Porcentajes individuales
+    const c1 = (p1 / 12) * 100;
+    const c2 = (p2 / 23) * 100;
+    const c3 = (p3 / 24) * 100;
+    const c4 = (p4 / 17) * 100;
+    const c5 = (p5 / 3) * 100;
+
+    document.getElementById('cal1_disp').textContent = p1 > 0 ? c1.toFixed(1) : '0.0';
+    document.getElementById('cal2_disp').textContent = p2 > 0 ? c2.toFixed(1) : '0.0';
+    document.getElementById('cal3_disp').textContent = p3 > 0 ? c3.toFixed(1) : '0.0';
+    document.getElementById('cal4_disp').textContent = p4 > 0 ? c4.toFixed(1) : '0.0';
+    document.getElementById('cal5_disp').textContent = p5 > 0 ? c5.toFixed(1) : '0.0';
+
+    // Desglose móvil
+    document.getElementById('m_row_pts1').textContent = p1;
+    document.getElementById('m_row_cal1').textContent = c1.toFixed(1);
+    document.getElementById('m_row_pts2').textContent = p2;
+    document.getElementById('m_row_cal2').textContent = c2.toFixed(1);
+    document.getElementById('m_row_pts3').textContent = p3;
+    document.getElementById('m_row_cal3').textContent = c3.toFixed(1);
+    document.getElementById('m_row_pts4').textContent = p4;
+    document.getElementById('m_row_cal4').textContent = c4.toFixed(1);
+    document.getElementById('m_row_pts5').textContent = p5;
+    document.getElementById('m_row_cal5').textContent = c5.toFixed(1);
+
+    // Calificación global
+    const totalScore = (c1 + c2 + c3 + c4 + c5) / 5;
+    const hasActivity = (p1 + p2 + p3 + p4 + p5) > 0;
+
+    evalState.scores = {
+      p1, c1, p2, c2, p3, c3, p4, c4, p5, c5,
+      total: hasActivity ? parseFloat(totalScore.toFixed(1)) : 0,
+      apto: totalScore >= 80
+    };
+
+    const finalDisp = document.getElementById('finalScoreDisplay');
+    const liveNum = document.getElementById('liveScoreNum');
+    const livePill = document.getElementById('liveStatusPill');
+    const mScore = document.getElementById('m_final_score');
+    const mBadge = document.getElementById('m_final_badge');
+    const boxApto = document.getElementById('boxApto');
+    const boxNoApto = document.getElementById('boxNoApto');
+
+    if (hasActivity) {
+      const scoreStr = totalScore.toFixed(1);
+      finalDisp.textContent = scoreStr;
+      liveNum.textContent = scoreStr + '%';
+      mScore.textContent = scoreStr + '%';
+
+      if (totalScore >= 80) {
+        livePill.textContent = "CONDUCTOR APTO";
+        livePill.className = "status-pill apto";
+        mBadge.textContent = "✓ CONDUCTOR APTO (APROBADO)";
+        mBadge.style.background = "#dcfce7";
+        mBadge.style.color = "#15803d";
+        boxApto.textContent = "X";
+        boxNoApto.textContent = "";
+      } else {
+        livePill.textContent = "CONDUCTOR NO APTO";
+        livePill.className = "status-pill no-apto";
+        mBadge.textContent = "✗ CONDUCTOR NO APTO (< 80%)";
+        mBadge.style.background = "#fee2e2";
+        mBadge.style.color = "#b91c1c";
+        boxApto.textContent = "";
+        boxNoApto.textContent = "X";
+      }
+    } else {
+      finalDisp.textContent = "--";
+      liveNum.textContent = "--";
+      mScore.textContent = "--";
+      livePill.textContent = "PENDIENTE";
+      livePill.className = "status-pill pend";
+      mBadge.textContent = "PENDIENTE DE EVALUAR";
+      mBadge.style.background = "#f1f5f9";
+      mBadge.style.color = "#64748b";
+      boxApto.textContent = "";
+      boxNoApto.textContent = "";
+    }
+  }
+
+  function setAptoManual(isApto) {
+    evalState.scores.apto = isApto;
+    const boxApto = document.getElementById('boxApto');
+    const boxNoApto = document.getElementById('boxNoApto');
+    const livePill = document.getElementById('liveStatusPill');
+    const mBadge = document.getElementById('m_final_badge');
+
+    if (isApto) {
+      boxApto.textContent = "X";
+      boxNoApto.textContent = "";
+      livePill.textContent = "CONDUCTOR APTO";
+      livePill.className = "status-pill apto";
+      mBadge.textContent = "✓ CONDUCTOR APTO";
+      mBadge.style.background = "#dcfce7";
+      mBadge.style.color = "#15803d";
+    } else {
+      boxNoApto.textContent = "X";
+      boxApto.textContent = "";
+      livePill.textContent = "CONDUCTOR NO APTO";
+      livePill.className = "status-pill no-apto";
+      mBadge.textContent = "✗ CONDUCTOR NO APTO";
+      mBadge.style.background = "#fee2e2";
+      mBadge.style.color = "#b91c1c";
+    }
+    autoSaveDraft();
+  }
+
+  /* =========================================================
+     CRONÓMETRO INTERACTIVO PARA MANIOBRAS EN PATIO
+     ========================================================= */
+  const timers = {
+    1: { remaining: 480, interval: null, running: false },
+    2: { remaining: 480, interval: null, running: false },
+    3: { remaining: 600, interval: null, running: false }
+  };
+
+  function toggleTimer(id, defaultSeconds) {
+    const t = timers[id];
+    const btn = document.getElementById('btnTimer' + id);
+    const disp = document.getElementById('timerDisplay' + id);
+
+    if (t.running) {
+      clearInterval(t.interval);
+      t.running = false;
+      btn.textContent = "▶️ Reanudar";
+      btn.style.background = "#0284c7";
+    } else {
+      t.running = true;
+      btn.textContent = "⏸️ Pausar";
+      btn.style.background = "#e11d48";
+      t.interval = setInterval(() => {
+        t.remaining--;
+        const mins = String(Math.floor(t.remaining / 60)).padStart(2, '0');
+        const secs = String(t.remaining % 60).padStart(2, '0');
+        disp.textContent = `${mins}:${secs}`;
+
+        if (t.remaining <= 60) {
+          disp.style.color = "#dc2626";
+        }
+        if (t.remaining <= 0) {
+          clearInterval(t.interval);
+          t.running = false;
+          btn.textContent = "⏱️ Tiempo!";
+          btn.style.background = "#dc2626";
+          alert(`¡Tiempo límite alcanzado en la maniobra ${id}!`);
+        }
+      }, 1000);
+    }
+  }
+
+  /* =========================================================
+     SISTEMA DE FIRMAS DIGITALES (CANVAS OFICIAL Y MODAL MÓVIL)
+     ========================================================= */
+  let currentModalSigId = 1;
+  let modalDrawing = false;
+  let modalLastX = 0, modalLastY = 0;
+  let modalCanvas, modalCtx;
+
+  function initModalSignature() {
+    modalCanvas = document.getElementById('modalCanvas');
+    if (!modalCanvas) return;
+    modalCtx = modalCanvas.getContext('2d');
+    modalCtx.strokeStyle = "#0f172a";
+    modalCtx.lineWidth = 2.4;
+    modalCtx.lineCap = "round";
+    modalCtx.lineJoin = "round";
+
+    function getPos(e) {
+      const rect = modalCanvas.getBoundingClientRect();
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
+      return [cx - rect.left, cy - rect.top];
+    }
+
+    function start(e) {
+      modalDrawing = true;
+      [modalLastX, modalLastY] = getPos(e);
+    }
+
+    function move(e) {
+      if (!modalDrawing) return;
+      e.preventDefault();
+      const [x, y] = getPos(e);
+      modalCtx.beginPath();
+      modalCtx.moveTo(modalLastX, modalLastY);
+      modalCtx.lineTo(x, y);
+      modalCtx.stroke();
+      [modalLastX, modalLastY] = [x, y];
+    }
+
+    function end() { modalDrawing = false; }
+
+    modalCanvas.onmousedown = start;
+    modalCanvas.onmousemove = move;
+    window.addEventListener('mouseup', end);
+
+    modalCanvas.ontouchstart = start;
+    modalCanvas.ontouchmove = move;
+    modalCanvas.ontouchend = end;
+  }
+
+  function abrirModalFirma(id, title) {
+    currentModalSigId = id;
+    document.getElementById('sigModalTitle').textContent = title || `Firma ${id}`;
+    document.getElementById('sigModal').classList.add('open');
+
+    setTimeout(() => {
+      const wrap = modalCanvas.parentElement;
+      modalCanvas.width = wrap.clientWidth;
+      modalCanvas.height = wrap.clientHeight;
+      limpiarModalCanvas();
+
+      if (evalState.firmas['sig' + id]) {
+        const img = new Image();
+        img.onload = () => modalCtx.drawImage(img, 0, 0, modalCanvas.width, modalCanvas.height);
+        img.src = evalState.firmas['sig' + id];
+      }
+    }, 50);
+  }
+
+  function cerrarModalFirma() {
+    document.getElementById('sigModal').classList.remove('open');
+  }
+
+  function limpiarModalCanvas() {
+    if (!modalCtx) return;
+    modalCtx.clearRect(0, 0, modalCanvas.width, modalCanvas.height);
+    modalCtx.strokeStyle = "#0f172a";
+    modalCtx.lineWidth = 2.4;
+  }
+
+  function guardarFirmaDesdeModal() {
+    const dataUrl = modalCanvas.toDataURL('image/png');
+    evalState.firmas['sig' + currentModalSigId] = dataUrl;
+
+    const imgEl = document.getElementById('imgSig' + currentModalSigId);
+    const cvsEl = document.getElementById('canvasSig' + currentModalSigId);
+    if (imgEl && cvsEl) {
+      imgEl.src = dataUrl;
+      imgEl.style.display = 'block';
+      cvsEl.style.display = 'none';
+    }
+
+    const statusLabel = document.getElementById('sigStatusLabel' + currentModalSigId);
+    if (statusLabel) {
+      statusLabel.textContent = "✓ Firmado correctamente";
+      statusLabel.style.color = "#16a34a";
+    }
+
+    cerrarModalFirma();
+    autoSaveDraft();
+  }
+
+  function initPaperCanvases() {
+    for (let i = 1; i <= 3; i++) {
+      const c = document.getElementById('canvasSig' + i);
+      if (!c) continue;
+      const parent = c.parentElement;
+      c.width = parent.clientWidth || 200;
+      c.height = parent.clientHeight || 50;
+      const sCtx = c.getContext('2d');
+      sCtx.strokeStyle = "#0f172a";
+      sCtx.lineWidth = 1.8;
+      sCtx.lineCap = "round";
+      sCtx.lineJoin = "round";
+
+      let drawing = false;
+      let lastX = 0, lastY = 0;
+
+      function getPos(evt) {
+        const r = c.getBoundingClientRect();
+        const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+        return [clientX - r.left, clientY - r.top];
+      }
+
+      function startDraw(e) {
+        drawing = true;
+        [lastX, lastY] = getPos(e);
+      }
+
+      function draw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const [x, y] = getPos(e);
+        sCtx.beginPath();
+        sCtx.moveTo(lastX, lastY);
+        sCtx.lineTo(x, y);
+        sCtx.stroke();
+        [lastX, lastY] = [x, y];
+      }
+
+      function stopDraw() {
+        if (drawing) {
+          drawing = false;
+          evalState.firmas['sig' + i] = c.toDataURL();
+          autoSaveDraft();
+        }
+      }
+
+      c.onmousedown = startDraw;
+      c.onmousemove = draw;
+      window.addEventListener('mouseup', stopDraw);
+
+      c.ontouchstart = startDraw;
+      c.ontouchmove = draw;
+      c.ontouchend = stopDraw;
+    }
+  }
+
+  function redrawAllPaperCanvases() {
+    for (let i = 1; i <= 3; i++) {
+      const c = document.getElementById('canvasSig' + i);
+      if (!c) continue;
+      const parent = c.parentElement;
+      if (parent.clientWidth > 0) {
+        c.width = parent.clientWidth;
+        c.height = parent.clientHeight;
+      }
+      if (evalState.firmas['sig' + i]) {
+        const img = document.getElementById('imgSig' + i);
+        img.src = evalState.firmas['sig' + i];
+        img.style.display = 'block';
+        c.style.display = 'none';
+      }
+    }
+  }
+
+  function triggerSigUpload(idx) {
+    document.getElementById('fileSig' + idx).click();
+  }
+
+  function handleSigUpload(e, idx) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      evalState.firmas['sig' + idx] = event.target.result;
+      const img = document.getElementById('imgSig' + idx);
+      const cvs = document.getElementById('canvasSig' + idx);
+      img.src = event.target.result;
+      img.style.display = 'block';
+      cvs.style.display = 'none';
+
+      const statusLabel = document.getElementById('sigStatusLabel' + idx);
+      if (statusLabel) {
+        statusLabel.textContent = "✓ Imagen de firma cargada";
+        statusLabel.style.color = "#16a34a";
+      }
+      autoSaveDraft();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearSigCanvas(idx) {
+    evalState.firmas['sig' + idx] = null;
+    const cvs = document.getElementById('canvasSig' + idx);
+    const img = document.getElementById('imgSig' + idx);
+    const file = document.getElementById('fileSig' + idx);
+    if (cvs) {
+      const sCtx = cvs.getContext('2d');
+      sCtx.clearRect(0, 0, cvs.width, cvs.height);
+      cvs.style.display = 'block';
+    }
+    if (img) {
+      img.src = '';
+      img.style.display = 'none';
+    }
+    if (file) file.value = '';
+
+    const statusLabel = document.getElementById('sigStatusLabel' + idx);
+    if (statusLabel) {
+      statusLabel.textContent = idx === 1 ? "Sin firmar" : (idx === 2 ? "Sin firmar" : "Espacio libre");
+      statusLabel.style.color = "#64748b";
+    }
+    autoSaveDraft();
+  }
+
+  /* =========================================================
+     CONTROL DE EVALUACIONES (GUARDAR, LISTAR, CARGAR, EXPORTAR)
+     ========================================================= */
+  async function guardarEnHistorial() {
+    const nombre = evalState.datos.nombre.trim();
+    if (!nombre) {
+      alert("Por favor ingrese al menos el Nombre del Aspirante antes de guardar.");
+      cambiarPestana('mobile');
+      document.getElementById('m_nombre').focus();
+      return;
+    }
+
+    recalcularTodo();
+
+    const timestamp = new Date().toISOString();
+    const folio = evalState.id || `BACH-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+    evalState.id = folio;
+
+    const record = {
+      id: folio,
+      timestamp: timestamp,
+      fecha: evalState.fecha,
+      aspirante: nombre,
+      master: evalState.datos.master_nombre || 'Francisco Alberto Ambrosio Solis',
+      centro: evalState.datos.centro,
+      unidad_neg: evalState.datos.unidad_neg,
+      configuracion: evalState.datos.cfg_veh,
+      motor: evalState.datos.motor,
+      transmision: evalState.datos.trans,
+      score: evalState.scores.total,
+      apto: evalState.scores.apto,
+      tipo: 'operador_master',
+      fullState: JSON.parse(JSON.stringify(evalState))
+    };
+
+    try {
+      if (typeof window.guardarEvaluacionFirestore !== 'function') {
+        throw new Error('La conexión de Firebase todavía no está lista.');
+      }
+      await window.guardarEvaluacionFirestore(record);
+      try {
+        localStorage.removeItem(STORAGE_KEY_DRAFT);
+      } catch (error) {
+        console.error('La evaluación se guardó en Firebase, pero no se pudo limpiar el borrador local:', error);
+      }
+      if (window.evaluationAccessRole !== 'admin') evalState.id = "";
+      if (window.evaluationAccessRole === 'admin') {
+        cambiarPestana('history');
+        try {
+          await window.cargarHistorialEvaluaciones();
+        } catch (error) {
+          console.error('La evaluación se guardó, pero no se pudo actualizar el historial:', error);
+          alert(`La evaluación se guardó en Firebase, pero no se pudo actualizar el historial: ${error.message}`);
+        }
+      }
+      alert(`Evaluación guardada en Firebase con folio: ${folio}\nResultado: ${evalState.scores.apto ? 'APTO' : 'NO APTO'} (${evalState.scores.total}%)`);
+    } catch (error) {
+      console.error('No se pudo guardar la evaluación en Firebase:', error);
+      alert(`No se pudo confirmar el guardado en Firebase: ${error.message}\nEl borrador permanece en este dispositivo; verifica tu conexión y vuelve a intentar.`);
+    }
+  }
+
+  function obtenerHistorial() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY_EVALS);
+      const localHistory = data ? JSON.parse(data) : [];
+      const recordsById = new Map(localHistory.map(item => [item.id, item]));
+      historialFirebase.forEach(item => recordsById.set(item.id, item));
+      return Array.from(recordsById.values());
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function actualizarTablaHistorial() {
+    const list = obtenerHistorial();
+    document.getElementById('historyCountBadge').textContent = list.length;
+
+    // Actualizar listas desplegables de filtros de auditoría (Años y Másters únicos)
+    poblarFiltrosAuditoria(list);
+
+    // Filtrar y renderizar
+    filtrarHistorial();
+  }
+
+  function poblarFiltrosAuditoria(list) {
+    const anioSelect = document.getElementById('filterAnio');
+    const masterSelect = document.getElementById('filterMaster');
+    if (!anioSelect || !masterSelect) return;
+
+    const currentAnio = anioSelect.value;
+    const currentMaster = masterSelect.value;
+
+    const anios = new Set();
+    const masters = new Set();
+
+    list.forEach(item => {
+      if (item.fecha) {
+        const y = item.fecha.split('-')[0];
+        if (y) anios.add(y);
+      }
+      if (item.master) {
+        masters.add(item.master.trim());
+      }
+    });
+
+    anios.add(new Date().getFullYear().toString());
+
+    const sortedAnios = Array.from(anios).sort().reverse();
+    let optAnios = '<option value="">📅 Todos los años</option>';
+    sortedAnios.forEach(y => {
+      optAnios += `<option value="${y}" ${y === currentAnio ? 'selected' : ''}>Año ${y}</option>`;
+    });
+    anioSelect.innerHTML = optAnios;
+
+    const sortedMasters = Array.from(masters).sort();
+    let optMasters = '<option value="">👷‍♂️ Todos los Másters</option>';
+    sortedMasters.forEach(m => {
+      optMasters += `<option value="${m}" ${m === currentMaster ? 'selected' : ''}>${m}</option>`;
+    });
+    masterSelect.innerHTML = optMasters;
+  }
+
+  let ultimaListaFiltrada = [];
+
+  function filtrarHistorial() {
+    if (window.evaluationAccessRole !== 'admin') {
+      document.getElementById('historialTbody').replaceChildren();
+      return;
+    }
+    const q = (document.getElementById('historySearch')?.value || '').toLowerCase().trim();
+    const fAnio = document.getElementById('filterAnio')?.value || '';
+    const fMaster = (document.getElementById('filterMaster')?.value || '').toLowerCase().trim();
+    const fApto = document.getElementById('filterApto')?.value || '';
+
+    const list = obtenerHistorial();
+
+    const filtrado = list.filter(item => {
+      const matchesQ = !q || (
+        (item.id && item.id.toLowerCase().includes(q)) ||
+        (item.aspirante && item.aspirante.toLowerCase().includes(q)) ||
+        (item.centro && item.centro.toLowerCase().includes(q)) ||
+        (item.master && item.master.toLowerCase().includes(q))
+      );
+
+      const itemAnio = item.fecha ? item.fecha.split('-')[0] : '';
+      const matchesAnio = !fAnio || (itemAnio === fAnio);
+
+      const itemMaster = (item.master || '').toLowerCase().trim();
+      const matchesMaster = !fMaster || (itemMaster === fMaster);
+
+      const matchesApto = !fApto || (fApto === 'APTO' ? item.apto : !item.apto);
+
+      return matchesQ && matchesAnio && matchesMaster && matchesApto;
+    });
+
+    ultimaListaFiltrada = filtrado;
+
+    // Actualizar métricas dinámicas para la auditoría
+    document.getElementById('statTotal').textContent = filtrado.length;
+    const aptos = filtrado.filter(x => x.apto).length;
+    const noAptos = filtrado.length - aptos;
+    document.getElementById('statAptos').textContent = aptos;
+    document.getElementById('statNoAptos').textContent = noAptos;
+
+    if (filtrado.length > 0) {
+      const prom = (filtrado.reduce((acc, x) => acc + (x.score || 0), 0) / filtrado.length).toFixed(1);
+      document.getElementById('statPromedio').textContent = `${prom}%`;
+    } else {
+      document.getElementById('statPromedio').textContent = '--%';
+    }
+
+    const sumEl = document.getElementById('auditFilterSummary');
+    if (sumEl) {
+      const partes = [];
+      if (fAnio) partes.push(`Año: ${fAnio}`);
+      if (fMaster) partes.push(`Máster: ${document.getElementById('filterMaster').value}`);
+      if (fApto) partes.push(`Resultado: ${fApto}`);
+      sumEl.textContent = partes.length > 0 
+        ? `${filtrado.length} evaluaciones encontradas (${partes.join(' • ')})` 
+        : `Mostrando las ${filtrado.length} evaluaciones totales registradas`;
+    }
+
+    renderizarFilasHistorial(filtrado);
+  }
+
+  function renderizarFilasHistorial(list) {
+    const tbody = document.getElementById('historialTbody');
+    if (list.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; color: #64748b; padding: 24px;">
+            No se encontraron evaluaciones con los filtros seleccionados.<br>
+            <span style="font-size: 11px;">Puedes importar el archivo .JSON de tus compañeros o presionar <strong>"➕ Nueva"</strong> para registrar una.</span>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = list.map(item => `
+      <tr>
+        <td><strong>${item.id}</strong></td>
+        <td>${item.fecha || '--'}</td>
+        <td><strong>${item.aspirante}</strong></td>
+        <td><span style="color:#ea580c; font-weight:700;">${item.master || 'Francisco A. Ambrosio'}</span></td>
+        <td>${item.centro || '--'} / ${item.unidad_neg || '--'}</td>
+        <td><strong>${item.score}%</strong></td>
+        <td>
+          <span class="status-pill ${item.apto ? 'apto' : 'no-apto'}">
+            ${item.apto ? 'APTO' : 'NO APTO'}
+          </span>
+        </td>
+        <td>
+          <button type="button" class="btn-table-action" onclick="cargarEvaluacion('${item.id}')">✏️ Cargar</button>
+          <button type="button" class="btn-table-action" onclick="imprimirDesdeHistorial('${item.id}')">🖨️ PDF</button>
+          <button type="button" class="btn-table-action danger" onclick="eliminarEvaluacion('${item.id}')">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function cargarEvaluacion(folio) {
+    if (window.evaluationAccessRole !== 'admin') return;
+    const list = obtenerHistorial();
+    const item = list.find(x => x.id === folio);
+    if (!item || !item.fullState) {
+      alert("No se encontró la evaluación seleccionada.");
+      return;
+    }
+
+    evalState = JSON.parse(JSON.stringify(item.fullState));
+    aplicarEstadoAControles();
+    recalcularTodo();
+    cambiarPestana('mobile');
+    alert(`Evaluación ${folio} de "${item.aspirante}" cargada correctamente.`);
+  }
+
+  function imprimirDesdeHistorial(folio) {
+    cargarEvaluacion(folio);
+    setTimeout(() => {
+      cambiarPestana('official');
+      window.print();
+    }, 200);
+  }
+
+  async function eliminarEvaluacion(folio) {
+    if (window.evaluationAccessRole !== 'admin') return;
+    if (!confirm(`¿Está seguro de eliminar la evaluación con folio ${folio}?`)) return;
+    try {
+      await window.eliminarEvaluacionFirestore(folio);
+      const list = obtenerHistorial().filter(x => x.id !== folio);
+      try {
+        localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(list));
+      } catch (error) {
+        console.error('La evaluación se eliminó de Firebase, pero no se pudo actualizar el respaldo local:', error);
+      }
+      await window.cargarHistorialEvaluaciones();
+    } catch (error) {
+      console.error('No se pudo eliminar la evaluación de Firebase:', error);
+      alert(`No se pudo eliminar la evaluación: ${error.message}`);
+    }
+  }
+
+  function nuevaEvaluacion() {
+    if (confirm("¿Desea iniciar una nueva evaluación? Se limpiarán los datos actuales de la pantalla.")) {
+      limpiarTodoSinConfirmar();
+      cambiarPestana('mobile');
+    }
+  }
+
+  /* =========================================================
+     PERSISTENCIA AUTOMÁTICA Y BORRADOR
+     ========================================================= */
+  function autoSaveDraft() {
+    try {
+      localStorage.setItem(STORAGE_KEY_DRAFT, JSON.stringify(evalState));
+    } catch (error) {
+      console.error('No se pudo guardar el borrador local:', error);
+    }
+  }
+
+  function cargarBorradorOInciar() {
+    try {
+      const draft = localStorage.getItem(STORAGE_KEY_DRAFT);
+      if (draft) {
+        evalState = JSON.parse(draft);
+        aplicarEstadoAControles();
+        recalcularTodo();
+      }
+    } catch(e) {}
+  }
+
+  function aplicarEstadoAControles() {
+    for (const [k, v] of Object.entries(evalState.datos)) {
+      const mEl = document.getElementById('m_' + k);
+      const pEl = document.getElementById('p_' + k);
+      if (mEl) mEl.value = v || '';
+      if (pEl) {
+        if (pEl.value !== undefined) pEl.value = v || '';
+        else pEl.textContent = v || '';
+      }
+    }
+
+    if (evalState.datos.modalidad) {
+      const r = document.querySelector(`input[name="m_modalidad"][value="${evalState.datos.modalidad}"]`);
+      if (r) r.checked = true;
+    }
+    document.getElementById('chk_mod_fed').textContent = evalState.checks.mod_fed ? 'X' : '';
+    document.getElementById('chk_mod_est').textContent = evalState.checks.mod_est ? 'X' : '';
+
+    if (evalState.datos.cfg_veh) document.getElementById('m_cfg_veh').value = evalState.datos.cfg_veh;
+    if (evalState.datos.motor) document.getElementById('m_motor').value = evalState.datos.motor;
+    if (evalState.datos.trans) document.getElementById('m_trans').value = evalState.datos.trans;
+
+    ['cfg_ul', 'cfg_art', 'cfg_up', 'cfg_da', 'mot_dd13', 'mot_dd16', 'mot_dd15', 'mot_om926', 'trn_rtlo18', 'trn_ultra', 'trn_rtlo20', 'trn_fr14'].forEach(k => {
+      const el = document.getElementById('chk_' + k);
+      if (el) el.textContent = evalState.checks[k] ? 'X' : '';
+    });
+
+    ['sec1', 'sec2', 'sec4', 'sec5'].forEach(sec => {
+      evalState.checks[sec].forEach((val, idx) => {
+        applyCheckVisuals(sec, idx, val);
+      });
+    });
+
+    ['man1', 'man2', 'man3'].forEach(m => {
+      const mCard = document.getElementById(`m_chk_${m}`);
+      const pBox = document.getElementById(`p_chk_${m}`);
+      if (evalState.checks[m]) {
+        if (mCard) mCard.classList.add('checked');
+        if (pBox) pBox.textContent = 'X';
+      } else {
+        if (mCard) mCard.classList.remove('checked');
+        if (pBox) pBox.textContent = '';
+      }
+    });
+
+    for (let i = 1; i <= 3; i++) {
+      if (evalState.firmas['sig' + i]) {
+        const img = document.getElementById('imgSig' + i);
+        const cvs = document.getElementById('canvasSig' + i);
+        if (img && cvs) {
+          img.src = evalState.firmas['sig' + i];
+          img.style.display = 'block';
+          cvs.style.display = 'none';
+        }
+        const lbl = document.getElementById('sigStatusLabel' + i);
+        if (lbl) {
+          lbl.textContent = "✓ Firmado";
+          lbl.style.color = "#16a34a";
+        }
+      } else {
+        clearSigCanvas(i);
+      }
+    }
+
+    if (evalState.datos.nombre) {
+      document.getElementById('liveAspiranteName').textContent = evalState.datos.nombre;
+      const opNombre = document.getElementById('p_operador_nombre');
+      if (opNombre) opNombre.textContent = evalState.datos.nombre;
+    }
+
+    if (evalState.datos.master_nombre) {
+      const mastEl = document.getElementById('p_master_nombre');
+      if (mastEl) mastEl.textContent = evalState.datos.master_nombre;
+      const dispEl = document.getElementById('sigMasterNameDisplay');
+      if (dispEl) dispEl.textContent = evalState.datos.master_nombre;
+    }
+  }
+
+  function limpiarTodoSinConfirmar() {
+    evalState = {
+      id: null,
+      fecha: new Date().toISOString().split('T')[0],
+      datos: {
+        master_nombre: 'Francisco Alberto Ambrosio Solis',
+        nombre: '', centro: '', unidad_neg: '',
+        dia: '', mes: '', anio: '',
+        licencia: '', lic_tipo: '', modalidad: '', lic_vig: '', lic_ant: '',
+        apto_med: '', apto_vig: '',
+        ruta: '', veh_opera: '', tiempo_man: '',
+        cfg_veh: '', motor: '', trans: '',
+        obs_man1: '', obs_man2: '', obs_man3: '',
+        obs_tec: '', obs_def: '',
+        rec1: '', rec2: '', rec3: '', rec4: ''
+      },
+      checks: {
+        sec1: new Array(12).fill(false),
+        sec2: new Array(24).fill(false),
+        man1: false, man2: false, man3: false,
+        sec4: new Array(23).fill(false),
+        sec5: new Array(17).fill(false),
+        mod_fed: false, mod_est: false,
+        cfg_ul: false, cfg_art: false, cfg_up: false, cfg_da: false,
+        mot_dd13: false, mot_dd16: false, mot_dd15: false, mot_om926: false,
+        trn_rtlo18: false, trn_ultra: false, trn_rtlo20: false, trn_fr14: false
+      },
+      scores: { p1:0, c1:0, p2:0, c2:0, p3:0, c3:0, p4:0, c4:0, p5:0, c5:0, total:0, apto:false },
+      firmas: { sig1: null, sig2: null, sig3: null }
+    };
+    initDateDefaults();
+    aplicarEstadoAControles();
+    recalcularTodo();
+    localStorage.removeItem(STORAGE_KEY_DRAFT);
+  }
+
+  function limpiarTodo() {
+    if (!confirm('¿Deseas vaciar todas las marcas y campos?')) return;
+    limpiarTodoSinConfirmar();
+  }
+
+  function imprimirFormatoOficial() {
+    cambiarPestana('official');
+    setTimeout(() => {
+      window.print();
+    }, 250);
+  }
+
+  /* =========================================================
+     EXPORTACIÓN E IMPORTACIÓN (EXCEL CSV Y FUSIÓN JSON)
+     ========================================================= */
+  function exportarCSV() {
+    if (window.evaluationAccessRole !== 'admin') return;
+    const list = ultimaListaFiltrada.length > 0 ? ultimaListaFiltrada : obtenerHistorial();
+    if (list.length === 0) {
+      alert("No hay evaluaciones para exportar con los filtros seleccionados.");
+      return;
+    }
+
+    const fAnio = document.getElementById('filterAnio')?.value || 'Todos';
+    const fMaster = document.getElementById('filterMaster')?.value || 'Todos';
+
+    const headers = ["Folio", "Fecha", "Aspirante", "Op_Master_Evaluador", "Centro_Trabajo", "Unidad_Negocio", "Configuracion", "Motor", "Transmision", "Calificacion_Final", "Resultado_Dictamen"];
+    const rows = list.map(x => [
+      `"${x.id}"`,
+      `"${x.fecha || ''}"`,
+      `"${(x.aspirante || '').replace(/"/g, '""')}"`,
+      `"${(x.master || 'Francisco A. Ambrosio').replace(/"/g, '""')}"`,
+      `"${(x.centro || '').replace(/"/g, '""')}"`,
+      `"${(x.unidad_neg || '').replace(/"/g, '""')}"`,
+      `"${(x.configuracion || '').replace(/"/g, '""')}"`,
+      `"${(x.motor || '').replace(/"/g, '""')}"`,
+      `"${(x.transmision || '').replace(/"/g, '""')}"`,
+      x.score,
+      x.apto ? "APTO" : "NO APTO"
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Auditoria_Evaluaciones_Bachoco_${fAnio}_${fMaster.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  }
+
+  function respaldarJSON() {
+    if (window.evaluationAccessRole !== 'admin') return;
+    const list = obtenerHistorial();
+    if (list.length === 0) {
+      alert("No hay evaluaciones guardadas para respaldar.");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(list, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    const masterActual = evalState.datos.master_nombre || 'Master';
+    link.download = `Evaluaciones_AppTolva_${masterActual.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+  }
+
+  /* FUSIÓN INTELIGENTE: Permite importar múltiples archivos JSON de otros másters sin borrar los tuyos */
+  function restaurarJSON(e) {
+    const files = Array.from(e.target.files);
+    if (!files || files.length === 0) return;
+
+    let localList = obtenerHistorial();
+    let totalNuevos = 0;
+    let totalActualizados = 0;
+    let filesProcessed = 0;
+
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const data = JSON.parse(event.target.result);
+          const arrayData = Array.isArray(data) ? data : [data];
+
+          arrayData.forEach(item => {
+            if (!item.id || !item.aspirante) return;
+            const existingIdx = localList.findIndex(x => x.id === item.id);
+            if (existingIdx >= 0) {
+              localList[existingIdx] = item;
+              totalActualizados++;
+            } else {
+              localList.unshift(item);
+              totalNuevos++;
+            }
+          });
+        } catch(err) {
+          console.error("Error al procesar archivo:", file.name, err);
+        }
+
+        filesProcessed++;
+        if (filesProcessed === files.length) {
+          localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(localList));
+          actualizarTablaHistorial();
+          alert(`✅ FUSIÓN COMPLETADA EXITOSAMENTE:\n\n` +
+                `• Evaluaciones nuevas agregadas: ${totalNuevos}\n` +
+                `• Evaluaciones actualizadas: ${totalActualizados}\n` +
+                `• Total acumulado en este dispositivo: ${localList.length}\n\n` +
+                `Ahora puedes ver y filtrar todas las evaluaciones de tus compañeros en la tabla.`);
+          document.getElementById('importFile').value = '';
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+</script>
+<script type="module">
+  import { initializeApp } from "./js/firebase-sdk.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "./js/firebase-sdk.js";
+  import {
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    getFirestore,
+    limit,
+    orderBy,
+    query,
+    setDoc
+  } from "./js/firebase-sdk.js";
+
+  const firebaseConfig = {
+    apiKey: "__FIREBASE_API_KEY__",
+    authDomain: "gen-lang-client-0015118308.firebaseapp.com",
+    projectId: "gen-lang-client-0015118308",
+    storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
+    messagingSenderId: "228375512926",
+    appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
+    measurementId: "G-SK8TYXT3JD"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const evaluationsCollection = collection(db, "evaluaciones_operador_master");
+  const loginForm = document.getElementById("evalLoginForm");
+  const loginButton = document.getElementById("evalLoginButton");
+  const loginError = document.getElementById("evalAccessError");
+  let accessRole = null;
+  let authStateVersion = 0;
+
+  function showLoginError(message) {
+    loginError.textContent = message;
+    loginError.style.display = "block";
+  }
+
+  function loginErrorMessage(error) {
+    const messages = {
+      "auth/invalid-credential": "Correo o contraseña incorrectos.",
+      "auth/invalid-email": "Escribe un correo válido.",
+      "auth/too-many-requests": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+      "auth/network-request-failed": "No se pudo conectar con Firebase Authentication."
+    };
+    return messages[error.code] || `No se pudo iniciar sesión: ${error.message}`;
+  }
+
+  async function loadEvaluationsHistory() {
+    if (accessRole !== "admin") throw new Error("Solo la cuenta administradora puede consultar el historial.");
+    const result = await getDocs(query(evaluationsCollection, orderBy("timestamp", "desc"), limit(500)));
+    const records = result.docs.map(snapshot => ({ ...snapshot.data(), id: snapshot.id }));
+    window.actualizarHistorialFirebase(records);
+  }
+
+  window.cargarHistorialEvaluaciones = loadEvaluationsHistory;
+  window.guardarEvaluacionFirestore = async (record) => {
+    if (!auth.currentUser || !["admin", "evaluador"].includes(accessRole)) {
+      throw new Error("La cuenta no tiene permiso para guardar evaluaciones.");
+    }
+    const serialized = JSON.stringify(record);
+    if (new Blob([serialized]).size > 850000) {
+      throw new Error("El registro supera el tamaño permitido para Firestore. Reduce el tamaño de las firmas antes de guardar.");
+    }
+    const reference = doc(evaluationsCollection, record.id);
+    await setDoc(reference, {
+      ...record,
+      creadoPor: auth.currentUser.email.toLowerCase(),
+      actualizadoEn: new Date().toISOString()
+    }, { merge: true });
+  };
+  window.eliminarEvaluacionFirestore = async (id) => {
+    if (!auth.currentUser || accessRole !== "admin") {
+      throw new Error("Solo la cuenta administradora puede eliminar evaluaciones.");
+    }
+    await deleteDoc(doc(evaluationsCollection, id));
+  };
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    loginButton.disabled = true;
+    loginError.style.display = "none";
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        document.getElementById("evalAccessEmail").value.trim(),
+        document.getElementById("evalAccessPassword").value
+      );
+      document.getElementById("evalAccessPassword").value = "";
+    } catch (error) {
+      showLoginError(loginErrorMessage(error));
+    } finally {
+      loginButton.disabled = false;
+    }
+  });
+
+  document.getElementById("evalLogoutButton").addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      window.location.reload();
+    } catch (error) {
+      console.error("No se pudo cerrar la sesión de evaluaciones:", error);
+      alert(`No se pudo cerrar la sesión: ${error.message}`);
+    }
+  });
+
+  onAuthStateChanged(auth, async (user) => {
+    const stateVersion = ++authStateVersion;
+    let role = null;
+    let accessError = null;
+
+    if (user?.email && user.providerData.some(provider => provider.providerId === "password")) {
+      try {
+        const profile = await getDoc(doc(db, "usuarios", user.email.toLowerCase()));
+        const evaluationRole = profile.exists() ? profile.data().rol_evaluaciones : null;
+        if (evaluationRole === "admin" || evaluationRole === "evaluador") role = evaluationRole;
+      } catch (error) {
+        console.error("No se pudo comprobar el permiso del módulo de evaluaciones:", error);
+        accessError = error;
+      }
+    }
+    if (stateVersion !== authStateVersion) return;
+
+    accessRole = role;
+    window.evaluationAccessRole = role;
+    const authorized = Boolean(user && role);
+    document.getElementById("evalAccessOverlay").style.display = authorized ? "none" : "flex";
+    document.getElementById("evalAppContent").style.display = authorized ? "block" : "none";
+    document.getElementById("evalSignedInUser").textContent = authorized ? user.email : "";
+    document.getElementById("btnTabHistory").style.display = role === "admin" ? "" : "none";
+
+    if (!authorized) {
+      window.limpiarHistorialFirebase();
+      if (user && !accessError) showLoginError("Esta cuenta no tiene permiso para usar el módulo de evaluaciones.");
+      else if (accessError) showLoginError(`No se pudo comprobar el permiso: ${accessError.message}`);
+      if (user) await signOut(auth);
+      return;
+    }
+
+    document.getElementById("evalAccessError").style.display = "none";
+    document.getElementById("evalAccessEmail").value = "";
+    const evaluationUiAlreadyInitialized = Boolean(window.evaluationUIInitialized);
+    window.separarBorradorEvaluacionPorUsuario(user.email.toLowerCase(), role);
+    if (evaluationUiAlreadyInitialized) window.cargarBorradorEvaluacion();
+    else window.initializeEvaluationUI();
+    window.asignarNombreEvaluadorSiFalta(user.displayName || user.email.split("@")[0]);
+
+    if (role === "admin") {
+      try {
+        await loadEvaluationsHistory();
+      } catch (error) {
+        console.error("No se pudo cargar el historial de evaluaciones:", error);
+        alert(`No se pudo cargar el historial de Firebase: ${error.message}`);
+      }
+    } else {
+      window.limpiarHistorialFirebase();
+    }
+  });
+</script>
+</body>
+</html>

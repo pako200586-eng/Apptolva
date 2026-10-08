@@ -25,6 +25,45 @@ service cloud.firestore {
       return isPanelUser() && getUserRole() == 'admin';
     }
 
+    // Keep evaluation access independent from usuarios/{email}.rol (panel role).
+    function isEmailPasswordUser() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email is string;
+    }
+
+    function getEvaluationRole() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email.lower())).data.get('rol_evaluaciones', 'sin_acceso');
+    }
+
+    function isEvaluationUser() {
+      return isEmailPasswordUser()
+        && getEvaluationRole() in ['admin', 'evaluador'];
+    }
+
+    function isEvaluationAdmin() {
+      return isEmailPasswordUser() && getEvaluationRole() == 'admin';
+    }
+
+    function validEvaluation(evaluationId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'timestamp', 'fecha', 'aspirante', 'master', 'centro',
+          'unidad_neg', 'configuracion', 'motor', 'transmision', 'score',
+          'apto', 'tipo', 'fullState', 'creadoPor', 'actualizadoEn'
+        ])
+        && request.resource.data.id == evaluationId
+        && request.resource.data.tipo == 'operador_master'
+        && request.resource.data.timestamp is string
+        && request.resource.data.fecha is string
+        && request.resource.data.aspirante is string
+        && request.resource.data.master is string
+        && request.resource.data.score is number
+        && request.resource.data.apto is bool
+        && request.resource.data.fullState is map
+        && request.resource.data.creadoPor == request.auth.token.email.lower()
+        && request.resource.data.actualizadoEn is string;
+    }
+
     match /sistema/contadores {
       allow read: if signedIn();
       allow delete: if false;
@@ -93,6 +132,13 @@ service cloud.firestore {
     match /ot_por_reporte/{reportId} {
       allow read: if isPanelUser();
       allow write: if isAdmin();
+    }
+
+    match /evaluaciones_operador_master/{evaluationId} {
+      allow get, list: if isEvaluationAdmin();
+      allow create: if isEvaluationUser() && validEvaluation(evaluationId);
+      allow update: if isEvaluationAdmin() && validEvaluation(evaluationId);
+      allow delete: if isEvaluationAdmin();
     }
 
     match /{document=**} {
