@@ -1027,7 +1027,10 @@
 </head>
 <body>
 
-<div id="evalAccessOverlay" style="position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.82);display:flex;align-items:center;justify-content:center;padding:16px;">
+<div id="evalAuthLoading" style="position:fixed;inset:0;z-index:2001;background:rgba(15,23,42,.82);display:flex;align-items:center;justify-content:center;padding:16px;color:#fff;font-size:15px;">
+  Verificando sesión de Evaluaciones…
+</div>
+<div id="evalAccessOverlay" style="position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.82);display:none;align-items:center;justify-content:center;padding:16px;">
   <form id="evalLoginForm" style="width:100%;max-width:380px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);">
     <h2 style="margin:0 0 6px;color:#0f172a;font-size:20px;">Acceso a Evaluaciones</h2>
     <p style="margin:0 0 16px;color:#475569;font-size:13px;">Ingresa con tu cuenta autorizada de AppTolva.</p>
@@ -3799,6 +3802,7 @@
     accessRole = role;
     window.evaluationAccessRole = role;
     const authorized = Boolean(user && role);
+    document.getElementById("evalAuthLoading").style.display = "none";
     document.getElementById("evalAccessOverlay").style.display = authorized ? "none" : "flex";
     document.getElementById("evalAppContent").style.display = authorized ? "block" : "none";
     document.getElementById("evalSignedInUser").textContent = authorized ? user.email : "";

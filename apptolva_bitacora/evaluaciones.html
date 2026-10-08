@@ -25,7 +25,10 @@
     </style>
 </head>
 <body class="text-slate-800">
-    <div id="evalAccessOverlay" class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div id="evalAuthLoading" class="fixed inset-0 z-[60] bg-slate-900/90 flex items-center justify-center p-4 text-white font-semibold">
+        Verificando sesión de Evaluaciones…
+    </div>
+    <div id="evalAccessOverlay" class="fixed inset-0 z-50 bg-black/60 hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div class="bg-[#ea580c] text-white p-5 flex items-center gap-3">
                 <i class="fas fa-lock text-2xl"></i>
@@ -692,6 +695,7 @@
             }
             if (stateVersion !== authStateVersion) return;
 
+            document.getElementById("evalAuthLoading").classList.add("hidden");
             document.getElementById("evalAccessOverlay").classList.toggle("hidden", Boolean(role));
             document.getElementById("evaluationApp").classList.toggle("hidden", !role);
             document.getElementById("adminEvalPanelCard").style.display = role === "admin" ? "flex" : "none";
