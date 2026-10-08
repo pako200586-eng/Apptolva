@@ -605,7 +605,9 @@
             getAuth,
             onAuthStateChanged,
             signInWithEmailAndPassword,
-            signOut
+            signOut,
+            setPersistence,
+            browserLocalPersistence
         } from "./js/firebase-sdk.js";
         import { doc, getDoc, getFirestore } from "./js/firebase-sdk.js";
 
@@ -619,7 +621,7 @@
             measurementId: "G-SK8TYXT3JD"
         };
 
-        const app = initializeApp(firebaseConfig);
+        const app = initializeApp(firebaseConfig, "apptolva-evaluaciones");
         const auth = getAuth(app);
         const db = getFirestore(app);
         const loginForm = document.getElementById("evalLoginForm");
@@ -654,8 +656,10 @@
             accessError.classList.add("hidden");
             const email = emailInput.value.trim().toLowerCase();
             try {
+                await setPersistence(auth, browserLocalPersistence);
                 await signInWithEmailAndPassword(auth, email, passwordInput.value);
                 passwordInput.value = "";
+                await updateAccessState(auth.currentUser);
             } catch (error) {
                 console.error("No se pudo iniciar sesión en el módulo de evaluaciones:", error);
                 showAccessError(describeAuthError(error));
@@ -664,7 +668,7 @@
             }
         });
 
-        onAuthStateChanged(auth, async (user) => {
+        async function updateAccessState(user) {
             const stateVersion = ++authStateVersion;
             let role = null;
             let profileError = null;
@@ -684,21 +688,24 @@
             document.getElementById("evalAccessOverlay").classList.toggle("hidden", Boolean(role));
             document.getElementById("evaluationApp").classList.toggle("hidden", !role);
             if (role) {
+                accessError.classList.add("hidden");
                 volverEvalMenu();
-                return;
+            } else if (user && !profileError) {
+                showAccessError("Acceso denegado. Este módulo es exclusivo para Másters y administradores autorizados.");
+                try {
+                    await signOut(auth);
+                } catch (error) {
+                    console.error("No se pudo cerrar la sesión sin permiso de evaluaciones:", error);
+                    showAccessError(`Acceso denegado y no se pudo cerrar la sesión: ${error.message}`);
+                }
             }
-            if (!user) return;
+            if (profileError) {
+                showAccessError(`No se pudo comprobar el permiso: ${profileError.message}`);
+            }
+            return role;
+        }
 
-            showAccessError(profileError
-                ? `No se pudo comprobar el permiso: ${profileError.message}`
-                : "Esta cuenta no tiene permiso para usar el módulo de evaluaciones.");
-            try {
-                await signOut(auth);
-            } catch (error) {
-                console.error("No se pudo cerrar la sesión sin permiso de evaluaciones:", error);
-                showAccessError(`La cuenta no tiene permiso y no se pudo cerrar la sesión: ${error.message}`);
-            }
-        });
+        onAuthStateChanged(auth, updateAccessState);
 
     </script>
 </body>

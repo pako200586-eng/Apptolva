@@ -1028,11 +1028,19 @@
 <body>
 
 <div id="evalAccessOverlay" style="position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.82);display:flex;align-items:center;justify-content:center;padding:16px;">
-  <div style="width:100%;max-width:380px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);">
+  <form id="evalLoginForm" style="width:100%;max-width:380px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);">
     <h2 style="margin:0 0 6px;color:#0f172a;font-size:20px;">Acceso a Evaluaciones</h2>
-    <p style="margin:0 0 16px;color:#475569;font-size:13px;">Comprueba tu sesión para continuar.</p>
-    <a href="./evaluaciones.html" style="display:block;text-align:center;padding:11px;background:#f1f5f9;border-radius:6px;color:#334155;text-decoration:none;font-weight:700;">Ir al acceso de Evaluaciones</a>
-  </div>
+    <p style="margin:0 0 16px;color:#475569;font-size:13px;">Ingresa con tu cuenta autorizada de AppTolva.</p>
+    <label for="evalAccessEmail" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Correo</label>
+    <input id="evalAccessEmail" type="email" autocomplete="username" required aria-label="Correo" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;">
+    <label for="evalAccessPassword" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Contraseña</label>
+    <input id="evalAccessPassword" type="password" autocomplete="current-password" required aria-label="Contraseña" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:10px;">
+    <p id="evalAccessError" role="alert" style="display:none;color:#b91c1c;font-size:12px;margin:0 0 10px;"></p>
+    <div style="display:flex;gap:8px;">
+      <a href="./evaluaciones.html" style="flex:1;text-align:center;padding:11px;background:#f1f5f9;border-radius:6px;color:#334155;text-decoration:none;font-weight:700;">Volver</a>
+      <button id="evalLoginButton" type="submit" style="flex:1;padding:11px;background:#ea580c;border:0;border-radius:6px;color:#fff;font-weight:700;cursor:pointer;">Ingresar</button>
+    </div>
+  </form>
 </div>
 <div id="evalAppContent" style="display:none;">
 
@@ -3632,7 +3640,14 @@
 </script>
 <script type="module">
   import { initializeApp } from "./js/firebase-sdk.js";
-  import { getAuth, onAuthStateChanged, signOut } from "./js/firebase-sdk.js";
+  import {
+    browserLocalPersistence,
+    getAuth,
+    onAuthStateChanged,
+    setPersistence,
+    signInWithEmailAndPassword,
+    signOut
+  } from "./js/firebase-sdk.js";
   import {
     collection,
     deleteDoc,
@@ -3656,12 +3671,53 @@
     measurementId: "G-SK8TYXT3JD"
   };
 
-  const app = initializeApp(firebaseConfig);
+  const app = initializeApp(firebaseConfig, "apptolva-evaluaciones");
   const auth = getAuth(app);
   const db = getFirestore(app);
   const evaluationsCollection = collection(db, "evaluaciones_operador_master");
+  const loginForm = document.getElementById("evalLoginForm");
+  const loginButton = document.getElementById("evalLoginButton");
+  const loginError = document.getElementById("evalAccessError");
+  const emailInput = document.getElementById("evalAccessEmail");
+  const passwordInput = document.getElementById("evalAccessPassword");
   let accessRole = null;
   let authStateVersion = 0;
+
+  function showAccessError(message) {
+    loginError.textContent = message;
+    loginError.style.display = "block";
+  }
+
+  function describeAuthError(error) {
+    const messages = {
+      "auth/invalid-credential": "Correo o contraseña incorrectos.",
+      "auth/invalid-login-credentials": "Correo o contraseña incorrectos.",
+      "auth/user-not-found": "No existe una cuenta con ese correo en Firebase Authentication.",
+      "auth/wrong-password": "Correo o contraseña incorrectos.",
+      "auth/invalid-email": "Escribe un correo válido.",
+      "auth/user-disabled": "Esta cuenta está deshabilitada.",
+      "auth/too-many-requests": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+      "auth/network-request-failed": "No se pudo conectar con Firebase Authentication."
+    };
+    return messages[error.code] || `No se pudo iniciar sesión: ${error.message}`;
+  }
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    loginButton.disabled = true;
+    loginError.style.display = "none";
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithEmailAndPassword(auth, emailInput.value.trim().toLowerCase(), passwordInput.value);
+      passwordInput.value = "";
+      await updateEvaluationAccess(auth.currentUser);
+    } catch (error) {
+      console.error("No se pudo iniciar sesión en evaluaciones:", error);
+      showAccessError(describeAuthError(error));
+    } finally {
+      loginButton.disabled = false;
+    }
+  });
 
   async function loadEvaluationsHistory() {
     if (accessRole !== "admin") throw new Error("Solo la cuenta administradora puede consultar el historial.");
@@ -3703,7 +3759,7 @@
     }
   });
 
-  onAuthStateChanged(auth, async (user) => {
+  async function updateEvaluationAccess(user) {
     const stateVersion = ++authStateVersion;
     let role = null;
     let accessError = null;
@@ -3730,18 +3786,22 @@
 
     if (!authorized) {
       window.limpiarHistorialFirebase();
-      if (accessError) console.error("No se pudo comprobar el permiso del módulo de evaluaciones:", accessError);
-      if (user) {
+      if (accessError) {
+        console.error("No se pudo comprobar el permiso del módulo de evaluaciones:", accessError);
+        showAccessError(`No se pudo comprobar el permiso: ${accessError.message}`);
+      } else if (user) {
+        showAccessError("Acceso denegado. Este módulo es exclusivo para Másters y administradores autorizados.");
         try {
           await signOut(auth);
         } catch (error) {
           console.error("No se pudo cerrar la sesión sin permiso de evaluaciones:", error);
         }
       }
-      window.location.replace("./evaluaciones.html");
       return;
     }
 
+    loginError.style.display = "none";
+    emailInput.value = "";
     const evaluationUiAlreadyInitialized = Boolean(window.evaluationUIInitialized);
     window.separarBorradorEvaluacionPorUsuario(user.email.toLowerCase(), role);
     if (evaluationUiAlreadyInitialized) window.cargarBorradorEvaluacion();
@@ -3758,7 +3818,9 @@
     } else {
       window.limpiarHistorialFirebase();
     }
-  });
+  }
+
+  onAuthStateChanged(auth, updateEvaluationAccess);
 
 </script>
 </body>

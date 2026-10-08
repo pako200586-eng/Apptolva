@@ -3,8 +3,10 @@ export {
   getAuth,
   getIdTokenResult,
   onAuthStateChanged,
+  browserLocalPersistence,
   signInAnonymously,
   signInWithEmailAndPassword,
+  setPersistence,
   signOut,
 } from "firebase/auth";
 export {
