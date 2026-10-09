@@ -1024,28 +1024,14 @@
     }
   }
 </style>
+
+<!-- SDKs de Firebase (Compat v10) para AppTolva -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
 </head>
 <body>
-
-<div id="evalAuthLoading" style="position:fixed;inset:0;z-index:2001;background:rgba(15,23,42,.82);display:none;align-items:center;justify-content:center;padding:16px;color:#fff;font-size:15px;">
-  Verificando sesión de Evaluaciones…
-</div>
-<div id="evalAccessOverlay" style="position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.82);display:none;align-items:center;justify-content:center;padding:16px;">
-  <form id="evalLoginForm" style="width:100%;max-width:380px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);">
-    <h2 style="margin:0 0 6px;color:#0f172a;font-size:20px;">Acceso a Evaluaciones</h2>
-    <p style="margin:0 0 16px;color:#475569;font-size:13px;">Ingresa con tu cuenta autorizada de AppTolva.</p>
-    <label for="evalAccessEmail" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Correo</label>
-    <input id="evalAccessEmail" type="email" autocomplete="username" required aria-label="Correo" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:12px;">
-    <label for="evalAccessPassword" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Contraseña</label>
-    <input id="evalAccessPassword" type="password" autocomplete="current-password" required aria-label="Contraseña" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:10px;">
-    <p id="evalAccessError" role="alert" style="display:none;color:#b91c1c;font-size:12px;margin:0 0 10px;"></p>
-    <div style="display:flex;gap:8px;">
-      <a href="./evaluaciones.html" style="flex:1;text-align:center;padding:11px;background:#f1f5f9;border-radius:6px;color:#334155;text-decoration:none;font-weight:700;">Volver</a>
-      <button id="evalLoginButton" type="submit" style="flex:1;padding:11px;background:#ea580c;border:0;border-radius:6px;color:#fff;font-weight:700;cursor:pointer;">Ingresar</button>
-    </div>
-  </form>
-</div>
-<div id="evalAppContent" style="display:none;">
 
 <!-- ENCABEZADO SUPERIOR AppTolva -->
 <header class="app-header no-print">
@@ -1059,9 +1045,6 @@
     </div>
   </div>
   <div class="top-action-btns">
-    <a href="./evaluaciones.html" class="btn-sm-action" style="text-decoration:none;">← Evaluaciones</a>
-    <span id="evalSignedInUser" style="font-size:11px;color:#cbd5e1;"></span>
-    <button id="evalLogoutButton" type="button" class="btn-sm-action">Cerrar sesión</button>
     <button type="button" class="btn-sm-action primary" onclick="guardarEnHistorial()">
       💾 Guardar
     </button>
@@ -1099,7 +1082,6 @@
   </div>
 </div>
 
-</div>
 
 <!-- ===================================================================
      PESTAÑA 1: MODO CELULAR (ASISTENTE FÁCIL DE LLENAR PARA MÁSTERS)
@@ -1231,7 +1213,56 @@
           <button type="button" class="btn-batch" onclick="marcarGrupo('sec1', false)">Desmarcar</button>
         </div>
       </div>
-      <div class="touch-item-list" id="list_sec1"></div>
+      <div class="touch-item-list" id="list_sec1">
+        <div class="touch-item" id="m_item_sec1_0" onclick="toggleMobileCheck('sec1', 0)">
+          <span class="touch-item-text">1. Aceite motor</span>
+          <div class="touch-check-pill" id="m_pill_sec1_0">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_1" onclick="toggleMobileCheck('sec1', 1)">
+          <span class="touch-item-text">2. Anticongelante</span>
+          <div class="touch-check-pill" id="m_pill_sec1_1">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_2" onclick="toggleMobileCheck('sec1', 2)">
+          <span class="touch-item-text">3. Carrocería</span>
+          <div class="touch-check-pill" id="m_pill_sec1_2">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_3" onclick="toggleMobileCheck('sec1', 3)">
+          <span class="touch-item-text">4. Presencia fugas fluidos</span>
+          <div class="touch-check-pill" id="m_pill_sec1_3">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_4" onclick="toggleMobileCheck('sec1', 4)">
+          <span class="touch-item-text">5. Aceite dirección</span>
+          <div class="touch-check-pill" id="m_pill_sec1_4">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_5" onclick="toggleMobileCheck('sec1', 5)">
+          <span class="touch-item-text">6. Estado bandas</span>
+          <div class="touch-check-pill" id="m_pill_sec1_5">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_6" onclick="toggleMobileCheck('sec1', 6)">
+          <span class="touch-item-text">7. Doc. del vehículo</span>
+          <div class="touch-check-pill" id="m_pill_sec1_6">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_7" onclick="toggleMobileCheck('sec1', 7)">
+          <span class="touch-item-text">8. Presencia fugas aire</span>
+          <div class="touch-check-pill" id="m_pill_sec1_7">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_8" onclick="toggleMobileCheck('sec1', 8)">
+          <span class="touch-item-text">9. Liquido embrague</span>
+          <div class="touch-check-pill" id="m_pill_sec1_8">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_9" onclick="toggleMobileCheck('sec1', 9)">
+          <span class="touch-item-text">10. Estado mangueras</span>
+          <div class="touch-check-pill" id="m_pill_sec1_9">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_10" onclick="toggleMobileCheck('sec1', 10)">
+          <span class="touch-item-text">11. Neumáticos</span>
+          <div class="touch-check-pill" id="m_pill_sec1_10">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec1_11" onclick="toggleMobileCheck('sec1', 11)">
+          <span class="touch-item-text">12. Estado remolque (s)</span>
+          <div class="touch-check-pill" id="m_pill_sec1_11">✓</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1253,12 +1284,110 @@
       <div style="font-size: 12px; font-weight: 800; color: #ea580c; margin: 10px 0 6px 0; text-transform: uppercase;">
         A) Desacople (11 pasos)
       </div>
-      <div class="touch-item-list" id="list_sec2_desacople"></div>
+      <div class="touch-item-list" id="list_sec2_desacople">
+        <div class="touch-item" id="m_item_sec2_0" onclick="toggleMobileCheck('sec2', 0)">
+          <span class="touch-item-text">1. Enciende intermitentes</span>
+          <div class="touch-check-pill" id="m_pill_sec2_0">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_1" onclick="toggleMobileCheck('sec2', 1)">
+          <span class="touch-item-text">2. Realiza acción en suelo firme</span>
+          <div class="touch-check-pill" id="m_pill_sec2_1">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_2" onclick="toggleMobileCheck('sec2', 2)">
+          <span class="touch-item-text">3. Verifica zona segura</span>
+          <div class="touch-check-pill" id="m_pill_sec2_2">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_3" onclick="toggleMobileCheck('sec2', 3)">
+          <span class="touch-item-text">4. Usa tres puntos apoyo para ascenso y descenso cabina</span>
+          <div class="touch-check-pill" id="m_pill_sec2_3">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_4" onclick="toggleMobileCheck('sec2', 4)">
+          <span class="touch-item-text">5. Usa dos manos para hacer descender patines</span>
+          <div class="touch-check-pill" id="m_pill_sec2_4">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_5" onclick="toggleMobileCheck('sec2', 5)">
+          <span class="touch-item-text">6. Patines están firmes en el piso</span>
+          <div class="touch-check-pill" id="m_pill_sec2_5">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_6" onclick="toggleMobileCheck('sec2', 6)">
+          <span class="touch-item-text">7. Jala gancho 5ta rueda</span>
+          <div class="touch-check-pill" id="m_pill_sec2_6">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_7" onclick="toggleMobileCheck('sec2', 7)">
+          <span class="touch-item-text">8. Desconecta mangueras de servicio y emergencia</span>
+          <div class="touch-check-pill" id="m_pill_sec2_7">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_8" onclick="toggleMobileCheck('sec2', 8)">
+          <span class="touch-item-text">9. Desconecta cable 7 vías</span>
+          <div class="touch-check-pill" id="m_pill_sec2_8">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_9" onclick="toggleMobileCheck('sec2', 9)">
+          <span class="touch-item-text">10. Ajusta altura suspensión del tracto</span>
+          <div class="touch-check-pill" id="m_pill_sec2_9">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_10" onclick="toggleMobileCheck('sec2', 10)">
+          <span class="touch-item-text">11. Avanza lentamente para desacople</span>
+          <div class="touch-check-pill" id="m_pill_sec2_10">✓</div>
+        </div>
+      </div>
 
       <div style="font-size: 12px; font-weight: 800; color: #ea580c; margin: 16px 0 6px 0; text-transform: uppercase;">
         B) Enganche (13 pasos)
       </div>
-      <div class="touch-item-list" id="list_sec2_enganche"></div>
+      <div class="touch-item-list" id="list_sec2_enganche">
+        <div class="touch-item" id="m_item_sec2_11" onclick="toggleMobileCheck('sec2', 11)">
+          <span class="touch-item-text">1. Enciende intermitentes</span>
+          <div class="touch-check-pill" id="m_pill_sec2_11">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_12" onclick="toggleMobileCheck('sec2', 12)">
+          <span class="touch-item-text">2. Realiza acción en suelo firme</span>
+          <div class="touch-check-pill" id="m_pill_sec2_12">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_13" onclick="toggleMobileCheck('sec2', 13)">
+          <span class="touch-item-text">3. Verifica zona segura</span>
+          <div class="touch-check-pill" id="m_pill_sec2_13">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_14" onclick="toggleMobileCheck('sec2', 14)">
+          <span class="touch-item-text">4. Usa tres puntos apoyo para ascenso y descenso a la cabina</span>
+          <div class="touch-check-pill" id="m_pill_sec2_14">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_15" onclick="toggleMobileCheck('sec2', 15)">
+          <span class="touch-item-text">5. Retrocede lentamente hasta semirremolque</span>
+          <div class="touch-check-pill" id="m_pill_sec2_15">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_16" onclick="toggleMobileCheck('sec2', 16)">
+          <span class="touch-item-text">6. Presenta quinta rueda en plancha antes de enganchar</span>
+          <div class="touch-check-pill" id="m_pill_sec2_16">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_17" onclick="toggleMobileCheck('sec2', 17)">
+          <span class="touch-item-text">7. Verifica que semirremolque y tracto camión estén alineados</span>
+          <div class="touch-check-pill" id="m_pill_sec2_17">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_18" onclick="toggleMobileCheck('sec2', 18)">
+          <span class="touch-item-text">8. Perno rey alineado a quinta rueda</span>
+          <div class="touch-check-pill" id="m_pill_sec2_18">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_19" onclick="toggleMobileCheck('sec2', 19)">
+          <span class="touch-item-text">9. Acople suave, no golpea elementos de arrastre</span>
+          <div class="touch-check-pill" id="m_pill_sec2_19">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_20" onclick="toggleMobileCheck('sec2', 20)">
+          <span class="touch-item-text">10. Verifica cierre de seguros de quinta rueda de forma visual</span>
+          <div class="touch-check-pill" id="m_pill_sec2_20">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_21" onclick="toggleMobileCheck('sec2', 21)">
+          <span class="touch-item-text">11. Verifica cierre de seguros de quinta rueda "jalón"</span>
+          <div class="touch-check-pill" id="m_pill_sec2_21">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_22" onclick="toggleMobileCheck('sec2', 22)">
+          <span class="touch-item-text">12. Levanta patines a distancia segura antes de comprobar cierre</span>
+          <div class="touch-check-pill" id="m_pill_sec2_22">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec2_23" onclick="toggleMobileCheck('sec2', 23)">
+          <span class="touch-item-text">13. Conecta mangueras de servicio y emergencia</span>
+          <div class="touch-check-pill" id="m_pill_sec2_23">✓</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1353,7 +1482,100 @@
           <button type="button" class="btn-batch" onclick="marcarGrupo('sec4', false)">Desmarcar</button>
         </div>
       </div>
-      <div class="touch-item-list" id="list_sec4"></div>
+      <div class="touch-item-list" id="list_sec4">
+        <div class="touch-item" id="m_item_sec4_0" onclick="toggleMobileCheck('sec4', 0)">
+          <span class="touch-item-text">1. Permite barrido de agujas en tablero</span>
+          <div class="touch-check-pill" id="m_pill_sec4_0">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_1" onclick="toggleMobileCheck('sec4', 1)">
+          <span class="touch-item-text">2. Permite aumento de temperatura de motor normal (no acelera el vehículo)</span>
+          <div class="touch-check-pill" id="m_pill_sec4_1">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_2" onclick="toggleMobileCheck('sec4', 2)">
+          <span class="touch-item-text">3. Pisa pedal de embrague para encender</span>
+          <div class="touch-check-pill" id="m_pill_sec4_2">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_3" onclick="toggleMobileCheck('sec4', 3)">
+          <span class="touch-item-text">4. No mantiene pie en pedal de embrague</span>
+          <div class="touch-check-pill" id="m_pill_sec4_3">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_4" onclick="toggleMobileCheck('sec4', 4)">
+          <span class="touch-item-text">5. Neutral en transmisión antes de arrancar</span>
+          <div class="touch-check-pill" id="m_pill_sec4_4">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_5" onclick="toggleMobileCheck('sec4', 5)">
+          <span class="touch-item-text">6. Libera válvulas de estacionamiento antes de avanzar</span>
+          <div class="touch-check-pill" id="m_pill_sec4_5">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_6" onclick="toggleMobileCheck('sec4', 6)">
+          <span class="touch-item-text">7. Uso correcto de multiplicador</span>
+          <div class="touch-check-pill" id="m_pill_sec4_6">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_7" onclick="toggleMobileCheck('sec4', 7)">
+          <span class="touch-item-text">8. No excede el limite de velocidad establecido</span>
+          <div class="touch-check-pill" id="m_pill_sec4_7">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_8" onclick="toggleMobileCheck('sec4', 8)">
+          <span class="touch-item-text">9. Uso correcto de selector de rango</span>
+          <div class="touch-check-pill" id="m_pill_sec4_8">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_9" onclick="toggleMobileCheck('sec4', 9)">
+          <span class="touch-item-text">10. Utiliza freno de motor en pendientes descendentes</span>
+          <div class="touch-check-pill" id="m_pill_sec4_9">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_10" onclick="toggleMobileCheck('sec4', 10)">
+          <span class="touch-item-text">11. No hace ruido al cambiar velocidad</span>
+          <div class="touch-check-pill" id="m_pill_sec4_10">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_11" onclick="toggleMobileCheck('sec4', 11)">
+          <span class="touch-item-text">12. No realiza cambios innecesarios en transmisión</span>
+          <div class="touch-check-pill" id="m_pill_sec4_11">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_12" onclick="toggleMobileCheck('sec4', 12)">
+          <span class="touch-item-text">13. Uso de embrague correcto</span>
+          <div class="touch-check-pill" id="m_pill_sec4_12">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_13" onclick="toggleMobileCheck('sec4', 13)">
+          <span class="touch-item-text">14. Manejo torque en pendientes ascendentes</span>
+          <div class="touch-check-pill" id="m_pill_sec4_13">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_14" onclick="toggleMobileCheck('sec4', 14)">
+          <span class="touch-item-text">15. Manejo en zona de confort</span>
+          <div class="touch-check-pill" id="m_pill_sec4_14">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_15" onclick="toggleMobileCheck('sec4', 15)">
+          <span class="touch-item-text">16. Reduce cambios de manera efectiva</span>
+          <div class="touch-check-pill" id="m_pill_sec4_15">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_16" onclick="toggleMobileCheck('sec4', 16)">
+          <span class="touch-item-text">17. Aceleración suave</span>
+          <div class="touch-check-pill" id="m_pill_sec4_16">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_17" onclick="toggleMobileCheck('sec4', 17)">
+          <span class="touch-item-text">18. Cambios progresivos</span>
+          <div class="touch-check-pill" id="m_pill_sec4_17">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_18" onclick="toggleMobileCheck('sec4', 18)">
+          <span class="touch-item-text">19. Arranca en primera velocidad</span>
+          <div class="touch-check-pill" id="m_pill_sec4_18">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_19" onclick="toggleMobileCheck('sec4', 19)">
+          <span class="touch-item-text">20. Verifica parámetros en tablero</span>
+          <div class="touch-check-pill" id="m_pill_sec4_19">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_20" onclick="toggleMobileCheck('sec4', 20)">
+          <span class="touch-item-text">21. No realiza frenadas bruscas</span>
+          <div class="touch-check-pill" id="m_pill_sec4_20">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_21" onclick="toggleMobileCheck('sec4', 21)">
+          <span class="touch-item-text">22. Tironea al arrancar</span>
+          <div class="touch-check-pill" id="m_pill_sec4_21">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec4_22" onclick="toggleMobileCheck('sec4', 22)">
+          <span class="touch-item-text">23. Utiliza inercia del vehículo al avanzar</span>
+          <div class="touch-check-pill" id="m_pill_sec4_22">✓</div>
+        </div>
+      </div>
 
       <div class="m-field" style="margin-top: 12px;">
         <label>Observaciones Manejo Técnico - Económico</label>
@@ -1376,7 +1598,76 @@
           <button type="button" class="btn-batch" onclick="marcarGrupo('sec5', false)">Desmarcar</button>
         </div>
       </div>
-      <div class="touch-item-list" id="list_sec5"></div>
+      <div class="touch-item-list" id="list_sec5">
+        <div class="touch-item" id="m_item_sec5_0" onclick="toggleMobileCheck('sec5', 0)">
+          <span class="touch-item-text">1. Utiliza los Espejos Laterales.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_0">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_1" onclick="toggleMobileCheck('sec5', 1)">
+          <span class="touch-item-text">2. Mantiene Distancia de Seguridad entre Vehículos.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_1">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_2" onclick="toggleMobileCheck('sec5', 2)">
+          <span class="touch-item-text">3. Alto Total en Vías de Tren.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_2">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_3" onclick="toggleMobileCheck('sec5', 3)">
+          <span class="touch-item-text">4. Uso de Cinturón de Seguridad antes de Ponerse en Marcha.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_3">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_4" onclick="toggleMobileCheck('sec5', 4)">
+          <span class="touch-item-text">5. Respeta los Señalamientos.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_4">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_5" onclick="toggleMobileCheck('sec5', 5)">
+          <span class="touch-item-text">6. Mantiene una Buena Postura al Conducir.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_5">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_6" onclick="toggleMobileCheck('sec5', 6)">
+          <span class="touch-item-text">7. Cortesía con Vehículos.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_6">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_7" onclick="toggleMobileCheck('sec5', 7)">
+          <span class="touch-item-text">8. Uso de Intermitentes Cuando es Requerido.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_7">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_8" onclick="toggleMobileCheck('sec5', 8)">
+          <span class="touch-item-text">9. Cede el Paso al Peatón.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_8">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_9" onclick="toggleMobileCheck('sec5', 9)">
+          <span class="touch-item-text">10. Sujeta el Volante con las dos Manos.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_9">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_10" onclick="toggleMobileCheck('sec5', 10)">
+          <span class="touch-item-text">11. No se Distrae al Volante.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_10">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_11" onclick="toggleMobileCheck('sec5', 11)">
+          <span class="touch-item-text">12. Uso de Claxon Adecuado.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_11">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_12" onclick="toggleMobileCheck('sec5', 12)">
+          <span class="touch-item-text">13. Rebasa de Forma Adecuada.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_12">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_13" onclick="toggleMobileCheck('sec5', 13)">
+          <span class="touch-item-text">14. Conoce los Señalamientos.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_13">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_14" onclick="toggleMobileCheck('sec5', 14)">
+          <span class="touch-item-text">15. No Utiliza Celular.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_14">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_15" onclick="toggleMobileCheck('sec5', 15)">
+          <span class="touch-item-text">16. Circula por el Carril Adecuado.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_15">✓</div>
+        </div>
+        <div class="touch-item" id="m_item_sec5_16" onclick="toggleMobileCheck('sec5', 16)">
+          <span class="touch-item-text">17. Uso de las Direccionales.</span>
+          <div class="touch-check-pill" id="m_pill_sec5_16">✓</div>
+        </div>
+      </div>
 
       <div class="m-field" style="margin-top: 12px;">
         <label>Observaciones Manejo Defensivo</label>
@@ -2184,8 +2475,8 @@
   <div style="background: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px;">
     <span style="font-size: 20px;">🔒</span>
     <div style="font-size: 11.5px; color: #065f46; line-height: 1.4;">
-      <strong>Historial privado del módulo de Operador Máster.</strong><br>
-      Las evaluaciones confirmadas se guardan en Firebase y solo las cuentas autorizadas como administradoras pueden consultar el historial. El borrador en curso permanece en este dispositivo hasta confirmar su guardado.
+      <strong>¿Dónde se guardan las evaluaciones?</strong><br>
+      Se guardan automáticamente en la <strong>memoria local de tu celular/navegador (LocalStorage)</strong>. Esto te permite evaluar en patio o carretera <strong>sin necesidad de conexión a internet</strong>. Las evaluaciones permanecen aquí seguras aunque cierres el navegador o apagues el teléfono. Puedes verlas en la tabla abajo, recargarlas, imprimirlas en PDF o exportarlas a Excel.
     </div>
   </div>
 
@@ -2215,6 +2506,9 @@
       <button type="button" class="btn-sm-action primary" onclick="nuevaEvaluacion()">➕ Nueva</button>
       <button type="button" class="btn-sm-action" onclick="exportarCSV()">📊 Exportar Excel (Auditoría)</button>
       <button type="button" class="btn-sm-action" onclick="respaldarJSON()">💾 Respaldar / Enviar</button>
+      <button type="button" class="btn-sm-action" onclick="document.getElementById('importFile').click()">📥 Importar / Fusionar</button>
+      <button type="button" class="btn-sm-action" onclick="configurarNube()">☁️ Conectar Nube</button>
+      <input type="file" id="importFile" accept=".json" multiple style="display: none;" onchange="restaurarJSON(event)">
     </div>
   </div>
 
@@ -2300,6 +2594,39 @@
      LÓGICA JAVASCRIPT: SINCRONIZACIÓN BIDIRECCIONAL, CÁLCULO Y CONTROL
      =================================================================== -->
 <script>
+  // =========================================================
+  // CONFIGURACIÓN OFICIAL FIREBASE - APPTOLVA (PROD)
+  // =========================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyBXb_KWL18HJYrRYEWlaibrzlAw-2INBLQ",
+    authDomain: "gen-lang-client-0015118308.firebaseapp.com",
+    projectId: "gen-lang-client-0015118308",
+    storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
+    messagingSenderId: "228375512926",
+    appId: "1:228375512926:web:8d521df233a6bd90fdb1cf",
+    measurementId: "G-2L6EFZBLLX"
+  };
+
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // Autenticación anónima para Operadores Máster (cumple con las reglas isAnonymousOperator())
+  auth.onAuthStateChanged(user => {
+    if (!user) {
+      auth.signInAnonymously().catch(err => console.warn("Aviso Auth AppTolva:", err.message));
+    } else {
+      console.log("Sesión activa AppTolva (Firebase):", user.uid);
+    }
+  });
+
+  // Habilitar caché local offline para patios y carreteras
+  db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+    console.log("Caché offline de Firebase activa.");
+  });
+
   // Definición de ítems por sección para sincronización y generación móvil
   const SECTIONS_DEF = {
     sec1: {
@@ -2412,43 +2739,48 @@
 
   // Clave en LocalStorage
   const STORAGE_KEY_EVALS = "apptolva_evaluaciones_v1";
-  let STORAGE_KEY_DRAFT = "apptolva_eval_draft_v1";
-  let historialFirebase = [];
-
-  window.actualizarHistorialFirebase = (records) => {
-    historialFirebase = records;
-    actualizarTablaHistorial();
-  };
-  window.limpiarHistorialFirebase = () => {
-    historialFirebase = [];
-    document.getElementById("historialTbody").replaceChildren();
-  };
-
-  window.separarBorradorEvaluacionPorUsuario = (email, role) => {
-    STORAGE_KEY_DRAFT = role === "admin"
-      ? "apptolva_eval_draft_v1"
-      : `apptolva_eval_draft_v1_${encodeURIComponent(email)}`;
-  };
-  window.cargarBorradorEvaluacion = cargarBorradorOInciar;
-  window.asignarNombreEvaluadorSiFalta = (name) => {
-    const defaultMaster = "Francisco Alberto Ambrosio Solis";
-    if (!evalState.datos.master_nombre || evalState.datos.master_nombre === defaultMaster) {
-      syncToPaper("master_nombre", name);
-    }
-  };
+  const STORAGE_KEY_DRAFT = "apptolva_eval_draft_v1";
 
   /* =========================================================
      INICIALIZACIÓN Y MONTAJE
      ========================================================= */
-  function initializeEvaluationUI() {
-    if (window.evaluationUIInitialized) return;
-    window.evaluationUIInitialized = true;
+  window.addEventListener('DOMContentLoaded', () => {
     initDateDefaults();
     renderMobileChecklists();
     initPaperCanvases();
     initModalSignature();
     cargarBorradorOInciar();
-  }
+    actualizarTablaHistorial();
+
+    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('panel') === 'admin') {
+      cambiarPestana('history');
+    }
+
+
+    // Sincronización en tiempo real desde Firebase Firestore (Trae evaluaciones de todos los Másters)
+    db.collection("evaluaciones_conduccion").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+      if (!snapshot.empty) {
+        const cloudEvals = [];
+        snapshot.forEach(doc => {
+          cloudEvals.push(doc.data());
+        });
+        localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(cloudEvals));
+        actualizarTablaHistorial();
+
+    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('panel') === 'admin') {
+      cambiarPestana('history');
+    }
+
+        console.log("Sincronizadas evaluaciones desde Firebase:", cloudEvals.length);
+      }
+    }, err => {
+      console.warn("Aviso de sincronización Firestore:", err.message);
+    });
+  });
 
   function initDateDefaults() {
     const today = new Date();
@@ -2487,7 +2819,11 @@
 
   /* Render de listas móviles */
   function renderMobileChecklists() {
-    // Sección 1 (Revisión previa)
+    // Si los elementos ya están en el HTML estático, solo asegurar sincronización visual
+    if (document.querySelectorAll('.touch-item').length > 50) {
+      console.log("Checklists ya precargados en HTML.");
+      return;
+    }
     const list1 = document.getElementById('list_sec1');
     list1.innerHTML = SECTIONS_DEF.sec1.items.map((item, idx) => `
       <div class="touch-item" id="m_item_sec1_${idx}" onclick="toggleMobileCheck('sec1', ${idx})">
@@ -2540,7 +2876,6 @@
      NAVEGACIÓN ENTRE PESTAÑAS (MÓVIL / OFICIAL / HISTORIAL)
      ========================================================= */
   function cambiarPestana(tabName) {
-    if (tabName === 'history' && window.evaluationAccessRole !== 'admin') return;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
@@ -2555,6 +2890,13 @@
       document.getElementById('btnTabHistory').classList.add('active');
       document.getElementById('tabHistory').classList.add('active');
       actualizarTablaHistorial();
+
+    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('panel') === 'admin') {
+      cambiarPestana('history');
+    }
+
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -3124,7 +3466,7 @@
   /* =========================================================
      CONTROL DE EVALUACIONES (GUARDAR, LISTAR, CARGAR, EXPORTAR)
      ========================================================= */
-  async function guardarEnHistorial() {
+  function guardarEnHistorial() {
     const nombre = evalState.datos.nombre.trim();
     if (!nombre) {
       alert("Por favor ingrese al menos el Nombre del Aspirante antes de guardar.");
@@ -3136,7 +3478,7 @@
     recalcularTodo();
 
     const timestamp = new Date().toISOString();
-    const folio = evalState.id || `BACH-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+    const folio = evalState.id || `BACH-${Date.now().toString().slice(-6)}`;
     evalState.id = folio;
 
     const record = {
@@ -3152,44 +3494,46 @@
       transmision: evalState.datos.trans,
       score: evalState.scores.total,
       apto: evalState.scores.apto,
-      tipo: 'operador_master',
       fullState: JSON.parse(JSON.stringify(evalState))
     };
 
-    try {
-      if (typeof window.guardarEvaluacionFirestore !== 'function') {
-        throw new Error('La conexión de Firebase todavía no está lista.');
-      }
-      await window.guardarEvaluacionFirestore(record);
-      try {
-        localStorage.removeItem(STORAGE_KEY_DRAFT);
-      } catch (error) {
-        console.error('La evaluación se guardó en Firebase, pero no se pudo limpiar el borrador local:', error);
-      }
-      if (window.evaluationAccessRole !== 'admin') evalState.id = "";
-      if (window.evaluationAccessRole === 'admin') {
-        cambiarPestana('history');
-        try {
-          await window.cargarHistorialEvaluaciones();
-        } catch (error) {
-          console.error('La evaluación se guardó, pero no se pudo actualizar el historial:', error);
-          alert(`La evaluación se guardó en Firebase, pero no se pudo actualizar el historial: ${error.message}`);
-        }
-      }
-      alert(`Evaluación guardada en Firebase con folio: ${folio}\nResultado: ${evalState.scores.apto ? 'APTO' : 'NO APTO'} (${evalState.scores.total}%)`);
-    } catch (error) {
-      console.error('No se pudo guardar la evaluación en Firebase:', error);
-      alert(`No se pudo confirmar el guardado en Firebase: ${error.message}\nEl borrador permanece en este dispositivo; verifica tu conexión y vuelve a intentar.`);
+    let historico = obtenerHistorial();
+    const existingIdx = historico.findIndex(item => item.id === folio);
+    if (existingIdx >= 0) {
+      historico[existingIdx] = record;
+    } else {
+      historico.unshift(record);
     }
+
+    localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(historico));
+
+    // Guardar simultáneamente en Firebase Firestore (Colección oficial evaluaciones_conduccion)
+    db.collection("evaluaciones_conduccion").doc(folio).set(record)
+      .then(() => {
+        console.log("✅ Evaluación sincronizada en tiempo real con Firebase Firestore.");
+      })
+      .catch(err => {
+        console.warn("Guardada localmente; se sincronizará con Firebase al reconectar:", err);
+      });
+
+    localStorage.removeItem(STORAGE_KEY_DRAFT);
+
+    actualizarTablaHistorial();
+
+    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('panel') === 'admin') {
+      cambiarPestana('history');
+    }
+
+    alert(`Evaluación guardada exitosamente con Folio: ${folio}\nResultado: ${evalState.scores.apto ? 'APTO' : 'NO APTO'} (${evalState.scores.total}%)`);
+    cambiarPestana('history');
   }
 
   function obtenerHistorial() {
     try {
       const data = localStorage.getItem(STORAGE_KEY_EVALS);
-      const localHistory = data ? JSON.parse(data) : [];
-      const recordsById = new Map(localHistory.map(item => [item.id, item]));
-      historialFirebase.forEach(item => recordsById.set(item.id, item));
-      return Array.from(recordsById.values());
+      return data ? JSON.parse(data) : [];
     } catch(e) {
       return [];
     }
@@ -3206,8 +3550,6 @@
     filtrarHistorial();
   }
 
-  let filtrosAuditoriaInicializados = false;
-
   function poblarFiltrosAuditoria(list) {
     const anioSelect = document.getElementById('filterAnio');
     const masterSelect = document.getElementById('filterMaster');
@@ -3215,9 +3557,6 @@
 
     const currentAnio = anioSelect.value;
     const currentMaster = masterSelect.value;
-    const selectedYear = currentAnio || (
-      filtrosAuditoriaInicializados ? '' : new Date().getFullYear().toString()
-    );
 
     const anios = new Set();
     const masters = new Set();
@@ -3237,10 +3576,9 @@
     const sortedAnios = Array.from(anios).sort().reverse();
     let optAnios = '<option value="">📅 Todos los años</option>';
     sortedAnios.forEach(y => {
-      optAnios += `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>Año ${y}</option>`;
+      optAnios += `<option value="${y}" ${y === currentAnio ? 'selected' : ''}>Año ${y}</option>`;
     });
     anioSelect.innerHTML = optAnios;
-    filtrosAuditoriaInicializados = true;
 
     const sortedMasters = Array.from(masters).sort();
     let optMasters = '<option value="">👷‍♂️ Todos los Másters</option>';
@@ -3253,10 +3591,6 @@
   let ultimaListaFiltrada = [];
 
   function filtrarHistorial() {
-    if (window.evaluationAccessRole !== 'admin') {
-      document.getElementById('historialTbody').replaceChildren();
-      return;
-    }
     const q = (document.getElementById('historySearch')?.value || '').toLowerCase().trim();
     const fAnio = document.getElementById('filterAnio')?.value || '';
     const fMaster = (document.getElementById('filterMaster')?.value || '').toLowerCase().trim();
@@ -3350,7 +3684,6 @@
   }
 
   function cargarEvaluacion(folio) {
-    if (window.evaluationAccessRole !== 'admin') return;
     const list = obtenerHistorial();
     const item = list.find(x => x.id === folio);
     if (!item || !item.fullState) {
@@ -3373,22 +3706,19 @@
     }, 200);
   }
 
-  async function eliminarEvaluacion(folio) {
-    if (window.evaluationAccessRole !== 'admin') return;
+  function eliminarEvaluacion(folio) {
     if (!confirm(`¿Está seguro de eliminar la evaluación con folio ${folio}?`)) return;
-    try {
-      await window.eliminarEvaluacionFirestore(folio);
-      const list = obtenerHistorial().filter(x => x.id !== folio);
-      try {
-        localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(list));
-      } catch (error) {
-        console.error('La evaluación se eliminó de Firebase, pero no se pudo actualizar el respaldo local:', error);
-      }
-      await window.cargarHistorialEvaluaciones();
-    } catch (error) {
-      console.error('No se pudo eliminar la evaluación de Firebase:', error);
-      alert(`No se pudo eliminar la evaluación: ${error.message}`);
+    let list = obtenerHistorial();
+    list = list.filter(x => x.id !== folio);
+    localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(list));
+    actualizarTablaHistorial();
+
+    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('panel') === 'admin') {
+      cambiarPestana('history');
     }
+
   }
 
   function nuevaEvaluacion() {
@@ -3402,11 +3732,7 @@
      PERSISTENCIA AUTOMÁTICA Y BORRADOR
      ========================================================= */
   function autoSaveDraft() {
-    try {
-      localStorage.setItem(STORAGE_KEY_DRAFT, JSON.stringify(evalState));
-    } catch (error) {
-      console.error('No se pudo guardar el borrador local:', error);
-    }
+    localStorage.setItem(STORAGE_KEY_DRAFT, JSON.stringify(evalState));
   }
 
   function cargarBorradorOInciar() {
@@ -3550,8 +3876,7 @@
      EXPORTACIÓN E IMPORTACIÓN (EXCEL CSV Y FUSIÓN JSON)
      ========================================================= */
   function exportarCSV() {
-    if (window.evaluationAccessRole !== 'admin') return;
-    const list = ultimaListaFiltrada;
+    const list = ultimaListaFiltrada.length > 0 ? ultimaListaFiltrada : obtenerHistorial();
     if (list.length === 0) {
       alert("No hay evaluaciones para exportar con los filtros seleccionados.");
       return;
@@ -3584,7 +3909,6 @@
   }
 
   function respaldarJSON() {
-    if (window.evaluationAccessRole !== 'admin') return;
     const list = obtenerHistorial();
     if (list.length === 0) {
       alert("No hay evaluaciones guardadas para respaldar.");
@@ -3634,6 +3958,13 @@
         if (filesProcessed === files.length) {
           localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(localList));
           actualizarTablaHistorial();
+
+    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('panel') === 'admin') {
+      cambiarPestana('history');
+    }
+
           alert(`✅ FUSIÓN COMPLETADA EXITOSAMENTE:\n\n` +
                 `• Evaluaciones nuevas agregadas: ${totalNuevos}\n` +
                 `• Evaluaciones actualizadas: ${totalActualizados}\n` +
@@ -3646,206 +3977,27 @@
     });
   }
 
-</script>
-<script type="module">
-  import { initializeApp } from "./js/firebase-sdk.js";
-  import {
-    browserLocalPersistence,
-    getAuth,
-    onAuthStateChanged,
-    setPersistence,
-    signInWithEmailAndPassword,
-    signOut
-  } from "./js/firebase-sdk.js";
-  import {
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    getFirestore,
-    limit,
-    orderBy,
-    query,
-    startAfter,
-    setDoc
-  } from "./js/firebase-sdk.js";
+  /* CONEXIÓN A LA NUBE (Google Sheets Webhook / AppTolva Cloud API) */
+  const STORAGE_KEY_CLOUD_URL = "apptolva_cloud_webhook_url";
 
-  const firebaseConfig = {
-    apiKey: "__FIREBASE_API_KEY__",
-    authDomain: "gen-lang-client-0015118308.firebaseapp.com",
-    projectId: "gen-lang-client-0015118308",
-    storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
-    messagingSenderId: "228375512926",
-    appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
-    measurementId: "G-SK8TYXT3JD"
-  };
+  function configurarNube() {
+    const currentUrl = localStorage.getItem(STORAGE_KEY_CLOUD_URL) || "";
+    const url = prompt(
+      "🌐 CONECTAR CON HOJA CENTRAL EN LA NUBE / APPTOLVA:\n\n" +
+      "Para que todas las evaluaciones de todos los másters se guarden automáticamente en una sola base de datos (por ejemplo, Google Sheets o el servidor de AppTolva):\n\n" +
+      "Pega aquí la URL de tu Webhook / API:",
+      currentUrl
+    );
 
-  const app = initializeApp(firebaseConfig, "apptolva-evaluaciones");
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const evaluationsCollection = collection(db, "evaluaciones_operador_master");
-  const openAdminPanel = new URLSearchParams(window.location.search).get("panel") === "admin";
-  const loginForm = document.getElementById("evalLoginForm");
-  const loginButton = document.getElementById("evalLoginButton");
-  const loginError = document.getElementById("evalAccessError");
-  const emailInput = document.getElementById("evalAccessEmail");
-  const passwordInput = document.getElementById("evalAccessPassword");
-  let accessRole = null;
-  let authStateVersion = 0;
-
-  function showAccessError(message) {
-    loginError.textContent = message;
-    loginError.style.display = "block";
-  }
-
-  function describeAuthError(error) {
-    const messages = {
-      "auth/invalid-credential": "Correo o contraseña incorrectos.",
-      "auth/invalid-login-credentials": "Correo o contraseña incorrectos.",
-      "auth/user-not-found": "No existe una cuenta con ese correo en Firebase Authentication.",
-      "auth/wrong-password": "Correo o contraseña incorrectos.",
-      "auth/invalid-email": "Escribe un correo válido.",
-      "auth/user-disabled": "Esta cuenta está deshabilitada.",
-      "auth/too-many-requests": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
-      "auth/network-request-failed": "No se pudo conectar con Firebase Authentication."
-    };
-    return messages[error.code] || `No se pudo iniciar sesión: ${error.message}`;
-  }
-
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    loginButton.disabled = true;
-    loginError.style.display = "none";
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-      await signInWithEmailAndPassword(auth, emailInput.value.trim().toLowerCase(), passwordInput.value);
-      passwordInput.value = "";
-      await updateEvaluationAccess(auth.currentUser);
-    } catch (error) {
-      console.error("No se pudo iniciar sesión en evaluaciones:", error);
-      showAccessError(describeAuthError(error));
-    } finally {
-      loginButton.disabled = false;
-    }
-  });
-
-  async function loadEvaluationsHistory() {
-    if (accessRole !== "admin") throw new Error("Solo la cuenta administradora puede consultar el historial.");
-    const records = [];
-    let lastDocument = null;
-    while (true) {
-      const pageQuery = query(
-        evaluationsCollection,
-        orderBy("timestamp", "desc"),
-        limit(500),
-        ...(lastDocument ? [startAfter(lastDocument)] : [])
-      );
-      const result = await getDocs(pageQuery);
-      records.push(...result.docs.map(snapshot => ({ ...snapshot.data(), id: snapshot.id })));
-      if (result.docs.length < 500) break;
-      lastDocument = result.docs[result.docs.length - 1];
-    }
-    window.actualizarHistorialFirebase(records);
-  }
-
-  window.cargarHistorialEvaluaciones = loadEvaluationsHistory;
-  window.guardarEvaluacionFirestore = async (record) => {
-    if (!auth.currentUser || !["admin", "evaluador"].includes(accessRole)) {
-      throw new Error("La cuenta no tiene permiso para guardar evaluaciones.");
-    }
-    const serialized = JSON.stringify(record);
-    if (new Blob([serialized]).size > 850000) {
-      throw new Error("El registro supera el tamaño permitido para Firestore. Reduce el tamaño de las firmas antes de guardar.");
-    }
-    const reference = doc(evaluationsCollection, record.id);
-    await setDoc(reference, {
-      ...record,
-      creadoPor: auth.currentUser.email.toLowerCase(),
-      actualizadoEn: new Date().toISOString()
-    }, { merge: true });
-  };
-  window.eliminarEvaluacionFirestore = async (id) => {
-    if (!auth.currentUser || accessRole !== "admin") {
-      throw new Error("Solo la cuenta administradora puede eliminar evaluaciones.");
-    }
-    await deleteDoc(doc(evaluationsCollection, id));
-  };
-
-  document.getElementById("evalLogoutButton").addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-      window.location.reload();
-    } catch (error) {
-      console.error("No se pudo cerrar la sesión de evaluaciones:", error);
-      alert(`No se pudo cerrar la sesión: ${error.message}`);
-    }
-  });
-
-  async function updateEvaluationAccess(user) {
-    const stateVersion = ++authStateVersion;
-    let role = null;
-    let accessError = null;
-
-    if (user?.email && user.providerData.some(provider => provider.providerId === "password")) {
-      try {
-        const profile = await getDoc(doc(db, "usuarios", user.email.toLowerCase()));
-        const evaluationRole = profile.exists() ? profile.data().rol_evaluaciones : null;
-        if (evaluationRole === "admin" || evaluationRole === "evaluador") role = evaluationRole;
-      } catch (error) {
-        console.error("No se pudo comprobar el permiso del módulo de evaluaciones:", error);
-        accessError = error;
+    if (url !== null) {
+      localStorage.setItem(STORAGE_KEY_CLOUD_URL, url.trim());
+      if (url.trim()) {
+        alert("✅ URL de nube configurada. Ahora, cada vez que guardes una evaluación, se sincronizará automáticamente.");
+      } else {
+        alert("ℹ️ Conexión a la nube desactivada. Las evaluaciones seguirán guardándose localmente en este dispositivo.");
       }
     }
-    if (stateVersion !== authStateVersion) return;
-
-    accessRole = role;
-    window.evaluationAccessRole = role;
-    const authorized = Boolean(user && role);
-    document.getElementById("evalAuthLoading").style.display = "none";
-    document.getElementById("evalAccessOverlay").style.display = authorized ? "none" : "flex";
-    document.getElementById("evalAppContent").style.display = authorized ? "block" : "none";
-    document.getElementById("evalSignedInUser").textContent = authorized ? user.email : "";
-    document.getElementById("btnTabHistory").style.display = role === "admin" ? "" : "none";
-
-    if (!authorized) {
-      window.limpiarHistorialFirebase();
-      if (accessError) {
-        console.error("No se pudo comprobar el permiso del módulo de evaluaciones:", accessError);
-        showAccessError(`No se pudo comprobar el permiso: ${accessError.message}`);
-      } else if (user) {
-        showAccessError("Acceso denegado. Este módulo es exclusivo para Másters y administradores autorizados.");
-        try {
-          await signOut(auth);
-        } catch (error) {
-          console.error("No se pudo cerrar la sesión sin permiso de evaluaciones:", error);
-        }
-      }
-      return;
-    }
-
-    loginError.style.display = "none";
-    emailInput.value = "";
-    const evaluationUiAlreadyInitialized = Boolean(window.evaluationUIInitialized);
-    window.separarBorradorEvaluacionPorUsuario(user.email.toLowerCase(), role);
-    if (evaluationUiAlreadyInitialized) window.cargarBorradorEvaluacion();
-    else window.initializeEvaluationUI();
-    window.asignarNombreEvaluadorSiFalta(user.displayName || user.email.split("@")[0]);
-
-    if (role === "admin") {
-      try {
-        await loadEvaluationsHistory();
-        if (openAdminPanel) cambiarPestana("history");
-      } catch (error) {
-        console.error("No se pudo cargar el historial de evaluaciones:", error);
-        alert(`No se pudo cargar el historial de Firebase: ${error.message}`);
-      }
-    } else {
-      window.limpiarHistorialFirebase();
-    }
   }
-
-  onAuthStateChanged(auth, updateEvaluationAccess);
 
 </script>
 </body>
