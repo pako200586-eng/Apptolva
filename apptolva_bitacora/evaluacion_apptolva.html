@@ -1033,39 +1033,43 @@
 </head>
 <body>
 
-<!-- ENCABEZADO SUPERIOR AppTolva -->
-<header class="app-header no-print">
-  <div class="app-brand">
-    <div class="app-badge-b">B</div>
+<!-- ENCABEZADO SUPERIOR AppTolva COMPACTO PARA CELULAR -->
+<header class="app-header no-print" style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;">
+  <div class="app-brand" style="display: flex; align-items: center; gap: 8px;">
+    <!-- FLECHA DE REGRESO COMPACTA -->
+    <a href="./evaluaciones.html" style="background: rgba(255,255,255,0.18); color: white; text-decoration: none; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; flex-shrink: 0;" title="Volver al menú">
+      ❮
+    </a>
+    <div class="app-badge-b" style="width: 28px; height: 28px; font-size: 14px; flex-shrink: 0;">B</div>
     <div class="app-title-box">
-      <h1>AppTolva <span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">| Módulo Evaluación</span></h1>
-      <div class="app-subtitle">
-        <span>Bachoco Transporte</span> • <span class="badge-master">Operador Máster</span>
-      </div>
+      <h1 style="margin: 0; font-size: 13px; font-weight: 800; line-height: 1.1;">AppTolva</h1>
+      <span class="badge-master" style="font-size: 8.5px; padding: 1px 5px;">Máster</span>
     </div>
   </div>
-  <div class="top-action-btns">
-    <button type="button" class="btn-sm-action primary" onclick="guardarEnHistorial()">
+  
+  <div class="top-action-btns" style="display: flex; gap: 5px;">
+    <button type="button" class="btn-sm-action primary" style="padding: 6px 8px; font-size: 11px;" onclick="guardarEnHistorial()">
       💾 Guardar
     </button>
-    <button type="button" class="btn-sm-action green" onclick="imprimirFormatoOficial()">
-      🖨️ PDF Oficial
+    <button type="button" class="btn-sm-action green" style="padding: 6px 8px; font-size: 11px;" onclick="imprimirFormatoOficial()">
+      🖨️ PDF
     </button>
   </div>
 </header>
 
-<!-- BARRA DE PESTAÑAS (MÓVIL / FORMATO OFICIAL / HISTORIAL) -->
-<nav class="app-tabs-nav no-print">
-  <button type="button" class="tab-btn active" id="btnTabMobile" onclick="cambiarPestana('mobile')">
-    📱 Modo Celular (Llenado Rápido)
+<!-- BARRA DE PESTAÑAS CON DESPLAZAMIENTO SUAVE (NO ROMPE EL TEXTO) -->
+<nav class="app-tabs-nav no-print" style="overflow-x: auto; white-space: nowrap; justify-content: flex-start; padding: 6px 8px; gap: 6px;">
+  <button type="button" class="tab-btn active" id="btnTabMobile" style="flex-shrink: 0;" onclick="cambiarPestana('mobile')">
+    📱 Modo Celular
   </button>
-  <button type="button" class="tab-btn" id="btnTabOfficial" onclick="cambiarPestana('official')">
+  <button type="button" class="tab-btn" id="btnTabOfficial" style="flex-shrink: 0;" onclick="cambiarPestana('official')">
     📄 Formato Oficial (3 Páginas)
   </button>
-  <button type="button" class="tab-btn" id="btnTabHistory" onclick="cambiarPestana('history')">
+  <button type="button" class="tab-btn" id="btnTabHistory" style="flex-shrink: 0;" onclick="cambiarPestana('history')">
     📊 Historial y Control (<span id="historyCountBadge">0</span>)
   </button>
 </nav>
+
 
 <!-- BARRA DE CALIFICACIÓN Y ESTADO EN VIVO -->
 <div class="mobile-score-bar no-print">
@@ -2752,14 +2756,15 @@
     cargarBorradorOInciar();
     actualizarTablaHistorial();
 
-    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('panel') === 'admin') {
-      cambiarPestana('history');
-    }
+   // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('panel') === 'admin') {
+  cambiarPestana('history');
+  const scoreBar = document.querySelector('.mobile-score-bar');
+  if (scoreBar) scoreBar.style.display = 'none';
+}
 
-
-    // Sincronización en tiempo real desde Firebase Firestore (Trae evaluaciones de todos los Másters)
+  // Sincronización en tiempo real desde Firebase Firestore (Trae evaluaciones de todos los Másters)
     db.collection("evaluaciones_conduccion").orderBy("timestamp", "desc").onSnapshot(snapshot => {
       if (!snapshot.empty) {
         const cloudEvals = [];
@@ -2769,13 +2774,7 @@
         localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(cloudEvals));
         actualizarTablaHistorial();
 
-    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('panel') === 'admin') {
-      cambiarPestana('history');
-    }
-
-        console.log("Sincronizadas evaluaciones desde Firebase:", cloudEvals.length);
+    console.log("Sincronizadas evaluaciones desde Firebase:", cloudEvals.length);
       }
     }, err => {
       console.warn("Aviso de sincronización Firestore:", err.message);
