@@ -4,7 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AppTolva - Módulo de Evaluación de Conducción | Grupo Bachoco</title>
+
+<script>
+  if (window.location.search.includes('panel=admin')) {
+    document.documentElement.classList.add('is-admin-view');
+  }
+</script>
+
 <style>
+
   /* =========================================================
      ESTILOS BASE Y VARIABLES CORPORATIVAS (AppTolva / Bachoco)
      ========================================================= */
@@ -1023,6 +1031,25 @@
       font-family: Arial, Helvetica, sans-serif !important;
     }
   }
+   /* OCULTAR EVALUACIÓN Y BARRA DE PROMEDIO AL INSTANTE EN EL MINI PANEL */
+  html.is-admin-view #tabMobile,
+  html.is-admin-view .mobile-score-bar {
+    display: none !important;
+  }
+  html.is-admin-view #tabHistory {
+    display: block !important;
+  }
+  html.is-admin-view #btnTabMobile {
+    background: transparent !important;
+    color: #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+  html.is-admin-view #btnTabHistory {
+    background: var(--primary) !important;
+    color: white !important;
+    box-shadow: 0 2px 6px rgba(234, 88, 12, 0.35) !important;
+  }
+  
 </style>
 
 <!-- SDKs de Firebase (Compat v10) para AppTolva -->
@@ -2875,7 +2902,8 @@ if (urlParams.get('panel') === 'admin') {
      NAVEGACIÓN ENTRE PESTAÑAS (MÓVIL / OFICIAL / HISTORIAL)
      ========================================================= */
   function cambiarPestana(tabName) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.documentElement.classList.remove('is-admin-view');
+document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
     if (tabName === 'mobile') {
