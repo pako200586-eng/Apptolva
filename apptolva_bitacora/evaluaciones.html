@@ -444,7 +444,21 @@
                 alert("No se encontró la evaluación para generar el PDF.");
                 return;
             }
-
+                // 👉 Guardar en Firebase automáticamente al generar el PDF
+            if (typeof window.guardarDescargaFirebase === 'function') {
+                const resumenData = evalResumenCalificacion(cfg);
+                window.guardarDescargaFirebase({
+                    operador: evalCampoValor('opNombre'),
+                    fecha: evalCampoValor('opFecha'),
+                    granja: evalCampoValor('opGranja'),
+                    economico: evalCampoValor('opEco'),
+                    calificacion: resumenData.pct,
+                    resultado: resumenData.estado,
+                    observaciones: evalCampoValor('opObs'),
+                    respuestas: evalRespuestas
+                });
+            }
+            
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             const pageW = 210;
@@ -619,7 +633,8 @@
             setPersistence,
             browserLocalPersistence
         } from "./js/firebase-sdk.js";
-        import { doc, getDoc, getFirestore } from "./js/firebase-sdk.js";
+        import { doc, getDoc, getFirestore, setDoc, serverTimestamp } from "./js/firebase-sdk.js";
+
 
             const firebaseConfig = {
             apiKey: "AIzaSyBXb_KWL18HJYrRYEWlaibrzlAw-2INBLQ",
@@ -718,8 +733,33 @@
             return role;
         }
 
+ 
         onAuthStateChanged(auth, updateAccessState);
+
+        // 👉 GUARDAR EVALUACIÓN DE DESCARGA EN FIREBASE FIRESTORE
+        window.guardarDescargaFirebase = async function(evalData) {
+            try {
+                const folio = `DESC-${Date.now().toString().slice(-6)}`;
+                await setDoc(doc(db, "evaluaciones_descarga", folio), {
+                    folio: folio,
+                    operador: evalData.operador,
+                    fecha: evalData.fecha,
+                    granja: evalData.granja,
+                    economico: evalData.economico,
+                    calificacion: evalData.calificacion,
+                    resultado: evalData.resultado,
+                    observaciones: evalData.observaciones,
+                    respuestas: evalData.respuestas,
+                    evaluador: auth.currentUser?.email || "Master",
+                    timestamp: serverTimestamp()
+                });
+                console.log("✅ Evaluación de Descarga guardada en Firestore con folio:", folio);
+            } catch (err) {
+                console.warn("⚠️ Guardada localmente; se subirá al reconectar:", err.message);
+            }
+        };
 
     </script>
 </body>
 </html>
+
