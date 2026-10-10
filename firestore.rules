@@ -200,8 +200,9 @@ service cloud.firestore {
 
     match /evaluaciones_conduccion/{evaluationId} {
       allow get, list: if isEvaluationUser();
-      allow create: if isAnonymousOperator() && validConduccionEvaluation(evaluationId);
-      allow update: if isAnonymousOperator()
+      allow create: if (isAnonymousOperator() || isEvaluationUser())
+        && validConduccionEvaluation(evaluationId);
+      allow update: if (isAnonymousOperator() || isEvaluationUser())
         && resource.data.creadoPor == request.auth.uid
         && validConduccionEvaluation(evaluationId);
     }

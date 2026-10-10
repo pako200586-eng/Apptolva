@@ -2726,7 +2726,12 @@
     db.collection("evaluaciones_conduccion").orderBy("timestamp", "desc").onSnapshot(snapshot => {
       const listaConduccion = [];
       snapshot.forEach(doc => {
-        listaConduccion.push({ ...doc.data(), tipoEvaluacion: "Conducción" });
+        const data = doc.data();
+        listaConduccion.push({
+          ...data,
+          id: data.id || data.folio || doc.id,
+          tipoEvaluacion: "Conducción"
+        });
       });
       localStorage.setItem(STORAGE_KEY_CONDUCCION_CACHE, JSON.stringify(listaConduccion));
       combinarYActualizarHistorial();
@@ -2976,9 +2981,41 @@ if (urlParams.get('panel') === 'admin') {
   });
 
   function combinarYActualizarHistorial() {
-    const conduccion = leerCacheEvaluaciones(STORAGE_KEY_CONDUCCION_CACHE);
-    const descarga = leerCacheEvaluaciones(STORAGE_KEY_DESCARGA_CACHE);
-    const unificadas = [...conduccion, ...descarga].sort((a, b) =>
+    const evaluaciones = new Map();
+    const fuentes = [
+      { registros: leerCacheEvaluaciones("apptolva_evaluaciones_v1"), tipo: "Conducción" },
+      { registros: leerCacheEvaluaciones(STORAGE_KEY_EVALS), tipo: "Conducción" },
+      { registros: leerCacheEvaluaciones(STORAGE_KEY_CONDUCCION_CACHE), tipo: "Conducción" },
+      { registros: leerCacheEvaluaciones(STORAGE_KEY_DESCARGA_CACHE), tipo: "Descarga" }
+    ];
+
+    fuentes.forEach(({ registros, tipo }) => {
+      registros.forEach(item => {
+        const id = item.id || item.folio;
+        if (!id) return;
+        const tipoEvaluacion = item.tipoEvaluacion || tipo;
+        const registro = {
+          ...item,
+          id,
+          tipoEvaluacion
+        };
+        if (tipoEvaluacion === "Descarga") {
+          registro.aspirante = item.aspirante || item.operador || "—";
+          registro.master = item.master || item.evaluador || "Evaluador";
+          registro.score = Number(item.score != null ? item.score : item.calificacion) || 0;
+          registro.apto = item.apto != null
+            ? item.apto
+            : item.resultado === "APTO" || item.resultado === "APTO (APROBADO)";
+          registro.centro = item.centro || item.granja || "Granja";
+          registro.unidad_neg = item.unidad_neg || item.economico || "Tolva";
+        }
+        evaluaciones.set(`${tipoEvaluacion}:${id}`, {
+          ...registro
+        });
+      });
+    });
+
+    const unificadas = Array.from(evaluaciones.values()).sort((a, b) =>
       new Date(b.timestamp || b.fecha) - new Date(a.timestamp || a.fecha)
     );
     localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(unificadas));
@@ -3675,6 +3712,28 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
   /* =========================================================
      CONTROL DE EVALUACIONES (GUARDAR, LISTAR, CARGAR, EXPORTAR)
      ========================================================= */
+  async function sincronizarConduccionFirebase(record) {
+    try {
+      let user = auth.currentUser;
+      if (!user) {
+        const credential = await auth.signInAnonymously();
+        user = credential.user;
+      }
+      record.creadoPor = user.uid;
+      const historico = obtenerHistorial();
+      const index = historico.findIndex(item => item.id === record.id);
+      if (index !== -1) {
+        historico[index] = record;
+        localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(historico));
+      }
+
+      await db.collection("evaluaciones_conduccion").doc(record.id).set(record);
+      console.log("Evaluación de conducción sincronizada con Firestore:", record.id);
+    } catch (err) {
+      console.warn("La evaluación permanece guardada localmente; no se pudo sincronizar con Firestore:", err);
+    }
+  }
+
   function guardarEnHistorial() {
     const nombre = evalState.datos.nombre.trim();
     if (!nombre) {
@@ -3718,14 +3777,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
 
     localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(historico));
 
-    // Guardar simultáneamente en Firebase Firestore (Colección oficial evaluaciones_conduccion)
-    db.collection("evaluaciones_conduccion").doc(folio).set(record)
-      .then(() => {
-        console.log("✅ Evaluación sincronizada en tiempo real con Firebase Firestore.");
-      })
-      .catch(err => {
-        console.warn("Guardada localmente; se sincronizará con Firebase al reconectar:", err);
-      });
+    sincronizarConduccionFirebase(record);
 
     localStorage.removeItem(STORAGE_KEY_DRAFT);
 
