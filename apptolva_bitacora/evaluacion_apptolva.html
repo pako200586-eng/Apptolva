@@ -1049,6 +1049,48 @@
     color: white !important;
     box-shadow: 0 2px 6px rgba(234, 88, 12, 0.35) !important;
   }
+  .admin-auth-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.92);
+  }
+  .admin-auth-overlay[hidden] {
+    display: none !important;
+  }
+  html.is-admin-view .admin-auth-overlay:not([hidden]) {
+    display: flex;
+  }
+  .admin-auth-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 24px;
+    border-radius: 14px;
+    background: white;
+    box-shadow: var(--shadow-lg);
+  }
+  .admin-auth-card input {
+    width: 100%;
+    margin-top: 6px;
+    padding: 11px;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+  }
+  .admin-auth-card label {
+    display: block;
+    margin-top: 14px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .admin-auth-error {
+    margin-top: 12px;
+    color: var(--danger);
+    font-size: 12px;
+  }
   
 </style>
 
@@ -1059,6 +1101,18 @@
 
 </head>
 <body>
+<div id="adminAuthOverlay" class="admin-auth-overlay">
+  <form id="adminAuthForm" class="admin-auth-card">
+    <h2 style="margin: 0; color: var(--slate-900);">Acceso al Mini Panel</h2>
+    <p style="margin: 8px 0 18px; color: var(--slate-600); font-size: 13px;">Inicia sesión con una cuenta autorizada de Evaluaciones.</p>
+    <label for="adminAuthEmail">Correo</label>
+    <input id="adminAuthEmail" type="email" autocomplete="username" required>
+    <label for="adminAuthPassword">Contraseña</label>
+    <input id="adminAuthPassword" type="password" autocomplete="current-password" required>
+    <button id="adminAuthButton" type="submit" class="btn-sm-action primary" style="width: 100%; margin-top: 18px;">Iniciar sesión</button>
+    <div id="adminAuthError" class="admin-auth-error" role="alert" aria-live="polite"></div>
+  </form>
+</div>
 
 <!-- ENCABEZADO SUPERIOR AppTolva COMPACTO PARA CELULAR -->
 <header class="app-header no-print" style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;">
@@ -2500,6 +2554,8 @@
      =================================================================== -->
 <div class="tab-content" id="tabHistory">
 
+  <div id="historySyncError" role="alert" hidden style="margin-bottom: 12px; padding: 10px 12px; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; color: #991b1b; font-size: 12px;"></div>
+
   <!-- RESUMEN DE MÉTRICAS -->
   
   <!-- BANNER EXPLICATIVO DE ALMACENAMIENTO -->
@@ -2507,7 +2563,7 @@
     <span style="font-size: 20px;">🔒</span>
     <div style="font-size: 11.5px; color: #065f46; line-height: 1.4;">
       <strong>¿Dónde se guardan las evaluaciones?</strong><br>
-      Se guardan automáticamente en la <strong>memoria local de tu celular/navegador (LocalStorage)</strong>. Esto te permite evaluar en patio o carretera <strong>sin necesidad de conexión a internet</strong>. Las evaluaciones permanecen aquí seguras aunque cierres el navegador o apagues el teléfono. Puedes verlas en la tabla abajo, recargarlas, imprimirlas en PDF o exportarlas a Excel.
+      Las evaluaciones de conducción se guardan en la <strong>memoria local de tu celular/navegador (LocalStorage)</strong>, para que puedas evaluar en patio o carretera <strong>sin conexión a internet</strong>. El Mini Panel combina en tiempo real las evaluaciones de conducción y descarga autorizadas en Firestore. Puedes consultar el historial, imprimir formatos y exportar el concentrado a Excel.
     </div>
   </div>
 
@@ -2532,7 +2588,7 @@
 
   <!-- BARRA DE HERRAMIENTAS Y FILTROS PARA AUDITORÍA -->
   <div class="history-toolbar">
-    <input type="text" class="history-search-input" id="historySearch" placeholder="🔍 Buscar por aspirante, centro, folio..." oninput="filtrarHistorial()">
+    <input type="text" class="history-search-input" id="historySearch" placeholder="🔍 Buscar operador, granja, tipo o folio..." oninput="filtrarHistorial()">
     <div style="display: flex; gap: 6px; flex-wrap: wrap;">
       <button type="button" class="btn-sm-action primary" onclick="nuevaEvaluacion()">➕ Nueva</button>
       <button type="button" class="btn-sm-action" onclick="exportarCSV()">📊 Exportar Excel (Auditoría)</button>
@@ -2577,10 +2633,11 @@
       <thead>
         <tr>
           <th>Folio</th>
+          <th>Tipo</th>
           <th>Fecha</th>
-          <th>Aspirante</th>
+          <th>Aspirante / Operador</th>
           <th>Op. Máster</th>
-          <th>Centro / Unidad</th>
+          <th>Granja / Centro / Unidad</th>
           <th>Calificación</th>
           <th>Resultado</th>
           <th>Acciones</th>
@@ -2643,13 +2700,125 @@
   }
   const auth = firebase.auth();
   const db = firebase.firestore();
+  const ADMIN_PANEL_MODE = new URLSearchParams(window.location.search).get('panel') === 'admin';
+  const adminAuthOverlay = document.getElementById('adminAuthOverlay');
+  const adminAuthForm = document.getElementById('adminAuthForm');
+  const adminAuthButton = document.getElementById('adminAuthButton');
+  const adminAuthError = document.getElementById('adminAuthError');
+  let authVerificationVersion = 0;
+  let historySyncStarted = false;
 
-  // Autenticación anónima para Operadores Máster (cumple con las reglas isAnonymousOperator())
+  function showAdminAuthError(message) {
+    adminAuthError.textContent = message;
+  }
+
+  function showHistorySyncError(message) {
+    const status = document.getElementById('historySyncError');
+    if (!status) return;
+    status.textContent = message;
+    status.hidden = false;
+  }
+
+  function startHistorySync() {
+    if (historySyncStarted) return;
+    historySyncStarted = true;
+
+    db.collection("evaluaciones_conduccion").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+      const listaConduccion = [];
+      snapshot.forEach(doc => {
+        listaConduccion.push({ ...doc.data(), tipoEvaluacion: "Conducción" });
+      });
+      localStorage.setItem(STORAGE_KEY_CONDUCCION_CACHE, JSON.stringify(listaConduccion));
+      combinarYActualizarHistorial();
+    }, err => {
+      console.error("No se pudieron sincronizar las evaluaciones de conducción:", err);
+      showHistorySyncError("No se pudieron cargar las evaluaciones de conducción. Verifica los permisos de Firestore.");
+    });
+
+    db.collection("evaluaciones_descarga").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+      const listaDescarga = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        listaDescarga.push({
+          ...data,
+          id: data.folio || doc.id,
+          tipoEvaluacion: "Descarga",
+          aspirante: data.operador || "—",
+          master: data.evaluador || "Evaluador",
+          score: Number(data.calificacion) || 0,
+          apto: data.resultado === "APTO" || data.resultado === "APTO (APROBADO)",
+          centro: data.granja || "Granja",
+          unidad_neg: data.economico || "Tolva"
+        });
+      });
+      localStorage.setItem(STORAGE_KEY_DESCARGA_CACHE, JSON.stringify(listaDescarga));
+      combinarYActualizarHistorial();
+    }, err => {
+      console.error("No se pudieron sincronizar las evaluaciones de descarga:", err);
+      showHistorySyncError("No se pudieron cargar las evaluaciones de descarga. Verifica los permisos de Firestore.");
+    });
+  }
+
   auth.onAuthStateChanged(user => {
+    if (!ADMIN_PANEL_MODE) {
+      if (!user) {
+        auth.signInAnonymously().catch(err => console.warn("Aviso Auth AppTolva:", err.message));
+      } else {
+        console.log("Sesión activa AppTolva (Firebase):", user.uid);
+      }
+      return;
+    }
+
+    const stateVersion = ++authVerificationVersion;
     if (!user) {
-      auth.signInAnonymously().catch(err => console.warn("Aviso Auth AppTolva:", err.message));
-    } else {
-      console.log("Sesión activa AppTolva (Firebase):", user.uid);
+      adminAuthOverlay.hidden = false;
+      return;
+    }
+
+    adminAuthOverlay.hidden = false;
+    const isPasswordUser = user.email
+      && user.providerData.some(provider => provider.providerId === 'password');
+    if (!isPasswordUser) {
+      showAdminAuthError("Inicia sesión con una cuenta de Evaluaciones autorizada.");
+      auth.signOut().catch(err => console.error("No se pudo cerrar la sesión no autorizada:", err));
+      return;
+    }
+
+    db.collection("usuarios").doc(user.email.toLowerCase()).get().then(profile => {
+      if (stateVersion !== authVerificationVersion) return;
+      const role = profile.exists ? profile.data().rol_evaluaciones : null;
+      if (role === 'admin' || role === 'evaluador') {
+        adminAuthError.textContent = "";
+        adminAuthOverlay.hidden = true;
+        startHistorySync();
+      } else {
+        showAdminAuthError("Acceso denegado. Se requiere el rol de administrador o evaluador.");
+        auth.signOut().catch(err => console.error("No se pudo cerrar la sesión sin permiso:", err));
+      }
+    }).catch(err => {
+      if (stateVersion !== authVerificationVersion) return;
+      console.error("No se pudo comprobar el permiso del Mini Panel:", err);
+      showAdminAuthError("No se pudo comprobar tu permiso. Verifica la conexión e inténtalo de nuevo.");
+    });
+  });
+
+  adminAuthForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    adminAuthButton.disabled = true;
+    adminAuthError.textContent = "";
+    const email = document.getElementById('adminAuthEmail').value.trim().toLowerCase();
+    const password = document.getElementById('adminAuthPassword').value;
+    try {
+      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      await auth.signInWithEmailAndPassword(email, password);
+      document.getElementById('adminAuthPassword').value = "";
+    } catch (err) {
+      console.error("No se pudo iniciar sesión en el Mini Panel:", err);
+      showAdminAuthError(err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials'
+        ? "Correo o contraseña incorrectos."
+        : `No se pudo iniciar sesión: ${err.message}`);
+    } finally {
+      adminAuthButton.disabled = false;
     }
   });
 
@@ -2769,8 +2938,12 @@
   };
 
   // Clave en LocalStorage
-  const STORAGE_KEY_EVALS = "apptolva_evaluaciones_v1";
+  const STORAGE_KEY_EVALS = ADMIN_PANEL_MODE
+    ? "apptolva_evaluaciones_admin_v1"
+    : "apptolva_evaluaciones_v1";
   const STORAGE_KEY_DRAFT = "apptolva_eval_draft_v1";
+  const STORAGE_KEY_CONDUCCION_CACHE = "evals_conduccion_cache";
+  const STORAGE_KEY_DESCARGA_CACHE = "evals_descarga_cache";
 
   /* =========================================================
      INICIALIZACIÓN Y MONTAJE
@@ -2791,22 +2964,36 @@ if (urlParams.get('panel') === 'admin') {
   if (scoreBar) scoreBar.style.display = 'none';
 }
 
-  // Sincronización en tiempo real desde Firebase Firestore (Trae evaluaciones de todos los Másters)
-    db.collection("evaluaciones_conduccion").orderBy("timestamp", "desc").onSnapshot(snapshot => {
-      if (!snapshot.empty) {
-        const cloudEvals = [];
-        snapshot.forEach(doc => {
-          cloudEvals.push(doc.data());
-        });
-        localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(cloudEvals));
-        actualizarTablaHistorial();
-
-    console.log("Sincronizadas evaluaciones desde Firebase:", cloudEvals.length);
-      }
-    }, err => {
-      console.warn("Aviso de sincronización Firestore:", err.message);
-    });
+  document.getElementById('historialTbody').addEventListener('click', event => {
+  const button = event.target.closest('button[data-history-action]');
+  if (!button) return;
+  const folio = button.dataset.folio;
+  if (button.dataset.historyAction === 'load') cargarEvaluacion(folio);
+  else if (button.dataset.historyAction === 'print') imprimirDesdeHistorial(folio);
+  else if (button.dataset.historyAction === 'delete') eliminarEvaluacion(folio);
   });
+
+  });
+
+  function combinarYActualizarHistorial() {
+    const conduccion = leerCacheEvaluaciones(STORAGE_KEY_CONDUCCION_CACHE);
+    const descarga = leerCacheEvaluaciones(STORAGE_KEY_DESCARGA_CACHE);
+    const unificadas = [...conduccion, ...descarga].sort((a, b) =>
+      new Date(b.timestamp || b.fecha) - new Date(a.timestamp || a.fecha)
+    );
+    localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(unificadas));
+    actualizarTablaHistorial();
+  }
+
+  function leerCacheEvaluaciones(key) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(cache) ? cache : [];
+    } catch (err) {
+      console.warn("No se pudo leer la caché de evaluaciones:", err);
+      return [];
+    }
+  }
 
   function initDateDefaults() {
     const today = new Date();
@@ -2902,7 +3089,9 @@ if (urlParams.get('panel') === 'admin') {
      NAVEGACIÓN ENTRE PESTAÑAS (MÓVIL / OFICIAL / HISTORIAL)
      ========================================================= */
   function cambiarPestana(tabName) {
-    document.documentElement.classList.remove('is-admin-view');
+    if (new URLSearchParams(window.location.search).get('panel') !== 'admin') {
+      document.documentElement.classList.remove('is-admin-view');
+    }
 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
@@ -2917,13 +3106,6 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
       document.getElementById('btnTabHistory').classList.add('active');
       document.getElementById('tabHistory').classList.add('active');
       actualizarTablaHistorial();
-
-    // Detección automática: si viene de "Mini Panel Administrativo", abrir directo el panel
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('panel') === 'admin') {
-      cambiarPestana('history');
-    }
-
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -3510,6 +3692,8 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
 
     const record = {
       id: folio,
+      tipoEvaluacion: "Conducción",
+      creadoPor: auth.currentUser?.uid || '',
       timestamp: timestamp,
       fecha: evalState.fecha,
       aspirante: nombre,
@@ -3627,10 +3811,12 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
 
     const filtrado = list.filter(item => {
       const matchesQ = !q || (
-        (item.id && item.id.toLowerCase().includes(q)) ||
-        (item.aspirante && item.aspirante.toLowerCase().includes(q)) ||
-        (item.centro && item.centro.toLowerCase().includes(q)) ||
-        (item.master && item.master.toLowerCase().includes(q))
+        String(item.id || '').toLowerCase().includes(q) ||
+        String(item.aspirante || '').toLowerCase().includes(q) ||
+        String(item.centro || '').toLowerCase().includes(q) ||
+        String(item.unidad_neg || '').toLowerCase().includes(q) ||
+        String(item.tipoEvaluacion || '').toLowerCase().includes(q) ||
+        String(item.master || '').toLowerCase().includes(q)
       );
 
       const itemAnio = item.fecha ? item.fecha.split('-')[0] : '';
@@ -3639,7 +3825,9 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
       const itemMaster = (item.master || '').toLowerCase().trim();
       const matchesMaster = !fMaster || (itemMaster === fMaster);
 
-      const matchesApto = !fApto || (fApto === 'APTO' ? item.apto : !item.apto);
+      const matchesApto = !fApto || (fApto === 'APTO'
+        ? item.apto
+        : !item.apto && item.resultado !== 'PENDIENTE');
 
       return matchesQ && matchesAnio && matchesMaster && matchesApto;
     });
@@ -3649,7 +3837,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     // Actualizar métricas dinámicas para la auditoría
     document.getElementById('statTotal').textContent = filtrado.length;
     const aptos = filtrado.filter(x => x.apto).length;
-    const noAptos = filtrado.length - aptos;
+    const noAptos = filtrado.filter(x => !x.apto && x.resultado !== 'PENDIENTE').length;
     document.getElementById('statAptos').textContent = aptos;
     document.getElementById('statNoAptos').textContent = noAptos;
 
@@ -3679,7 +3867,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     if (list.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" style="text-align: center; color: #64748b; padding: 24px;">
+          <td colspan="9" style="text-align: center; color: #64748b; padding: 24px;">
             No se encontraron evaluaciones con los filtros seleccionados.<br>
             <span style="font-size: 11px;">Puedes importar el archivo .JSON de tus compañeros o presionar <strong>"➕ Nueva"</strong> para registrar una.</span>
           </td>
@@ -3688,23 +3876,34 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
       return;
     }
 
+    const escaparHTML = value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[char]);
+
     tbody.innerHTML = list.map(item => `
       <tr>
-        <td><strong>${item.id}</strong></td>
-        <td>${item.fecha || '--'}</td>
-        <td><strong>${item.aspirante}</strong></td>
-        <td><span style="color:#ea580c; font-weight:700;">${item.master || 'Francisco A. Ambrosio'}</span></td>
-        <td>${item.centro || '--'} / ${item.unidad_neg || '--'}</td>
-        <td><strong>${item.score}%</strong></td>
+        <td><strong>${escaparHTML(item.id)}</strong></td>
+        <td>${item.tipoEvaluacion === 'Descarga' ? '🌾 Descarga' : '🚗 Conducción'}</td>
+        <td>${escaparHTML(item.fecha || '--')}</td>
+        <td><strong>${escaparHTML(item.aspirante || '--')}</strong></td>
+        <td><span style="color:#ea580c; font-weight:700;">${escaparHTML(item.master || 'Francisco A. Ambrosio')}</span></td>
+        <td>${escaparHTML(item.centro || '--')} / ${escaparHTML(item.unidad_neg || '--')}</td>
+        <td><strong>${escaparHTML(item.score)}%</strong></td>
         <td>
-          <span class="status-pill ${item.apto ? 'apto' : 'no-apto'}">
-            ${item.apto ? 'APTO' : 'NO APTO'}
+          <span class="status-pill ${item.resultado === 'PENDIENTE' ? 'pend' : item.apto ? 'apto' : 'no-apto'}">
+            ${escaparHTML(item.resultado || (item.apto ? 'APTO' : 'NO APTO'))}
           </span>
         </td>
         <td>
-          <button type="button" class="btn-table-action" onclick="cargarEvaluacion('${item.id}')">✏️ Cargar</button>
-          <button type="button" class="btn-table-action" onclick="imprimirDesdeHistorial('${item.id}')">🖨️ PDF</button>
-          <button type="button" class="btn-table-action danger" onclick="eliminarEvaluacion('${item.id}')">🗑️</button>
+          ${item.tipoEvaluacion === 'Descarga' ? '—' : `
+            <button type="button" class="btn-table-action" data-history-action="load" data-folio="${escaparHTML(item.id)}">✏️ Cargar</button>
+            <button type="button" class="btn-table-action" data-history-action="print" data-folio="${escaparHTML(item.id)}">🖨️ PDF</button>
+            ${ADMIN_PANEL_MODE ? '' : `<button type="button" class="btn-table-action danger" data-history-action="delete" data-folio="${escaparHTML(item.id)}">🗑️</button>`}
+          `}
         </td>
       </tr>
     `).join('');
@@ -3903,7 +4102,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
      EXPORTACIÓN E IMPORTACIÓN (EXCEL CSV Y FUSIÓN JSON)
      ========================================================= */
   function exportarCSV() {
-    const list = ultimaListaFiltrada.length > 0 ? ultimaListaFiltrada : obtenerHistorial();
+    const list = ultimaListaFiltrada;
     if (list.length === 0) {
       alert("No hay evaluaciones para exportar con los filtros seleccionados.");
       return;
@@ -3912,20 +4111,22 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     const fAnio = document.getElementById('filterAnio')?.value || 'Todos';
     const fMaster = document.getElementById('filterMaster')?.value || 'Todos';
 
-    const headers = ["Folio", "Fecha", "Aspirante", "Op_Master_Evaluador", "Centro_Trabajo", "Unidad_Negocio", "Configuracion", "Motor", "Transmision", "Calificacion_Final", "Resultado_Dictamen"];
+    const headers = ["Folio", "Tipo", "Fecha", "Aspirante_Operador", "Op_Master_Evaluador", "Granja_Centro", "Unidad_Negocio", "Configuracion", "Motor", "Transmision", "Calificacion_Final", "Resultado_Dictamen"];
+    const csvValue = value => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
     const rows = list.map(x => [
-      `"${x.id}"`,
-      `"${x.fecha || ''}"`,
-      `"${(x.aspirante || '').replace(/"/g, '""')}"`,
-      `"${(x.master || 'Francisco A. Ambrosio').replace(/"/g, '""')}"`,
-      `"${(x.centro || '').replace(/"/g, '""')}"`,
-      `"${(x.unidad_neg || '').replace(/"/g, '""')}"`,
-      `"${(x.configuracion || '').replace(/"/g, '""')}"`,
-      `"${(x.motor || '').replace(/"/g, '""')}"`,
-      `"${(x.transmision || '').replace(/"/g, '""')}"`,
+      x.id,
+      x.tipoEvaluacion || "Conducción",
+      x.fecha,
+      x.aspirante,
+      x.master || 'Francisco A. Ambrosio',
+      x.centro,
+      x.unidad_neg,
+      x.configuracion,
+      x.motor,
+      x.transmision,
       x.score,
-      x.apto ? "APTO" : "NO APTO"
-    ]);
+      x.resultado || (x.apto ? "APTO" : "NO APTO")
+    ].map(csvValue));
 
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

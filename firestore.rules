@@ -64,6 +64,63 @@ service cloud.firestore {
         && request.resource.data.actualizadoEn is string;
     }
 
+    function validDescargaEvaluation(evaluationId) {
+      return request.resource.data.keys().hasAll([
+          'folio', 'operador', 'fecha', 'granja', 'economico',
+          'calificacion', 'resultado', 'observaciones', 'respuestas',
+          'evaluador', 'timestamp'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'folio', 'operador', 'fecha', 'granja', 'economico',
+          'calificacion', 'resultado', 'observaciones', 'respuestas',
+          'evaluador', 'timestamp'
+        ])
+        && request.resource.data.folio == evaluationId
+        && request.resource.data.operador is string
+        && request.resource.data.fecha is string
+        && request.resource.data.granja is string
+        && request.resource.data.economico is string
+        && request.resource.data.calificacion is number
+        && request.resource.data.calificacion >= 0
+        && request.resource.data.calificacion <= 100
+        && request.resource.data.resultado in ['PENDIENTE', 'APTO (APROBADO)', 'NO APTO']
+        && request.resource.data.observaciones is string
+        && request.resource.data.respuestas is map
+        && request.resource.data.evaluador == request.auth.token.email
+        && request.resource.data.timestamp is string;
+    }
+
+    function validConduccionEvaluation(evaluationId) {
+      return request.resource.data.keys().hasAll([
+          'id', 'creadoPor', 'timestamp', 'fecha', 'aspirante', 'master',
+          'centro', 'unidad_neg', 'configuracion', 'motor', 'transmision',
+          'score', 'apto', 'fullState'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id', 'tipoEvaluacion', 'creadoPor', 'timestamp', 'fecha',
+          'aspirante', 'master', 'centro', 'unidad_neg', 'configuracion',
+          'motor', 'transmision', 'score', 'apto', 'fullState'
+        ])
+        && request.resource.data.id == evaluationId
+        && (!request.resource.data.keys().hasAny(['tipoEvaluacion'])
+          || request.resource.data.tipoEvaluacion == 'Conducción')
+        && request.resource.data.creadoPor == request.auth.uid
+        && request.resource.data.timestamp is string
+        && request.resource.data.fecha is string
+        && request.resource.data.aspirante is string
+        && request.resource.data.master is string
+        && request.resource.data.centro is string
+        && request.resource.data.unidad_neg is string
+        && request.resource.data.configuracion is string
+        && request.resource.data.motor is string
+        && request.resource.data.transmision is string
+        && request.resource.data.score is number
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 100
+        && request.resource.data.apto is bool
+        && request.resource.data.fullState is map;
+    }
+
     match /sistema/contadores {
       allow read: if signedIn();
       allow delete: if false;
@@ -139,6 +196,19 @@ service cloud.firestore {
       allow create: if isEvaluationUser() && validEvaluation(evaluationId);
       allow update: if isEvaluationAdmin() && validEvaluation(evaluationId);
       allow delete: if isEvaluationAdmin();
+    }
+
+    match /evaluaciones_conduccion/{evaluationId} {
+      allow get, list: if isEvaluationUser();
+      allow create: if isAnonymousOperator() && validConduccionEvaluation(evaluationId);
+      allow update: if isAnonymousOperator()
+        && resource.data.creadoPor == request.auth.uid
+        && validConduccionEvaluation(evaluationId);
+    }
+
+    match /evaluaciones_descarga/{evaluationId} {
+      allow get, list: if isEvaluationUser();
+      allow create: if isEvaluationUser() && validDescargaEvaluation(evaluationId);
     }
 
     match /{document=**} {
