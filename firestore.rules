@@ -73,7 +73,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'folio', 'operador', 'fecha', 'granja', 'economico',
           'calificacion', 'resultado', 'observaciones', 'respuestas',
-          'evaluador', 'timestamp'
+          'evaluador', 'evaluadorEmail', 'timestamp'
         ])
         && request.resource.data.folio == evaluationId
         && request.resource.data.operador is string
@@ -86,7 +86,9 @@ service cloud.firestore {
         && request.resource.data.resultado in ['PENDIENTE', 'APTO (APROBADO)', 'NO APTO']
         && request.resource.data.observaciones is string
         && request.resource.data.respuestas is map
-        && request.resource.data.evaluador == request.auth.token.email
+        && request.resource.data.evaluador is string
+        && (!request.resource.data.keys().hasAny(['evaluadorEmail'])
+          || request.resource.data.evaluadorEmail == request.auth.token.email.lower())
         && request.resource.data.timestamp is string;
     }
 

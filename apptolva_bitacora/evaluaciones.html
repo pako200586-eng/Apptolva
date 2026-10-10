@@ -659,6 +659,25 @@
         const passwordInput = document.getElementById("evalAccessPassword");
         const accessError = document.getElementById("evalAccessError");
         let authStateVersion = 0;
+        let currentEvaluatorName = "";
+        let currentEvaluatorEmail = "";
+
+        const evaluatorNamesByEmail = {
+            "frank@apptolva.com": "Francisco Alberto Ambrosio Solis",
+            "omar_master@apptolva.com": "Omar Ignacio Morales Reyes"
+        };
+
+        function getEvaluatorName(user, profileData = {}) {
+            const email = (user?.email || "").trim().toLowerCase();
+            const profileName = [
+                profileData.nombre_completo,
+                profileData.nombreCompleto,
+                profileData.nombre,
+                profileData.displayName,
+                profileData.master_nombre
+            ].find((value) => typeof value === "string" && value.trim());
+            return evaluatorNamesByEmail[email] || profileName?.trim() || "Máster";
+        }
 
         function showAccessError(message) {
             accessError.textContent = message;
@@ -701,11 +720,15 @@
             const stateVersion = ++authStateVersion;
             let role = null;
             let profileError = null;
+            currentEvaluatorEmail = user?.email?.trim().toLowerCase() || "";
+            currentEvaluatorName = getEvaluatorName(user);
 
             if (user?.email && user.providerData.some((provider) => provider.providerId === "password")) {
                 try {
                     const profile = await getDoc(doc(db, "usuarios", user.email.toLowerCase()));
-                    const evaluationRole = profile.exists() ? profile.data().rol_evaluaciones : null;
+                    const profileData = profile.exists() ? profile.data() : {};
+                    const evaluationRole = profileData.rol_evaluaciones;
+                    currentEvaluatorName = getEvaluatorName(user, profileData);
                     if (evaluationRole === "admin" || evaluationRole === "evaluador") role = evaluationRole;
                 } catch (error) {
                     console.error("No se pudo comprobar el permiso del módulo de evaluaciones:", error);
@@ -753,7 +776,8 @@
                     resultado: evalData.resultado,
                     observaciones: evalData.observaciones,
                     respuestas: evalData.respuestas,
-                    evaluador: auth.currentUser?.email || "Master",
+                    evaluador: currentEvaluatorName || getEvaluatorName(auth.currentUser),
+                    evaluadorEmail: currentEvaluatorEmail || auth.currentUser?.email?.trim().toLowerCase() || "",
                     timestamp: new Date().toISOString()
                 });
                 console.log("✅ Evaluación de Descarga guardada en Firestore con folio:", folio);

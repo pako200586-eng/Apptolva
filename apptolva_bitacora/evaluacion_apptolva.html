@@ -2749,7 +2749,7 @@
           id: data.folio || doc.id,
           tipoEvaluacion: "Descarga",
           aspirante: data.operador || "—",
-          master: data.evaluador || "Evaluador",
+          master: nombreVisibleMaster(data),
           score: Number(data.calificacion) || 0,
           apto: data.resultado === "APTO" || data.resultado === "APTO (APROBADO)",
           centro: data.granja || "Granja",
@@ -2949,6 +2949,23 @@
   const STORAGE_KEY_DRAFT = "apptolva_eval_draft_v1";
   const STORAGE_KEY_CONDUCCION_CACHE = "evals_conduccion_cache";
   const STORAGE_KEY_DESCARGA_CACHE = "evals_descarga_cache";
+  const NOMBRES_MASTERS = {
+    "frank@apptolva.com": "Francisco Alberto Ambrosio Solis",
+    "omar_master@apptolva.com": "Omar Ignacio Morales Reyes"
+  };
+
+  function nombreVisibleMaster(evaluacion) {
+    const correo = String(evaluacion.evaluadorEmail || evaluacion.evaluador || "").trim().toLowerCase();
+    const nombreRegistrado = [
+      evaluacion.evaluadorNombre,
+      evaluacion.master,
+      evaluacion.evaluador
+    ].find(value => typeof value === "string" && value.trim() && !value.includes("@"));
+    return evaluacion.evaluadorNombre
+      || NOMBRES_MASTERS[correo]
+      || nombreRegistrado
+      || "Máster";
+  }
 
   /* =========================================================
      INICIALIZACIÓN Y MONTAJE
@@ -3001,7 +3018,7 @@ if (urlParams.get('panel') === 'admin') {
         };
         if (tipoEvaluacion === "Descarga") {
           registro.aspirante = item.aspirante || item.operador || "—";
-          registro.master = item.master || item.evaluador || "Evaluador";
+          registro.master = nombreVisibleMaster(item);
           registro.score = Number(item.score != null ? item.score : item.calificacion) || 0;
           registro.apto = item.apto != null
             ? item.apto
