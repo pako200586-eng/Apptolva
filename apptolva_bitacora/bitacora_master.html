@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="./css/fontawesome.min.css">
     <script src="./js/jspdf.min.js"></script>
     <script src="./js/qrcode.min.js"></script>
+    <script src="./js/catalogoOperadores.js"></script>
 
     <!-- 2. REGISTRO OFFLINE -->
     <script>
@@ -144,7 +145,12 @@
                     </select>
                 </div>
 
-                <div class="col-span-2 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Operador</label><input type="text" id="driverName" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre Completo"></div>
+                <div class="col-span-2 md:col-span-2 relative">
+                    <label class="text-xs text-gray-400 block mb-1">Operador (busca por número o apellido)</label>
+                    <input type="text" id="driverName" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Número de empleado o apellido" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="listaOperadoresNOM087" aria-expanded="false">
+                    <div id="listaOperadoresNOM087" class="hidden absolute left-0 right-0 top-full z-40 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg" role="listbox"></div>
+                </div>
+                <div><label class="text-xs text-gray-400 block mb-1">No. de empleado</label><input type="text" id="employeeNumber" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 bg-gray-100 font-bold" placeholder="Se completa del catálogo" readonly></div>
                 
                 <div><label class="text-xs text-gray-400 block mb-1">Licencia Federal</label><input type="text" id="license" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="Num. Licencia"></div>
                 <!-- CAMPO VIGENCIA -->
@@ -358,7 +364,7 @@
         }
 
         // Recuperar inputs
-        const ids = ['driverName', 'license', 'licenseExp', 'unitId', 'brandModel', 'plates', 'mode', 'folio', 'origin', 'destination', 'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 'kmInicio', 'kmFin', 'coConductor', 'coLicencia'];
+        const ids = ['driverName', 'employeeNumber', 'license', 'licenseExp', 'unitId', 'brandModel', 'plates', 'mode', 'folio', 'origin', 'destination', 'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 'kmInicio', 'kmFin', 'coConductor', 'coLicencia'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -373,6 +379,124 @@
         });
         const initialDriverName = document.getElementById('driverName')?.value.trim();
         if (initialDriverName) localStorage.setItem('nombreOperadorActual', initialDriverName);
+
+        // --- CATÁLOGO OFICIAL DE OPERADORES ---
+        const driverNameInput = document.getElementById('driverName');
+        const employeeNumberInput = document.getElementById('employeeNumber');
+        const operatorList = document.getElementById('listaOperadoresNOM087');
+        let selectedOperatorNumber = "";
+        let applyingCatalogOperator = false;
+
+        function normalizeOperatorText(value) {
+            return String(value || "")
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, "")
+                .trim()
+                .replace(/\s+/g, " ")
+                .toUpperCase();
+        }
+
+        function getSelectedCatalogOperator() {
+            const catalog = window.CATALOGO_OPERADORES;
+            const operator = catalog && catalog[employeeNumberInput.value.trim()];
+            if (!operator || normalizeOperatorText(operator.nombre) !== normalizeOperatorText(driverNameInput.value)) {
+                return null;
+            }
+            return { numero: employeeNumberInput.value.trim(), ...operator };
+        }
+
+        function hideOperatorSuggestions() {
+            operatorList.replaceChildren();
+            operatorList.classList.add('hidden');
+            driverNameInput.setAttribute('aria-expanded', 'false');
+        }
+
+        function selectCatalogOperator(numero) {
+            const operator = window.CATALOGO_OPERADORES && window.CATALOGO_OPERADORES[numero];
+            if (!operator) return;
+
+            applyingCatalogOperator = true;
+            selectedOperatorNumber = numero;
+            driverNameInput.value = operator.nombre;
+            employeeNumberInput.value = numero;
+            driverNameInput.classList.add('border-green-400', 'bg-green-50');
+            driverNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+            employeeNumberInput.dispatchEvent(new Event('input', { bubbles: true }));
+            applyingCatalogOperator = false;
+            hideOperatorSuggestions();
+        }
+
+        function showOperatorSuggestions(query) {
+            hideOperatorSuggestions();
+            if (!query || !window.CATALOGO_OPERADORES) return;
+
+            const normalizedQuery = normalizeOperatorText(query);
+            const matches = Object.entries(window.CATALOGO_OPERADORES)
+                .filter(([numero, operator]) =>
+                    numero.includes(normalizedQuery) ||
+                    normalizeOperatorText(operator.nombre).includes(normalizedQuery)
+                )
+                .slice(0, 8);
+
+            if (!matches.length) return;
+
+            matches.forEach(([numero, operator]) => {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'block w-full px-3 py-2 text-left text-xs hover:bg-orange-50 focus:bg-orange-50';
+                option.setAttribute('role', 'option');
+                option.textContent = `${numero} - ${operator.nombre}`;
+                option.addEventListener('mousedown', (event) => event.preventDefault());
+                option.addEventListener('click', () => selectCatalogOperator(numero));
+                operatorList.appendChild(option);
+            });
+            operatorList.classList.remove('hidden');
+            driverNameInput.setAttribute('aria-expanded', 'true');
+        }
+
+        if (driverNameInput && employeeNumberInput && operatorList) {
+            const savedNumber = employeeNumberInput.value.trim();
+            const savedOperator = window.CATALOGO_OPERADORES && window.CATALOGO_OPERADORES[savedNumber];
+            if (savedOperator && normalizeOperatorText(savedOperator.nombre) === normalizeOperatorText(driverNameInput.value)) {
+                selectCatalogOperator(savedNumber);
+            } else {
+                const savedMatch = Object.entries(window.CATALOGO_OPERADORES || {})
+                    .find(([, operator]) => normalizeOperatorText(operator.nombre) === normalizeOperatorText(driverNameInput.value));
+                if (savedMatch) {
+                    selectCatalogOperator(savedMatch[0]);
+                } else if (savedNumber) {
+                    employeeNumberInput.value = "";
+                    localStorage.setItem('nom087_employeeNumber', "");
+                }
+            }
+
+            driverNameInput.addEventListener('input', () => {
+                if (applyingCatalogOperator) return;
+                if (selectedOperatorNumber) {
+                    selectedOperatorNumber = "";
+                    employeeNumberInput.value = "";
+                    employeeNumberInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    driverNameInput.classList.remove('border-green-400', 'bg-green-50');
+                }
+                showOperatorSuggestions(driverNameInput.value);
+            });
+            driverNameInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !operatorList.classList.contains('hidden')) {
+                    const firstOption = operatorList.querySelector('[role="option"]');
+                    if (operatorList.children.length === 1 && firstOption) {
+                        event.preventDefault();
+                        firstOption.click();
+                    }
+                } else if (event.key === 'Escape') {
+                    hideOperatorSuggestions();
+                }
+            });
+            document.addEventListener('click', (event) => {
+                if (!operatorList.contains(event.target) && event.target !== driverNameInput) {
+                    hideOperatorSuggestions();
+                }
+            });
+        }
 
         // Validaciones ligeras de datos capturados (no bloquean el guardado offline)
         document.getElementById('licenseExp')?.addEventListener('change', checkLicenseExpiry);
@@ -748,6 +872,12 @@
 
         // --- GENERADOR PDF ---
         window.generarPDFSeguro = async function() {
+            const selectedOperator = getSelectedCatalogOperator();
+            if (!selectedOperator) {
+                alert("⚠️ Busca al operador por número o apellido y selecciónalo del catálogo oficial antes de generar el PDF.");
+                return;
+            }
+
             // 1. Verificar librerías
             if (!window.jspdf) { 
                 alert("⚠️ Error: Librería PDF no cargada. Abre la app con internet una vez."); return; 
@@ -813,10 +943,11 @@
             row("CONFIG:", document.getElementById('mode').value, 122, 25);
             row("VIN:", document.getElementById('vin').value, 149, 46);
             y += 9;
-            row("OPERADOR:", document.getElementById('driverName').value, 14, 60);
-            row("LICENCIA:", document.getElementById('license').value, 76, 40);
-            row("VIG. LIC:", document.getElementById('licenseExp').value, 118, 35);
-            row("TIPO CARGA:", document.getElementById('tipoCarga').value, 155, 40);
+            row("OPERADOR:", `${selectedOperator.nombre} (No. ${selectedOperator.numero})`, 14, 181);
+            y += 9;
+            row("LICENCIA:", document.getElementById('license').value, 14, 60);
+            row("VIG. LIC:", document.getElementById('licenseExp').value, 76, 60);
+            row("TIPO CARGA:", document.getElementById('tipoCarga').value, 138, 57);
             y += 9;
             row("ORIGEN:", document.getElementById('origin').value, 14, 60);
             row("DESTINO:", document.getElementById('destination').value, 76, 60);
@@ -991,7 +1122,7 @@
             doc.line(30, y+20, 80, y+20);
             doc.addImage(opSig, 'PNG', 35, y, 40, 18);
             doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y+23, {align:"center"});
-            doc.setFontSize(5); doc.text(document.getElementById('driverName').value || "", 55, y+26, {align:"center"});
+            doc.setFontSize(5); doc.text(selectedOperator.nombre, 55, y+26, {align:"center"});
             doc.text("Lic. Fed.: " + (document.getElementById('license').value || ""), 55, y+29, {align:"center"});
 
             doc.line(120, y+20, 170, y+20);
@@ -1110,6 +1241,7 @@
         function buildBitacoraPayload() {
             const rawFolio = document.getElementById('folio').value || "S/F";
             const folio = rawFolio.trim();
+            const operator = getSelectedCatalogOperator();
             let signatureOp = "", signatureSup = "";
             try {
                 const opPad = document.getElementById('signaturePad');
@@ -1124,7 +1256,8 @@
                 fecha: new Date().toLocaleDateString(),
                 unitId: document.getElementById('unitId').value.trim(),
                 plates: document.getElementById('plates').value || "",
-                driverName: document.getElementById('driverName').value.trim(),
+                driverName: operator ? operator.nombre : document.getElementById('driverName').value.trim(),
+                employeeNumber: operator ? operator.numero : "",
                 license: document.getElementById('license').value.trim(),
                 licenseExp: document.getElementById('licenseExp') ? document.getElementById('licenseExp').value : "",
                 brandModel: document.getElementById('brandModel') ? document.getElementById('brandModel').value : "",
@@ -1151,7 +1284,7 @@
             const missing = [];
             if (!payload.folio || payload.folio === "S/F") missing.push("folio");
             if (!payload.unitId) missing.push("económico");
-            if (!payload.driverName) missing.push("operador");
+            if (!payload.driverName || !payload.employeeNumber) missing.push("operador del catálogo (número y nombre oficial)");
             if (!payload.license) missing.push("licencia");
             if (!Array.isArray(payload.logs) || payload.logs.length === 0) missing.push("registros");
             return missing;
@@ -1568,6 +1701,7 @@ onAuthStateChanged(auth, (user) => {
                 report_type: "bitacora",
                 unit_id: payload.unitId || "",
                 driver_name: payload.driverName || "",
+                employee_number: payload.employeeNumber || "",
                 license: payload.license || "",
                 priority: "baja",
                 sync_status: "sincronizado",
