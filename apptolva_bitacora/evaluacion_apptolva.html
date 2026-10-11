@@ -4061,14 +4061,78 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
       : item.resultado === 'APTO' || item.resultado === 'APTO (APROBADO)';
     const masterNombre = item.master || item.evaluadorNombre || item.evaluador || 'Máster';
     const observaciones = item.observaciones || item.obs || 'Sin observaciones registradas.';
-    const respuestas = item.respuestas && typeof item.respuestas === 'object'
-      ? Object.entries(item.respuestas)
-      : [];
-    const filasRespuestas = respuestas.length
-      ? respuestas.map(([criterio, respuesta]) => `
-          <tr><td>${escaparHTMLDocumento(criterio)}</td><td>${escaparHTMLDocumento(respuesta || 'Sin respuesta')}</td></tr>
-        `).join('')
-      : '<tr><td colspan="2">No hay respuestas guardadas.</td></tr>';
+    const respuestas = item.radios || item.respuestas || item.fullState?.radios || item.checklist || {};
+    const seccionesOficiales = [
+      {
+        nombre: '1. Llegada y Posicionamiento',
+        puntos: 20,
+        criterios: [
+          { id: 's1_1', descripcion: 'Confirma con encargado el silo correcto (Evita mezcla)', puntos: 5 },
+          { id: 's1_2', descripcion: 'Alineación correcta del tubo sin forzarse', puntos: 5 },
+          { id: 's1_3', descripcion: 'Verifica tapa del silo abierta y limpia', puntos: 5 },
+          { id: 's1_4', descripcion: 'Coloca conos de seguridad o delimita área', puntos: 5 }
+        ]
+      },
+      {
+        nombre: '2. Preparación Mecánica y EPP',
+        puntos: 20,
+        criterios: [
+          { id: 's2_1', descripcion: 'Uso de EPP completo (Casco, lentes, botas, etc.)', puntos: 5 },
+          { id: 's2_2', descripcion: 'Revisión de mangueras hidráulicas antes de conectar', puntos: 5 },
+          { id: 's2_3', descripcion: 'Conexión suave de Toma de Fuerza (PTO)', puntos: 5 },
+          { id: 's2_4', descripcion: 'Ajuste de RPM correctas (No sobre-revoluciona)', puntos: 5 }
+        ]
+      },
+      {
+        nombre: '3. Operación de Descarga',
+        puntos: 40,
+        criterios: [
+          { id: 's3_1', descripcion: 'Apertura secuencial de compuertas (evita atascos)', puntos: 10 },
+          { id: 's3_2', descripcion: 'Monitoreo auditivo del sistema (ruidos extraños)', puntos: 10 },
+          { id: 's3_3', descripcion: 'Control de flujo para no ahogar el sistema', puntos: 10 },
+          { id: 's3_4', descripcion: 'Verificación visual de compartimentos vacíos', puntos: 10 }
+        ]
+      },
+      {
+        nombre: '4. Limpieza y Salida',
+        puntos: 20,
+        criterios: [
+          { id: 's4_1', descripcion: 'Realiza barrido final del tubo (sistema vacío)', puntos: 5 },
+          { id: 's4_2', descripcion: 'Desconecta PTO y baja RPM antes de apagar', puntos: 5 },
+          { id: 's4_3', descripcion: 'Asegura el tubo en su base (candado/seguro)', puntos: 5 },
+          { id: 's4_4', descripcion: 'Entrega documentación completa y limpia zona', puntos: 5 }
+        ]
+      }
+    ];
+    const htmlSecciones = seccionesOficiales.map(seccion => {
+      const filas = seccion.criterios.map(criterio => {
+        const respuesta = String(respuestas[criterio.id] || '').trim().toUpperCase();
+        let badge = '<span class="answer unanswered">--</span>';
+        if (respuesta === 'SI' || respuesta === 'SÍ') {
+          badge = '<span class="answer yes">✓ SÍ</span>';
+        } else if (respuesta === 'NO') {
+          badge = '<span class="answer no">✗ NO</span>';
+        } else if (respuesta === 'NA' || respuesta === 'N/A') {
+          badge = '<span class="answer na">N/A</span>';
+        }
+
+        return `
+          <tr>
+            <td>${escaparHTMLDocumento(criterio.descripcion)}</td>
+            <td class="points">${criterio.puntos} pts</td>
+            <td class="result">${badge}</td>
+          </tr>`;
+      }).join('');
+
+      return `
+        <section class="criteria-section">
+          <h2><span>${escaparHTMLDocumento(seccion.nombre)}</span><span>${seccion.puntos} pts</span></h2>
+          <table>
+            <thead><tr><th>Criterio oficial</th><th>Puntaje</th><th>Resultado</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </section>`;
+    }).join('');
     const win = window.open('', '_blank');
     if (!win) {
       alert('Permite las ventanas emergentes para imprimir la evaluación de Descarga.');
@@ -4083,26 +4147,35 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
   <style>
     @page { size: letter portrait; margin: 12mm 15mm; }
     * { box-sizing: border-box; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { margin: 0; padding: 20px; color: #1e293b; font-size: 12px; }
-    .header { position: relative; text-align: center; border-bottom: 4px solid #F26522; padding-bottom: 10px; margin-bottom: 16px; }
-    .logo { color: #F26522; font-weight: 900; font-size: 26px; letter-spacing: 1px; }
-    .subtitle { margin-top: 4px; color: #475569; font-size: 13px; font-weight: bold; text-transform: uppercase; }
-    .folio { position: absolute; right: 0; top: 5px; padding: 4px 8px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: bold; }
-    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; padding: 12px; border: 1px solid #e2e8f0; background: #f8fafc; }
-    .label { display: block; margin-bottom: 2px; color: #64748b; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    body { margin: 0; padding: 15px; color: #1e293b; font-size: 11px; }
+    .header { position: relative; text-align: center; border-bottom: 3px solid #F26522; padding-bottom: 8px; margin-bottom: 12px; }
+    .logo { color: #F26522; font-weight: 900; font-size: 24px; letter-spacing: 1px; }
+    .subtitle { margin-top: 3px; color: #475569; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+    .folio { position: absolute; right: 0; top: 0; padding: 4px 8px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: bold; }
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; padding: 10px; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .label { display: block; margin-bottom: 2px; color: #64748b; font-size: 9px; font-weight: bold; text-transform: uppercase; }
     .value { color: #0f172a; font-weight: bold; }
-    .summary { margin-top: 18px; padding: 16px; border: 1.5px solid #cbd5e1; background: #f8fafc; text-align: center; }
-    .score { margin: 4px 0; font-size: 32px; font-weight: 900; }
-    .status { display: inline-block; padding: 6px 18px; border-radius: 20px; color: white; font-weight: 900; }
+    .criteria-section { margin-top: 8px; border: 1px solid #cbd5e1; page-break-inside: avoid; }
+    .criteria-section h2 { display: flex; justify-content: space-between; margin: 0; padding: 5px 8px; background: #334155; color: white; font-size: 10px; }
+    .criteria-section h2 span:last-child { color: #cbd5e1; }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 9px; }
+    th { background: #f1f5f9; color: #475569; }
+    .points, .result { width: 62px; text-align: center; white-space: nowrap; }
+    .answer { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 800; }
+    .yes { border: 1px solid #86efac; background: #dcfce7; color: #15803d; }
+    .no { border: 1px solid #fca5a5; background: #fee2e2; color: #b91c1c; }
+    .na { border: 1px solid #cbd5e1; background: #f1f5f9; color: #475569; }
+    .unanswered { color: #94a3b8; }
+    .summary { margin-top: 10px; padding: 10px; border: 1.5px solid #cbd5e1; background: #f8fafc; text-align: center; page-break-inside: avoid; }
+    .score { margin: 2px 0; color: #0f172a; font-size: 26px; font-weight: 900; }
+    .status { display: inline-block; padding: 4px 14px; border-radius: 14px; color: white; font-weight: 900; }
     .apto { background: #16a34a; } .no-apto { background: #dc2626; }
-    .observations { margin-top: 16px; padding: 10px; border: 1px solid #cbd5e1; }
-    table { width: 100%; margin-top: 16px; border-collapse: collapse; }
-    th, td { padding: 6px; border: 1px solid #cbd5e1; text-align: left; }
-    th { background: #f1f5f9; }
-    .signatures { display: flex; justify-content: space-between; gap: 40px; margin-top: 45px; page-break-inside: avoid; }
+    .observations { margin-top: 10px; padding: 8px; border: 1px solid #cbd5e1; page-break-inside: avoid; }
+    .signatures { display: flex; justify-content: space-between; gap: 40px; margin-top: 30px; page-break-inside: avoid; }
     .sign { flex: 1; text-align: center; }
-    .line { min-height: 35px; margin-bottom: 6px; border-bottom: 1.5px solid #000; }
-    .sign-title { color: #475569; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    .line { min-height: 25px; margin-bottom: 5px; border-bottom: 1.5px solid #000; }
+    .sign-title { color: #475569; font-size: 9px; font-weight: bold; text-transform: uppercase; }
     @media print { body { padding: 0; } }
   </style>
 </head>
@@ -4118,6 +4191,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     <div><span class="label">Granja / destino</span><span class="value">${escaparHTMLDocumento(opGranja)}</span></div>
     <div><span class="label">Económico / No. tolva</span><span class="value">${escaparHTMLDocumento(opEco)}</span></div>
   </section>
+  ${htmlSecciones}
   <section class="summary">
     <div class="label">Calificación final obtenida (mínimo aprobatorio: 80%)</div>
     <div class="score">${escaparHTMLDocumento(opScore)}%</div>
@@ -4127,10 +4201,6 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     <span class="label">Observaciones y recomendaciones</span>
     <div>${escaparHTMLDocumento(observaciones)}</div>
   </section>
-  <table>
-    <thead><tr><th>Criterio</th><th>Respuesta</th></tr></thead>
-    <tbody>${filasRespuestas}</tbody>
-  </table>
   <footer class="signatures">
     <div class="sign"><div class="line"></div><div class="sign-title">Supervisor de prueba / Máster</div><div>${escaparHTMLDocumento(masterNombre)}</div></div>
     <div class="sign"><div class="line"></div><div class="sign-title">Conductor evaluado</div><div>${escaparHTMLDocumento(opNombre)}</div></div>

@@ -1,7 +1,7 @@
 /**
  * js/catalogoOperadores.js
  * Catálogo Maestro Oficial de Operadores de Transporte - Grupo Bachoco
- * Plantilla Flota Propia (66 Operadores)
+ * Plantilla Flota Propia (67 Operadores)
  */
 const CATALOGO_OPERADORES = {
   "278272": { nombre: "SANCHEZ RODRIGUEZ URIEL ARMANDO", depto: "TRANSPORTES" },
@@ -69,7 +69,8 @@ const CATALOGO_OPERADORES = {
   "297281": { nombre: "LOPEZ JIMENEZ MARTIN", depto: "TRANSPORTES" },
   "296246": { nombre: "PERALTA MARTINEZ JOSE LUIS", depto: "TRANSPORTES" },
   "297136": { nombre: "GOOPAR IVAN ANTONIO", depto: "TRANSPORTES" },
-  "297933": { nombre: "CHONTAL CORTEZ JOSE OSMIN", depto: "TRANSPORTES" }
+  "297933": { nombre: "CHONTAL CORTEZ JOSE OSMIN", depto: "TRANSPORTES" },
+  "293663": { nombre: "ROMERO MARTINEZ ANTONIO", depto: "TRANSPORTES" }
 };
 
 // Funciones de ayuda
