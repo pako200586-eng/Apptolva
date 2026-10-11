@@ -122,14 +122,9 @@
 
                 <div class="col-span-2 md:col-span-1">
                     <label class="text-xs font-bold text-orange-600 uppercase block mb-1">Folio</label>
-                    <div class="relative flex">
-                        <div class="relative flex-grow">
-                            <i class="fas fa-hashtag absolute left-3 top-2.5 text-orange-300"></i>
-                            <input type="text" id="folio" class="bachoco-input w-full rounded-l-lg py-2 pl-8 pr-2 bg-white font-bold text-gray-800 uppercase border border-gray-300" placeholder="Cargando...">
-                        </div>
-                        <button onclick="window.generarFolioFirebase(true)" class="bg-orange-600 text-white px-2 rounded-r-lg text-xs font-bold hover:bg-orange-700" title="Obtener Folio Cloud">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
+                    <div class="relative">
+                        <i class="fas fa-hashtag absolute left-3 top-2.5 text-orange-300"></i>
+                        <input type="text" id="folio" class="bachoco-input w-full rounded-lg py-2 pl-8 pr-2 bg-gray-100 font-bold text-gray-600 uppercase border border-gray-300" placeholder="Asignando folio..." readonly aria-readonly="true">
                     </div>
                 </div>
 
@@ -369,7 +364,11 @@
             const el = document.getElementById(id);
             if (!el) return;
             const val = localStorage.getItem('nom087_' + id);
-            if (val) el.value = val;
+            if (val && (id !== 'folio' || /^(?:FB\d+|OFF-\d{6})$/.test(val))) {
+                el.value = val;
+            } else if (id === 'folio' && val) {
+                localStorage.removeItem('nom087_folio');
+            }
             el.addEventListener('input', (e) => {
                 localStorage.setItem('nom087_' + id, e.target.value);
                 if (id === 'driverName' && e.target.value.trim()) {
@@ -678,6 +677,9 @@
                 localStorage.removeItem('nom087_logs');
                 localStorage.removeItem('nom087_folio');
                 document.getElementById('folio').value = '';
+                if (typeof window.generarFolioFirebase === 'function') {
+                    window.generarFolioFirebase();
+                }
                 document.getElementById('origin').value = '';
                 document.getElementById('destination').value = '';
                 localStorage.removeItem('nom087_origin');
@@ -1537,7 +1539,10 @@
             console.warn("Firebase: API key no configurada. Funciones de nube deshabilitadas.");
             window.generarFolioFirebase = function() {
                 const inputFolio = document.getElementById('folio');
-                if (inputFolio && !inputFolio.value) inputFolio.value = "OFF-" + new Date().getTime().toString().slice(-6);
+                if (!inputFolio || inputFolio.value) return;
+                const folio = "OFF-" + new Date().getTime().toString().slice(-6);
+                inputFolio.value = folio;
+                localStorage.setItem('nom087_folio', folio);
             };
             window.addEventListener('load', () => window.generarFolioFirebase());
         } else {
@@ -1634,49 +1639,62 @@
             .then(() => readPendingReportIds().forEach(observePendingReport))
             .catch((error) => console.error("No se pudieron reanudar reportes pendientes:", error));
 
-// EL ESCÁNER PERMANENTE: Revisa si ya hay pase o si necesita uno nuevo
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        // SI TIENE PASE (Usuario detectado)
-        console.log("¡Vigilante autoriza! Gafete activo:", user.uid);
-        
-        // AQUÍ VAN TUS FOLIOS, AHORA SÍ 100% SEGUROS
-        try {
-             obtenerFolioChecklist(); 
-             obtenerSiguienteFolio(); 
-        } catch(e) {
-             console.log("Cargando folios..."); 
-        }
-        
-    } else {
-        // SI NO TIENE PASE, LO CREAMOS INMEDIATAMENTE
-        console.log("Sin gafete. Solicitando uno nuevo...");
-        iniciarSesionAnonima().catch((error) => {
-            console.error("Error crítico al dar gafete:", error);
-        });
-    }
-});
+        let folioGenerationPromise = null;
 
-        window.generarFolioFirebase = async function(manual = false) {
+        window.generarFolioFirebase = async function() {
              const inputFolio = document.getElementById('folio');
-             if (!manual && inputFolio.value) return;
+             if (!inputFolio) return;
+             if (inputFolio.value.trim()) return inputFolio.value.trim();
              if (!navigator.onLine) {
-                 if(!inputFolio.value) inputFolio.value = "OFF-" + new Date().getTime().toString().slice(-6);
-                 return;
+                 const offlineFolio = "OFF-" + new Date().getTime().toString().slice(-6);
+                 inputFolio.value = offlineFolio;
+                 localStorage.setItem('nom087_folio', offlineFolio);
+                 inputFolio.dispatchEvent(new Event('input', { bubbles: true }));
+                 return offlineFolio;
              }
-             try {
-                const newFolio = await runTransaction(db, async (transaction) => {
-                    const counterRef = doc(db, "sistema", "contadores");
-                    const sfDoc = await transaction.get(counterRef);
-                    let newSeq = 1000;
-                    if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
-                    transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
-                    return `FB${newSeq}`;
-                });
-                inputFolio.value = newFolio;
-                localStorage.setItem('nom087_folio', newFolio);
-             } catch(e) { console.error(e); }
+             if (folioGenerationPromise) return folioGenerationPromise;
+
+             folioGenerationPromise = (async () => {
+                 try {
+                    const newFolio = await runTransaction(db, async (transaction) => {
+                        const counterRef = doc(db, "sistema", "contadores");
+                        const sfDoc = await transaction.get(counterRef);
+                        let newSeq = 1000;
+                        if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
+                        transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
+                        return `FB${newSeq}`;
+                    });
+                    inputFolio.value = newFolio;
+                    localStorage.setItem('nom087_folio', newFolio);
+                    inputFolio.dispatchEvent(new Event('input', { bubbles: true }));
+                    return newFolio;
+                 } catch(error) {
+                    console.error("No se pudo reservar el folio de la bitácora en Firebase:", error);
+                    window.dispatchEvent(new CustomEvent("bitacora-firestore-sync-error", {
+                        detail: { message: `No se pudo reservar el folio en Firebase. Se asignó un folio temporal. ${error.message}` }
+                    }));
+                    const offlineFolio = "OFF-" + new Date().getTime().toString().slice(-6);
+                    inputFolio.value = offlineFolio;
+                    localStorage.setItem('nom087_folio', offlineFolio);
+                    inputFolio.dispatchEvent(new Event('input', { bubbles: true }));
+                    return offlineFolio;
+                 } finally {
+                    folioGenerationPromise = null;
+                 }
+             })();
+             return folioGenerationPromise;
         }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("Sesión anónima lista para la bitácora:", user.uid);
+                window.generarFolioFirebase();
+            } else {
+                iniciarSesionAnonima().catch((error) => {
+                    console.error("Error crítico al dar gafete:", error);
+                });
+            }
+        });
 
         window.intentarSubirNubeFirebase = async function() {
             if (typeof window.intentarSubirNube === "function") {
@@ -1753,7 +1771,9 @@ onAuthStateChanged(auth, (user) => {
             };
         };
 
-        window.addEventListener('load', () => { if(navigator.onLine) window.generarFolioFirebase(false); });
+        window.addEventListener('load', () => {
+            if (!navigator.onLine) window.generarFolioFirebase();
+        });
         } // end else (Firebase configurado)
     </script>
 </body>
