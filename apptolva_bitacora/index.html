@@ -1528,6 +1528,125 @@ onAuthStateChanged(auth, (user) => {
         console.log("Sistema Nube: Listo para asignar folios bajo demanda.");
         } // end else (Firebase configurado)
     </script>
+    <!-- ============================================================ -->
+    <!-- CATÁLOGO OFICIAL Y AUTOCOMPLETADO MAESTRO DE OPERADORES      -->
+    <!-- ============================================================ -->
+    <script src="./catalogoOperadores.js"></script>
+    <script>
+    (function() {
+        function iniciarCatalogoOperadores() {
+            const catalogo = window.CATALOGO_OPERADORES;
+            if (!catalogo) {
+                console.warn("Catálogo de operadores aún no disponible en window.");
+                return;
+            }
+
+            // 1. Generar la lista desplegable con los 65 operadores oficiales
+            let dl = document.getElementById('listaOperadoresBachoco');
+            if (!dl) {
+                dl = document.createElement('datalist');
+                dl.id = 'listaOperadoresBachoco';
+                for (const [num, op] of Object.entries(catalogo)) {
+                    const opt = document.createElement('option');
+                    opt.value = num + " - " + op.nombre;
+                    dl.appendChild(opt);
+                }
+                document.body.appendChild(dl);
+            }
+
+            // 2. Localizar los campos de Checklist y Bitácora
+            const inputNum = document.getElementById('revEmpleado');        // Checklist: No. Empleado
+            const inputNombre = document.getElementById('revOperador');      // Checklist: Nombre Operador
+            const inputBitacora = document.getElementById('nombreOpTexto');  // Bitácora: Firma Operador
+
+            // Conectar el menú desplegable a los campos de nombre
+            if (inputNombre) inputNombre.setAttribute('list', 'listaOperadoresBachoco');
+            if (inputBitacora) inputBitacora.setAttribute('list', 'listaOperadoresBachoco');
+
+            // 3. Sincronización al escribir o detectar el Número de Empleado
+            function aplicarOperadorPorNumero(numStr) {
+                const num = (numStr || "").trim();
+                if (catalogo[num]) {
+                    const op = catalogo[num];
+                    if (inputNombre) {
+                        inputNombre.value = op.nombre;
+                        inputNombre.readOnly = true;
+                        inputNombre.style.backgroundColor = '#f0fdf4'; // Verde tenue de verificación
+                        inputNombre.style.borderColor = '#86efac';
+                        inputNombre.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    if (inputBitacora) {
+                        inputBitacora.value = op.nombre;
+                        inputBitacora.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    return true;
+                } else {
+                    if (inputNombre && inputNombre.readOnly) {
+                        inputNombre.readOnly = false;
+                        inputNombre.style.backgroundColor = '';
+                        inputNombre.style.borderColor = '';
+                    }
+                    return false;
+                }
+            }
+
+            // 4. Sincronización si el operador escribe su nombre por costumbre
+            function resolverDesdeTexto(texto) {
+                if (!texto) return;
+                const str = texto.trim();
+
+                // Caso A: Selecciona del datalist ("221417 - AMBROSIO SOLIS...")
+                const match = str.match(/^(\d+)\s*[-–]\s*(.+)$/);
+                if (match && catalogo[match[1]]) {
+                    if (inputNum) {
+                        inputNum.value = match[1];
+                        inputNum.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    aplicarOperadorPorNumero(match[1]);
+                    return;
+                }
+
+                // Caso B: Tecleó su nombre completo en mayúsculas
+                const upper = str.toUpperCase();
+                for (const [num, op] of Object.entries(catalogo)) {
+                    if (op.nombre === upper) {
+                        if (inputNum) {
+                            inputNum.value = num;
+                            inputNum.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        aplicarOperadorPorNumero(num);
+                        return;
+                    }
+                }
+            }
+
+            // 5. Escuchadores de eventos en tiempo real
+            if (inputNum) {
+                inputNum.addEventListener('input', (e) => aplicarOperadorPorNumero(e.target.value));
+                inputNum.addEventListener('change', (e) => aplicarOperadorPorNumero(e.target.value));
+                if (inputNum.value) aplicarOperadorPorNumero(inputNum.value);
+            }
+
+            if (inputNombre) {
+                inputNombre.addEventListener('change', (e) => resolverDesdeTexto(e.target.value));
+                inputNombre.addEventListener('input', (e) => {
+                    if (!inputNombre.readOnly) resolverDesdeTexto(e.target.value);
+                });
+            }
+
+            if (inputBitacora) {
+                inputBitacora.addEventListener('change', (e) => resolverDesdeTexto(e.target.value));
+                inputBitacora.addEventListener('input', (e) => resolverDesdeTexto(e.target.value));
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', iniciarCatalogoOperadores);
+        } else {
+            setTimeout(iniciarCatalogoOperadores, 100);
+        }
+    })();
+    </script>
 
 </body>
 </html>
