@@ -1,7 +1,7 @@
 /**
  * js/catalogoOperadores.js
  * Catálogo Maestro Oficial de Operadores de Transporte - Grupo Bachoco
- * Plantilla Flota Propia (65 Operadores)
+ * Plantilla Flota Propia (66 Operadores)
  */
 const CATALOGO_OPERADORES = {
   "278272": { nombre: "SANCHEZ RODRIGUEZ URIEL ARMANDO", depto: "TRANSPORTES" },
@@ -62,13 +62,14 @@ const CATALOGO_OPERADORES = {
   "262185": { nombre: "JUNCO GONZALEZ KENI DANIEL", depto: "TRANSPORTES" },
   "279838": { nombre: "ALVARADO AQUINO LUIS ANTONIO", depto: "TRANSPORTES" },
   "208525": { nombre: "CRUZ PEREZ BERNARDINO", depto: "TRANSPORTES" },
-  "248980": { nombre: "CARRION DOMINGUEZ MARIA FERNANDA", depto: "TRANSPORTES" },
-  "236179": { nombre: "VASQUEZ MONTIEL ZABDI ANNEME", depto: "TRANSPORTES" },
-  "292067": { nombre: "ACEVEDO RIVERA JAZMIN BERENICE", depto: "TRANSPORTES" },
   "234363": { nombre: "CRUZ HERNANDEZ EUGENIO", depto: "TRANSPORTES" },
   "160630": { nombre: "REYES LUIS CARLOS OMAR", depto: "TRANSPORTES" },
   "202278": { nombre: "MIRANDA MARTINEZ CARLOS IVAN", depto: "TRANSPORTES" },
-  "135471": { nombre: "LUIS SANTIAGO EMMANUEL", depto: "TRANSPORTES" }
+  "135471": { nombre: "LUIS SANTIAGO EMMANUEL", depto: "TRANSPORTES" },
+  "297281": { nombre: "LOPEZ JIMENEZ MARTIN", depto: "TRANSPORTES" },
+  "296246": { nombre: "PERALTA MARTINEZ JOSE LUIS", depto: "TRANSPORTES" },
+  "297136": { nombre: "GOOPAR IVAN ANTONIO", depto: "TRANSPORTES" },
+  "297933": { nombre: "CHONTAL CORTEZ JOSE OSMIN", depto: "TRANSPORTES" }
 };
 
 // Funciones de ayuda

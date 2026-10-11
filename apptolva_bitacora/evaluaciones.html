@@ -152,10 +152,13 @@
 
         let evalTipoActual = null;
         let evalRespuestas = {};
+        let folioEdicionDescarga = "";
+        let descargaEdicionCargada = false;
 
         function volverEvalMenu() {
             evalTipoActual = null;
             evalRespuestas = {};
+            folioEdicionDescarga = "";
             document.getElementById('evalForm').classList.add('hidden');
             document.getElementById('evalForm').innerHTML = '';
             document.getElementById('evalStart').classList.remove('hidden');
@@ -387,8 +390,63 @@
             if (!cfg) return;
             if (confirm("¿Estás seguro? Se borrarán los datos para evaluar a un nuevo operador.")) {
                 localStorage.removeItem(cfg.storageKey);
+                folioEdicionDescarga = "";
                 iniciarEval(evalTipoActual);
             }
+        }
+
+        function cargarDescargaPendienteEdicion() {
+            const folio = new URLSearchParams(window.location.search).get('folio');
+            if (!folio || !folio.startsWith('DESC-') || descargaEdicionCargada) return;
+            descargaEdicionCargada = true;
+
+            let evaluacion;
+            try {
+                evaluacion = JSON.parse(localStorage.getItem('eval_descarga_edicion') || 'null');
+            } catch (error) {
+                console.error('No se pudo leer la evaluación de Descarga para editar:', error);
+            }
+
+            if (!evaluacion || (evaluacion.id || evaluacion.folio) !== folio) {
+                alert(`No se encontró la información guardada de la evaluación ${folio}. Regresa al historial e inténtalo de nuevo.`);
+                return;
+            }
+
+            const inputs = {
+                opNombre: evaluacion.operador || evaluacion.aspirante || '',
+                opFecha: evaluacion.fecha || '',
+                opGranja: evaluacion.granja || evaluacion.centro || '',
+                opEco: evaluacion.economico || evaluacion.unidad_neg || '',
+                opObs: evaluacion.observaciones || evaluacion.obs || ''
+            };
+            localStorage.setItem(evaluaciones.descarga.storageKey, JSON.stringify({
+                inputs,
+                radios: evaluacion.respuestas || {}
+            }));
+
+            folioEdicionDescarga = folio;
+            iniciarEval('descarga');
+            Object.entries(inputs).forEach(([id, value]) => {
+                const input = document.getElementById(`ev_${id}`);
+                if (input) input.value = value;
+            });
+            evalRespuestas = evaluacion.respuestas && typeof evaluacion.respuestas === 'object'
+                ? { ...evaluacion.respuestas }
+                : {};
+            Object.entries(evalRespuestas).forEach(([itemId, respuesta]) => {
+                const group = document.querySelector(`[data-item="${itemId}"]`);
+                if (!group) return;
+                group.querySelectorAll('.eval-rad').forEach(button => {
+                    button.classList.remove('eval-si', 'eval-no', 'eval-na');
+                    button.classList.add('text-gray-500', 'bg-white');
+                    if (button.dataset.val === respuesta) {
+                        button.classList.remove('text-gray-500', 'bg-white');
+                        button.classList.add(`eval-${String(respuesta).toLowerCase()}`);
+                    }
+                });
+            });
+            evalGuardar();
+            calcularEval();
         }
 
         function validarEvalAntesDePDF() {
@@ -453,16 +511,23 @@
             const obs = evalCampoValor('opObs');
 
             if (typeof window.guardarDescargaFirebase === 'function') {
-                await window.guardarDescargaFirebase({
-                    operador: evalCampoValor('opNombre'),
-                    fecha: fechaDoc,
-                    granja: evalCampoValor('opGranja'),
-                    economico: evalCampoValor('opEco'),
-                    calificacion: resumen.pct,
-                    resultado: resumen.estado,
-                    observaciones: obs,
-                    respuestas: evalRespuestas
-                });
+                try {
+                    const guardado = await window.guardarDescargaFirebase({
+                        folio: folioEdicionDescarga,
+                        operador: evalCampoValor('opNombre'),
+                        fecha: fechaDoc,
+                        granja: evalCampoValor('opGranja'),
+                        economico: evalCampoValor('opEco'),
+                        calificacion: resumen.pct,
+                        resultado: resumen.estado,
+                        observaciones: obs,
+                        respuestas: evalRespuestas
+                    });
+                    if (guardado && guardado.folio) folioEdicionDescarga = guardado.folio;
+                } catch (error) {
+                    console.error('No se pudo guardar la evaluación antes de generar el PDF:', error);
+                    alert(`No se pudo actualizar Firebase; se generará el PDF con los datos actuales. ${error.message}`);
+                }
             }
             
             const { jsPDF } = window.jspdf;
@@ -743,7 +808,11 @@
             document.getElementById("adminEvalPanelCard").style.display = role === "admin" ? "flex" : "none";
             if (role) {
                 accessError.classList.add("hidden");
-                volverEvalMenu();
+                if (new URLSearchParams(window.location.search).has('folio')) {
+                    cargarDescargaPendienteEdicion();
+                } else {
+                    volverEvalMenu();
+                }
             } else if (user && !profileError) {
                 showAccessError("Acceso denegado. Este módulo es exclusivo para Másters y administradores autorizados.");
                 try {
@@ -765,7 +834,7 @@
         // 👉 GUARDAR EVALUACIÓN DE DESCARGA EN FIREBASE FIRESTORE
         window.guardarDescargaFirebase = async function(evalData) {
             try {
-                const folio = `DESC-${Date.now().toString().slice(-6)}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+                const folio = evalData.folio || `DESC-${Date.now().toString().slice(-6)}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
                 await setDoc(doc(db, "evaluaciones_descarga", folio), {
                     folio: folio,
                     operador: evalData.operador,
@@ -781,8 +850,10 @@
                     timestamp: new Date().toISOString()
                 });
                 console.log("✅ Evaluación de Descarga guardada en Firestore con folio:", folio);
+                return { folio };
             } catch (err) {
-                console.warn("Aviso Firebase: no se pudo guardar la evaluación en Firestore:", err);
+                console.error("No se pudo guardar la evaluación de Descarga en Firebase:", err);
+                throw err;
             }
         };
 

@@ -2992,6 +2992,8 @@ if (urlParams.get('panel') === 'admin') {
   const folio = button.dataset.folio;
   if (button.dataset.historyAction === 'load') cargarEvaluacion(folio);
   else if (button.dataset.historyAction === 'print') imprimirDesdeHistorial(folio);
+  else if (button.dataset.historyAction === 'load-descarga') cargarEvaluacionDescarga(folio);
+  else if (button.dataset.historyAction === 'print-descarga') imprimirEvaluacionDescarga(folio);
   else if (button.dataset.historyAction === 'delete') eliminarEvaluacion(folio);
   });
 
@@ -3956,7 +3958,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     tbody.innerHTML = list.map(item => `
       <tr>
         <td><strong>${escaparHTML(item.id)}</strong></td>
-        <td>${item.tipoEvaluacion === 'Descarga' ? '🌾 Descarga' : '🚗 Conducción'}</td>
+        <td>${item.tipoEvaluacion === 'Descarga' || String(item.id).startsWith('DESC-') ? '🌾 Descarga' : '🚗 Conducción'}</td>
         <td>${escaparHTML(item.fecha || '--')}</td>
         <td><strong>${escaparHTML(item.aspirante || '--')}</strong></td>
         <td><span style="color:#ea580c; font-weight:700;">${escaparHTML(item.master || 'Francisco A. Ambrosio')}</span></td>
@@ -3968,7 +3970,10 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
           </span>
         </td>
         <td>
-          ${item.tipoEvaluacion === 'Descarga' ? '—' : `
+          ${item.tipoEvaluacion === 'Descarga' || String(item.id).startsWith('DESC-') ? `
+            <button type="button" class="btn-table-action" data-history-action="load-descarga" data-folio="${escaparHTML(item.id)}">✏️ Cargar</button>
+            <button type="button" class="btn-table-action" data-history-action="print-descarga" data-folio="${escaparHTML(item.id)}">🖨️ PDF</button>
+          ` : `
             <button type="button" class="btn-table-action" data-history-action="load" data-folio="${escaparHTML(item.id)}">✏️ Cargar</button>
             <button type="button" class="btn-table-action" data-history-action="print" data-folio="${escaparHTML(item.id)}">🖨️ PDF</button>
             ${ADMIN_PANEL_MODE ? '' : `<button type="button" class="btn-table-action danger" data-history-action="delete" data-folio="${escaparHTML(item.id)}">🗑️</button>`}
@@ -3999,6 +4004,141 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
       cambiarPestana('official');
       window.print();
     }, 200);
+  }
+
+  function obtenerEvaluacionDescarga(folio) {
+    const evaluacion = obtenerHistorial().find(item =>
+      item.id === folio && (item.tipoEvaluacion === 'Descarga' || String(item.id).startsWith('DESC-'))
+    );
+    if (evaluacion) return evaluacion;
+
+    return leerCacheEvaluaciones(STORAGE_KEY_DESCARGA_CACHE).find(item =>
+      (item.folio || item.id) === folio
+    ) || null;
+  }
+
+  function cargarEvaluacionDescarga(folio) {
+    const evaluacion = obtenerEvaluacionDescarga(folio);
+    if (!evaluacion) {
+      alert(`No se encontró la evaluación de Descarga con folio: ${folio}`);
+      return;
+    }
+
+    try {
+      localStorage.setItem('folio_descarga_cargar', folio);
+      localStorage.setItem('eval_descarga_edicion', JSON.stringify(evaluacion));
+      window.location.href = `./evaluaciones.html?folio=${encodeURIComponent(folio)}`;
+    } catch (error) {
+      console.error('No se pudo preparar la evaluación de Descarga para edición:', error);
+      alert(`No se pudo abrir la evaluación ${folio}: ${error.message}`);
+    }
+  }
+
+  function escaparHTMLDocumento(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[char]);
+  }
+
+  function imprimirEvaluacionDescarga(folio) {
+    const item = obtenerEvaluacionDescarga(folio);
+    if (!item) {
+      alert(`No se encontró la información de la evaluación con folio: ${folio}`);
+      return;
+    }
+
+    const opNombre = item.aspirante || item.operador || 'OPERADOR';
+    const opFecha = item.fecha || '--';
+    const opGranja = item.centro || item.granja || '--';
+    const opEco = item.unidad_neg || item.economico || '--';
+    const opScore = Number(item.score != null ? item.score : item.calificacion) || 0;
+    const esApto = item.apto != null
+      ? Boolean(item.apto)
+      : item.resultado === 'APTO' || item.resultado === 'APTO (APROBADO)';
+    const masterNombre = item.master || item.evaluadorNombre || item.evaluador || 'Máster';
+    const observaciones = item.observaciones || item.obs || 'Sin observaciones registradas.';
+    const respuestas = item.respuestas && typeof item.respuestas === 'object'
+      ? Object.entries(item.respuestas)
+      : [];
+    const filasRespuestas = respuestas.length
+      ? respuestas.map(([criterio, respuesta]) => `
+          <tr><td>${escaparHTMLDocumento(criterio)}</td><td>${escaparHTMLDocumento(respuesta || 'Sin respuesta')}</td></tr>
+        `).join('')
+      : '<tr><td colspan="2">No hay respuestas guardadas.</td></tr>';
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Permite las ventanas emergentes para imprimir la evaluación de Descarga.');
+      return;
+    }
+
+    win.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Evaluación Oficial Descarga - ${escaparHTMLDocumento(folio)}</title>
+  <style>
+    @page { size: letter portrait; margin: 12mm 15mm; }
+    * { box-sizing: border-box; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; padding: 20px; color: #1e293b; font-size: 12px; }
+    .header { position: relative; text-align: center; border-bottom: 4px solid #F26522; padding-bottom: 10px; margin-bottom: 16px; }
+    .logo { color: #F26522; font-weight: 900; font-size: 26px; letter-spacing: 1px; }
+    .subtitle { margin-top: 4px; color: #475569; font-size: 13px; font-weight: bold; text-transform: uppercase; }
+    .folio { position: absolute; right: 0; top: 5px; padding: 4px 8px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: bold; }
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; padding: 12px; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .label { display: block; margin-bottom: 2px; color: #64748b; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    .value { color: #0f172a; font-weight: bold; }
+    .summary { margin-top: 18px; padding: 16px; border: 1.5px solid #cbd5e1; background: #f8fafc; text-align: center; }
+    .score { margin: 4px 0; font-size: 32px; font-weight: 900; }
+    .status { display: inline-block; padding: 6px 18px; border-radius: 20px; color: white; font-weight: 900; }
+    .apto { background: #16a34a; } .no-apto { background: #dc2626; }
+    .observations { margin-top: 16px; padding: 10px; border: 1px solid #cbd5e1; }
+    table { width: 100%; margin-top: 16px; border-collapse: collapse; }
+    th, td { padding: 6px; border: 1px solid #cbd5e1; text-align: left; }
+    th { background: #f1f5f9; }
+    .signatures { display: flex; justify-content: space-between; gap: 40px; margin-top: 45px; page-break-inside: avoid; }
+    .sign { flex: 1; text-align: center; }
+    .line { min-height: 35px; margin-bottom: 6px; border-bottom: 1.5px solid #000; }
+    .sign-title { color: #475569; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="folio">Folio: ${escaparHTMLDocumento(folio)}</div>
+    <div class="logo">GRUPO BACHOCO</div>
+    <div class="subtitle">Evaluación Oficial - Descarga de Tolvas</div>
+  </header>
+  <section class="data-grid">
+    <div><span class="label">Operador evaluado</span><span class="value">${escaparHTMLDocumento(opNombre)}</span></div>
+    <div><span class="label">Fecha de evaluación</span><span class="value">${escaparHTMLDocumento(opFecha)}</span></div>
+    <div><span class="label">Granja / destino</span><span class="value">${escaparHTMLDocumento(opGranja)}</span></div>
+    <div><span class="label">Económico / No. tolva</span><span class="value">${escaparHTMLDocumento(opEco)}</span></div>
+  </section>
+  <section class="summary">
+    <div class="label">Calificación final obtenida (mínimo aprobatorio: 80%)</div>
+    <div class="score">${escaparHTMLDocumento(opScore)}%</div>
+    <span class="status ${esApto ? 'apto' : 'no-apto'}">${esApto ? 'APTO (APROBADO)' : 'NO APTO'}</span>
+  </section>
+  <section class="observations">
+    <span class="label">Observaciones y recomendaciones</span>
+    <div>${escaparHTMLDocumento(observaciones)}</div>
+  </section>
+  <table>
+    <thead><tr><th>Criterio</th><th>Respuesta</th></tr></thead>
+    <tbody>${filasRespuestas}</tbody>
+  </table>
+  <footer class="signatures">
+    <div class="sign"><div class="line"></div><div class="sign-title">Supervisor de prueba / Máster</div><div>${escaparHTMLDocumento(masterNombre)}</div></div>
+    <div class="sign"><div class="line"></div><div class="sign-title">Conductor evaluado</div><div>${escaparHTMLDocumento(opNombre)}</div></div>
+  </footer>
+</body>
+</html>`);
+    win.document.close();
+    win.setTimeout(() => win.print(), 300);
   }
 
   function eliminarEvaluacion(folio) {
