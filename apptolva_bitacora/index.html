@@ -808,6 +808,15 @@ if (!u || !opNombre || !numeroEmpleado) {
     return alert("⚠️ Error: Son obligatorios la Unidad, Nombre del Operador y Número de Empleado.");
 }
 
+const catalogoOperadores = window.CATALOGO_OPERADORES;
+const operadorOficial = catalogoOperadores && catalogoOperadores[numeroEmpleado];
+if (!operadorOficial) {
+    return alert("⚠️ Selecciona un operador válido del catálogo usando su número de empleado.");
+}
+if (opNombre.trim().toUpperCase() !== operadorOficial.nombre.toUpperCase()) {
+    return alert("⚠️ El nombre del operador no coincide con el catálogo. Selecciónalo nuevamente desde la lista.");
+}
+
             
 const btn = document.getElementById('btnFinal');
 const msg = document.getElementById('statusMsg');
@@ -1531,7 +1540,7 @@ onAuthStateChanged(auth, (user) => {
     <!-- ============================================================ -->
     <!-- CATÁLOGO OFICIAL Y AUTOCOMPLETADO MAESTRO DE OPERADORES      -->
     <!-- ============================================================ -->
-    <script src="./catalogoOperadores.js"></script>
+    <script src="./js/catalogoOperadores.js"></script>
     <script>
     (function() {
         function iniciarCatalogoOperadores() {
@@ -1563,28 +1572,72 @@ onAuthStateChanged(auth, (user) => {
             if (inputNombre) inputNombre.setAttribute('list', 'listaOperadoresBachoco');
             if (inputBitacora) inputBitacora.setAttribute('list', 'listaOperadoresBachoco');
 
+            let sincronizando = false;
+            let numeroAplicado = "";
+
+            function notificarCambio(input) {
+                if (!input) return;
+                sincronizando = true;
+                try {
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                } finally {
+                    sincronizando = false;
+                }
+            }
+
+            function normalizarTexto(texto) {
+                return String(texto || "")
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .trim()
+                    .replace(/\s+/g, " ")
+                    .toUpperCase();
+            }
+
             // 3. Sincronización al escribir o detectar el Número de Empleado
             function aplicarOperadorPorNumero(numStr) {
+                if (sincronizando) return false;
                 const num = (numStr || "").trim();
                 if (catalogo[num]) {
                     const op = catalogo[num];
+                    numeroAplicado = num;
                     if (inputNombre) {
                         inputNombre.value = op.nombre;
                         inputNombre.readOnly = true;
                         inputNombre.style.backgroundColor = '#f0fdf4'; // Verde tenue de verificación
                         inputNombre.style.borderColor = '#86efac';
-                        inputNombre.dispatchEvent(new Event('input', { bubbles: true }));
+                        notificarCambio(inputNombre);
                     }
                     if (inputBitacora) {
                         inputBitacora.value = op.nombre;
-                        inputBitacora.dispatchEvent(new Event('input', { bubbles: true }));
+                        inputBitacora.readOnly = true;
+                        inputBitacora.style.backgroundColor = '#f0fdf4';
+                        inputBitacora.style.borderColor = '#86efac';
+                        notificarCambio(inputBitacora);
                     }
                     return true;
                 } else {
+                    const operadorAnterior = catalogo[numeroAplicado];
+                    numeroAplicado = "";
                     if (inputNombre && inputNombre.readOnly) {
                         inputNombre.readOnly = false;
                         inputNombre.style.backgroundColor = '';
                         inputNombre.style.borderColor = '';
+                    }
+                    if (inputBitacora && inputBitacora.readOnly) {
+                        inputBitacora.readOnly = false;
+                        inputBitacora.style.backgroundColor = '';
+                        inputBitacora.style.borderColor = '';
+                    }
+                    if (operadorAnterior) {
+                        if (inputNombre && inputNombre.value === operadorAnterior.nombre) {
+                            inputNombre.value = "";
+                            notificarCambio(inputNombre);
+                        }
+                        if (inputBitacora && inputBitacora.value === operadorAnterior.nombre) {
+                            inputBitacora.value = "";
+                            notificarCambio(inputBitacora);
+                        }
                     }
                     return false;
                 }
@@ -1592,7 +1645,7 @@ onAuthStateChanged(auth, (user) => {
 
             // 4. Sincronización si el operador escribe su nombre por costumbre
             function resolverDesdeTexto(texto) {
-                if (!texto) return;
+                if (sincronizando || !texto) return;
                 const str = texto.trim();
 
                 // Caso A: Selecciona del datalist ("221417 - AMBROSIO SOLIS...")
@@ -1600,19 +1653,19 @@ onAuthStateChanged(auth, (user) => {
                 if (match && catalogo[match[1]]) {
                     if (inputNum) {
                         inputNum.value = match[1];
-                        inputNum.dispatchEvent(new Event('input', { bubbles: true }));
+                        notificarCambio(inputNum);
                     }
                     aplicarOperadorPorNumero(match[1]);
                     return;
                 }
 
-                // Caso B: Tecleó su nombre completo en mayúsculas
-                const upper = str.toUpperCase();
+                // Caso B: Tecleó el nombre oficial completo
+                const upper = normalizarTexto(str);
                 for (const [num, op] of Object.entries(catalogo)) {
-                    if (op.nombre === upper) {
+                    if (normalizarTexto(op.nombre) === upper) {
                         if (inputNum) {
                             inputNum.value = num;
-                            inputNum.dispatchEvent(new Event('input', { bubbles: true }));
+                            notificarCambio(inputNum);
                         }
                         aplicarOperadorPorNumero(num);
                         return;
@@ -1622,21 +1675,35 @@ onAuthStateChanged(auth, (user) => {
 
             // 5. Escuchadores de eventos en tiempo real
             if (inputNum) {
-                inputNum.addEventListener('input', (e) => aplicarOperadorPorNumero(e.target.value));
-                inputNum.addEventListener('change', (e) => aplicarOperadorPorNumero(e.target.value));
+                inputNum.addEventListener('input', (e) => {
+                    if (!sincronizando) aplicarOperadorPorNumero(e.target.value);
+                });
+                inputNum.addEventListener('change', (e) => {
+                    if (!sincronizando) aplicarOperadorPorNumero(e.target.value);
+                });
                 if (inputNum.value) aplicarOperadorPorNumero(inputNum.value);
             }
 
             if (inputNombre) {
-                inputNombre.addEventListener('change', (e) => resolverDesdeTexto(e.target.value));
-                inputNombre.addEventListener('input', (e) => {
-                    if (!inputNombre.readOnly) resolverDesdeTexto(e.target.value);
+                inputNombre.addEventListener('change', (e) => {
+                    if (!sincronizando && !inputNombre.readOnly) resolverDesdeTexto(e.target.value);
                 });
+                inputNombre.addEventListener('input', (e) => {
+                    if (!sincronizando && !inputNombre.readOnly) resolverDesdeTexto(e.target.value);
+                });
+                if (!inputNum || !inputNum.value) resolverDesdeTexto(inputNombre.value);
             }
 
             if (inputBitacora) {
-                inputBitacora.addEventListener('change', (e) => resolverDesdeTexto(e.target.value));
-                inputBitacora.addEventListener('input', (e) => resolverDesdeTexto(e.target.value));
+                inputBitacora.addEventListener('change', (e) => {
+                    if (!sincronizando && !inputBitacora.readOnly) resolverDesdeTexto(e.target.value);
+                });
+                inputBitacora.addEventListener('input', (e) => {
+                    if (!sincronizando && !inputBitacora.readOnly) resolverDesdeTexto(e.target.value);
+                });
+                if ((!inputNum || !inputNum.value) && (!inputNombre || !inputNombre.value)) {
+                    resolverDesdeTexto(inputBitacora.value);
+                }
             }
         }
 
