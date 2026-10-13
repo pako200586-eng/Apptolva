@@ -64,7 +64,6 @@
             
             <!-- GRUPO IZQUIERDA: SALIR -->
             <div class="flex items-center gap-2">
-                <!-- 1. Casita (Regresar al Menú) -->
                 <button onclick="window.history.back()" class="bg-white/20 hover:bg-white/30 p-2 rounded-lg text-white border border-white/10 active:scale-95 transition" title="Volver al Menú">
                     <i class="fas fa-home text-lg"></i>
                 </button>
@@ -72,15 +71,12 @@
 
             <!-- GRUPO DERECHA: RELOJ Y EVIDENCIAS -->
             <div class="flex items-center gap-2">
-                <!-- 3. Reloj -->
                 <div class="bg-black/20 px-2 py-1 rounded-full text-[10px] font-mono" id="clockDisplay">00:00</div>
                 
-                <!-- 4. PDF Legal -->
                 <button onclick="generarPDFSeguro()" class="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center gap-1 active:scale-95 transition border border-orange-200">
                     <i class="fas fa-file-contract"></i> PDF
                 </button>
                 
-                <!-- 5. QR Rápido -->
                 <button onclick="generarQRSeguro()" id="qrBtn" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center ml-1 active:scale-95 transition border border-gray-600">
                     <i class="fas fa-qrcode text-lg"></i>
                 </button>
@@ -94,18 +90,18 @@
         
     <div class="container mx-auto p-4 max-w-4xl space-y-4">
      
-       <!-- 1. Datos del Servicio (CARÁTULA COMPLETA) -->
+       <!-- 1. Datos del Servicio (CARÁTULA COMPLETA NOM-087) -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
             <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                <h2 class="text-sm font-bold text-gray-600 uppercase tracking-wide">Carátula de Bitácora</h2>
+                <h2 class="text-sm font-bold text-gray-600 uppercase tracking-wide">Carátula de Bitácora Oficial (NOM-087-SCT-2-2017)</h2>
                 <i class="fas fa-info-circle text-gray-400"></i>
             </div>
             <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 
-                <!-- Permisionario -->
+                <!-- Permisionario Corregido -->
                 <div class="col-span-2 md:col-span-4 bg-orange-50 p-3 rounded border border-orange-100 mb-2">
-                    <p class="text-[10px] text-orange-500 font-bold uppercase">Permisionario / Empresa</p>
-                    <p class="font-bold text-gray-800">GRUPO BACHOCO, S.A.B. DE C.V.</p>
+                    <p class="text-[10px] text-orange-500 font-bold uppercase">Permisionario / Empresa de Autotransporte</p>
+                    <p class="font-bold text-gray-800">GRUPO BACHOCO, S.A. DE C.V.</p>
                     <p class="text-[10px] text-gray-500">Av. Tecnológico 401, Celaya, Gto. CP 38010</p>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                         <div><span class="text-[10px] text-gray-400">RFC:</span> <span class="text-[11px] font-bold text-gray-700">GBA940707AH4</span></div>
@@ -129,7 +125,6 @@
                 </div>
 
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Económico</label><input type="text" id="unitId" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="14123"></div>
-                <!-- CAMPO MARCA/MODELO -->
                 <div class="col-span-2 md:col-span-1"><label class="text-xs font-bold text-gray-500 block mb-1">Marca / Modelo</label><input type="text" id="brandModel" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="CASCADIA"></div>
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Placas</label><input type="text" id="plates" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="45-AK-9"></div>
                 
@@ -148,17 +143,14 @@
                 <div><label class="text-xs text-gray-400 block mb-1">No. de empleado</label><input type="text" id="employeeNumber" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 bg-gray-100 font-bold" placeholder="Se completa del catálogo" readonly></div>
                 
                 <div><label class="text-xs text-gray-400 block mb-1">Licencia Federal</label><input type="text" id="license" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="Num. Licencia"></div>
-                <!-- CAMPO VIGENCIA -->
                 <div>
                     <label class="text-xs text-gray-400 block mb-1">Vigencia Lic.</label>
                     <input type="date" id="licenseExp" class="bachoco-input w-full rounded-lg p-2 text-xs border border-gray-300">
                     <span id="licenseExpBadge" class="hidden mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full"></span>
                 </div>
 
-                <!-- Número de Serie Vehicular (VIN) -->
                 <div class="col-span-2"><label class="text-xs font-bold text-gray-500 block mb-1">No. Serie Vehicular (VIN)</label><input type="text" id="vin" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300 font-mono text-xs" placeholder="1FUJA6CG57LW86529" maxlength="17"></div>
 
-                <!-- Tipo de Carga -->
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Tipo de Carga</label>
                     <select id="tipoCarga" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
                         <option value="Alimento Perecedero">Alimento Perecedero</option>
@@ -169,12 +161,28 @@
                     </select>
                 </div>
 
-                <!-- Odómetro -->
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Km Inicio</label><input type="number" id="kmInicio" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="0"></div>
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Km Fin</label><input type="number" id="kmFin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="0"></div>
 
-                <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Origen</label><input type="text" id="origin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="PA CHAPO"></div>
-                <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Destino</label><input type="text" id="destination" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Cliente..."></div>
+                <!-- Origen y Destino -->
+                <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Origen</label><input type="text" id="origin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="PA CHAPO / Planta Celaya"></div>
+                <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Destino</label><input type="text" id="destination" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Cedis / Cliente..."></div>
+
+                <!-- Puntos Intermedios e Itinerario (NUEVO REQUERIMIENTO) -->
+                <div class="col-span-2 md:col-span-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <label class="text-xs font-bold text-gray-600 block mb-1"><i class="fas fa-route text-orange-500 mr-1"></i> Puntos Intermedios / Escalas de Ruta / Casetas (Itinerario)</label>
+                    <input type="text" id="puntosIntermedios" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 text-xs" placeholder="Ej. Caseta Palmillas, Querétaro, San Juan del Río, Arco Norte...">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                        <div>
+                            <label class="text-[11px] text-gray-500 font-bold block mb-1">Hora y Fecha de Salida (Inicio Viaje)</label>
+                            <input type="datetime-local" id="horaSalida" class="bachoco-input w-full rounded-lg p-1.5 text-xs border border-gray-300">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-gray-500 font-bold block mb-1">Hora y Fecha de Llegada (Estimada / Real)</label>
+                            <input type="datetime-local" id="horaLlegada" class="bachoco-input w-full rounded-lg p-1.5 text-xs border border-gray-300">
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Co-conductor -->
                 <div class="col-span-2"><label class="text-xs text-gray-400 block mb-1">Co-conductor (si aplica relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre del co-conductor (opcional)"></div>
@@ -182,7 +190,7 @@
             </div>
         </div>
 
-        <!-- 2. Botones de Acción -->
+        <!-- 2. Botones de Acción (ESTADO 4 RENOMBRADO A AUXILIAR) -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
             <button onclick="window.changeStatus(1)" id="btn-1" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-active:bg-red-500 group-active:text-white transition"><i class="fas fa-home text-lg"></i></div>
@@ -190,7 +198,7 @@
             </button>
             <button onclick="window.changeStatus(2)" id="btn-2" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-active:bg-blue-500 group-active:text-white transition"><i class="fas fa-bed text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Pausa</span><span class="text-[10px] text-gray-400">Comida/Descanso corto</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Pausa</span><span class="text-[10px] text-gray-400">Comida / Descanso 30m</span></div>
             </button>
             <button onclick="window.changeStatus(3)" id="btn-3" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-active:bg-green-500 group-active:text-white transition"><i class="fas fa-truck-moving text-lg"></i></div>
@@ -198,24 +206,24 @@
             </button>
             <button onclick="window.changeStatus(4)" id="btn-4" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center group-active:bg-yellow-500 group-active:text-white transition"><i class="fas fa-tools text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Servicio</span><span class="text-[10px] text-gray-400">Carga/Descarga</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Auxiliar</span><span class="text-[10px] text-gray-400">Carga / Descarga / Tareas</span></div>
             </button>
             <button onclick="window.changeStatus(5)" id="btn-5" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-active:bg-purple-500 group-active:text-white transition"><i class="fas fa-exclamation-triangle text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Excepción</span><span class="text-[10px] text-gray-400">Emergencia/Falla</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Excepción</span><span class="text-[10px] text-gray-400">Falla / Caso Fortuito</span></div>
             </button>
         </div>
 
         <!-- Alerta de Fatiga (14h en 24h) -->
         <div id="alertBox" class="hidden bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-exclamation-triangle mt-1"></i>
-            <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h/24h</p><p id="alertMsg" class="text-xs">Te acercas al límite de 14 horas de conducción en 24 horas. Busca un lugar seguro para descanso obligatorio de 8 horas.</p></div>
+            <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h/24h</p><p id="alertMsg" class="text-xs">Te acercas al límite de 14 horas de conducción en 24 horas. Busca un lugar seguro para descanso obligatorio de 8 horas continuas.</p></div>
         </div>
 
         <!-- Alerta de 5h continuas -->
         <div id="alertBox5h" class="hidden bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-clock mt-1"></i>
-            <div><p class="font-bold text-sm">¡Pausa Obligatoria! (NOM-087 Art. 4.1)</p><p class="text-xs">Llevas más de 4.5 horas de conducción continua. Debes realizar una pausa mínima de 30 minutos antes de completar 5 horas.</p></div>
+            <div><p class="font-bold text-sm">¡Pausa Obligatoria! (NOM-087 Art. 4.1)</p><p class="text-xs">Llevas más de 4.5 horas de conducción continua. Debes realizar una pausa mínima de 30 minutos ininterrumpidos antes de completar 5 horas.</p></div>
         </div>
 
         <!-- Evidencia GPS -->
@@ -240,36 +248,7 @@
             </div>
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
             <div id="chartXAxisLabels" class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"></div>
-            <script>
-                window.addEventListener('DOMContentLoaded', function () {
-                    var container = document.getElementById('chartXAxisLabels');
-                    if (!container) return;
-
-                    // Fallback to legacy hardcoded labels if SHIFT_START_HOUR is not available
-                    var labels;
-                    if (typeof SHIFT_START_HOUR === 'number') {
-                        labels = [];
-                        var stepHours = 6;
-                        var totalLabels = 5;
-                        for (var i = 0; i < totalLabels; i++) {
-                            var hour = (SHIFT_START_HOUR + i * stepHours) % 24;
-                            var hourStr = (hour < 10 ? '0' : '') + hour + ':00';
-                            labels.push(hourStr);
-                        }
-                    } else {
-                        labels = ['08:00', '14:00', '20:00', '02:00', '08:00'];
-                    }
-
-                    container.innerHTML = '';
-                    labels.forEach(function (label) {
-                        var span = document.createElement('span');
-                        span.textContent = label;
-                        container.appendChild(span);
-                    });
-                });
-            </script>
             
-            <!-- BOTÓN TERMINAR GRÁFICA 48H -->
             <button onclick="terminarTurno48h()" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
                 <i class="fas fa-flag-checkered text-lg"></i> TERMINAR GRÁFICA 48H Y NUEVO TURNO
             </button>
@@ -278,7 +257,7 @@
         <!-- 4. Bitácora (Lista) -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
             <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center gap-2">
-                <h3 class="font-bold text-gray-600 text-xs uppercase flex items-center gap-2">Registros <span id="logCountBadge" class="text-[10px] font-mono text-gray-400"></span></h3>
+                <h3 class="font-bold text-gray-600 text-xs uppercase flex items-center gap-2">Registros de Turno <span id="logCountBadge" class="text-[10px] font-mono text-gray-400"></span></h3>
                 <button onclick="window.openObs()" aria-label="Agregar nota al registro actual" class="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded flex items-center gap-1 hover:bg-orange-200 active:scale-95 transition"><i class="fas fa-sticky-note"></i> Agregar Nota</button>
             </div>
             <div id="logList" class="divide-y divide-gray-100 max-h-60 overflow-y-auto"></div>
@@ -288,31 +267,31 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-24">
             <div class="bg-white p-4 rounded-xl shadow-md border border-gray-100">
                 <div class="flex justify-between items-center mb-2">
-                    <h3 class="font-bold text-gray-700 text-sm">Firma Operador</h3>
+                    <h3 class="font-bold text-gray-700 text-sm">Firma Conductor</h3>
                     <button onclick="window.clearSig('op')" class="text-xs text-red-500 font-medium flex items-center gap-1"><i class="fas fa-eraser"></i> Borrar</button>
                 </div>
                 <div class="relative"><canvas id="signaturePad" class="signature-pad" width="400" height="150"></canvas><div class="absolute bottom-2 right-2 text-[10px] text-gray-300 pointer-events-none">Firma aquí</div></div>
             </div>
             <div class="bg-white p-4 rounded-xl shadow-md border border-gray-100">
                 <div class="flex justify-between items-center mb-2">
-                    <h3 class="font-bold text-gray-700 text-sm">Firma Supervisor</h3>
+                    <h3 class="font-bold text-gray-700 text-sm">Firma Supervisor / Permisionario</h3>
                     <button onclick="window.clearSig('sup')" class="text-xs text-red-500 font-medium flex items-center gap-1"><i class="fas fa-eraser"></i> Borrar</button>
                 </div>
                 <div class="relative"><canvas id="supervisorPad" class="signature-pad" width="400" height="150"></canvas><div class="absolute bottom-2 right-2 text-[10px] text-gray-300 pointer-events-none">Visto bueno</div></div>
             </div>
         </div>
 
-        <!-- Guardar -->
+        <!-- Guardar / Sincronizar -->
         <div class="fixed bottom-6 right-6 z-40">
-            <button onclick="intentarSubirNube()" id="saveBtn" class="bg-gray-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition active:bg-black border-2 border-orange-500"><i class="fas fa-cloud-upload-alt text-xl"></i></button>
+            <button onclick="intentarSubirNube()" id="saveBtn" class="bg-gray-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition active:bg-black border-2 border-orange-500" title="Guardar / Sincronizar"><i class="fas fa-cloud-upload-alt text-xl"></i></button>
         </div>
     </div>
 
     <!-- Modal Notas -->
     <div id="obsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
         <div class="bg-white rounded-xl p-5 w-11/12 max-w-sm shadow-2xl">
-            <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-gray-800">Agregar Nota</h3><button onclick="window.closeObs()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button></div>
-            <textarea id="obsText" class="w-full border-2 border-gray-200 rounded-lg p-3 h-24 text-sm focus:border-orange-500 outline-none resize-none" placeholder="Excepción, falla, tráfico..."></textarea>
+            <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-gray-800">Agregar Nota / Justificación</h3><button onclick="window.closeObs()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button></div>
+            <textarea id="obsText" class="w-full border-2 border-gray-200 rounded-lg p-3 h-24 text-sm focus:border-orange-500 outline-none resize-none" placeholder="Excepción, retén, tráfico severo, avería mecánica..."></textarea>
             <div class="flex justify-end gap-2 mt-4">
                 <button onclick="window.closeObs()" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
                 <button onclick="window.saveObs()" class="px-4 py-2 text-sm bg-orange-600 text-white font-bold rounded-lg shadow hover:bg-orange-700">Guardar</button>
@@ -320,31 +299,28 @@
         </div>
     </div>
 
-    <!-- MODAL QR -->
+    <!-- MODAL QR HÍBRIDO -->
     <div id="qrModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[70] animate-in fade-in duration-200">
         <div class="bg-white rounded-2xl p-6 w-11/12 max-w-sm shadow-2xl text-center relative">
             <button onclick="window.closeQR()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-2"><i class="fas fa-times text-xl"></i></button>
             
             <h3 class="font-bold text-gray-800 text-lg mb-1"><i class="fas fa-shield-alt text-orange-500 mr-1"></i> Bitácora Digital</h3>
-            <p class="text-[10px] text-gray-400 mb-3 uppercase tracking-widest">Escanea para ver el PDF completo (NOM-087)</p>
+            <p class="text-[10px] text-gray-400 mb-3 uppercase tracking-widest">NOM-087-SCT-2-2017</p>
             
             <div class="bg-white p-2 rounded-lg inline-block border-2 border-gray-100 shadow-inner mb-3">
                 <div id="qrcode" class="flex justify-center items-center" style="min-height:200px;min-width:200px;"></div>
             </div>
             
-            <div class="text-left text-xs bg-gray-50 p-3 rounded border border-gray-200 max-h-28 overflow-y-auto font-mono">
-                <div id="qrTextContent"><span style="color:#F28B00;font-weight:bold">⏳ Subiendo bitácora…</span></div>
+            <div class="text-left text-xs bg-gray-50 p-3 rounded border border-gray-200 max-h-32 overflow-y-auto font-mono">
+                <div id="qrTextContent"><span style="color:#F28B00;font-weight:bold">⏳ Procesando bitácora…</span></div>
             </div>
-            <p class="text-[9px] text-gray-400 mt-2">Al escanear se abre el PDF completo en el navegador del inspector.</p>
+            <p class="text-[9px] text-gray-400 mt-2">Permite inspección inmediata de autoridad aún sin conexión a internet.</p>
         </div>
     </div>
-    <style>
-        @keyframes qr-spin { to { transform: rotate(360deg); } }
-    </style>
 
     <script>
         // --- CONSTANTE GLOBAL DE TURNO ---
-        const SHIFT_START_HOUR = 8; // Los turnos inician a las 08:00 a.m.
+        const SHIFT_START_HOUR = 8; // Turno inicia a las 08:00 a.m.
         const GPS_TIMEOUT_MS = 8000;
         const LICENSE_EXP_WARNING_DAYS = 15;
         const FIRESTORE_PENDING_IDS_KEY = "nom087_firestore_pending_ids";
@@ -358,8 +334,15 @@
             logs.push({ status: 1, startTime: now, endTime: null, place: "Inicio", observation: "", gps: null });
         }
 
-        // Recuperar inputs
-        const ids = ['driverName', 'employeeNumber', 'license', 'licenseExp', 'unitId', 'brandModel', 'plates', 'mode', 'folio', 'origin', 'destination', 'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 'kmInicio', 'kmFin', 'coConductor', 'coLicencia'];
+        // Recuperar y persistir inputs (incluye puntosIntermedios, horaSalida, horaLlegada)
+        const ids = [
+            'driverName', 'employeeNumber', 'license', 'licenseExp', 
+            'unitId', 'brandModel', 'plates', 'mode', 'folio', 
+            'origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada',
+            'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 
+            'kmInicio', 'kmFin', 'coConductor', 'coLicencia'
+        ];
+        
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -376,6 +359,7 @@
                 }
             });
         });
+        
         const initialDriverName = document.getElementById('driverName')?.value.trim();
         if (initialDriverName) localStorage.setItem('nombreOperadorActual', initialDriverName);
 
@@ -497,7 +481,7 @@
             });
         }
 
-        // Validaciones ligeras de datos capturados (no bloquean el guardado offline)
+        // Validaciones ligeras
         document.getElementById('licenseExp')?.addEventListener('change', checkLicenseExpiry);
         document.getElementById('kmFin')?.addEventListener('blur', checkKmRange);
         document.getElementById('vin')?.addEventListener('blur', checkVinFormat);
@@ -516,7 +500,7 @@
                 localStorage.setItem('nom087_logs', JSON.stringify(logs));
             } catch (e) {
                 console.error("No se pudo guardar la bitácora localmente:", e);
-                alert("⚠️ No hay espacio de almacenamiento suficiente en este dispositivo para guardar la bitácora. Genera el PDF ahora y termina el turno para liberar espacio.");
+                alert("⚠️ Almacenamiento lleno. Genera el PDF ahora y finaliza el turno.");
             }
             updateUI();
         }
@@ -549,7 +533,7 @@
             const kmInicio = parseFloat(kmInicioEl.value);
             const kmFin = parseFloat(kmFinEl.value);
             if (!isNaN(kmInicio) && !isNaN(kmFin) && kmFin < kmInicio) {
-                alert("⚠️ El Km Fin no puede ser menor que el Km Inicio. Revisa el odómetro.");
+                alert("⚠️ El Km Fin no puede ser menor que el Km Inicio.");
             }
         }
 
@@ -558,7 +542,7 @@
             if (!vinEl || !vinEl.value) return;
             const vin = vinEl.value.trim().toUpperCase();
             if (vin.length > 0 && (vin.length !== 17 || /[IOQ]/.test(vin))) {
-                alert("⚠️ El VIN capturado no parece válido: debe tener 17 caracteres y no incluir las letras I, O ni Q. Verifica la tarjeta de circulación.");
+                alert("⚠️ El VIN debe tener 17 caracteres y no contener I, O ni Q.");
             }
         }
 
@@ -573,15 +557,13 @@
             if (typeof rawStatus === "number" && Number.isInteger(rawStatus) && rawStatus >= 1 && rawStatus <= 5) {
                 return rawStatus;
             }
-
             const value = String(rawStatus ?? "").trim();
             if (/^[1-5]$/.test(value)) return Number(value);
-
             const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
             if (/PAUSA|BREAK|COMIDA|DESCANSO CORTO/.test(normalized)) return 2;
             if (/DESCANSO|REST/.test(normalized)) return 1;
             if (/MANEJ|CONDUC|EN RUTA|DRIVING/.test(normalized)) return 3;
-            if (/SERVICIO|AUXILIAR|CARGA|DESCARGA|SERVICE/.test(normalized)) return 4;
+            if (/AUXILIAR|SERVICIO|CARGA|DESCARGA|SERVICE/.test(normalized)) return 4;
             if (/EXCEPCION|EMERGENCIA|EXCEPTION/.test(normalized)) return 5;
             return null;
         }
@@ -613,7 +595,6 @@
                     resolve({ gps: null, message: "GPS no disponible en este dispositivo." });
                     return;
                 }
-
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         resolve({
@@ -627,16 +608,11 @@
                                 capturedAt: new Date().toISOString(),
                                 source: "device-geolocation"
                             },
-                            message: "Ubicación GPS capturada y guardada como evidencia."
+                            message: "Ubicación GPS capturada y vinculada al registro."
                         });
                     },
                     (error) => {
-                        const reasons = {
-                            1: "Permiso de GPS denegado. La bitácora sigue funcionando sin ubicación.",
-                            2: "GPS sin señal suficiente. Se guardará el registro sin coordenadas.",
-                            3: "GPS tardó demasiado. Se guardará el registro sin coordenadas."
-                        };
-                        resolve({ gps: null, message: reasons[error.code] || "No se pudo capturar GPS." });
+                        resolve({ gps: null, message: "Registro guardado sin coordenadas GPS." });
                     },
                     { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 60000 }
                 );
@@ -673,23 +649,19 @@
         };
 
         window.terminarTurno48h = function() {
-            if(confirm("⚠️ ¿TERMINAR GRÁFICA DE 48H Y EMPEZAR NUEVO TURNO?\n\nAsegúrate de haber generado tu PDF de bitácora.\nEsto limpiará la gráfica actual y comenzará un nuevo periodo en cero.")) {
+            if(confirm("⚠️ ¿TERMINAR GRÁFICA DE 48H Y EMPEZAR NUEVO TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nEsto reiniciará el periodo de bitácora.")) {
                 localStorage.removeItem('nom087_logs');
                 localStorage.removeItem('nom087_folio');
                 document.getElementById('folio').value = '';
                 if (typeof window.generarFolioFirebase === 'function') {
                     window.generarFolioFirebase();
                 }
-                document.getElementById('origin').value = '';
-                document.getElementById('destination').value = '';
-                localStorage.removeItem('nom087_origin');
-                localStorage.removeItem('nom087_destination');
-                // Km Inicio/Fin corresponden al viaje que termina; deben limpiarse para no
-                // arrastrar el kilometraje del turno anterior al nuevo periodo.
-                document.getElementById('kmInicio').value = '';
-                document.getElementById('kmFin').value = '';
-                localStorage.removeItem('nom087_kmInicio');
-                localStorage.removeItem('nom087_kmFin');
+                const clearIds = ['origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada', 'kmInicio', 'kmFin'];
+                clearIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                    localStorage.removeItem('nom087_' + id);
+                });
                 location.reload();
             }
         }
@@ -704,6 +676,14 @@
             guardarLocal();
             await attachGpsToLog(newLog, true);
             updateUI();
+
+            // NOM-087 Art. 4.7: Excepción exige justificación obligatoria
+            if (st === 5) {
+                setTimeout(() => {
+                    alert("⚠️ NOM-087 Art. 4.7: El estado de EXCEPCIÓN exige justificación obligatoria (avería mecánica, clima adverso, congestión severa o fuerza mayor). Anota la causa.");
+                    window.openObs();
+                }, 300);
+            }
         };
 
         function updateUI() {
@@ -714,7 +694,8 @@
 
             [...logs].reverse().forEach(l => {
                 const s = new Date(l.startTime);
-                const stNames = ["","Descanso","Pausa","Conduciendo","Servicio","Excepción"];
+                // Estado 4 unificado a "Auxiliar"
+                const stNames = ["","Descanso","Pausa","Conduciendo","Auxiliar","Excepción"];
                 const stName = stNames[l.status] || "Otro";
                 const clss = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-purple-500"];
                 const cls = clss[l.status] || "bg-gray-500";
@@ -740,11 +721,7 @@
             });
 
             const countBadge = document.getElementById('logCountBadge');
-            if (countBadge) {
-                countBadge.textContent = String(logs.length);
-                countBadge.classList.remove('text-yellow-600', 'text-red-600', 'font-bold');
-                countBadge.classList.add('text-gray-400');
-            }
+            if (countBadge) countBadge.textContent = String(logs.length);
 
             // Total Manejo 24h
             const limit = now - (24 * 60 * 60 * 1000);
@@ -769,72 +746,87 @@
             // Alerta 5h conducción continua (NOM-087 Art. 4.1)
             let continuousDrive = 0;
             if (logs.length > 0) {
-                // Count backwards from the last log to find continuous driving
                 for (let i = logs.length - 1; i >= 0; i--) {
                     if (logs[i].status === 3) {
                         const end = logs[i].endTime || now;
                         continuousDrive += Math.floor((end - logs[i].startTime) / 60000);
-                    } else {
-                        // Check if the break was >= 30 min (valid pause)
+                    } else if (logs[i].status === 2 || logs[i].status === 1) {
                         const breakEnd = logs[i].endTime || now;
                         const breakDur = Math.floor((breakEnd - logs[i].startTime) / 60000);
-                        if (breakDur >= 30) break; // Valid pause, reset count
+                        if (breakDur >= 30) break; // Pausa legal >= 30 min restablece el contador
                     }
                 }
             }
-            if (continuousDrive > 270) document.getElementById('alertBox5h')?.classList.remove('hidden'); // 4h30m warning
+            if (continuousDrive > 270) document.getElementById('alertBox5h')?.classList.remove('hidden');
             else document.getElementById('alertBox5h')?.classList.add('hidden');
 
             drawChart();
         }
 
+        // Gráfica con dibujo en escalón ortogonal (formato legal exacto)
         function drawChart() {
             const cvs = document.getElementById('logChart');
             if(!cvs) return;
             const ctx = cvs.getContext('2d');
-            const w = cvs.width; const h = cvs.height; const p=30;
-            ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
-            const rowH = (h-p*2)/5;
-            const lbl = ["Descanso","Pausa","Manejo","Servicio", "Excep."];
-            for(let i=0;i<5;i++) {    
-                let y = p + (i*rowH) + (rowH/2);
-                if(i%2==0) { ctx.fillStyle="#fafafa"; ctx.fillRect(p,p+(i*rowH),w-p,rowH); }
-                ctx.fillStyle="#666"; ctx.font = "10px sans-serif";
-                ctx.fillText(lbl[i],5,y+4);
-                ctx.beginPath(); ctx.moveTo(p,p+(i*rowH)+rowH); ctx.lineTo(w,p+(i*rowH)+rowH); ctx.strokeStyle="#eee"; ctx.stroke();
+            const w = cvs.width; const h = cvs.height; const p = 30;
+            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+            const rowH = (h - p * 2) / 5;
+            const lbl = ["Descanso", "Pausa", "Manejo", "Auxiliar", "Excep."];
+            for(let i = 0; i < 5; i++) {    
+                let y = p + (i * rowH) + (rowH / 2);
+                if(i % 2 === 0) { ctx.fillStyle = "#fafafa"; ctx.fillRect(p, p + (i * rowH), w - p, rowH); }
+                ctx.fillStyle = "#666"; ctx.font = "10px sans-serif";
+                ctx.fillText(lbl[i], 5, y + 4);
+                ctx.beginPath(); ctx.moveTo(p, p + (i * rowH) + rowH); ctx.lineTo(w, p + (i * rowH) + rowH); ctx.strokeStyle = "#eee"; ctx.stroke();
             }
-            for(let i=0;i<=24;i++){ let x=p+((w-p)/24)*i; ctx.beginPath(); ctx.moveTo(x,p); ctx.lineTo(x,h-p); ctx.stroke(); }
+            for(let i = 0; i <= 24; i++) { 
+                let x = p + ((w - p) / 24) * i; 
+                ctx.beginPath(); ctx.moveTo(x, p); ctx.lineTo(x, h - p); ctx.strokeStyle = "#e5e7eb"; ctx.stroke(); 
+            }
             
-            if(logs.length===0) return;
-            ctx.lineWidth=3; ctx.strokeStyle='#F28B00'; ctx.lineJoin='round'; ctx.beginPath();
-            logs.forEach((l,i) => {
-                let ds=new Date(l.startTime); let de=l.endTime?new Date(l.endTime):new Date();
-                let h1=(ds.getHours()+ds.getMinutes()/60-SHIFT_START_HOUR+24)%24;
-                let h2=(de.getHours()+de.getMinutes()/60-SHIFT_START_HOUR+24)%24;
-                let x1=p+((w-p)/24)*h1;
-                let x2=p+((w-p)/24)*h2;
-                let y=p+((l.status-1)*rowH)+(rowH/2);
+            if(logs.length === 0) return;
+            ctx.lineWidth = 3; ctx.strokeStyle = '#F28B00'; ctx.lineJoin = 'miter'; ctx.beginPath();
+            
+            logs.forEach((l, i) => {
+                let ds = new Date(l.startTime); let de = l.endTime ? new Date(l.endTime) : new Date();
+                let h1 = (ds.getHours() + ds.getMinutes() / 60 - SHIFT_START_HOUR + 24) % 24;
+                let h2 = (de.getHours() + de.getMinutes() / 60 - SHIFT_START_HOUR + 24) % 24;
+                let x1 = p + ((w - p) / 24) * h1;
+                let x2 = p + ((w - p) / 24) * h2;
+                let y = p + ((l.status - 1) * rowH) + (rowH / 2);
+
+                if (i === 0) {
+                    ctx.moveTo(x1, y);
+                } else {
+                    // Escalón vertical exacto desde la posición anterior
+                    ctx.lineTo(x1, y);
+                }
+
                 if (h2 >= h1) {
-                    if (i === 0) ctx.moveTo(x1, y); else ctx.lineTo(x1, y);
                     ctx.lineTo(x2, y);
                 } else {
-                    // Interval crosses shift boundary: draw x1→end-of-chart and start-of-chart→x2
-                    let xEnd = w;
-                    let xStart = p;
-                    if (i === 0) ctx.moveTo(x1, y); else ctx.lineTo(x1, y);
-                    ctx.lineTo(xEnd, y);
-                    ctx.moveTo(xStart, y);
+                    ctx.lineTo(w, y);
+                    ctx.moveTo(p, y);
                     ctx.lineTo(x2, y);
                 }
             });
             ctx.stroke();
         }
 
-        // --- CANVAS FIRMAS ---
+        // --- CANVAS DE FIRMAS (CON FONDO BLANCO PROTEGIDO) ---
         const pads = { op: {c:document.getElementById('signaturePad')}, sup: {c:document.getElementById('supervisorPad')} };
+        
+        function clearPadToWhite(canvas, ctx) {
+            if (!canvas || !ctx) return;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
         Object.keys(pads).forEach(k => {
             const p = pads[k]; if(!p.c) return;
             p.ctx = p.c.getContext('2d'); p.paint = false;
+            clearPadToWhite(p.c, p.ctx);
+
             const start = (e) => { e.preventDefault(); p.paint=true; p.ctx.beginPath(); draw(e,k); };
             const end = () => p.paint=false;
             const draw = (e,key) => {
@@ -842,13 +834,18 @@
                 const r = p.c.getBoundingClientRect();
                 const x = (e.touches?e.touches[0].clientX:e.clientX) - r.left;
                 const y = (e.touches?e.touches[0].clientY:e.clientY) - r.top;
-                p.ctx.lineWidth=2; p.ctx.lineCap='round'; p.ctx.lineTo(x,y); p.ctx.stroke(); p.ctx.beginPath(); p.ctx.moveTo(x,y);
+                p.ctx.lineWidth=2; p.ctx.strokeStyle = "#000000"; p.ctx.lineCap='round'; 
+                p.ctx.lineTo(x,y); p.ctx.stroke(); p.ctx.beginPath(); p.ctx.moveTo(x,y);
             };
             ['mousedown','touchstart'].forEach(ev=>p.c.addEventListener(ev, start, {passive:false}));
             ['mousemove','touchmove'].forEach(ev=>p.c.addEventListener(ev, (e)=>draw(e,k), {passive:false}));
             ['mouseup','touchend','mouseleave'].forEach(ev=>p.c.addEventListener(ev, end));
         });
-        window.clearSig = (k) => { const p = pads[k]; if(p && p.c) p.ctx.clearRect(0,0,p.c.width,p.c.height); };
+        
+        window.clearSig = (k) => { 
+            const p = pads[k]; 
+            if(p && p.c) clearPadToWhite(p.c, p.ctx); 
+        };
         
         function resizeC() {
             const r = Math.max(window.devicePixelRatio||1, 1);
@@ -856,13 +853,13 @@
                 if (!p.c) return;
                 const newW = Math.round(p.c.offsetWidth * r);
                 const newH = Math.round(p.c.offsetHeight * r);
-                if (p.c.width === newW && p.c.height === newH) return; // ya está al tamaño correcto, no perder la firma
-                // Redimensionar un <canvas> borra su contenido; se respalda antes de tocarlo
-                // para que rotar o cambiar el tamaño de la pantalla no borre una firma ya capturada.
+                if (p.c.width === newW && p.c.height === newH) return;
+                
                 let previous = null;
-                try { previous = p.c.width > 0 && p.c.height > 0 ? p.c.toDataURL('image/png') : null; } catch (e) { previous = null; }
+                try { previous = p.c.width > 0 && p.c.height > 0 ? p.c.toDataURL('image/png') : null; } catch (e) {}
                 p.c.width = newW; p.c.height = newH;
                 p.ctx.scale(r, r);
+                clearPadToWhite(p.c, p.ctx);
                 if (previous) {
                     const img = new Image();
                     img.onload = () => p.ctx.drawImage(img, 0, 0, newW / r, newH / r);
@@ -872,109 +869,107 @@
         }
         window.addEventListener("resize", resizeC); setTimeout(resizeC, 500);
 
-        // --- GENERADOR PDF ---
+        // --- GENERADOR PDF LEGAL NOM-087 ---
         window.generarPDFSeguro = async function() {
             const selectedOperator = getSelectedCatalogOperator();
             if (!selectedOperator) {
-                alert("⚠️ Busca al operador por número o apellido y selecciónalo del catálogo oficial antes de generar el PDF.");
+                alert("⚠️ Selecciona al operador del catálogo oficial antes de generar el PDF.");
                 return;
             }
 
-            // 1. Verificar librerías
             if (!window.jspdf) { 
-                alert("⚠️ Error: Librería PDF no cargada. Abre la app con internet una vez."); return; 
+                alert("⚠️ Error: Librería PDF no disponible. Abre la app con conexión una vez."); return; 
             }
             
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const naranja = [242, 139, 0]; 
-            const azulOficial = [0, 51, 153]; // Azul para trazos legales
+            const azulOficial = [0, 51, 153];
             
             const folio = document.getElementById('folio').value || "S/F";
 
-            // --- LÓGICA DE CORTE 48 HORAS ---
-            // El turno inicia a las SHIFT_START_HOUR. El Día 2 comienza a esa hora del siguiente día calendario.
+            // Corte 48 horas
             const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
             const limit24Date = new Date(startTrip);
             limit24Date.setHours(SHIFT_START_HOUR, 0, 0, 0);
-            // Si la hora de inicio de turno del mismo día ya pasó (o es exactamente la hora de inicio), avanzar al día siguiente
             if (limit24Date.getTime() <= startTrip) {
                 limit24Date.setDate(limit24Date.getDate() + 1);
             }
-            const limit24 = limit24Date.getTime(); // Corte día 1 → inicio de turno del día siguiente
+            const limit24 = limit24Date.getTime();
             
-            // Filtramos qué pasó el Día 1 y qué pasó el Día 2
-            // logsD1: registros que empezaron en el Día 1
             const logsD1 = logs.filter(l => l.startTime < limit24);
-            // logsD2: registros que empezaron en el Día 2 O que cruzan la medianoche (endTime en Día 2)
             const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
-
-            // --- PÁGINA 1: DATOS Y GRÁFICAS ---
 
             // Encabezado
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
             doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica","bold");
             doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 10, {align:"center"});
             doc.setFontSize(7); doc.setFont("helvetica","normal");
-            doc.text("NOM-087-SCT-2-2017 | Norma Oficial Mexicana de Tiempos de Conducción y Descanso", 105, 16, {align:"center"});
-            doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(0);
+            doc.text("NOM-087-SCT-2-2017 | Tiempos de Conducción y Pausas en Autotransporte Federal", 105, 16, {align:"center"});
+            doc.setFontSize(8); doc.setTextColor(0);
 
             let y = 26;
 
-            // Datos Generales (Tabla Compacta)
             const row = (lbl, val, x, w) => {
-                doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 7, 'FD');
-                doc.setFont("helvetica","bold"); doc.text(lbl, x+2, y+4.5);
-                doc.setFont("helvetica","normal"); doc.text(val||"", x+w-2, y+4.5, {align:"right"});
+                doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 6.5, 'FD');
+                doc.setFont("helvetica","bold"); doc.text(lbl, x+2, y+4.2);
+                doc.setFont("helvetica","normal"); doc.text(String(val||""), x+w-2, y+4.2, {align:"right"});
             };
 
             doc.setFontSize(7);
-            // Datos del Permisionario
-            doc.setFont("helvetica","bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A.B. DE C.V. — RFC: GBA940707AH4", 14, y);
-            y+=4;
-            doc.setFont("helvetica","normal"); doc.text("Domicilio: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
-            y+=5;
+            // Permisionario corregido a S.A. de C.V.
+            doc.setFont("helvetica","bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A. DE C.V. — RFC: GBA940707AH4", 14, y);
+            y += 4;
+            doc.setFont("helvetica","normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
+            y += 5;
+            
             row("FOLIO:", folio, 14, 35);
-            row("FECHA:", new Date().toLocaleDateString(), 51, 35);
+            row("FECHA EMISIÓN:", new Date().toLocaleDateString(), 51, 35);
             row("PERMISO SCT:", document.getElementById('permisoSCT').value, 88, 45);
             row("TIPO PERMISO:", document.getElementById('tipoPermiso').value, 135, 60);
-            y += 9;
+            y += 8;
             row("UNIDAD:", document.getElementById('unitId').value, 14, 32);
             row("MARCA/MOD:", document.getElementById('brandModel').value, 48, 38);
             row("PLACAS:", document.getElementById('plates').value, 88, 32);
             row("CONFIG:", document.getElementById('mode').value, 122, 25);
             row("VIN:", document.getElementById('vin').value, 149, 46);
-            y += 9;
+            y += 8;
             row("OPERADOR:", `${selectedOperator.nombre} (No. ${selectedOperator.numero})`, 14, 181);
-            y += 9;
+            y += 8;
             row("LICENCIA:", document.getElementById('license').value, 14, 60);
-            row("VIG. LIC:", document.getElementById('licenseExp').value, 76, 60);
-            row("TIPO CARGA:", document.getElementById('tipoCarga').value, 138, 57);
-            y += 9;
+            row("VIG. LICENCIA:", document.getElementById('licenseExp').value, 76, 60);
+            row("TIPO DE CARGA:", document.getElementById('tipoCarga').value, 138, 57);
+            y += 8;
             row("ORIGEN:", document.getElementById('origin').value, 14, 60);
             row("DESTINO:", document.getElementById('destination').value, 76, 60);
             row("KM INICIO:", document.getElementById('kmInicio').value, 138, 28);
             row("KM FIN:", document.getElementById('kmFin').value, 168, 27);
-            y += 9;
-            // Co-conductor (si aplica)
+            y += 8;
+            
+            // Itinerario y horarios de viaje (NOM-087)
+            const puntosIntermedios = document.getElementById('puntosIntermedios').value;
+            row("PUNTOS INTERMEDIOS / RUTA:", puntosIntermedios || "Directo por carretera federal", 14, 181);
+            y += 8;
+            row("HORA SALIDA:", document.getElementById('horaSalida').value || "No registrada", 14, 90);
+            row("HORA LLEGADA (ESTIMADA/REAL):", document.getElementById('horaLlegada').value || "En ruta", 106, 89);
+            y += 8;
+
             const coCond = document.getElementById('coConductor').value;
             if (coCond && coCond.trim()) {
                 row("CO-CONDUCTOR:", coCond, 14, 92);
                 row("LIC. CO-COND:", document.getElementById('coLicencia').value, 108, 87);
-                y += 9;
+                y += 8;
             }
-            y += 3;
+            y += 2;
 
-            // --- FUNCIÓN DIBUJAR REJILLA ---
+            // Función para dibujar rejilla de 24h
             const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
-                // Título Gráfica
                 doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
                 doc.setTextColor(0); doc.setFont("helvetica","bold"); doc.text(label, 105, startY+3.5, {align:"center"});
                 
-                const gx = 20; const gy = startY + 8; const gw = 175; const gh = 30; const rowH = gh / 5;
+                const gx = 20; const gy = startY + 8; const gw = 175; const gh = 28; const rowH = gh / 5;
                 const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
                 
-                // Líneas horizontales y etiquetas
                 doc.setFontSize(5); doc.setDrawColor(150); doc.setLineWidth(0.1);
                 statusLabels.forEach((s, i) => {
                     doc.text(s, 19, gy + (i*rowH) + (rowH/2), {align:"right"});
@@ -982,24 +977,18 @@
                 });
                 doc.line(gx, gy+gh, gx+gw, gy+gh);
 
-                // Líneas verticales (24h) con etiquetas del turno (empieza en SHIFT_START_HOUR)
                 for(let i=0; i<=24; i++) {
                     let x = gx + (gw/24)*i;
                     doc.line(x, gy, x, gy+gh);
                     if(i%2===0) {
                         const rawHour = (SHIFT_START_HOUR + i) % 24;
-                        const label = rawHour.toString().padStart(2, "0");
-                        doc.text(label, x, gy-2, {align:"center"});
+                        doc.text(rawHour.toString().padStart(2, "0"), x, gy-2, {align:"center"});
                     }
                 }
-                doc.rect(gx, gy, gw, gh); // Marco
+                doc.rect(gx, gy, gw, gh);
 
-                // TRAZAR LÍNEA DE TIEMPO
                 if(dayLogs && dayLogs.length > 0) {
                     doc.setDrawColor(...azulOficial); doc.setLineWidth(0.7);
-                    // Mapeo App -> Gráfica Legal
-                    // App: 1=Descanso, 2=Pausa, 3=Manejo, 4=Servicio(Aux), 5=Excepción
-                    // Gráfica: 0=Manejo, 1=Pausa, 2=Aux, 3=Excep, 4=Descanso
                     const mapSt = { 3:0, 2:1, 4:2, 5:3, 1:4 }; 
 
                     dayLogs.forEach((l, i) => {
@@ -1010,63 +999,53 @@
                         let ds = new Date(l.startTime); 
                         let de = l.endTime ? new Date(l.endTime) : new Date();
                         
-                        // Aplicar desfase de turno: (hora_real - SHIFT_START_HOUR + 24) % 24
                         let h1 = (ds.getHours() + ds.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
                         let h2 = (de.getHours() + de.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
                         
-                        // Coordenadas X
                         let x1 = gx + (gw/24) * h1;
                         let x2 = gx + (gw/24) * h2;
-                        
-                        // Detectar si el tramo cruza el límite del turno (08:00 a.m.)
                         const cruzaLimiteTurno = (de > ds) && (x2 < x1);
-
                         let yLine = gy + (rIdx * rowH) + (rowH/2);
 
                         if (cruzaLimiteTurno) {
                             if (!isDay2) {
-                                // Día 1: dibujar solo desde startTime hasta el borde derecho (08:00 a.m.)
-                                const xShiftEnd = gx + gw;
-                                doc.line(x1, yLine, xShiftEnd, yLine);
+                                doc.line(x1, yLine, gx + gw, yLine);
                             } else {
-                                // Día 2: dibujar solo desde el borde izquierdo (08:00 a.m.) hasta endTime
                                 doc.line(gx, yLine, x2, yLine);
                             }
                         } else {
-                            doc.line(x1, yLine, x2, yLine); // Horizontal normal
+                            doc.line(x1, yLine, x2, yLine);
                         }
                         
-                        // Vertical (conectar con anterior) - se mantiene para el inicio del tramo actual
+                        // Conexión vertical ortogonal con el estado anterior
                         if(i > 0) {
                             let prev = dayLogs[i-1];
                             const prevStatus = getActivityStatus(prev);
                             const prevR = mapSt[prevStatus];
-                            if (prevR === undefined) return;
-                            let prevY = gy + (prevR * rowH) + (rowH/2);
-                            // Solo conectar si es continuo en tiempo (usando desfase de turno)
-                            let prevEnd = new Date(prev.endTime);
-                            let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
-                            let xPrevEnd = gx + (gw/24) * hPrevEnd;
-                            if(Math.abs(x1 - xPrevEnd) < 2) {
-                                doc.line(x1, prevY, x1, yLine);
+                            if (prevR !== undefined) {
+                                let prevY = gy + (prevR * rowH) + (rowH/2);
+                                let prevEnd = new Date(prev.endTime);
+                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
+                                let xPrevEnd = gx + (gw/24) * hPrevEnd;
+                                if(Math.abs(x1 - xPrevEnd) < 2) {
+                                    doc.line(x1, prevY, x1, yLine);
+                                }
                             }
                         }
                     });
                 }
             };
 
-            // DIBUJAR GRÁFICAS
             drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS)", logsD1, false);
-            y += 45;
-            drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE)", logsD2, true);
-            y += 45;
+            y += 42;
+            drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE / 48 HORAS)", logsD2, true);
+            y += 42;
 
-            // --- TABLA DE DESGLOSE (TEXTO) ---
+            // Tabla de Desglose
             doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica","bold");
-            doc.text("DESGLOSE DE ACTIVIDADES", 14, y);
+            doc.text("DESGLOSE CRONOLÓGICO DE ACTIVIDADES", 14, y);
             y += 4;
 
-            // Header Tabla
             doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
             doc.setTextColor(0); doc.setFontSize(6);
             doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 42, y+3.5);
@@ -1074,33 +1053,26 @@
             doc.text("GPS", 121, y+3.5); doc.text("OBSERVACIONES / LUGAR", 151, y+3.5);
             y += 5;
 
-            // Filas
             doc.setFont("helvetica","normal");
             logs.forEach((l, idx) => {
                 if (y > 250) {
-                    // Salto de página si se llena
                     doc.addPage();
                     y = 20;
-
-                    // Reimprimir encabezado de la tabla en la nueva página
                     doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
                     doc.setTextColor(0); doc.setFontSize(6);
                     doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 42, y+3.5);
                     doc.text("ACTIVIDAD", 66, y+3.5); doc.text("DURACIÓN", 96, y+3.5);
                     doc.text("GPS", 121, y+3.5); doc.text("OBSERVACIONES / LUGAR", 151, y+3.5);
                     y += 5;
-
-                    // Restaurar fuente para las filas
                     doc.setFont("helvetica","normal");
                 }
                 
-                const stName = ["", "DESCANSO", "PAUSA", "MANEJANDO", "SERVICIO", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
+                const stName = ["", "DESCANSO", "PAUSA", "CONDUCIENDO", "AUXILIAR", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
                 const dur = Math.floor((e-s)/60000);
                 const durStr = `${Math.floor(dur/60)}h ${dur%60}m`;
                 
-                // Fondo alternado
                 if(idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
                 
                 doc.text(s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 16, y+3);
@@ -1113,70 +1085,65 @@
                 y += 4;
             });
 
-            // --- FIRMAS ---
-            if(y > 230) { doc.addPage(); y=30; }
+            // Firmas
+            if(y > 220) { doc.addPage(); y = 30; }
             y += 10;
             
             doc.setDrawColor(0);
-            const opSig = document.getElementById('signaturePad').toDataURL("image/png");
-            const supSig = document.getElementById('supervisorPad').toDataURL("image/png");
+            const opSig = document.getElementById('signaturePad').toDataURL("image/jpeg", 0.9);
+            const supSig = document.getElementById('supervisorPad').toDataURL("image/jpeg", 0.9);
 
             doc.line(30, y+20, 80, y+20);
-            doc.addImage(opSig, 'PNG', 35, y, 40, 18);
+            doc.addImage(opSig, 'JPEG', 35, y, 40, 18);
             doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y+23, {align:"center"});
             doc.setFontSize(5); doc.text(selectedOperator.nombre, 55, y+26, {align:"center"});
-            doc.text("Lic. Fed.: " + (document.getElementById('license').value || ""), 55, y+29, {align:"center"});
+            doc.text("Lic. Federal: " + (document.getElementById('license').value || ""), 55, y+29, {align:"center"});
 
             doc.line(120, y+20, 170, y+20);
-            doc.addImage(supSig, 'PNG', 125, y, 40, 18);
+            doc.addImage(supSig, 'JPEG', 125, y, 40, 18);
             doc.setFontSize(7); doc.text("FIRMA SUPERVISOR / DESPACHADOR", 145, y+23, {align:"center"});
 
-            // Declaratoria bajo protesta de decir verdad
-            y += 34;
+            // Declaratoria bajo protesta
+            y += 33;
             doc.setFontSize(5); doc.setTextColor(0);
             doc.setFont("helvetica","bold");
             doc.text("DECLARATORIA BAJO PROTESTA DE DECIR VERDAD", 105, y, {align:"center"});
             doc.setFont("helvetica","normal");
-            y += 4;
+            y += 3.5;
             const declaratoria = doc.splitTextToSize(
-                "El conductor que suscribe la presente bitácora DECLARA BAJO PROTESTA DE DECIR VERDAD que los datos, tiempos de conducción, " +
-                "descansos y demás información aquí contenida son verídicos y reflejan fielmente sus actividades durante el periodo registrado, " +
-                "en cumplimiento con la NOM-087-SCT-2-2017 y demás disposiciones aplicables en materia de autotransporte federal. " +
-                "Esta bitácora deberá conservarse por un periodo mínimo de 30 días naturales conforme a lo establecido por la norma.", 180);
+                "El conductor y el permisionario que suscriben la presente bitácora DECLARAN BAJO PROTESTA DE DECIR VERDAD que los datos, tiempos de conducción, " +
+                "pausas, descansos, itinerario y registros son fidedignos y reflejan sus actividades reales durante el periodo comprendido, en estricto " +
+                "cumplimiento con la Norma Oficial Mexicana NOM-087-SCT-2-2017 y las leyes federales de autotransporte. " +
+                "Esta bitácora se conservará por un periodo mínimo legal de 30 días naturales.", 180);
             doc.text(declaratoria, 105, y, {align:"center"});
-            y += declaratoria.length * 3 + 3;
+            y += declaratoria.length * 3 + 2;
 
-            // Pie de página legal
             doc.setFontSize(4); doc.setTextColor(120);
-            doc.text("Documento generado digitalmente conforme a NOM-087-SCT-2-2017 — Válido como bitácora de horas de servicio.", 105, y, {align:"center"});
-            doc.text("GRUPO BACHOCO, S.A.B. DE C.V. — Permisionario de Autotransporte Federal de Carga — Folio: " + folio + " — " + new Date().toISOString(), 105, y+3, {align:"center"});
+            doc.text("GRUPO BACHOCO, S.A. DE C.V. — Permisionario de Autotransporte Federal — Folio: " + folio + " — " + new Date().toISOString(), 105, y+2, {align:"center"});
 
-            // --- PÁGINA 2: REGLAMENTO (Reverso) ---
+            // Página 2: Reglamento NOM-087
             doc.addPage();
             doc.setFillColor(...naranja); doc.rect(0,0,210,15,'F');
             doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica","bold");
-            doc.text("RESUMEN DE OBLIGACIONES — NOM-087-SCT-2-2017", 105, 10, {align:"center"});
+            doc.text("RESUMEN DE OBLIGACIONES LEGALES — NOM-087-SCT-2-2017", 105, 10, {align:"center"});
 
             doc.setTextColor(0); doc.setFontSize(7);
             let ry = 22;
 
-            // Título de sección
             doc.setFont("helvetica","bold"); doc.setFontSize(8);
-            doc.text("TIEMPOS DE CONDUCCIÓN Y DESCANSO OBLIGATORIOS", 14, ry);
+            doc.text("TIEMPOS MÁXIMOS DE CONDUCCIÓN Y PAUSAS OBLIGATORIAS", 14, ry);
             ry += 5;
 
             doc.setFontSize(7); doc.setFont("helvetica","normal");
             const rules = [
-                "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: El conductor no podrá conducir más de 5 horas continuas sin realizar una pausa obligatoria de al menos 30 minutos.",
-                "4.2 PAUSAS NO ACUMULABLES: Los periodos de pausa no son acumulables. No se puede fraccionar la pausa de 30 minutos en periodos menores.",
-                "4.3 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo total de conducción en un periodo de 24 horas no podrá exceder las 14 horas.",
-                "4.4 DESCANSO OBLIGATORIO: Después de un periodo máximo de 14 horas de conducción, el conductor deberá tomar un descanso mínimo de 8 horas continuas antes de reanudar la conducción.",
-                "4.5 PERIODO DE 24 HORAS: El periodo de 24 horas se contará a partir del momento en que el conductor inicie la conducción después de un descanso de al menos 8 horas.",
-                "4.6 CO-CONDUCTOR (RELEVO): En caso de contar con co-conductor, cada conductor deberá llevar su propia bitácora. El tiempo como copiloto no cuenta como tiempo de descanso.",
-                "4.7 EXCEPCIONES: El tiempo de conducción podrá prolongarse únicamente por avería mecánica, condiciones climatológicas adversas, perturbación del tránsito u otras causas de fuerza mayor, debiendo anotarse como excepción justificada con observación detallada.",
-                "4.8 BITÁCORA OBLIGATORIA: Todo conductor de autotransporte federal deberá portar la bitácora de horas de servicio durante el viaje. La bitácora deberá estar disponible para inspección por parte de la autoridad en todo momento.",
-                "4.9 CONSERVACIÓN: La empresa y el conductor deberán conservar las bitácoras por un periodo mínimo de 30 días naturales contados a partir de la fecha de registro.",
-                "4.10 RESPONSABILIDAD: El permisionario es corresponsable del cumplimiento de los tiempos de conducción y descanso de sus operadores."
+                "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: Máximo 5 horas continuas de conducción, tras las cuales se debe tomar una pausa de al menos 30 minutos ininterrumpidos.",
+                "4.2 PAUSAS NO FRACCIONABLES: Las pausas obligatorias de 30 minutos no se pueden fraccionar ni acumular.",
+                "4.3 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo total no excederá de 14 horas en un periodo de 24 horas.",
+                "4.4 DESCANSO OBLIGATORIO: Al completar la jornada de 14 horas o al término de la jornada, descanso mínimo de 8 horas continuas.",
+                "4.5 ITINERARIO Y PUNTOS INTERMEDIOS: El conductor debe asentar la ruta, escalas intermedias y horas de salida y llegada para validación de la autoridad federal.",
+                "4.6 CO-CONDUCTOR: En relevo, cada conductor llevará su propia bitácora individual. El tiempo de copiloto no sustituye el descanso de 8 horas.",
+                "4.7 EXCEPCIONES: La conducción solo se prolongará por fuerza mayor justificada y anotada textualmente en la bitácora.",
+                "4.8 PORTABILIDAD DE LA BITÁCORA: Deberá portarse en la unidad física o digitalmente para inspección de la Guardia Nacional / SCT en todo momento."
             ];
             rules.forEach(r => {
                 const split = doc.splitTextToSize(r, 180);
@@ -1184,33 +1151,10 @@
                 ry += (split.length * 3.5) + 3;
             });
 
-            // Sección de sanciones
-            ry += 3;
-            doc.setFont("helvetica","bold"); doc.setFontSize(8);
-            doc.text("FUNDAMENTO LEGAL Y SANCIONES", 14, ry);
-            ry += 5;
-            doc.setFont("helvetica","normal"); doc.setFontSize(6);
-            const sanciones = [
-                "• Ley de Caminos, Puentes y Autotransporte Federal — Art. 36, 74 BIS.",
-                "• Reglamento de Autotransporte Federal y Servicios Auxiliares — Art. 46.",
-                "• NOM-087-SCT-2-2017: Tiempos de conducción y descanso para conductores de autotransporte federal.",
-                "• El incumplimiento de esta norma es motivo de sanción administrativa, retención de unidad y responsabilidad civil/penal en caso de siniestro.",
-                "• La falsificación o alteración de datos en la bitácora constituye una infracción grave conforme a la legislación vigente."
-            ];
-            sanciones.forEach(s => {
-                const split = doc.splitTextToSize(s, 180);
-                doc.text(split, 14, ry);
-                ry += (split.length * 3) + 2;
-            });
-
-            // Pie de página
-            doc.setFontSize(4); doc.setTextColor(120);
-            doc.text("Este documento es un resumen informativo. Consulte la NOM-087-SCT-2-2017 completa publicada en el DOF para el texto íntegro de la norma.", 105, 280, {align:"center"});
-
             doc.save(`Bitacora_${folio.replace(/[\\/]/g, '-')}.pdf`);
         };
 
-        // --- GENERADOR QR ---
+        // --- GENERADOR QR HÍBRIDO (OFFLINE Y ONLINE) ---
         let qrGenerationInProgress = false;
 
         function setQrButtonBusy(isBusy) {
@@ -1218,11 +1162,27 @@
             if (!qrBtn) return;
             qrBtn.disabled = isBusy;
             qrBtn.classList.toggle('opacity-60', isBusy);
-            qrBtn.classList.toggle('cursor-not-allowed', isBusy);
         }
 
-        function buildBasicQrData(folio) {
-            return `NOM-087\nFOLIO:${folio}\nUNIDAD:${document.getElementById('unitId').value}\nFECHA:${new Date().toLocaleDateString()}`;
+        // Estructura de texto compacta para escaneo legal sin conexión
+        function buildFullOfflineQrData(payload) {
+            const totalDrive = document.getElementById('totalDriving')?.innerText || '0h 0m';
+            const statusNames = ["", "Descanso", "Pausa", "Conduciendo", "Auxiliar", "Excepción"];
+            return [
+                "BITACORA DIGITAL NOM-087",
+                `FOLIO: ${payload.folio}`,
+                `EMPRESA: GRUPO BACHOCO, S.A. DE C.V.`,
+                `OPERADOR: ${payload.driverName} (${payload.employeeNumber})`,
+                `LICENCIA: ${payload.license} | VIG: ${payload.licenseExp || 'N/A'}`,
+                `UNIDAD: ${payload.unitId} | PLACAS: ${payload.plates}`,
+                `ORIGEN: ${payload.origin} -> DESTINO: ${payload.destination}`,
+                payload.puntosIntermedios ? `ESCALAS: ${payload.puntosIntermedios}` : '',
+                `SALIDA: ${payload.horaSalida || 'N/A'}`,
+                `LLEGADA: ${payload.horaLlegada || 'En ruta'}`,
+                `ESTADO ACTUAL: ${statusNames[currentStatus] || 'En ruta'}`,
+                `CONDUCCION 24H: ${totalDrive}`,
+                `FECHA REPORTE: ${new Date().toLocaleString()}`
+            ].filter(Boolean).join("\n");
         }
 
         function setOfflineSyncStatus(message, tone = "warning") {
@@ -1242,38 +1202,41 @@
 
         function buildBitacoraPayload() {
             const rawFolio = document.getElementById('folio').value || "S/F";
-            const folio = rawFolio.trim();
             const operator = getSelectedCatalogOperator();
             let signatureOp = "", signatureSup = "";
             try {
                 const opPad = document.getElementById('signaturePad');
-                if (opPad) signatureOp = opPad.toDataURL("image/png");
+                if (opPad) signatureOp = opPad.toDataURL("image/jpeg", 0.7);
                 const supPad = document.getElementById('supervisorPad');
-                if (supPad) signatureSup = supPad.toDataURL("image/png");
-            } catch (e) { /* ignore if pads are not ready */ }
+                if (supPad) signatureSup = supPad.toDataURL("image/jpeg", 0.7);
+            } catch (e) {}
 
             return {
-                folio,
+                folio: rawFolio.trim(),
                 reportType: "bitacora",
                 fecha: new Date().toLocaleDateString(),
+                empresa: "GRUPO BACHOCO, S.A. DE C.V.",
                 unitId: document.getElementById('unitId').value.trim(),
                 plates: document.getElementById('plates').value || "",
                 driverName: operator ? operator.nombre : document.getElementById('driverName').value.trim(),
                 employeeNumber: operator ? operator.numero : "",
                 license: document.getElementById('license').value.trim(),
-                licenseExp: document.getElementById('licenseExp') ? document.getElementById('licenseExp').value : "",
-                brandModel: document.getElementById('brandModel') ? document.getElementById('brandModel').value : "",
-                mode: document.getElementById('mode') ? document.getElementById('mode').value : "",
-                permisoSCT: document.getElementById('permisoSCT') ? document.getElementById('permisoSCT').value : "",
-                tipoPermiso: document.getElementById('tipoPermiso') ? document.getElementById('tipoPermiso').value : "",
-                vin: document.getElementById('vin') ? document.getElementById('vin').value : "",
-                tipoCarga: document.getElementById('tipoCarga') ? document.getElementById('tipoCarga').value : "",
-                kmInicio: document.getElementById('kmInicio') ? document.getElementById('kmInicio').value : "",
-                kmFin: document.getElementById('kmFin') ? document.getElementById('kmFin').value : "",
-                coConductor: document.getElementById('coConductor') ? document.getElementById('coConductor').value : "",
-                coLicencia: document.getElementById('coLicencia') ? document.getElementById('coLicencia').value : "",
-                origin: document.getElementById('origin').value || "",
-                destination: document.getElementById('destination').value || "",
+                licenseExp: document.getElementById('licenseExp')?.value || "",
+                brandModel: document.getElementById('brandModel')?.value || "",
+                mode: document.getElementById('mode')?.value || "",
+                permisoSCT: document.getElementById('permisoSCT')?.value || "",
+                tipoPermiso: document.getElementById('tipoPermiso')?.value || "",
+                vin: document.getElementById('vin')?.value || "",
+                tipoCarga: document.getElementById('tipoCarga')?.value || "",
+                kmInicio: document.getElementById('kmInicio')?.value || "",
+                kmFin: document.getElementById('kmFin')?.value || "",
+                origin: document.getElementById('origin')?.value || "",
+                destination: document.getElementById('destination')?.value || "",
+                puntosIntermedios: document.getElementById('puntosIntermedios')?.value || "",
+                horaSalida: document.getElementById('horaSalida')?.value || "",
+                horaLlegada: document.getElementById('horaLlegada')?.value || "",
+                coConductor: document.getElementById('coConductor')?.value || "",
+                coLicencia: document.getElementById('coLicencia')?.value || "",
                 shiftStartHour: SHIFT_START_HOUR,
                 logs: structuredClone(logs),
                 gpsEvidenceVersion: 1,
@@ -1286,128 +1249,65 @@
             const missing = [];
             if (!payload.folio || payload.folio === "S/F") missing.push("folio");
             if (!payload.unitId) missing.push("económico");
-            if (!payload.driverName || !payload.employeeNumber) missing.push("operador del catálogo (número y nombre oficial)");
+            if (!payload.driverName || !payload.employeeNumber) missing.push("operador oficial");
             if (!payload.license) missing.push("licencia");
-            if (!Array.isArray(payload.logs) || payload.logs.length === 0) missing.push("registros");
             return missing;
         }
 
-        function exceedsFirestoreSizeLimit(payload) {
-            return new Blob([JSON.stringify(payload)]).size > 800000;
-        }
-
-        function showQueuedQrState(folio, detailText) {
-            showOfflineQrFallback(folio, "⚠️ Guardado offline — pendiente de sincronizar", detailText);
-            setOfflineSyncStatus("Bitácora guardada en este dispositivo. Firebase la sincronizará cuando regrese la conexión.");
-        }
-
-        async function syncBitacoraPayload(payload) {
-            if (typeof window.guardarBitacoraEnFirestore !== "function") {
-                throw new Error("El módulo de guardado en Firebase no está inicializado.");
-            }
-            const result = await window.guardarBitacoraEnFirestore(payload);
-            if (result.status === "pending") {
-                return {
-                    queued: true,
-                    localId: result.id,
-                    message: "Bitácora guardada localmente y pendiente de sincronizar con Firebase."
-                };
-            }
-            return { queued: false, result };
-        }
-
-        window.intentarSubirNube = async function() {
-            const btn = document.getElementById('saveBtn');
-            const payload = buildBitacoraPayload();
-            if (exceedsFirestoreSizeLimit(payload)) {
-                alert("⚠️ El reporte excede el tamaño permitido por Firestore (800 KB). Reduce el tamaño de las firmas antes de guardarlo.");
-                return;
-            }
-            const missing = validateBitacoraPayload(payload);
-            if (missing.length > 0) {
-                alert(`⚠️ Completa: ${missing.join(", ")} antes de sincronizar.`);
-                return;
-            }
-
-            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            try {
-                const syncResult = await syncBitacoraPayload(payload);
-                if (syncResult.queued) {
-                    setOfflineSyncStatus("Bitácora guardada en este dispositivo. Firebase la sincronizará cuando vuelva la señal.");
-                    alert("⚠️ Sin conexión: bitácora guardada en este dispositivo para sincronización automática.");
-                } else {
-                    setOfflineSyncStatus("Bitácora sincronizada correctamente.", "success");
-                    alert("✅ Sincronizado");
-                }
-            } catch (error) {
-                alert("Error al guardar: " + error.message);
-            } finally {
-                if (btn) btn.innerHTML = '<i class="fas fa-cloud-upload-alt text-xl"></i>';
-            }
-        };
-
-        function showOfflineQrFallback(folio, titleText, detailText) {
-            const qrData = buildBasicQrData(folio);
+        function showOfflineQrModal(payload, mensaje) {
+            const qrText = buildFullOfflineQrData(payload);
             document.getElementById('qrcode').innerHTML = "";
-            new QRCode(document.getElementById("qrcode"), { text: qrData, width: 200, height: 200 });
+            new QRCode(document.getElementById("qrcode"), { 
+                text: qrText, 
+                width: 200, 
+                height: 200, 
+                correctLevel: QRCode.CorrectLevel.L 
+            });
             document.getElementById('qrTextContent').innerHTML =
-                `<span style="color:#dc2626;font-weight:bold">${titleText}</span><br>` +
-                `<span id="qrFallbackDetail" style="font-size:11px;color:#6b7280"></span><br>` +
-                `<span id="qrDataText" style="white-space:pre;font-size:11px"></span>`;
-            const qrDataTextEl = document.getElementById('qrDataText');
-            if (qrDataTextEl) qrDataTextEl.textContent = qrData;
-            const qrFallbackDetailEl = document.getElementById('qrFallbackDetail');
-            if (qrFallbackDetailEl) qrFallbackDetailEl.textContent = detailText;
+                `<span style="color:#F28B00;font-weight:bold">${mensaje || 'QR de Inspección Directa (Offline)'}</span><br>` +
+                `<span style="font-size:10px;color:#4b5563;white-space:pre-wrap">${qrText}</span>`;
+            document.getElementById('qrModal').classList.remove('hidden');
         }
 
         window.generarQRSeguro = async function() {
-            if (typeof QRCode === 'undefined') { alert("⚠️ QR no cargado."); return; }
+            if (typeof QRCode === 'undefined') { alert("⚠️ Módulo QR no disponible."); return; }
             if (qrGenerationInProgress) return;
 
             qrGenerationInProgress = true;
             setQrButtonBusy(true);
-            const folio = document.getElementById('folio').value || "S/F";
+            const payload = buildBitacoraPayload();
+            const missing = validateBitacoraPayload(payload);
+
+            if (missing.length > 0) {
+                alert(`⚠️ Completa: ${missing.join(", ")} antes de generar el QR.`);
+                qrGenerationInProgress = false;
+                setQrButtonBusy(false);
+                return;
+            }
+
+            // Si está offline, mostrar de inmediato el QR de contingencia con datos completos
+            if (!navigator.onLine) {
+                showOfflineQrModal(payload, "📱 QR Offline para Guardia Nacional / SCT");
+                setOfflineSyncStatus("Guardado localmente. Se enviará a la nube cuando haya red.");
+                qrGenerationInProgress = false;
+                setQrButtonBusy(false);
+                return;
+            }
 
             try {
-                // Show modal with loading state
                 document.getElementById('qrcode').innerHTML =
-                    '<div style="width:36px;height:36px;border:4px solid #FFF0DB;border-top-color:#F28B00;border-radius:50%;animation:qr-spin .8s linear infinite"></div>';
+                    '<div style="width:36px;height:36px;border:4px solid #FFF0DB;border-top-color:#F28B00;border-radius:50%;animation:spin 1s linear infinite"></div>';
                 document.getElementById('qrTextContent').innerHTML =
-                    '<span style="color:#F28B00;font-weight:bold">⏳ Guardando bitácora en Firebase…</span>';
+                    '<span style="color:#F28B00;font-weight:bold">⏳ Sincronizando con Firebase…</span>';
                 document.getElementById('qrModal').classList.remove('hidden');
 
-                const payload = buildBitacoraPayload();
-
-                if (exceedsFirestoreSizeLimit(payload)) {
-                    showOfflineQrFallback(
-                        folio,
-                        "⚠️ Reporte demasiado grande — QR local",
-                        "El reporte excede el tamaño permitido por Firestore. Genera el PDF como respaldo."
-                    );
-                    return;
+                if (typeof window.guardarBitacoraEnFirestore !== "function") {
+                    throw new Error("Módulo Firebase no disponible.");
                 }
 
-                const missing = validateBitacoraPayload(payload);
+                const syncResult = await window.guardarBitacoraEnFirestore(payload);
+                const viewerUrl = syncResult.url;
 
-                if (missing.length > 0) {
-                    showOfflineQrFallback(
-                        folio,
-                        "⚠️ Datos incompletos — QR local",
-                        `Completa: ${missing.join(", ")} para generar un QR verificable.`
-                    );
-                    return;
-                }
-
-                const syncResult = await syncBitacoraPayload(payload);
-                if (syncResult.queued) {
-                    showQueuedQrState(folio, syncResult.message || "La bitácora se enviará automáticamente cuando vuelva la señal.");
-                    return;
-                }
-
-                const result = syncResult.result;
-                const viewerUrl = result.url;
-
-                // Generate QR with the viewer URL
                 document.getElementById('qrcode').innerHTML = "";
                 new QRCode(document.getElementById("qrcode"), {
                     text: viewerUrl,
@@ -1416,16 +1316,11 @@
                     correctLevel: QRCode.CorrectLevel.M,
                 });
                 document.getElementById('qrTextContent').innerHTML =
-                    `<span style="color:#16a34a;font-weight:bold">✅ Listo — escanea para ver el PDF</span><br>` +
-                    `<span id="qrViewerUrl" style="word-break:break-all;font-size:10px;color:#6b7280"></span><br>` +
-                    `<span style="color:#9ca3af;font-size:10px">FOLIO: <span id="qrFolio"></span></span>`;
-                const qrViewerUrlEl = document.getElementById('qrViewerUrl');
-                if (qrViewerUrlEl) qrViewerUrlEl.textContent = viewerUrl;
-                const qrFolioEl = document.getElementById('qrFolio');
-                if (qrFolioEl) qrFolioEl.textContent = folio;
-
+                    `<span style="color:#16a34a;font-weight:bold">✅ Sincronizado en la nube</span><br>` +
+                    `<span style="font-size:10px;color:#4b5563;word-break:break-all">${viewerUrl}</span><br>` +
+                    `<span style="color:#9ca3af;font-size:10px">FOLIO: ${payload.folio}</span>`;
             } catch (err) {
-                showOfflineQrFallback(folio, "⚠️ Sin conexión — QR básico", err.message || "No se pudo sincronizar.");
+                showOfflineQrModal(payload, "⚠️ Sin señal de nube — Mostrando QR de inspección local");
             } finally {
                 qrGenerationInProgress = false;
                 setQrButtonBusy(false);
@@ -1437,81 +1332,52 @@
         window.openObs = function() {
             const obsText = document.getElementById('obsText');
             if (!obsText) return;
-            const current = logs.length > 0 ? (logs[logs.length - 1].observation || '') : '';
-            obsText.value = current;
+            obsText.value = logs.length > 0 ? (logs[logs.length - 1].observation || '') : '';
             document.getElementById('obsModal').classList.remove('hidden');
         };
         window.saveObs = function() {
             const obsText = document.getElementById('obsText');
-            if (!obsText) { window.closeObs(); return; }
-            const text = obsText.value.trim();
-            if (logs.length > 0) {
-                logs[logs.length - 1].observation = text;
+            if (obsText && logs.length > 0) {
+                logs[logs.length - 1].observation = obsText.value.trim();
                 guardarLocal();
             }
             window.closeObs();
         };
 
+        window.intentarSubirNube = async function() {
+            const btn = document.getElementById('saveBtn');
+            const payload = buildBitacoraPayload();
+            const missing = validateBitacoraPayload(payload);
+            if (missing.length > 0) {
+                alert(`⚠️ Completa: ${missing.join(", ")}`);
+                return;
+            }
+
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                if (!navigator.onLine || typeof window.guardarBitacoraEnFirestore !== "function") {
+                    setOfflineSyncStatus("Guardado en dispositivo (Modo Offline).");
+                    alert("⚠️ Sin conexión: Bitácora guardada localmente.");
+                } else {
+                    await window.guardarBitacoraEnFirestore(payload);
+                    setOfflineSyncStatus("Bitácora sincronizada con éxito.", "success");
+                    alert("✅ Bitácora sincronizada con Firebase.");
+                }
+            } catch (error) {
+                alert("Error: " + error.message);
+            } finally {
+                if (btn) btn.innerHTML = '<i class="fas fa-cloud-upload-alt text-xl"></i>';
+            }
+        };
+
         updateUI(); 
 
         window.addEventListener('online', () => {
-            setOfflineSyncStatus("Conexión recuperada. Firebase está sincronizando los reportes pendientes...");
-            solicitarSincronizacionPendiente();
+            setOfflineSyncStatus("Conexión restablecida. Sincronizando con Firebase...");
         });
-
-        async function solicitarSincronizacionPendiente() {
-            if (!('serviceWorker' in navigator)) return;
-            try {
-                const registration = await navigator.serviceWorker.ready;
-                const worker = navigator.serviceWorker.controller || registration.active;
-                worker?.postMessage({ type: "SYNC_NOW" });
-            } catch (error) {
-                console.error("No se pudo reintentar la sincronización pendiente:", error);
-            }
-        }
-
-        window.addEventListener('bitacora-firestore-synced', (event) => {
-            const { folio, url } = event.detail || {};
-            setOfflineSyncStatus(`Bitácora ${folio || ""} sincronizada correctamente con Firebase.`, "success");
-
-            const qrModal = document.getElementById('qrModal');
-            const currentFolio = document.getElementById('folio').value.trim();
-            if (!qrModal || qrModal.classList.contains('hidden') || !url || folio !== currentFolio) return;
-
-            document.getElementById('qrcode').innerHTML = "";
-            new QRCode(document.getElementById("qrcode"), {
-                text: url,
-                width: 200,
-                height: 200,
-                correctLevel: QRCode.CorrectLevel.M
-            });
-            document.getElementById('qrTextContent').innerHTML =
-                '<span style="color:#16a34a;font-weight:bold">✅ Sincronizado — escanea para ver el PDF</span><br>' +
-                '<span id="qrViewerUrl" style="word-break:break-all;font-size:10px;color:#6b7280"></span><br>' +
-                '<span style="color:#9ca3af;font-size:10px">FOLIO: <span id="qrFolio"></span></span>';
-            document.getElementById('qrViewerUrl').textContent = url;
-            document.getElementById('qrFolio').textContent = folio || "";
-        });
-
-        window.addEventListener('bitacora-firestore-sync-error', (event) => {
-            const { message } = event.detail || {};
-            setOfflineSyncStatus(`Error al sincronizar con Firebase: ${message || "Error desconocido"}`);
-        });
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('message', (event) => {
-                if (!event.data) return;
-                if (event.data.type === "REPORT_QUEUED") {
-                    setOfflineSyncStatus("Bitácora guardada offline. Pendiente de sincronizar.");
-                }
-                if (event.data.type === "REPORT_SYNCED") {
-                    setOfflineSyncStatus(`Bitácora ${event.data.folio || ""} sincronizada correctamente.`, "success");
-                }
-            });
-        }
     </script>
 
-    <!-- FIREBASE -->
+    <!-- 3. CONFIGURACIÓN FIREBASE Y FOLIO OFFLINE -->
     <script type="module">
         import { initializeApp } from "./js/firebase-sdk.js";
         import {
@@ -1536,7 +1402,6 @@
         };
 
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
-            console.warn("Firebase: API key no configurada. Funciones de nube deshabilitadas.");
             window.generarFolioFirebase = function() {
                 const inputFolio = document.getElementById('folio');
                 if (!inputFolio || inputFolio.value) return;
@@ -1546,116 +1411,24 @@
             };
             window.addEventListener('load', () => window.generarFolioFirebase());
         } else {
-        const app = initializeApp(firebaseConfig);
-        const db = initializeFirestore(app, {
-            localCache: persistentLocalCache({
-                tabManager: persistentMultipleTabManager()
-            })
-        });
-        const auth = getAuth(app);
-
-        let signInPromise = null;
-        function iniciarSesionAnonima() {
-            if (!signInPromise) {
-                signInPromise = signInAnonymously(auth)
-                    .then((credential) => credential.user)
-                    .finally(() => { signInPromise = null; });
-            }
-            return signInPromise;
-        }
-
-        function esperarAuthListo() {
-            if (auth.currentUser) return Promise.resolve(auth.currentUser);
-            return new Promise((resolve, reject) => {
-                let unsubscribe = () => {};
-                let timeout;
-                let finished = false;
-                let signInStarted = false;
-                const finish = (callback, value) => {
-                    if (finished) return;
-                    finished = true;
-                    clearTimeout(timeout);
-                    unsubscribe();
-                    callback(value);
-                };
-                timeout = setTimeout(() => {
-                    finish(reject, new Error("Tiempo de espera agotado al conectar con Firebase Authentication."));
-                }, 10000);
-                unsubscribe = onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        finish(resolve, user);
-                    } else if (!signInStarted) {
-                        signInStarted = true;
-                        iniciarSesionAnonima().then(
-                            (authenticatedUser) => finish(resolve, authenticatedUser),
-                            (error) => finish(reject, error)
-                        );
-                    }
-                }, (error) => finish(reject, error));
+            const app = initializeApp(firebaseConfig);
+            const db = initializeFirestore(app, {
+                localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
             });
-        }
+            const auth = getAuth(app);
 
-        const reportObservers = new Map();
-        function readPendingReportIds() {
-            try {
-                const ids = JSON.parse(localStorage.getItem(FIRESTORE_PENDING_IDS_KEY) || "[]");
-                return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
-            } catch (error) {
-                console.error("No se pudieron leer los reportes pendientes de Firebase:", error);
-                return [];
-            }
-        }
+            window.generarFolioFirebase = async function() {
+                const inputFolio = document.getElementById('folio');
+                if (!inputFolio || inputFolio.value.trim()) return inputFolio?.value;
+                
+                if (!navigator.onLine) {
+                    const offlineFolio = "OFF-" + new Date().getTime().toString().slice(-6);
+                    inputFolio.value = offlineFolio;
+                    localStorage.setItem('nom087_folio', offlineFolio);
+                    return offlineFolio;
+                }
 
-        function writePendingReportIds(ids) {
-            localStorage.setItem(FIRESTORE_PENDING_IDS_KEY, JSON.stringify([...new Set(ids)]));
-        }
-
-        function observePendingReport(id) {
-            if (reportObservers.has(id)) return;
-            const reportRef = doc(db, "bitacora_reports", id);
-            const unsubscribe = onSnapshot(reportRef, { includeMetadataChanges: true }, (snapshot) => {
-                if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache || !snapshot.exists()) return;
-                writePendingReportIds(readPendingReportIds().filter((pendingId) => pendingId !== id));
-                unsubscribe();
-                reportObservers.delete(id);
-                window.dispatchEvent(new CustomEvent("bitacora-firestore-synced", {
-                    detail: {
-                        id,
-                        folio: snapshot.data().folio || "",
-                        url: new URL(`./viewer.html?id=${id}`, window.location.href).href
-                    }
-                }));
-            }, (error) => {
-                unsubscribe();
-                reportObservers.delete(id);
-                window.dispatchEvent(new CustomEvent("bitacora-firestore-sync-error", {
-                    detail: { id, message: error.message }
-                }));
-            });
-            reportObservers.set(id, unsubscribe);
-        }
-
-        esperarAuthListo()
-            .then(() => readPendingReportIds().forEach(observePendingReport))
-            .catch((error) => console.error("No se pudieron reanudar reportes pendientes:", error));
-
-        let folioGenerationPromise = null;
-
-        window.generarFolioFirebase = async function() {
-             const inputFolio = document.getElementById('folio');
-             if (!inputFolio) return;
-             if (inputFolio.value.trim()) return inputFolio.value.trim();
-             if (!navigator.onLine) {
-                 const offlineFolio = "OFF-" + new Date().getTime().toString().slice(-6);
-                 inputFolio.value = offlineFolio;
-                 localStorage.setItem('nom087_folio', offlineFolio);
-                 inputFolio.dispatchEvent(new Event('input', { bubbles: true }));
-                 return offlineFolio;
-             }
-             if (folioGenerationPromise) return folioGenerationPromise;
-
-             folioGenerationPromise = (async () => {
-                 try {
+                try {
                     const newFolio = await runTransaction(db, async (transaction) => {
                         const counterRef = doc(db, "sistema", "contadores");
                         const sfDoc = await transaction.get(counterRef);
@@ -1666,115 +1439,52 @@
                     });
                     inputFolio.value = newFolio;
                     localStorage.setItem('nom087_folio', newFolio);
-                    inputFolio.dispatchEvent(new Event('input', { bubbles: true }));
                     return newFolio;
-                 } catch(error) {
-                    console.error("No se pudo reservar el folio de la bitácora en Firebase:", error);
-                    window.dispatchEvent(new CustomEvent("bitacora-firestore-sync-error", {
-                        detail: { message: `No se pudo reservar el folio en Firebase. Se asignó un folio temporal. ${error.message}` }
-                    }));
+                } catch(error) {
                     const offlineFolio = "OFF-" + new Date().getTime().toString().slice(-6);
                     inputFolio.value = offlineFolio;
                     localStorage.setItem('nom087_folio', offlineFolio);
-                    inputFolio.dispatchEvent(new Event('input', { bubbles: true }));
                     return offlineFolio;
-                 } finally {
-                    folioGenerationPromise = null;
-                 }
-             })();
-             return folioGenerationPromise;
-        }
+                }
+            };
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                console.log("Sesión anónima lista para la bitácora:", user.uid);
-                window.generarFolioFirebase();
-            } else {
-                iniciarSesionAnonima().catch((error) => {
-                    console.error("Error crítico al dar gafete:", error);
-                });
-            }
-        });
-
-        window.intentarSubirNubeFirebase = async function() {
-            if (typeof window.intentarSubirNube === "function") {
-                return window.intentarSubirNube();
-            }
-        };
-
-        window.guardarBitacoraEnFirestore = async function(payload) {
-            await esperarAuthListo();
-
-            const reportIdKey = `nom087_firestore_report_${encodeURIComponent(payload.folio)}`;
-            let reportId = localStorage.getItem(reportIdKey);
-            if (!reportId) {
-                reportId = crypto.randomUUID().replace(/-/g, "");
+            window.guardarBitacoraEnFirestore = async function(payload) {
+                const reportIdKey = `nom087_firestore_report_${encodeURIComponent(payload.folio)}`;
+                let reportId = localStorage.getItem(reportIdKey) || crypto.randomUUID().replace(/-/g, "");
                 localStorage.setItem(reportIdKey, reportId);
-            }
 
-            const reportRef = doc(db, "bitacora_reports", reportId);
-            const data = {
-                id: reportId,
-                folio: payload.folio || "",
-                report_type: "bitacora",
-                unit_id: payload.unitId || "",
-                driver_name: payload.driverName || "",
-                employee_number: payload.employeeNumber || "",
-                license: payload.license || "",
-                priority: "baja",
-                sync_status: "sincronizado",
-                payload,
-                created_at: new Date().toISOString()
+                const reportRef = doc(db, "bitacora_reports", reportId);
+                const data = {
+                    id: reportId,
+                    folio: payload.folio || "",
+                    report_type: "bitacora",
+                    unit_id: payload.unitId || "",
+                    driver_name: payload.driverName || "",
+                    employee_number: payload.employeeNumber || "",
+                    license: payload.license || "",
+                    empresa: "GRUPO BACHOCO, S.A. DE C.V.",
+                    puntos_intermedios: payload.puntosIntermedios || "",
+                    hora_salida: payload.horaSalida || "",
+                    hora_llegada: payload.horaLlegada || "",
+                    priority: "baja",
+                    sync_status: "sincronizado",
+                    payload,
+                    created_at: new Date().toISOString()
+                };
+
+                await setDoc(reportRef, data);
+                return {
+                    id: reportId,
+                    url: new URL(`./viewer.html?id=${reportId}`, window.location.href).href,
+                    status: "synced"
+                };
             };
-            const payloadBytes = new Blob([JSON.stringify(data)]).size;
-            if (payloadBytes > 800000) {
-                throw new Error(`La bitácora excede el tamaño permitido por Firestore (${Math.round(payloadBytes / 1024)} KB). Reduce el tamaño de las firmas.`);
-            }
 
-            let writing = false;
-            let unsubscribePendingWrite = () => {};
-            const pendingLocalWrite = new Promise((resolve, reject) => {
-                unsubscribePendingWrite = onSnapshot(
-                    reportRef,
-                    { includeMetadataChanges: true },
-                    (snapshot) => {
-                        if (!writing || !snapshot.exists() || !snapshot.metadata.hasPendingWrites) return;
-
-                        const pendingIds = readPendingReportIds();
-                        if (!pendingIds.includes(reportId)) {
-                            pendingIds.push(reportId);
-                            writePendingReportIds(pendingIds);
-                        }
-                        observePendingReport(reportId);
-                        resolve();
-                    },
-                    reject
-                );
+            onAuthStateChanged(auth, (user) => {
+                if (!user) signInAnonymously(auth).catch(console.error);
+                window.generarFolioFirebase();
             });
-
-            writing = true;
-            const writePromise = setDoc(reportRef, data);
-            let status;
-            try {
-                status = await Promise.race([
-                    writePromise.then(() => "synced"),
-                    pendingLocalWrite.then(() => "pending")
-                ]);
-            } finally {
-                unsubscribePendingWrite();
-            }
-
-            return {
-                id: reportId,
-                url: new URL(`./viewer.html?id=${reportId}`, window.location.href).href,
-                status
-            };
-        };
-
-        window.addEventListener('load', () => {
-            if (!navigator.onLine) window.generarFolioFirebase();
-        });
-        } // end else (Firebase configurado)
+        }
     </script>
 </body>
 </html>
