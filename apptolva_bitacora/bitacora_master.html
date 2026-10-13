@@ -11,7 +11,7 @@
     <title>Bitácora NOM-087 | AppTolva</title>
     <link rel="manifest" href="manifest.json">
     
-    <!-- 1. CARGA DE LIBRERÍAS (CRÍTICO) -->
+    <!-- 1. LIBRERÍAS -->
     <script src="./js/tailwindcss.js"></script>
     <link rel="stylesheet" href="./css/fontawesome.min.css">
     <script src="./js/jspdf.min.js"></script>
@@ -35,7 +35,7 @@
 
     <style>
         :root { color-scheme: light; }
-        body { user-select: none; -webkit-user-select: none; padding-bottom: 100px; background-color: #f3f4f6; }
+        body { user-select: none; -webkit-user-select: none; padding-bottom: 30px; background-color: #f3f4f6; }
         input, textarea, select {
             user-select: text;
             -webkit-user-select: text;
@@ -58,26 +58,32 @@
 </head>
 <body class="font-sans text-gray-800">
 
-    <!-- Navbar Móvil Offline -->
+    <!-- Navbar con Estado de Sincronización Integrado -->
     <nav class="bg-gradient-to-r from-orange-600 to-[#F28B00] text-white p-2 shadow-lg sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
             
-            <!-- GRUPO IZQUIERDA: SALIR -->
             <div class="flex items-center gap-2">
                 <button onclick="window.history.back()" class="bg-white/20 hover:bg-white/30 p-2 rounded-lg text-white border border-white/10 active:scale-95 transition" title="Volver al Menú">
                     <i class="fas fa-home text-lg"></i>
                 </button>
+                <div class="hidden sm:block text-xs font-bold tracking-wide">NOM-087 · Bitácora Digital</div>
             </div>
 
-            <!-- GRUPO DERECHA: RELOJ Y EVIDENCIAS -->
+            <!-- Grupo Derecho: Estado de Nube, Reloj, PDF y QR -->
             <div class="flex items-center gap-2">
+                <!-- Indicador Pasivo de Nube (Reemplaza al botón flotante) -->
+                <div id="cloudSyncIndicator" class="bg-black/20 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5" title="Estado de la conexión y sincronización">
+                    <i class="fas fa-cloud text-gray-300" id="cloudIcon"></i>
+                    <span id="cloudText" class="hidden xs:inline">Local</span>
+                </div>
+
                 <div class="bg-black/20 px-2 py-1 rounded-full text-[10px] font-mono" id="clockDisplay">00:00</div>
                 
                 <button onclick="generarPDFSeguro()" class="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center gap-1 active:scale-95 transition border border-orange-200">
                     <i class="fas fa-file-contract"></i> PDF
                 </button>
                 
-                <button onclick="generarQRSeguro()" id="qrBtn" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center ml-1 active:scale-95 transition border border-gray-600">
+                <button onclick="generarQRSeguro()" id="qrBtn" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center active:scale-95 transition border border-gray-600" title="Exhibir QR oficial">
                     <i class="fas fa-qrcode text-lg"></i>
                 </button>
             </div>
@@ -85,22 +91,22 @@
     </nav>
 
     <div id="offlineSyncStatus" class="hidden sticky top-[48px] z-40 bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-[11px] font-bold text-amber-800">
-        <i class="fas fa-cloud-upload-alt mr-1"></i><span id="offlineSyncText">Bitácora pendiente de sincronizar.</span>
+        <i class="fas fa-cloud-upload-alt mr-1"></i><span id="offlineSyncText">Bitácora guardada en el dispositivo.</span>
     </div>
         
     <div class="container mx-auto p-4 max-w-4xl space-y-4">
      
-       <!-- 1. Datos del Servicio (CARÁTULA COMPLETA NOM-087) -->
+       <!-- 1. Carátula Oficial NOM-087 -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
             <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
                 <h2 class="text-sm font-bold text-gray-600 uppercase tracking-wide">Carátula de Bitácora Oficial (NOM-087-SCT-2-2017)</h2>
-                <i class="fas fa-info-circle text-gray-400"></i>
+                <i class="fas fa-shield-alt text-orange-500"></i>
             </div>
             <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 
-                <!-- Permisionario Corregido -->
-                <div class="col-span-2 md:col-span-4 bg-orange-50 p-3 rounded border border-orange-100 mb-2">
-                    <p class="text-[10px] text-orange-500 font-bold uppercase">Permisionario / Empresa de Autotransporte</p>
+                <!-- Permisionario: S.A. de C.V. -->
+                <div class="col-span-2 md:col-span-4 bg-orange-50 p-3 rounded-lg border border-orange-100 mb-2">
+                    <p class="text-[10px] text-orange-500 font-bold uppercase">Permisionario / Empresa de Autotransporte Federal</p>
                     <p class="font-bold text-gray-800">GRUPO BACHOCO, S.A. DE C.V.</p>
                     <p class="text-[10px] text-gray-500">Av. Tecnológico 401, Celaya, Gto. CP 38010</p>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
@@ -140,7 +146,7 @@
                     <input type="text" id="driverName" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Número de empleado o apellido" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="listaOperadoresNOM087" aria-expanded="false">
                     <div id="listaOperadoresNOM087" class="hidden absolute left-0 right-0 top-full z-40 mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg" role="listbox"></div>
                 </div>
-                <div><label class="text-xs text-gray-400 block mb-1">No. de empleado</label><input type="text" id="employeeNumber" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 bg-gray-100 font-bold" placeholder="Se completa del catálogo" readonly></div>
+                <div><label class="text-xs text-gray-400 block mb-1">No. de empleado</label><input type="text" id="employeeNumber" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 bg-gray-100 font-bold" placeholder="Del catálogo" readonly></div>
                 
                 <div><label class="text-xs text-gray-400 block mb-1">Licencia Federal</label><input type="text" id="license" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="Num. Licencia"></div>
                 <div>
@@ -166,12 +172,12 @@
 
                 <!-- Origen y Destino -->
                 <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Origen</label><input type="text" id="origin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="PA CHAPO / Planta Celaya"></div>
-                <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Destino</label><input type="text" id="destination" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Cedis / Cliente..."></div>
+                <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Destino Final</label><input type="text" id="destination" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Cedis / Granja..."></div>
 
-                <!-- Puntos Intermedios e Itinerario (NUEVO REQUERIMIENTO) -->
+                <!-- Puntos Intermedios e Itinerario Legal -->
                 <div class="col-span-2 md:col-span-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <label class="text-xs font-bold text-gray-600 block mb-1"><i class="fas fa-route text-orange-500 mr-1"></i> Puntos Intermedios / Escalas de Ruta / Casetas (Itinerario)</label>
-                    <input type="text" id="puntosIntermedios" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 text-xs" placeholder="Ej. Caseta Palmillas, Querétaro, San Juan del Río, Arco Norte...">
+                    <label class="text-xs font-bold text-gray-700 block mb-1"><i class="fas fa-route text-orange-500 mr-1"></i> Puntos Intermedios / Escalas / Maniobras de Ruta</label>
+                    <input type="text" id="puntosIntermedios" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 text-xs" placeholder="Ej. Agua Fría 3 (Desenganche), Caseta Palmillas, Querétaro...">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                         <div>
                             <label class="text-[11px] text-gray-500 font-bold block mb-1">Hora y Fecha de Salida (Inicio Viaje)</label>
@@ -185,20 +191,20 @@
                 </div>
 
                 <!-- Co-conductor -->
-                <div class="col-span-2"><label class="text-xs text-gray-400 block mb-1">Co-conductor (si aplica relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre del co-conductor (opcional)"></div>
+                <div class="col-span-2"><label class="text-xs text-gray-400 block mb-1">Co-conductor (si aplica relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre co-conductor (opcional)"></div>
                 <div><label class="text-xs text-gray-400 block mb-1">Licencia Co-conductor</label><input type="text" id="coLicencia" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="(opcional)"></div>
             </div>
         </div>
 
-        <!-- 2. Botones de Acción (ESTADO 4 RENOMBRADO A AUXILIAR) -->
+        <!-- 2. Botones de Acción (Estado 4: Auxiliar) -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
             <button onclick="window.changeStatus(1)" id="btn-1" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-active:bg-red-500 group-active:text-white transition"><i class="fas fa-home text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Descanso</span><span class="text-[10px] text-gray-400">Fuera de Servicio</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Descanso</span><span class="text-[10px] text-gray-400">Fuera de Servicio (8h+)</span></div>
             </button>
             <button onclick="window.changeStatus(2)" id="btn-2" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-active:bg-blue-500 group-active:text-white transition"><i class="fas fa-bed text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Pausa</span><span class="text-[10px] text-gray-400">Comida / Descanso 30m</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Pausa</span><span class="text-[10px] text-gray-400">Pausa Mínima 30m</span></div>
             </button>
             <button onclick="window.changeStatus(3)" id="btn-3" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-active:bg-green-500 group-active:text-white transition"><i class="fas fa-truck-moving text-lg"></i></div>
@@ -206,7 +212,7 @@
             </button>
             <button onclick="window.changeStatus(4)" id="btn-4" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center group-active:bg-yellow-500 group-active:text-white transition"><i class="fas fa-tools text-lg"></i></div>
-                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Auxiliar</span><span class="text-[10px] text-gray-400">Carga / Descarga / Tareas</span></div>
+                <div class="text-center leading-3"><span class="block font-bold text-gray-700 text-sm">Auxiliar</span><span class="text-[10px] text-gray-400">Carga / Desenganche</span></div>
             </button>
             <button onclick="window.changeStatus(5)" id="btn-5" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-active:bg-purple-500 group-active:text-white transition"><i class="fas fa-exclamation-triangle text-lg"></i></div>
@@ -214,16 +220,16 @@
             </button>
         </div>
 
-        <!-- Alerta de Fatiga (14h en 24h) -->
+        <!-- Alerta 14h en el ciclo de 24h -->
         <div id="alertBox" class="hidden bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-exclamation-triangle mt-1"></i>
-            <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h/24h</p><p id="alertMsg" class="text-xs">Te acercas al límite de 14 horas de conducción en 24 horas. Busca un lugar seguro para descanso obligatorio de 8 horas continuas.</p></div>
+            <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h de Conducción</p><p id="alertMsg" class="text-xs">Te acercas al límite máximo de 14 horas de conducción en tu jornada de 24h. Debes tomar tu descanso obligatorio de 8 horas continuas.</p></div>
         </div>
 
-        <!-- Alerta de 5h continuas -->
+        <!-- Alerta 5h continua -->
         <div id="alertBox5h" class="hidden bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-clock mt-1"></i>
-            <div><p class="font-bold text-sm">¡Pausa Obligatoria! (NOM-087 Art. 4.1)</p><p class="text-xs">Llevas más de 4.5 horas de conducción continua. Debes realizar una pausa mínima de 30 minutos ininterrumpidos antes de completar 5 horas.</p></div>
+            <div><p class="font-bold text-sm">¡Pausa Obligatoria de 30 min! (NOM-087 Art. 4.1)</p><p class="text-xs">Superaste 4.5 horas de manejo continuo. Debes realizar una pausa mínima de 30 minutos ininterrumpidos antes de las 5 horas.</p></div>
         </div>
 
         <!-- Evidencia GPS -->
@@ -231,7 +237,7 @@
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                     <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2"><i class="fas fa-map-marker-alt text-orange-500"></i> Evidencia GPS</h3>
-                    <p id="gpsStatusText" class="text-xs text-gray-500 mt-1">GPS opcional: se adjunta al cambio de estado cuando el dispositivo lo permita.</p>
+                    <p id="gpsStatusText" class="text-xs text-gray-500 mt-1">GPS automático en cambios de estado cuando haya señal satelital.</p>
                 </div>
                 <button onclick="window.capturarGPSManual()" id="gpsBtn" class="bg-orange-600 text-white px-3 py-2 rounded-lg font-bold text-xs shadow flex items-center justify-center gap-2 active:scale-95 transition">
                     <i class="fas fa-location-arrow"></i> Capturar ubicación
@@ -240,31 +246,32 @@
             <div id="gpsEvidenceBox" class="mt-3 hidden text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono text-gray-700"></div>
         </div>
 
-        <!-- 3. Gráfica Visual (App) -->
+        <!-- 3. Gráfica 24h Dinámica -->
         <div class="bg-white p-3 rounded-xl shadow-md border border-gray-100">
             <div class="flex justify-between items-center mb-2 px-1">
-                <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2"><i class="fas fa-chart-line text-orange-500"></i> Gráfica 24h</h3>
-                <div class="text-xs bg-gray-100 px-2 py-1 rounded">Manejo: <span id="totalDriving" class="font-bold text-gray-800">0h 0m</span> / 14h</div>
+                <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2"><i class="fas fa-chart-line text-orange-500"></i> Gráfica 24h Oficial</h3>
+                <div class="text-xs bg-gray-100 px-2 py-1 rounded">Manejo en Jornada: <span id="totalDriving" class="font-bold text-gray-800">0h 0m</span> / 14h</div>
             </div>
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
-            <div id="chartXAxisLabels" class="flex justify-between text-[10px] text-gray-400 px-2 mt-1 font-mono"></div>
+            <!-- Eje X Dinámico según la hora real de inicio -->
+            <div id="chartXAxisLabels" class="flex justify-between text-[10px] text-gray-500 px-2 mt-1 font-mono font-bold"></div>
             
             <button onclick="terminarTurno48h()" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
-                <i class="fas fa-flag-checkered text-lg"></i> TERMINAR GRÁFICA 48H Y NUEVO TURNO
+                <i class="fas fa-flag-checkered text-lg"></i> FINALIZAR VIAJE / TERMINAR TURNO Y RESPALDAR
             </button>
         </div>
 
-        <!-- 4. Bitácora (Lista) -->
+        <!-- 4. Registros -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
             <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center gap-2">
-                <h3 class="font-bold text-gray-600 text-xs uppercase flex items-center gap-2">Registros de Turno <span id="logCountBadge" class="text-[10px] font-mono text-gray-400"></span></h3>
+                <h3 class="font-bold text-gray-600 text-xs uppercase flex items-center gap-2">Registros del Turno <span id="logCountBadge" class="text-[10px] font-mono text-gray-400"></span></h3>
                 <button onclick="window.openObs()" aria-label="Agregar nota al registro actual" class="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded flex items-center gap-1 hover:bg-orange-200 active:scale-95 transition"><i class="fas fa-sticky-note"></i> Agregar Nota</button>
             </div>
             <div id="logList" class="divide-y divide-gray-100 max-h-60 overflow-y-auto"></div>
         </div>
 
         <!-- 5. Firmas -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-24">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <div class="bg-white p-4 rounded-xl shadow-md border border-gray-100">
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="font-bold text-gray-700 text-sm">Firma Conductor</h3>
@@ -280,18 +287,13 @@
                 <div class="relative"><canvas id="supervisorPad" class="signature-pad" width="400" height="150"></canvas><div class="absolute bottom-2 right-2 text-[10px] text-gray-300 pointer-events-none">Visto bueno</div></div>
             </div>
         </div>
-
-        <!-- Guardar / Sincronizar -->
-        <div class="fixed bottom-6 right-6 z-40">
-            <button onclick="intentarSubirNube()" id="saveBtn" class="bg-gray-900 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition active:bg-black border-2 border-orange-500" title="Guardar / Sincronizar"><i class="fas fa-cloud-upload-alt text-xl"></i></button>
-        </div>
     </div>
 
     <!-- Modal Notas -->
     <div id="obsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
         <div class="bg-white rounded-xl p-5 w-11/12 max-w-sm shadow-2xl">
-            <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-gray-800">Agregar Nota / Justificación</h3><button onclick="window.closeObs()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button></div>
-            <textarea id="obsText" class="w-full border-2 border-gray-200 rounded-lg p-3 h-24 text-sm focus:border-orange-500 outline-none resize-none" placeholder="Excepción, retén, tráfico severo, avería mecánica..."></textarea>
+            <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-gray-800">Agregar Justificación / Nota</h3><button onclick="window.closeObs()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button></div>
+            <textarea id="obsText" class="w-full border-2 border-gray-200 rounded-lg p-3 h-24 text-sm focus:border-orange-500 outline-none resize-none" placeholder="Excepción, retén, maniobra de desenganche, avería..."></textarea>
             <div class="flex justify-end gap-2 mt-4">
                 <button onclick="window.closeObs()" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
                 <button onclick="window.saveObs()" class="px-4 py-2 text-sm bg-orange-600 text-white font-bold rounded-lg shadow hover:bg-orange-700">Guardar</button>
@@ -299,42 +301,64 @@
         </div>
     </div>
 
-    <!-- MODAL QR HÍBRIDO -->
+    <!-- Modal QR -->
     <div id="qrModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[70] animate-in fade-in duration-200">
         <div class="bg-white rounded-2xl p-6 w-11/12 max-w-sm shadow-2xl text-center relative">
             <button onclick="window.closeQR()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-2"><i class="fas fa-times text-xl"></i></button>
             
-            <h3 class="font-bold text-gray-800 text-lg mb-1"><i class="fas fa-shield-alt text-orange-500 mr-1"></i> Bitácora Digital</h3>
-            <p class="text-[10px] text-gray-400 mb-3 uppercase tracking-widest">NOM-087-SCT-2-2017</p>
+            <h3 class="font-bold text-gray-800 text-lg mb-1"><i class="fas fa-shield-alt text-orange-500 mr-1"></i> Bitácora Digital NOM-087</h3>
+            <p class="text-[10px] text-gray-400 mb-3 uppercase tracking-widest">Inspección de Guardia Nacional / SICT</p>
             
             <div class="bg-white p-2 rounded-lg inline-block border-2 border-gray-100 shadow-inner mb-3">
                 <div id="qrcode" class="flex justify-center items-center" style="min-height:200px;min-width:200px;"></div>
             </div>
             
             <div class="text-left text-xs bg-gray-50 p-3 rounded border border-gray-200 max-h-32 overflow-y-auto font-mono">
-                <div id="qrTextContent"><span style="color:#F28B00;font-weight:bold">⏳ Procesando bitácora…</span></div>
+                <div id="qrTextContent"><span style="color:#F28B00;font-weight:bold">Procesando bitácora…</span></div>
             </div>
-            <p class="text-[9px] text-gray-400 mt-2">Permite inspección inmediata de autoridad aún sin conexión a internet.</p>
+            <p class="text-[9px] text-gray-400 mt-2">Funciona en línea o directamente fuera de cobertura celular.</p>
         </div>
     </div>
 
     <script>
-        // --- CONSTANTE GLOBAL DE TURNO ---
-        const SHIFT_START_HOUR = 8; // Turno inicia a las 08:00 a.m.
         const GPS_TIMEOUT_MS = 8000;
         const LICENSE_EXP_WARNING_DAYS = 15;
-        const FIRESTORE_PENDING_IDS_KEY = "nom087_firestore_pending_ids";
+        const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 
-        // --- 1. LÓGICA DE DATOS LOCALES ---
+        // --- 1. LÓGICA DE DATOS Y TURNO DINÁMICO (NOM-087) ---
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
-        let currentStatus = logs.length > 0 ? logs[logs.length-1].status : 1;
+        let currentStatus = logs.length > 0 ? logs[logs.length - 1].status : 1;
 
-        if(logs.length === 0) {
-            const now = new Date().getTime();
+        if (logs.length === 0) {
+            const now = Date.now();
             logs.push({ status: 1, startTime: now, endTime: null, place: "Inicio", observation: "", gps: null });
         }
 
-        // Recuperar y persistir inputs (incluye puntosIntermedios, horaSalida, horaLlegada)
+        // Calcula dinámicamente el inicio del periodo de 24h (Art. 4.5)
+        function getShiftStartTime(logList) {
+            if (!logList || logList.length === 0) return Date.now();
+            let ultimoDescansoIndex = -1;
+            for (let i = 0; i < logList.length; i++) {
+                const l = logList[i];
+                if (l.status === 1) { // Descanso
+                    const end = l.endTime || Date.now();
+                    if ((end - l.startTime) >= OCHO_HORAS_MS) {
+                        ultimoDescansoIndex = i;
+                    }
+                }
+            }
+            if (ultimoDescansoIndex !== -1 && ultimoDescansoIndex < logList.length - 1) {
+                return logList[ultimoDescansoIndex + 1].startTime;
+            }
+            return logList[0].startTime;
+        }
+
+        function getShiftStartHour(logList) {
+            const startTime = getShiftStartTime(logList);
+            return new Date(startTime).getHours();
+        }
+
+        // Persistencia y recuperación de inputs
         const ids = [
             'driverName', 'employeeNumber', 'license', 'licenseExp', 
             'unitId', 'brandModel', 'plates', 'mode', 'folio', 
@@ -357,13 +381,11 @@
                 if (id === 'driverName' && e.target.value.trim()) {
                     localStorage.setItem('nombreOperadorActual', e.target.value.trim());
                 }
+                sincronizarSilenciosoDebounced();
             });
         });
-        
-        const initialDriverName = document.getElementById('driverName')?.value.trim();
-        if (initialDriverName) localStorage.setItem('nombreOperadorActual', initialDriverName);
 
-        // --- CATÁLOGO OFICIAL DE OPERADORES ---
+        // --- CATÁLOGO DE OPERADORES ---
         const driverNameInput = document.getElementById('driverName');
         const employeeNumberInput = document.getElementById('employeeNumber');
         const operatorList = document.getElementById('listaOperadoresNOM087');
@@ -371,12 +393,7 @@
         let applyingCatalogOperator = false;
 
         function normalizeOperatorText(value) {
-            return String(value || "")
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, "")
-                .trim()
-                .replace(/\s+/g, " ")
-                .toUpperCase();
+            return String(value || "").normalize('NFD').replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
         }
 
         function getSelectedCatalogOperator() {
@@ -397,7 +414,6 @@
         function selectCatalogOperator(numero) {
             const operator = window.CATALOGO_OPERADORES && window.CATALOGO_OPERADORES[numero];
             if (!operator) return;
-
             applyingCatalogOperator = true;
             selectedOperatorNumber = numero;
             driverNameInput.value = operator.nombre;
@@ -412,26 +428,19 @@
         function showOperatorSuggestions(query) {
             hideOperatorSuggestions();
             if (!query || !window.CATALOGO_OPERADORES) return;
-
             const normalizedQuery = normalizeOperatorText(query);
             const matches = Object.entries(window.CATALOGO_OPERADORES)
-                .filter(([numero, operator]) =>
-                    numero.includes(normalizedQuery) ||
-                    normalizeOperatorText(operator.nombre).includes(normalizedQuery)
-                )
+                .filter(([numero, op]) => numero.includes(normalizedQuery) || normalizeOperatorText(op.nombre).includes(normalizedQuery))
                 .slice(0, 8);
-
             if (!matches.length) return;
-
-            matches.forEach(([numero, operator]) => {
-                const option = document.createElement('button');
-                option.type = 'button';
-                option.className = 'block w-full px-3 py-2 text-left text-xs hover:bg-orange-50 focus:bg-orange-50';
-                option.setAttribute('role', 'option');
-                option.textContent = `${numero} - ${operator.nombre}`;
-                option.addEventListener('mousedown', (event) => event.preventDefault());
-                option.addEventListener('click', () => selectCatalogOperator(numero));
-                operatorList.appendChild(option);
+            matches.forEach(([numero, op]) => {
+                const opt = document.createElement('button');
+                opt.type = 'button';
+                opt.className = 'block w-full px-3 py-2 text-left text-xs hover:bg-orange-50 focus:bg-orange-50';
+                opt.textContent = `${numero} - ${op.nombre}`;
+                opt.addEventListener('mousedown', (e) => e.preventDefault());
+                opt.addEventListener('click', () => selectCatalogOperator(numero));
+                operatorList.appendChild(opt);
             });
             operatorList.classList.remove('hidden');
             driverNameInput.setAttribute('aria-expanded', 'true');
@@ -442,108 +451,30 @@
             const savedOperator = window.CATALOGO_OPERADORES && window.CATALOGO_OPERADORES[savedNumber];
             if (savedOperator && normalizeOperatorText(savedOperator.nombre) === normalizeOperatorText(driverNameInput.value)) {
                 selectCatalogOperator(savedNumber);
-            } else {
-                const savedMatch = Object.entries(window.CATALOGO_OPERADORES || {})
-                    .find(([, operator]) => normalizeOperatorText(operator.nombre) === normalizeOperatorText(driverNameInput.value));
-                if (savedMatch) {
-                    selectCatalogOperator(savedMatch[0]);
-                } else if (savedNumber) {
-                    employeeNumberInput.value = "";
-                    localStorage.setItem('nom087_employeeNumber', "");
-                }
             }
-
             driverNameInput.addEventListener('input', () => {
                 if (applyingCatalogOperator) return;
-                if (selectedOperatorNumber) {
-                    selectedOperatorNumber = "";
-                    employeeNumberInput.value = "";
-                    employeeNumberInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    driverNameInput.classList.remove('border-green-400', 'bg-green-50');
-                }
                 showOperatorSuggestions(driverNameInput.value);
             });
-            driverNameInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' && !operatorList.classList.contains('hidden')) {
-                    const firstOption = operatorList.querySelector('[role="option"]');
-                    if (operatorList.children.length === 1 && firstOption) {
-                        event.preventDefault();
-                        firstOption.click();
-                    }
-                } else if (event.key === 'Escape') {
-                    hideOperatorSuggestions();
-                }
-            });
-            document.addEventListener('click', (event) => {
-                if (!operatorList.contains(event.target) && event.target !== driverNameInput) {
-                    hideOperatorSuggestions();
-                }
+            document.addEventListener('click', (e) => {
+                if (!operatorList.contains(e.target) && e.target !== driverNameInput) hideOperatorSuggestions();
             });
         }
-
-        // Validaciones ligeras
-        document.getElementById('licenseExp')?.addEventListener('change', checkLicenseExpiry);
-        document.getElementById('kmFin')?.addEventListener('blur', checkKmRange);
-        document.getElementById('vin')?.addEventListener('blur', checkVinFormat);
-        checkLicenseExpiry();
 
         // Reloj
         setInterval(() => {
             const now = new Date();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const clock = document.getElementById('clockDisplay');
-            if (clock) clock.innerText = timeString;
+            if (clock) clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }, 1000);
 
         function guardarLocal() {
             try {
                 localStorage.setItem('nom087_logs', JSON.stringify(logs));
             } catch (e) {
-                console.error("No se pudo guardar la bitácora localmente:", e);
-                alert("⚠️ Almacenamiento lleno. Genera el PDF ahora y finaliza el turno.");
+                console.error("Almacenamiento lleno:", e);
             }
             updateUI();
-        }
-
-        function checkLicenseExpiry() {
-            const el = document.getElementById('licenseExp');
-            const badge = document.getElementById('licenseExpBadge');
-            if (!el || !badge) return;
-            if (!el.value) { badge.classList.add('hidden'); return; }
-            const expDate = new Date(el.value + 'T00:00:00');
-            if (isNaN(expDate.getTime())) { badge.classList.add('hidden'); return; }
-            const today = new Date(); today.setHours(0,0,0,0);
-            const diffDays = Math.floor((expDate - today) / (24*60*60*1000));
-            badge.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-yellow-100', 'text-yellow-700');
-            if (diffDays < 0) {
-                badge.textContent = 'Licencia VENCIDA';
-                badge.classList.add('bg-red-100', 'text-red-700');
-            } else if (diffDays <= LICENSE_EXP_WARNING_DAYS) {
-                badge.textContent = `Vence en ${diffDays} día(s)`;
-                badge.classList.add('bg-yellow-100', 'text-yellow-700');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-
-        function checkKmRange() {
-            const kmInicioEl = document.getElementById('kmInicio');
-            const kmFinEl = document.getElementById('kmFin');
-            if (!kmInicioEl || !kmFinEl) return;
-            const kmInicio = parseFloat(kmInicioEl.value);
-            const kmFin = parseFloat(kmFinEl.value);
-            if (!isNaN(kmInicio) && !isNaN(kmFin) && kmFin < kmInicio) {
-                alert("⚠️ El Km Fin no puede ser menor que el Km Inicio.");
-            }
-        }
-
-        function checkVinFormat() {
-            const vinEl = document.getElementById('vin');
-            if (!vinEl || !vinEl.value) return;
-            const vin = vinEl.value.trim().toUpperCase();
-            if (vin.length > 0 && (vin.length !== 17 || /[IOQ]/.test(vin))) {
-                alert("⚠️ El VIN debe tener 17 caracteres y no contener I, O ni Q.");
-            }
         }
 
         function formatGps(gps) {
@@ -553,18 +484,16 @@
         }
 
         function getActivityStatus(log) {
-            const rawStatus = log?.status ?? log?.estado ?? log?.activity ?? log?.actividad;
-            if (typeof rawStatus === "number" && Number.isInteger(rawStatus) && rawStatus >= 1 && rawStatus <= 5) {
-                return rawStatus;
-            }
-            const value = String(rawStatus ?? "").trim();
-            if (/^[1-5]$/.test(value)) return Number(value);
-            const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-            if (/PAUSA|BREAK|COMIDA|DESCANSO CORTO/.test(normalized)) return 2;
-            if (/DESCANSO|REST/.test(normalized)) return 1;
-            if (/MANEJ|CONDUC|EN RUTA|DRIVING/.test(normalized)) return 3;
-            if (/AUXILIAR|SERVICIO|CARGA|DESCARGA|SERVICE/.test(normalized)) return 4;
-            if (/EXCEPCION|EMERGENCIA|EXCEPTION/.test(normalized)) return 5;
+            const raw = log?.status ?? log?.estado ?? log?.activity;
+            if (typeof raw === "number" && raw >= 1 && raw <= 5) return raw;
+            const val = String(raw ?? "").trim();
+            if (/^[1-5]$/.test(val)) return Number(val);
+            const n = val.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+            if (/PAUSA|BREAK|COMIDA/.test(n)) return 2;
+            if (/DESCANSO|REST/.test(n)) return 1;
+            if (/MANEJ|CONDUC|RUTA/.test(n)) return 3;
+            if (/AUXILIAR|SERVICIO|CARGA|DESCARGA/.test(n)) return 4;
+            if (/EXCEPCION|EMERGENCIA/.test(n)) return 5;
             return null;
         }
 
@@ -580,40 +509,28 @@
             if (status && message) status.textContent = message;
             if (!box) return;
             if (gps) {
-                const fecha = gps.capturedAt ? new Date(gps.capturedAt).toLocaleString() : new Date().toLocaleString();
                 box.classList.remove('hidden');
-                box.textContent = `${formatGps(gps)} | ${fecha}`;
-            } else if (message) {
-                box.classList.remove('hidden');
-                box.textContent = message;
+                box.textContent = `${formatGps(gps)} | ${new Date().toLocaleTimeString()}`;
             }
         }
 
         function getGpsEvidence() {
             return new Promise((resolve) => {
                 if (!navigator.geolocation) {
-                    resolve({ gps: null, message: "GPS no disponible en este dispositivo." });
+                    resolve({ gps: null, message: "GPS no disponible." });
                     return;
                 }
                 navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        resolve({
-                            gps: {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude,
-                                accuracy: position.coords.accuracy,
-                                altitude: position.coords.altitude,
-                                heading: position.coords.heading,
-                                speed: position.coords.speed,
-                                capturedAt: new Date().toISOString(),
-                                source: "device-geolocation"
-                            },
-                            message: "Ubicación GPS capturada y vinculada al registro."
-                        });
-                    },
-                    (error) => {
-                        resolve({ gps: null, message: "Registro guardado sin coordenadas GPS." });
-                    },
+                    (pos) => resolve({
+                        gps: {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            accuracy: pos.coords.accuracy,
+                            capturedAt: new Date().toISOString()
+                        },
+                        message: "GPS capturado correctamente."
+                    }),
+                    () => resolve({ gps: null, message: "Sin señal GPS." }),
                     { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 60000 }
                 );
             });
@@ -621,41 +538,99 @@
 
         async function attachGpsToLog(log, showStatus) {
             if (!log) return null;
-            if (showStatus) updateGpsStatus(null, "Solicitando GPS del dispositivo...");
-            const result = await getGpsEvidence();
-            if (result.gps) {
-                log.gps = result.gps;
+            if (showStatus) updateGpsStatus(null, "Buscando satélites GPS...");
+            const res = await getGpsEvidence();
+            if (res.gps) {
+                log.gps = res.gps;
                 localStorage.setItem('nom087_logs', JSON.stringify(logs));
             }
-            if (showStatus) updateGpsStatus(result.gps, result.message);
-            return result.gps;
+            if (showStatus) updateGpsStatus(res.gps, res.message);
+            return res.gps;
         }
 
         window.capturarGPSManual = async function() {
             const btn = document.getElementById('gpsBtn');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Capturando';
-            }
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obteniendo'; }
             try {
                 await attachGpsToLog(logs[logs.length - 1], true);
                 updateUI();
             } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-location-arrow"></i> Capturar ubicación';
-                }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-location-arrow"></i> Capturar ubicación'; }
             }
         };
 
-        window.terminarTurno48h = function() {
-            if(confirm("⚠️ ¿TERMINAR GRÁFICA DE 48H Y EMPEZAR NUEVO TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nEsto reiniciará el periodo de bitácora.")) {
+        // --- CAMBIO DE ESTADO Y AUTO-SINCRONIZACIÓN SILENCIOSA ---
+        window.changeStatus = async (st) => {
+            if (currentStatus === st) return;
+            const now = Date.now();
+            if (logs.length > 0) logs[logs.length - 1].endTime = now;
+            const newLog = { status: st, startTime: now, endTime: null, place: "En Ruta", observation: "", gps: null };
+            logs.push(newLog);
+            currentStatus = st;
+            guardarLocal();
+            await attachGpsToLog(newLog, false);
+            updateUI();
+
+            // Sincronización automática silenciosa
+            sincronizarSilencioso();
+
+            if (st === 5) {
+                setTimeout(() => {
+                    alert("⚠️ NOM-087 Art. 4.7: El estado de EXCEPCIÓN exige justificación obligatoria (avería, clima adverso, congestión). Por favor registra la causa.");
+                    window.openObs();
+                }, 300);
+            }
+        };
+
+        function setCloudStatus(estado) {
+            const icon = document.getElementById('cloudIcon');
+            const text = document.getElementById('cloudText');
+            if (!icon || !text) return;
+
+            if (estado === "syncing") {
+                icon.className = "fas fa-spinner fa-spin text-amber-300";
+                text.textContent = "Guardando";
+            } else if (estado === "synced") {
+                icon.className = "fas fa-check-circle text-green-300";
+                text.textContent = "Nube lista";
+            } else {
+                icon.className = "fas fa-cloud text-gray-300";
+                text.textContent = "Local";
+            }
+        }
+
+        let debounceTimer = null;
+        function sincronizarSilenciosoDebounced() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(sincronizarSilencioso, 2000);
+        }
+
+        async function sincronizarSilencioso() {
+            if (!navigator.onLine || typeof window.guardarBitacoraEnFirestore !== "function") {
+                setCloudStatus("offline");
+                return;
+            }
+            try {
+                setCloudStatus("syncing");
+                const payload = buildBitacoraPayload();
+                await window.guardarBitacoraEnFirestore(payload);
+                setCloudStatus("synced");
+            } catch (e) {
+                setCloudStatus("offline");
+            }
+        }
+
+        window.terminarTurno48h = async function() {
+            if (confirm("⚠️ ¿FINALIZAR VIAJE / TERMINAR TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nLa bitácora se respaldará en la nube y se iniciará un periodo en ceros.")) {
+                try {
+                    if (navigator.onLine && typeof window.guardarBitacoraEnFirestore === "function") {
+                        const payload = buildBitacoraPayload();
+                        await window.guardarBitacoraEnFirestore(payload);
+                    }
+                } catch (e) {}
+
                 localStorage.removeItem('nom087_logs');
                 localStorage.removeItem('nom087_folio');
-                document.getElementById('folio').value = '';
-                if (typeof window.generarFolioFirebase === 'function') {
-                    window.generarFolioFirebase();
-                }
                 const clearIds = ['origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada', 'kmInicio', 'kmFin'];
                 clearIds.forEach(id => {
                     const el = document.getElementById(id);
@@ -664,46 +639,29 @@
                 });
                 location.reload();
             }
-        }
-
-        window.changeStatus = async (st) => {
-            if(currentStatus === st) return;
-            const now = new Date().getTime();
-            if(logs.length > 0) logs[logs.length-1].endTime = now;
-            const newLog = { status: st, startTime: now, endTime: null, place: "En Ruta", observation: "", gps: null };
-            logs.push(newLog);
-            currentStatus = st;
-            guardarLocal();
-            await attachGpsToLog(newLog, true);
-            updateUI();
-
-            // NOM-087 Art. 4.7: Excepción exige justificación obligatoria
-            if (st === 5) {
-                setTimeout(() => {
-                    alert("⚠️ NOM-087 Art. 4.7: El estado de EXCEPCIÓN exige justificación obligatoria (avería mecánica, clima adverso, congestión severa o fuerza mayor). Anota la causa.");
-                    window.openObs();
-                }, 300);
-            }
         };
 
+        // --- ACTUALIZACIÓN DE UI Y GRÁFICA DINÁMICA ---
         function updateUI() {
-            document.querySelectorAll('.status-btn').forEach(b => { b.classList.remove('active'); if(b.id === `btn-${currentStatus}`) b.classList.add('active'); });
-            const list = document.getElementById('logList'); list.innerHTML = '';
-
-            const now = new Date().getTime();
+            document.querySelectorAll('.status-btn').forEach(b => {
+                b.classList.remove('active');
+                if (b.id === `btn-${currentStatus}`) b.classList.add('active');
+            });
+            const list = document.getElementById('logList');
+            list.innerHTML = '';
+            const now = Date.now();
 
             [...logs].reverse().forEach(l => {
                 const s = new Date(l.startTime);
-                // Estado 4 unificado a "Auxiliar"
-                const stNames = ["","Descanso","Pausa","Conduciendo","Auxiliar","Excepción"];
+                const stNames = ["", "Descanso", "Pausa", "Conduciendo", "Auxiliar", "Excepción"];
                 const stName = stNames[l.status] || "Otro";
-                const clss = ["","bg-red-500","bg-blue-500","bg-green-500","bg-yellow-500","bg-purple-500"];
+                const clss = ["", "bg-red-500", "bg-blue-500", "bg-green-500", "bg-yellow-500", "bg-purple-500"];
                 const cls = clss[l.status] || "bg-gray-500";
 
                 let dur = "";
-                if(l.endTime || now) {
-                    const d = Math.floor(((l.endTime || now) - l.startTime)/60000);
-                    dur = `${Math.floor(d/60)}h ${d%60}m`;
+                if (l.endTime || now) {
+                    const d = Math.floor(((l.endTime || now) - l.startTime) / 60000);
+                    dur = `${Math.floor(d / 60)}h ${d % 60}m`;
                 }
 
                 const gpsBadge = l.gps
@@ -715,7 +673,7 @@
                     : "";
 
                 list.innerHTML += `<div class="p-3 border-b flex justify-between items-start gap-3">
-                    <div><span class="dot-status ${cls}"></span><b>${stName}</b> <span class="text-xs text-gray-400">${s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>${gpsBadge}${obsNote}</div>
+                    <div><span class="dot-status ${cls}"></span><b>${stName}</b> <span class="text-xs text-gray-400">${s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>${gpsBadge}${obsNote}</div>
                     <div class="text-xs font-mono text-gray-500 whitespace-nowrap">${dur}</div>
                 </div>`;
             });
@@ -723,84 +681,101 @@
             const countBadge = document.getElementById('logCountBadge');
             if (countBadge) countBadge.textContent = String(logs.length);
 
-            // Total Manejo 24h
-            const limit = now - (24 * 60 * 60 * 1000);
+            // Cálculo legal de 14h en el ciclo de 24h actual
+            const shiftStart = getShiftStartTime(logs);
+            const limite24h = shiftStart + (24 * 60 * 60 * 1000);
             let driveMins = 0;
+
             logs.forEach(l => {
-                if(l.status === 3) {
-                     let start = l.startTime;
-                     let end = l.endTime || now;
-                     if (end > limit) {
-                         if(start < limit) start = limit;
-                         driveMins += Math.floor((end - start)/60000);
-                     }
+                if (l.status === 3) {
+                    let start = l.startTime;
+                    let end = l.endTime || now;
+                    if (end > shiftStart && start < limite24h) {
+                        const s = Math.max(start, shiftStart);
+                        const e = Math.min(end, limite24h, now);
+                        if (e > s) driveMins += Math.floor((e - s) / 60000);
+                    }
                 }
             });
-            
+
             const dmElem = document.getElementById('totalDriving');
-            if(dmElem) dmElem.innerText = `${Math.floor(driveMins/60)}h ${driveMins%60}m`;
-            
-            if(driveMins > 13 * 60) document.getElementById('alertBox')?.classList.remove('hidden');
+            if (dmElem) dmElem.innerText = `${Math.floor(driveMins / 60)}h ${driveMins % 60}m`;
+
+            if (driveMins > 13 * 60) document.getElementById('alertBox')?.classList.remove('hidden');
             else document.getElementById('alertBox')?.classList.add('hidden');
 
-            // Alerta 5h conducción continua (NOM-087 Art. 4.1)
+            // Alerta 5 horas continuas (NOM-087 Art. 4.1)
             let continuousDrive = 0;
             if (logs.length > 0) {
                 for (let i = logs.length - 1; i >= 0; i--) {
                     if (logs[i].status === 3) {
                         const end = logs[i].endTime || now;
                         continuousDrive += Math.floor((end - logs[i].startTime) / 60000);
-                    } else if (logs[i].status === 2 || logs[i].status === 1) {
+                    } else if (logs[i].status === 1 || logs[i].status === 2) {
                         const breakEnd = logs[i].endTime || now;
                         const breakDur = Math.floor((breakEnd - logs[i].startTime) / 60000);
-                        if (breakDur >= 30) break; // Pausa legal >= 30 min restablece el contador
+                        if (breakDur >= 30) break; // Pausa >= 30 min reinicia conteo
                     }
                 }
             }
+
             if (continuousDrive > 270) document.getElementById('alertBox5h')?.classList.remove('hidden');
             else document.getElementById('alertBox5h')?.classList.add('hidden');
 
             drawChart();
         }
 
-        // Gráfica con dibujo en escalón ortogonal (formato legal exacto)
+        // Dibuja gráfica con horas dinámicas
         function drawChart() {
             const cvs = document.getElementById('logChart');
-            if(!cvs) return;
+            if (!cvs) return;
             const ctx = cvs.getContext('2d');
             const w = cvs.width; const h = cvs.height; const p = 30;
             ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
             const rowH = (h - p * 2) / 5;
             const lbl = ["Descanso", "Pausa", "Manejo", "Auxiliar", "Excep."];
-            for(let i = 0; i < 5; i++) {    
+
+            for (let i = 0; i < 5; i++) {    
                 let y = p + (i * rowH) + (rowH / 2);
-                if(i % 2 === 0) { ctx.fillStyle = "#fafafa"; ctx.fillRect(p, p + (i * rowH), w - p, rowH); }
+                if (i % 2 === 0) { ctx.fillStyle = "#fafafa"; ctx.fillRect(p, p + (i * rowH), w - p, rowH); }
                 ctx.fillStyle = "#666"; ctx.font = "10px sans-serif";
                 ctx.fillText(lbl[i], 5, y + 4);
                 ctx.beginPath(); ctx.moveTo(p, p + (i * rowH) + rowH); ctx.lineTo(w, p + (i * rowH) + rowH); ctx.strokeStyle = "#eee"; ctx.stroke();
             }
-            for(let i = 0; i <= 24; i++) { 
+
+            const shiftStartH = getShiftStartHour(logs);
+
+            // Eje de horas (24 divisiones)
+            for (let i = 0; i <= 24; i++) { 
                 let x = p + ((w - p) / 24) * i; 
                 ctx.beginPath(); ctx.moveTo(x, p); ctx.lineTo(x, h - p); ctx.strokeStyle = "#e5e7eb"; ctx.stroke(); 
             }
-            
-            if(logs.length === 0) return;
+
+            // Actualizar etiquetas en pantalla
+            const axisContainer = document.getElementById('chartXAxisLabels');
+            if (axisContainer) {
+                axisContainer.innerHTML = '';
+                for (let i = 0; i <= 4; i++) {
+                    const hour = (shiftStartH + i * 6) % 24;
+                    const span = document.createElement('span');
+                    span.textContent = (hour < 10 ? '0' : '') + hour + ':00';
+                    axisContainer.appendChild(span);
+                }
+            }
+
+            if (logs.length === 0) return;
             ctx.lineWidth = 3; ctx.strokeStyle = '#F28B00'; ctx.lineJoin = 'miter'; ctx.beginPath();
-            
+
             logs.forEach((l, i) => {
                 let ds = new Date(l.startTime); let de = l.endTime ? new Date(l.endTime) : new Date();
-                let h1 = (ds.getHours() + ds.getMinutes() / 60 - SHIFT_START_HOUR + 24) % 24;
-                let h2 = (de.getHours() + de.getMinutes() / 60 - SHIFT_START_HOUR + 24) % 24;
+                let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
+                let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
                 let x1 = p + ((w - p) / 24) * h1;
                 let x2 = p + ((w - p) / 24) * h2;
                 let y = p + ((l.status - 1) * rowH) + (rowH / 2);
 
-                if (i === 0) {
-                    ctx.moveTo(x1, y);
-                } else {
-                    // Escalón vertical exacto desde la posición anterior
-                    ctx.lineTo(x1, y);
-                }
+                if (i === 0) ctx.moveTo(x1, y);
+                else ctx.lineTo(x1, y);
 
                 if (h2 >= h1) {
                     ctx.lineTo(x2, y);
@@ -813,9 +788,8 @@
             ctx.stroke();
         }
 
-        // --- CANVAS DE FIRMAS (CON FONDO BLANCO PROTEGIDO) ---
-        const pads = { op: {c:document.getElementById('signaturePad')}, sup: {c:document.getElementById('supervisorPad')} };
-        
+        // --- FIRMAS DIGITALES ---
+        const pads = { op: { c: document.getElementById('signaturePad') }, sup: { c: document.getElementById('supervisorPad') } };
         function clearPadToWhite(canvas, ctx) {
             if (!canvas || !ctx) return;
             ctx.fillStyle = "#ffffff";
@@ -823,104 +797,73 @@
         }
 
         Object.keys(pads).forEach(k => {
-            const p = pads[k]; if(!p.c) return;
+            const p = pads[k]; if (!p.c) return;
             p.ctx = p.c.getContext('2d'); p.paint = false;
             clearPadToWhite(p.c, p.ctx);
 
-            const start = (e) => { e.preventDefault(); p.paint=true; p.ctx.beginPath(); draw(e,k); };
-            const end = () => p.paint=false;
-            const draw = (e,key) => {
-                if(!p.paint) return; e.preventDefault();
+            const start = (e) => { e.preventDefault(); p.paint = true; p.ctx.beginPath(); draw(e, k); };
+            const end = () => p.paint = false;
+            const draw = (e, key) => {
+                if (!p.paint) return; e.preventDefault();
                 const r = p.c.getBoundingClientRect();
-                const x = (e.touches?e.touches[0].clientX:e.clientX) - r.left;
-                const y = (e.touches?e.touches[0].clientY:e.clientY) - r.top;
-                p.ctx.lineWidth=2; p.ctx.strokeStyle = "#000000"; p.ctx.lineCap='round'; 
-                p.ctx.lineTo(x,y); p.ctx.stroke(); p.ctx.beginPath(); p.ctx.moveTo(x,y);
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+                p.ctx.lineWidth = 2; p.ctx.strokeStyle = "#000000"; p.ctx.lineCap = 'round';
+                p.ctx.lineTo(x, y); p.ctx.stroke(); p.ctx.beginPath(); p.ctx.moveTo(x, y);
             };
-            ['mousedown','touchstart'].forEach(ev=>p.c.addEventListener(ev, start, {passive:false}));
-            ['mousemove','touchmove'].forEach(ev=>p.c.addEventListener(ev, (e)=>draw(e,k), {passive:false}));
-            ['mouseup','touchend','mouseleave'].forEach(ev=>p.c.addEventListener(ev, end));
+            ['mousedown', 'touchstart'].forEach(ev => p.c.addEventListener(ev, start, { passive: false }));
+            ['mousemove', 'touchmove'].forEach(ev => p.c.addEventListener(ev, (e) => draw(e, k), { passive: false }));
+            ['mouseup', 'touchend', 'mouseleave'].forEach(ev => p.c.addEventListener(ev, end));
         });
-        
+
         window.clearSig = (k) => { 
             const p = pads[k]; 
-            if(p && p.c) clearPadToWhite(p.c, p.ctx); 
+            if (p && p.c) clearPadToWhite(p.c, p.ctx); 
         };
-        
-        function resizeC() {
-            const r = Math.max(window.devicePixelRatio||1, 1);
-            Object.values(pads).forEach(p => {
-                if (!p.c) return;
-                const newW = Math.round(p.c.offsetWidth * r);
-                const newH = Math.round(p.c.offsetHeight * r);
-                if (p.c.width === newW && p.c.height === newH) return;
-                
-                let previous = null;
-                try { previous = p.c.width > 0 && p.c.height > 0 ? p.c.toDataURL('image/png') : null; } catch (e) {}
-                p.c.width = newW; p.c.height = newH;
-                p.ctx.scale(r, r);
-                clearPadToWhite(p.c, p.ctx);
-                if (previous) {
-                    const img = new Image();
-                    img.onload = () => p.ctx.drawImage(img, 0, 0, newW / r, newH / r);
-                    img.src = previous;
-                }
-            });
-        }
-        window.addEventListener("resize", resizeC); setTimeout(resizeC, 500);
 
-        // --- GENERADOR PDF LEGAL NOM-087 ---
+        // --- GENERADOR DE PDF OFICIAL (NOM-087) ---
         window.generarPDFSeguro = async function() {
             const selectedOperator = getSelectedCatalogOperator();
             if (!selectedOperator) {
                 alert("⚠️ Selecciona al operador del catálogo oficial antes de generar el PDF.");
                 return;
             }
-
             if (!window.jspdf) { 
-                alert("⚠️ Error: Librería PDF no disponible. Abre la app con conexión una vez."); return; 
+                alert("⚠️ Error: Librería PDF no disponible."); return; 
             }
             
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const naranja = [242, 139, 0]; 
             const azulOficial = [0, 51, 153];
-            
             const folio = document.getElementById('folio').value || "S/F";
 
-            // Corte 48 horas
-            const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
-            const limit24Date = new Date(startTrip);
-            limit24Date.setHours(SHIFT_START_HOUR, 0, 0, 0);
-            if (limit24Date.getTime() <= startTrip) {
-                limit24Date.setDate(limit24Date.getDate() + 1);
-            }
-            const limit24 = limit24Date.getTime();
+            const shiftStartH = getShiftStartHour(logs);
+            const shiftStartMs = getShiftStartTime(logs);
+            const limit24 = shiftStartMs + (24 * 60 * 60 * 1000);
             
             const logsD1 = logs.filter(l => l.startTime < limit24);
             const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
 
             // Encabezado
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
-            doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica","bold");
-            doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 10, {align:"center"});
-            doc.setFontSize(7); doc.setFont("helvetica","normal");
-            doc.text("NOM-087-SCT-2-2017 | Tiempos de Conducción y Pausas en Autotransporte Federal", 105, 16, {align:"center"});
+            doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica", "bold");
+            doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 10, { align: "center" });
+            doc.setFontSize(7); doc.setFont("helvetica", "normal");
+            doc.text("NOM-087-SCT-2-2017 | Tiempos de Conducción y Pausas en Autotransporte Federal", 105, 16, { align: "center" });
             doc.setFontSize(8); doc.setTextColor(0);
 
             let y = 26;
-
             const row = (lbl, val, x, w) => {
                 doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 6.5, 'FD');
-                doc.setFont("helvetica","bold"); doc.text(lbl, x+2, y+4.2);
-                doc.setFont("helvetica","normal"); doc.text(String(val||""), x+w-2, y+4.2, {align:"right"});
+                doc.setFont("helvetica", "bold"); doc.text(lbl, x + 2, y + 4.2);
+                doc.setFont("helvetica", "normal"); doc.text(String(val || ""), x + w - 2, y + 4.2, { align: "right" });
             };
 
             doc.setFontSize(7);
-            // Permisionario corregido a S.A. de C.V.
-            doc.setFont("helvetica","bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A. DE C.V. — RFC: GBA940707AH4", 14, y);
+            doc.setFont("helvetica", "bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A. DE C.V. — RFC: GBA940707AH4", 14, y);
             y += 4;
-            doc.setFont("helvetica","normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
+            doc.setFont("helvetica", "normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
             y += 5;
             
             row("FOLIO:", folio, 14, 35);
@@ -946,9 +889,9 @@
             row("KM FIN:", document.getElementById('kmFin').value, 168, 27);
             y += 8;
             
-            // Itinerario y horarios de viaje (NOM-087)
-            const puntosIntermedios = document.getElementById('puntosIntermedios').value;
-            row("PUNTOS INTERMEDIOS / RUTA:", puntosIntermedios || "Directo por carretera federal", 14, 181);
+            // Puntos intermedios y horas de viaje
+            const puntos = document.getElementById('puntosIntermedios').value;
+            row("PUNTOS INTERMEDIOS / RUTA:", puntos || "Directo por carretera federal", 14, 181);
             y += 8;
             row("HORA SALIDA:", document.getElementById('horaSalida').value || "No registrada", 14, 90);
             row("HORA LLEGADA (ESTIMADA/REAL):", document.getElementById('horaLlegada').value || "En ruta", 106, 89);
@@ -962,34 +905,34 @@
             }
             y += 2;
 
-            // Función para dibujar rejilla de 24h
+            // Rejilla de 24 horas sincronizada con el inicio real de turno
             const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
                 doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
-                doc.setTextColor(0); doc.setFont("helvetica","bold"); doc.text(label, 105, startY+3.5, {align:"center"});
+                doc.setTextColor(0); doc.setFont("helvetica", "bold"); doc.text(label, 105, startY + 3.5, { align: "center" });
                 
                 const gx = 20; const gy = startY + 8; const gw = 175; const gh = 28; const rowH = gh / 5;
                 const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
                 
                 doc.setFontSize(5); doc.setDrawColor(150); doc.setLineWidth(0.1);
                 statusLabels.forEach((s, i) => {
-                    doc.text(s, 19, gy + (i*rowH) + (rowH/2), {align:"right"});
-                    doc.line(gx, gy+(i*rowH), gx+gw, gy+(i*rowH));
+                    doc.text(s, 19, gy + (i * rowH) + (rowH / 2), { align: "right" });
+                    doc.line(gx, gy + (i * rowH), gx + gw, gy + (i * rowH));
                 });
-                doc.line(gx, gy+gh, gx+gw, gy+gh);
+                doc.line(gx, gy + gh, gx + gw, gy + gh);
 
-                for(let i=0; i<=24; i++) {
-                    let x = gx + (gw/24)*i;
-                    doc.line(x, gy, x, gy+gh);
-                    if(i%2===0) {
-                        const rawHour = (SHIFT_START_HOUR + i) % 24;
-                        doc.text(rawHour.toString().padStart(2, "0"), x, gy-2, {align:"center"});
+                for (let i = 0; i <= 24; i++) {
+                    let x = gx + (gw / 24) * i;
+                    doc.line(x, gy, x, gy + gh);
+                    if (i % 2 === 0) {
+                        const rawHour = (shiftStartH + i) % 24;
+                        doc.text(rawHour.toString().padStart(2, "0"), x, gy - 2, { align: "center" });
                     }
                 }
                 doc.rect(gx, gy, gw, gh);
 
-                if(dayLogs && dayLogs.length > 0) {
+                if (dayLogs && dayLogs.length > 0) {
                     doc.setDrawColor(...azulOficial); doc.setLineWidth(0.7);
-                    const mapSt = { 3:0, 2:1, 4:2, 5:3, 1:4 }; 
+                    const mapSt = { 3: 0, 2: 1, 4: 2, 5: 3, 1: 4 }; 
 
                     dayLogs.forEach((l, i) => {
                         const status = getActivityStatus(l);
@@ -998,143 +941,132 @@
 
                         let ds = new Date(l.startTime); 
                         let de = l.endTime ? new Date(l.endTime) : new Date();
-                        
-                        let h1 = (ds.getHours() + ds.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
-                        let h2 = (de.getHours() + de.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
-                        
-                        let x1 = gx + (gw/24) * h1;
-                        let x2 = gx + (gw/24) * h2;
-                        const cruzaLimiteTurno = (de > ds) && (x2 < x1);
-                        let yLine = gy + (rIdx * rowH) + (rowH/2);
+                        let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
+                        let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
+                        let x1 = gx + (gw / 24) * h1;
+                        let x2 = gx + (gw / 24) * h2;
+                        const cruza = (de > ds) && (x2 < x1);
+                        let yLine = gy + (rIdx * rowH) + (rowH / 2);
 
-                        if (cruzaLimiteTurno) {
-                            if (!isDay2) {
-                                doc.line(x1, yLine, gx + gw, yLine);
-                            } else {
-                                doc.line(gx, yLine, x2, yLine);
-                            }
+                        if (cruza) {
+                            if (!isDay2) doc.line(x1, yLine, gx + gw, yLine);
+                            else doc.line(gx, yLine, x2, yLine);
                         } else {
                             doc.line(x1, yLine, x2, yLine);
                         }
                         
-                        // Conexión vertical ortogonal con el estado anterior
-                        if(i > 0) {
-                            let prev = dayLogs[i-1];
-                            const prevStatus = getActivityStatus(prev);
-                            const prevR = mapSt[prevStatus];
+                        if (i > 0) {
+                            let prev = dayLogs[i - 1];
+                            const prevR = mapSt[getActivityStatus(prev)];
                             if (prevR !== undefined) {
-                                let prevY = gy + (prevR * rowH) + (rowH/2);
+                                let prevY = gy + (prevR * rowH) + (rowH / 2);
                                 let prevEnd = new Date(prev.endTime);
-                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes()/60 - SHIFT_START_HOUR + 24) % 24;
-                                let xPrevEnd = gx + (gw/24) * hPrevEnd;
-                                if(Math.abs(x1 - xPrevEnd) < 2) {
-                                    doc.line(x1, prevY, x1, yLine);
-                                }
+                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStartH + 24) % 24;
+                                let xPrevEnd = gx + (gw / 24) * hPrevEnd;
+                                if (Math.abs(x1 - xPrevEnd) < 2) doc.line(x1, prevY, x1, yLine);
                             }
                         }
                     });
                 }
             };
 
-            drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS)", logsD1, false);
+            drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS DE JORNADA)", logsD1, false);
             y += 42;
             drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE / 48 HORAS)", logsD2, true);
             y += 42;
 
-            // Tabla de Desglose
-            doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica","bold");
+            // Desglose
+            doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica", "bold");
             doc.text("DESGLOSE CRONOLÓGICO DE ACTIVIDADES", 14, y);
             y += 4;
 
             doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
             doc.setTextColor(0); doc.setFontSize(6);
-            doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 42, y+3.5);
-            doc.text("ACTIVIDAD", 66, y+3.5); doc.text("DURACIÓN", 96, y+3.5);
-            doc.text("GPS", 121, y+3.5); doc.text("OBSERVACIONES / LUGAR", 151, y+3.5);
+            doc.text("HORA INICIO", 16, y + 3.5); doc.text("HORA FIN", 42, y + 3.5);
+            doc.text("ACTIVIDAD", 66, y + 3.5); doc.text("DURACIÓN", 96, y + 3.5);
+            doc.text("GPS", 121, y + 3.5); doc.text("OBSERVACIONES / LUGAR", 151, y + 3.5);
             y += 5;
 
-            doc.setFont("helvetica","normal");
+            doc.setFont("helvetica", "normal");
             logs.forEach((l, idx) => {
                 if (y > 250) {
                     doc.addPage();
                     y = 20;
                     doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
                     doc.setTextColor(0); doc.setFontSize(6);
-                    doc.text("HORA INICIO", 16, y+3.5); doc.text("HORA FIN", 42, y+3.5);
-                    doc.text("ACTIVIDAD", 66, y+3.5); doc.text("DURACIÓN", 96, y+3.5);
-                    doc.text("GPS", 121, y+3.5); doc.text("OBSERVACIONES / LUGAR", 151, y+3.5);
+                    doc.text("HORA INICIO", 16, y + 3.5); doc.text("HORA FIN", 42, y + 3.5);
+                    doc.text("ACTIVIDAD", 66, y + 3.5); doc.text("DURACIÓN", 96, y + 3.5);
+                    doc.text("GPS", 121, y + 3.5); doc.text("OBSERVACIONES / LUGAR", 151, y + 3.5);
                     y += 5;
-                    doc.setFont("helvetica","normal");
+                    doc.setFont("helvetica", "normal");
                 }
                 
                 const stName = ["", "DESCANSO", "PAUSA", "CONDUCIENDO", "AUXILIAR", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
-                const dur = Math.floor((e-s)/60000);
-                const durStr = `${Math.floor(dur/60)}h ${dur%60}m`;
+                const dur = Math.floor((e - s) / 60000);
+                const durStr = `${Math.floor(dur / 60)}h ${dur % 60}m`;
                 
-                if(idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
+                if (idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
                 
-                doc.text(s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 16, y+3);
-                doc.text(e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), 42, y+3);
-                doc.text(stName, 66, y+3);
-                doc.text(durStr, 96, y+3);
-                doc.text(formatGps(l.gps).substring(0,26), 121, y+3);
-                doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0,28), 151, y+3);
-                
+                doc.text(s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 16, y + 3);
+                doc.text(e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 42, y + 3);
+                doc.text(stName, 66, y + 3);
+                doc.text(durStr, 96, y + 3);
+                doc.text(formatGps(l.gps).substring(0, 26), 121, y + 3);
+                doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0, 28), 151, y + 3);
                 y += 4;
             });
 
             // Firmas
-            if(y > 220) { doc.addPage(); y = 30; }
+            if (y > 220) { doc.addPage(); y = 30; }
             y += 10;
             
             doc.setDrawColor(0);
-            const opSig = document.getElementById('signaturePad').toDataURL("image/jpeg", 0.9);
-            const supSig = document.getElementById('supervisorPad').toDataURL("image/jpeg", 0.9);
+            const opSig = document.getElementById('signaturePad').toDataURL("image/jpeg", 0.7);
+            const supSig = document.getElementById('supervisorPad').toDataURL("image/jpeg", 0.7);
 
-            doc.line(30, y+20, 80, y+20);
+            doc.line(30, y + 20, 80, y + 20);
             doc.addImage(opSig, 'JPEG', 35, y, 40, 18);
-            doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y+23, {align:"center"});
-            doc.setFontSize(5); doc.text(selectedOperator.nombre, 55, y+26, {align:"center"});
-            doc.text("Lic. Federal: " + (document.getElementById('license').value || ""), 55, y+29, {align:"center"});
+            doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y + 23, { align: "center" });
+            doc.setFontSize(5); doc.text(selectedOperator.nombre, 55, y + 26, { align: "center" });
+            doc.text("Lic. Federal: " + (document.getElementById('license').value || ""), 55, y + 29, { align: "center" });
 
-            doc.line(120, y+20, 170, y+20);
+            doc.line(120, y + 20, 170, y + 20);
             doc.addImage(supSig, 'JPEG', 125, y, 40, 18);
-            doc.setFontSize(7); doc.text("FIRMA SUPERVISOR / DESPACHADOR", 145, y+23, {align:"center"});
+            doc.setFontSize(7); doc.text("FIRMA SUPERVISOR / DESPACHADOR", 145, y + 23, { align: "center" });
 
             // Declaratoria bajo protesta
             y += 33;
             doc.setFontSize(5); doc.setTextColor(0);
-            doc.setFont("helvetica","bold");
-            doc.text("DECLARATORIA BAJO PROTESTA DE DECIR VERDAD", 105, y, {align:"center"});
-            doc.setFont("helvetica","normal");
+            doc.setFont("helvetica", "bold");
+            doc.text("DECLARATORIA BAJO PROTESTA DE DECIR VERDAD", 105, y, { align: "center" });
+            doc.setFont("helvetica", "normal");
             y += 3.5;
             const declaratoria = doc.splitTextToSize(
                 "El conductor y el permisionario que suscriben la presente bitácora DECLARAN BAJO PROTESTA DE DECIR VERDAD que los datos, tiempos de conducción, " +
                 "pausas, descansos, itinerario y registros son fidedignos y reflejan sus actividades reales durante el periodo comprendido, en estricto " +
                 "cumplimiento con la Norma Oficial Mexicana NOM-087-SCT-2-2017 y las leyes federales de autotransporte. " +
                 "Esta bitácora se conservará por un periodo mínimo legal de 30 días naturales.", 180);
-            doc.text(declaratoria, 105, y, {align:"center"});
+            doc.text(declaratoria, 105, y, { align: "center" });
             y += declaratoria.length * 3 + 2;
 
             doc.setFontSize(4); doc.setTextColor(120);
-            doc.text("GRUPO BACHOCO, S.A. DE C.V. — Permisionario de Autotransporte Federal — Folio: " + folio + " — " + new Date().toISOString(), 105, y+2, {align:"center"});
+            doc.text("GRUPO BACHOCO, S.A. DE C.V. — Permisionario de Autotransporte Federal — Folio: " + folio + " — " + new Date().toISOString(), 105, y + 2, { align: "center" });
 
-            // Página 2: Reglamento NOM-087
+            // Página 2: Resumen legal NOM-087
             doc.addPage();
-            doc.setFillColor(...naranja); doc.rect(0,0,210,15,'F');
-            doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica","bold");
-            doc.text("RESUMEN DE OBLIGACIONES LEGALES — NOM-087-SCT-2-2017", 105, 10, {align:"center"});
+            doc.setFillColor(...naranja); doc.rect(0, 0, 210, 15, 'F');
+            doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
+            doc.text("RESUMEN DE OBLIGACIONES LEGALES — NOM-087-SCT-2-2017", 105, 10, { align: "center" });
 
             doc.setTextColor(0); doc.setFontSize(7);
             let ry = 22;
-
-            doc.setFont("helvetica","bold"); doc.setFontSize(8);
+            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
             doc.text("TIEMPOS MÁXIMOS DE CONDUCCIÓN Y PAUSAS OBLIGATORIAS", 14, ry);
             ry += 5;
 
-            doc.setFontSize(7); doc.setFont("helvetica","normal");
+            doc.setFontSize(7); doc.setFont("helvetica", "normal");
             const rules = [
                 "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: Máximo 5 horas continuas de conducción, tras las cuales se debe tomar una pausa de al menos 30 minutos ininterrumpidos.",
                 "4.2 PAUSAS NO FRACCIONABLES: Las pausas obligatorias de 30 minutos no se pueden fraccionar ni acumular.",
@@ -1154,17 +1086,7 @@
             doc.save(`Bitacora_${folio.replace(/[\\/]/g, '-')}.pdf`);
         };
 
-        // --- GENERADOR QR HÍBRIDO (OFFLINE Y ONLINE) ---
-        let qrGenerationInProgress = false;
-
-        function setQrButtonBusy(isBusy) {
-            const qrBtn = document.getElementById('qrBtn');
-            if (!qrBtn) return;
-            qrBtn.disabled = isBusy;
-            qrBtn.classList.toggle('opacity-60', isBusy);
-        }
-
-        // Estructura de texto compacta para escaneo legal sin conexión
+        // --- GENERADOR DE QR HÍBRIDO ---
         function buildFullOfflineQrData(payload) {
             const totalDrive = document.getElementById('totalDriving')?.innerText || '0h 0m';
             const statusNames = ["", "Descanso", "Pausa", "Conduciendo", "Auxiliar", "Excepción"];
@@ -1183,21 +1105,6 @@
                 `CONDUCCION 24H: ${totalDrive}`,
                 `FECHA REPORTE: ${new Date().toLocaleString()}`
             ].filter(Boolean).join("\n");
-        }
-
-        function setOfflineSyncStatus(message, tone = "warning") {
-            const box = document.getElementById('offlineSyncStatus');
-            const text = document.getElementById('offlineSyncText');
-            if (!box || !text) return;
-
-            text.textContent = message;
-            box.classList.remove('hidden', 'bg-amber-50', 'border-amber-200', 'text-amber-800', 'bg-green-50', 'border-green-200', 'text-green-800');
-            if (tone === "success") {
-                box.classList.add('bg-green-50', 'border-green-200', 'text-green-800');
-                setTimeout(() => box.classList.add('hidden'), 7000);
-            } else {
-                box.classList.add('bg-amber-50', 'border-amber-200', 'text-amber-800');
-            }
         }
 
         function buildBitacoraPayload() {
@@ -1237,11 +1144,12 @@
                 horaLlegada: document.getElementById('horaLlegada')?.value || "",
                 coConductor: document.getElementById('coConductor')?.value || "",
                 coLicencia: document.getElementById('coLicencia')?.value || "",
-                shiftStartHour: SHIFT_START_HOUR,
+                shiftStartHour: getShiftStartHour(logs),
+                shiftStartTime: getShiftStartTime(logs),
                 logs: structuredClone(logs),
                 gpsEvidenceVersion: 1,
                 signatureOp,
-                signatureSup,
+                signatureSup
             };
         }
 
@@ -1271,26 +1179,16 @@
 
         window.generarQRSeguro = async function() {
             if (typeof QRCode === 'undefined') { alert("⚠️ Módulo QR no disponible."); return; }
-            if (qrGenerationInProgress) return;
-
-            qrGenerationInProgress = true;
-            setQrButtonBusy(true);
             const payload = buildBitacoraPayload();
             const missing = validateBitacoraPayload(payload);
 
             if (missing.length > 0) {
                 alert(`⚠️ Completa: ${missing.join(", ")} antes de generar el QR.`);
-                qrGenerationInProgress = false;
-                setQrButtonBusy(false);
                 return;
             }
 
-            // Si está offline, mostrar de inmediato el QR de contingencia con datos completos
             if (!navigator.onLine) {
-                showOfflineQrModal(payload, "📱 QR Offline para Guardia Nacional / SCT");
-                setOfflineSyncStatus("Guardado localmente. Se enviará a la nube cuando haya red.");
-                qrGenerationInProgress = false;
-                setQrButtonBusy(false);
+                showOfflineQrModal(payload, "📱 QR Offline para Guardia Nacional / SICT");
                 return;
             }
 
@@ -1301,10 +1199,6 @@
                     '<span style="color:#F28B00;font-weight:bold">⏳ Sincronizando con Firebase…</span>';
                 document.getElementById('qrModal').classList.remove('hidden');
 
-                if (typeof window.guardarBitacoraEnFirestore !== "function") {
-                    throw new Error("Módulo Firebase no disponible.");
-                }
-
                 const syncResult = await window.guardarBitacoraEnFirestore(payload);
                 const viewerUrl = syncResult.url;
 
@@ -1313,7 +1207,7 @@
                     text: viewerUrl,
                     width: 200,
                     height: 200,
-                    correctLevel: QRCode.CorrectLevel.M,
+                    correctLevel: QRCode.CorrectLevel.M
                 });
                 document.getElementById('qrTextContent').innerHTML =
                     `<span style="color:#16a34a;font-weight:bold">✅ Sincronizado en la nube</span><br>` +
@@ -1321,12 +1215,9 @@
                     `<span style="color:#9ca3af;font-size:10px">FOLIO: ${payload.folio}</span>`;
             } catch (err) {
                 showOfflineQrModal(payload, "⚠️ Sin señal de nube — Mostrando QR de inspección local");
-            } finally {
-                qrGenerationInProgress = false;
-                setQrButtonBusy(false);
             }
-        }
-        
+        };
+
         window.closeQR = () => document.getElementById('qrModal').classList.add('hidden');
         window.closeObs = () => document.getElementById('obsModal').classList.add('hidden');
         window.openObs = function() {
@@ -1340,50 +1231,24 @@
             if (obsText && logs.length > 0) {
                 logs[logs.length - 1].observation = obsText.value.trim();
                 guardarLocal();
+                sincronizarSilencioso();
             }
             window.closeObs();
-        };
-
-        window.intentarSubirNube = async function() {
-            const btn = document.getElementById('saveBtn');
-            const payload = buildBitacoraPayload();
-            const missing = validateBitacoraPayload(payload);
-            if (missing.length > 0) {
-                alert(`⚠️ Completa: ${missing.join(", ")}`);
-                return;
-            }
-
-            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            try {
-                if (!navigator.onLine || typeof window.guardarBitacoraEnFirestore !== "function") {
-                    setOfflineSyncStatus("Guardado en dispositivo (Modo Offline).");
-                    alert("⚠️ Sin conexión: Bitácora guardada localmente.");
-                } else {
-                    await window.guardarBitacoraEnFirestore(payload);
-                    setOfflineSyncStatus("Bitácora sincronizada con éxito.", "success");
-                    alert("✅ Bitácora sincronizada con Firebase.");
-                }
-            } catch (error) {
-                alert("Error: " + error.message);
-            } finally {
-                if (btn) btn.innerHTML = '<i class="fas fa-cloud-upload-alt text-xl"></i>';
-            }
         };
 
         updateUI(); 
 
         window.addEventListener('online', () => {
-            setOfflineSyncStatus("Conexión restablecida. Sincronizando con Firebase...");
+            sincronizarSilencioso();
         });
     </script>
 
-    <!-- 3. CONFIGURACIÓN FIREBASE Y FOLIO OFFLINE -->
+    <!-- 3. CONFIGURACIÓN FIREBASE Y FOLIO AUTOMÁTICO -->
     <script type="module">
         import { initializeApp } from "./js/firebase-sdk.js";
         import {
             doc,
             initializeFirestore,
-            onSnapshot,
             persistentLocalCache,
             persistentMultipleTabManager,
             runTransaction,
@@ -1466,13 +1331,14 @@
                     puntos_intermedios: payload.puntosIntermedios || "",
                     hora_salida: payload.horaSalida || "",
                     hora_llegada: payload.horaLlegada || "",
+                    shift_start_hour: payload.shiftStartHour,
                     priority: "baja",
                     sync_status: "sincronizado",
                     payload,
-                    created_at: new Date().toISOString()
+                    updated_at: new Date().toISOString()
                 };
 
-                await setDoc(reportRef, data);
+                await setDoc(reportRef, data, { merge: true });
                 return {
                     id: reportId,
                     url: new URL(`./viewer.html?id=${reportId}`, window.location.href).href,
