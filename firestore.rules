@@ -127,8 +127,6 @@ service cloud.firestore {
       allow read: if signedIn();
       allow delete: if false;
 
-      // Operators may initialize only the public folio fields. Seed this
-      // document with the current production values before publishing the rules.
       allow create: if isAdmin()
         || (isAnonymousOperator()
           && (
@@ -150,19 +148,12 @@ service cloud.firestore {
           ));
     }
 
-    match /contadores/solicitudServicio {
-      allow read, update: if true;
-      allow create, delete: if false;
-    }
-
     match /bitacoras_087/{folio} {
       allow read, create: if signedIn();
       allow update, delete: if false;
     }
 
     match /bitacora_reports/{reportId} {
-      // QR links intentionally allow fetching one known report; the viewer
-      // authenticates anonymously. Collection queries are for panel users.
       allow get: if signedIn();
       allow list: if isPanelUser();
       allow create: if isAnonymousOperator() || isAdmin();
@@ -170,8 +161,6 @@ service cloud.firestore {
     }
 
     match /usuarios/{email} {
-      // Panel users can read only their own role record. Role writes remain
-      // restricted to trusted administrative tooling (Admin SDK / Console).
       allow get: if signedIn()
         && request.auth.token.firebase.sign_in_provider == 'password'
         && request.auth.token.email.lower() == email;
