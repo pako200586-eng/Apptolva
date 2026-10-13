@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v61";
+const CACHE_VERSION = "v62"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -66,6 +66,13 @@ const OFFLINE_URLS = [
   "./suelo.jpg"
 ];
 
+function generateSafeUUID() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "offline-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9);
+}
+
 function openOfflineDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -98,7 +105,7 @@ async function withPendingStore(mode, callback) {
 }
 
 async function savePendingReport(payload, type = "bitacora") {
-  const id = payload.offlineQueueId || crypto.randomUUID();
+  const id = payload.offlineQueueId || generateSafeUUID();
   const record = {
     id,
     type,
@@ -142,14 +149,14 @@ async function requestBackgroundSync() {
     await self.registration.sync.register(SYNC_TAG);
     return true;
   } catch (error) {
-    console.warn("No se pudo registrar Background Sync", error);
+    console.warn("No se pudo registrar Background Sync:", error);
     return false;
   }
 }
 
 async function precacheOfflineUrls() {
   const cache = await caches.open(CACHE_NAME);
-  const requests = OFFLINE_URLS.map((url) => new Request(url, { cache: "reload" }));
+  const requests = OFFLINE_URLS.map((url) => new Request(new URL(url, self.location.href), { cache: "reload" }));
   const results = await Promise.allSettled(
     requests.map(async (request) => {
       const response = await fetch(request);
@@ -163,23 +170,18 @@ async function precacheOfflineUrls() {
   const failed = results.filter((result) => result.status === "rejected");
   if (failed.length) {
     console.warn("Service worker: algunos recursos offline no se precargaron.", failed);
-    const firebaseSdkIndex = OFFLINE_URLS.indexOf("./js/firebase-sdk.js");
-    if (firebaseSdkIndex >= 0 && results[firebaseSdkIndex].status === "rejected") {
-      throw new Error("No se pudo precargar el SDK local de Firebase; el modo offline no está listo.");
-    }
   }
 }
 
-// Cache estático con filtro de dominio
 async function cacheStaticRequest(request) {
   const url = new URL(request.url);
 
-  // Solo cachea recursos de tu dominio (apptolva.com)
+  // Solo cachea recursos del mismo origen
   if (url.origin !== self.location.origin) {
-    return fetch(request); // ignora extensiones y otros esquemas
+    return fetch(request);
   }
 
-  const cached = await caches.match(request);
+  const cached = await caches.match(request, { ignoreSearch: true });
   if (cached) return cached;
 
   const response = await fetch(request);
@@ -190,13 +192,11 @@ async function cacheStaticRequest(request) {
   return response;
 }
 
-// Estrategia network-first con filtro de dominio
 async function networkFirstRequest(request) {
   const url = new URL(request.url);
 
-  // Solo aplica caché a recursos de tu dominio
   if (url.origin !== self.location.origin) {
-    return fetch(request); // ignora externos y extensiones
+    return fetch(request);
   }
 
   try {
@@ -207,7 +207,8 @@ async function networkFirstRequest(request) {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
+    // Si la red falla, busca en caché ignorando parámetros de búsqueda (?id=...)
+    const cached = await caches.match(request, { ignoreSearch: true });
     if (cached) return cached;
     throw error;
   }
@@ -215,17 +216,35 @@ async function networkFirstRequest(request) {
 
 async function offlineNavigationFallback(request) {
   const url = new URL(request.url);
-  const pageUrl = new URL(url.pathname, url.origin);
-  const page = await caches.match(pageUrl);
-  if (page) return page;
+  
+  // 1. Si la petición es hacia viewer.html (incluso con ?id=...), devolver viewer.html precargado
+  if (url.pathname.includes("viewer.html")) {
+    const viewerPage = await caches.match(new URL("./viewer.html", self.location.href));
+    if (viewerPage) return viewerPage;
+  }
 
+  // 2. Si es hacia bitacora_master.html
+  if (url.pathname.includes("bitacora_master.html")) {
+    const masterPage = await caches.match(new URL("./bitacora_master.html", self.location.href));
+    if (masterPage) return masterPage;
+  }
+
+  // 3. Coincidencia genérica
+  const directMatch = await caches.match(request, { ignoreSearch: true });
+  if (directMatch) return directMatch;
+
+  // 4. Fallback final al menú principal
   return caches.match(new URL("./index.html", self.location.href));
 }
 
 async function queueBitacoraRequest(request) {
   try {
     const response = await fetch(request.clone());
+    // Si el servidor responde con 500+, forzamos el guardado local para no perder la bitácora
     if (response && response.ok) return response;
+    if (response && response.status >= 500) {
+      throw new Error(`Fallo de servidor remoto (${response.status})`);
+    }
     return response;
   } catch (error) {
     const payload = await request.clone().json();
@@ -242,7 +261,7 @@ async function queueBitacoraRequest(request) {
       offline: true,
       queued: true,
       localId: record.id,
-      message: "Bitácora guardada offline. Se sincronizará cuando vuelva la señal."
+      message: "Bitácora guardada en almacenamiento local. Se sincronizará al detectar conexión."
     }), {
       status: 202,
       headers: { "Content-Type": "application/json" }
@@ -252,7 +271,12 @@ async function queueBitacoraRequest(request) {
 
 async function queueAppScriptRequest(request) {
   try {
-    return await fetch(request.clone());
+    const response = await fetch(request.clone());
+    if (response && response.ok) return response;
+    if (response && response.status >= 500) {
+      throw new Error(`Fallo en servicio Apps Script (${response.status})`);
+    }
+    return response;
   } catch (error) {
     const payload = await request.clone().json();
     const type = normalizarTipoReporte(payload.tipo);
@@ -263,7 +287,7 @@ async function queueAppScriptRequest(request) {
       offline: true,
       queued: true,
       localId: record.id,
-      message: "Reporte guardado offline. Se sincronizará cuando vuelva la señal."
+      message: "Reporte guardado offline. Se sincronizará automáticamente."
     }), {
       status: 202,
       headers: { "Content-Type": "application/json" }
@@ -295,7 +319,17 @@ async function enviarReportesPendientes() {
       } catch (error) {
         result = {};
       }
-      if (response.ok && result && result.success === true) {
+
+      // Validación flexible de éxito (soporta success: true, status: "ok" o existencia de id)
+      const esExitoso = response.ok && (
+        result.success === true || 
+        result.status === "ok" || 
+        result.status === "synced" ||
+        Boolean(result.id) ||
+        Boolean(result.folio)
+      );
+
+      if (esExitoso) {
         await deletePendingReport(reporte.id);
         await notifyClients({
           type: "REPORT_SYNCED",
@@ -410,22 +444,20 @@ self.addEventListener("message", (event) => {
     event.waitUntil(enviarReportesPendientes());
   }
 });
-// Manejo de clic en notificaciones para abrir módulo NOM-087
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   if (event.action === "abrir_bitacora" || !event.action) {
-    const bitacoraUrl = "./bitacora_master.html"; // <-- Ruta directa al archivo maestro
+    const bitacoraUrl = "./bitacora_master.html";
 
     event.waitUntil(
       clients.matchAll({ type: "window" }).then((clientList) => {
-        // Escanea si el operador ya tiene la bitácora abierta en RAM
         for (const client of clientList) {
-          if (client.url.includes("bitacora_master.html") && "focus" in client) {
-            return client.focus(); // Lo trae al frente sin recargar
+          if ((client.url.includes("bitacora_master.html") || client.url.includes("index.html")) && "focus" in client) {
+            return client.focus();
           }
         }
-        // Si no está abierta, lanza el archivo
         if (clients.openWindow) {
           return clients.openWindow(bitacoraUrl);
         }
