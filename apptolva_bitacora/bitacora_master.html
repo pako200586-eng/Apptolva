@@ -46,7 +46,6 @@
         input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
         input[type="date"], input[type="datetime-local"] { color-scheme: light; }
         #logChart { background: #fff; border-radius: 8px; width: 100%; height: 250px; touch-action: none; }
-        .signature-pad { background: #fff; border: 2px dashed #cbd5e1; border-radius: 12px; width: 100%; height: 150px; touch-action: none; }
         .status-btn.active { border-color: #F28B00; background-color: #FFF0DB; box-shadow: 0 4px 6px -1px rgba(242, 139, 0, 0.3); transform: translateY(-2px); font-weight: 800; }
         .bachoco-input:focus { outline: none; border-color: #F28B00; box-shadow: 0 0 0 3px rgba(242, 139, 0, 0.2); }
         .dot-status { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
@@ -69,9 +68,7 @@
                 <div class="hidden sm:block text-xs font-bold tracking-wide">NOM-087 · Bitácora Digital</div>
             </div>
 
-            <!-- Grupo Derecho: Estado de Nube, Reloj, PDF y QR -->
             <div class="flex items-center gap-2">
-                <!-- Indicador Pasivo de Nube (Reemplaza al botón flotante) -->
                 <div id="cloudSyncIndicator" class="bg-black/20 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5" title="Estado de la conexión y sincronización">
                     <i class="fas fa-cloud text-gray-300" id="cloudIcon"></i>
                     <span id="cloudText" class="hidden xs:inline">Local</span>
@@ -226,7 +223,7 @@
             <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h de Conducción</p><p id="alertMsg" class="text-xs">Te acercas al límite máximo de 14 horas de conducción en tu jornada de 24h. Debes tomar tu descanso obligatorio de 8 horas continuas.</p></div>
         </div>
 
-        <!-- Alerta 5h continua -->
+        <!-- Alerta 5 horas continuas -->
         <div id="alertBox5h" class="hidden bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-clock mt-1"></i>
             <div><p class="font-bold text-sm">¡Pausa Obligatoria de 30 min! (NOM-087 Art. 4.1)</p><p class="text-xs">Superaste 4.5 horas de manejo continuo. Debes realizar una pausa mínima de 30 minutos ininterrumpidos antes de las 5 horas.</p></div>
@@ -253,7 +250,6 @@
                 <div class="text-xs bg-gray-100 px-2 py-1 rounded">Manejo en Jornada: <span id="totalDriving" class="font-bold text-gray-800">0h 0m</span> / 14h</div>
             </div>
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
-            <!-- Eje X Dinámico según la hora real de inicio -->
             <div id="chartXAxisLabels" class="flex justify-between text-[10px] text-gray-500 px-2 mt-1 font-mono font-bold"></div>
             
             <button onclick="terminarTurno48h()" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
@@ -270,21 +266,108 @@
             <div id="logList" class="divide-y divide-gray-100 max-h-60 overflow-y-auto"></div>
         </div>
 
-        <!-- 5. Firmas -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <div class="bg-white p-4 rounded-xl shadow-md border border-gray-100">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="font-bold text-gray-700 text-sm">Firma Conductor</h3>
-                    <button onclick="window.clearSig('op')" class="text-xs text-red-500 font-medium flex items-center gap-1"><i class="fas fa-eraser"></i> Borrar</button>
-                </div>
-                <div class="relative"><canvas id="signaturePad" class="signature-pad" width="400" height="150"></canvas><div class="absolute bottom-2 right-2 text-[10px] text-gray-300 pointer-events-none">Firma aquí</div></div>
+        <!-- 5. FIRMAS DIGITALES COMPACTAS (SISTEMA MODAL PROFESIONAL) -->
+        <div class="bg-white rounded-xl shadow-md p-4 border border-gray-100 mb-8">
+            <div class="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
+                <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2">
+                    <i class="fas fa-file-signature text-orange-500"></i> Firmas Digitales de Conformidad
+                </h3>
+                <span class="text-[10px] text-gray-400">NOM-087-SCT-2-2017</span>
             </div>
-            <div class="bg-white p-4 rounded-xl shadow-md border border-gray-100">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="font-bold text-gray-700 text-sm">Firma Supervisor / Permisionario</h3>
-                    <button onclick="window.clearSig('sup')" class="text-xs text-red-500 font-medium flex items-center gap-1"><i class="fas fa-eraser"></i> Borrar</button>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Tarjeta Firma Conductor -->
+                <div class="border rounded-xl p-3 bg-gray-50 flex flex-col justify-between" id="cardSigOp">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="text-xs font-bold text-gray-800">Firma del Conductor</p>
+                            <p id="labelDriverSig" class="text-[11px] text-gray-500 font-medium">Sin operador asignado</p>
+                        </div>
+                        <span id="badgeSigOp" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1">
+                            <i class="fas fa-pen"></i> Sin firmar
+                        </span>
+                    </div>
+                    
+                    <!-- Vista previa protegida contra toques accidentales -->
+                    <div id="previewSigOpContainer" class="hidden my-2 bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-center relative min-h-[65px]">
+                        <img id="imgSigOp" src="" alt="Firma Conductor" class="max-h-16 max-w-full object-contain pointer-events-none select-none">
+                    </div>
+
+                    <div class="flex items-center gap-2 mt-2">
+                        <button onclick="window.abrirModalFirma('op')" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition" id="btnSignOp">
+                            <i class="fas fa-signature"></i> <span id="btnSignOpText">Capturar Firma</span>
+                        </button>
+                        <button onclick="window.borrarFirmaGuardada('op')" id="btnDeleteSigOp" class="hidden text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-2 rounded-lg border border-red-200 hover:bg-red-50 active:scale-95 transition" title="Borrar firma">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="relative"><canvas id="supervisorPad" class="signature-pad" width="400" height="150"></canvas><div class="absolute bottom-2 right-2 text-[10px] text-gray-300 pointer-events-none">Visto bueno</div></div>
+
+                <!-- Tarjeta Firma Supervisor -->
+                <div class="border rounded-xl p-3 bg-gray-50 flex flex-col justify-between" id="cardSigSup">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="text-xs font-bold text-gray-800">Firma Supervisor / Permisionario</p>
+                            <p class="text-[11px] text-gray-500 font-medium">Visto Bueno de Despacho</p>
+                        </div>
+                        <span id="badgeSigSup" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1">
+                            <i class="fas fa-pen"></i> Sin firmar
+                        </span>
+                    </div>
+                    
+                    <div id="previewSigSupContainer" class="hidden my-2 bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-center relative min-h-[65px]">
+                        <img id="imgSigSup" src="" alt="Firma Supervisor" class="max-h-16 max-w-full object-contain pointer-events-none select-none">
+                    </div>
+
+                    <div class="flex items-center gap-2 mt-2">
+                        <button onclick="window.abrirModalFirma('sup')" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition" id="btnSignSup">
+                            <i class="fas fa-signature"></i> <span id="btnSignSupText">Capturar Firma</span>
+                        </button>
+                        <button onclick="window.borrarFirmaGuardada('sup')" id="btnDeleteSigSup" class="hidden text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-2 rounded-lg border border-red-200 hover:bg-red-50 active:scale-95 transition" title="Borrar firma">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CAPTURA DE FIRMA DEDICADO -->
+    <div id="signatureModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col animate-in fade-in duration-150">
+            <!-- Header del Modal -->
+            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-gray-800 text-sm" id="modalSigTitle">Firma Digital</h3>
+                    <p class="text-[11px] text-gray-500">Firme claramente dentro del recuadro con su dedo o lápiz táctil.</p>
+                </div>
+                <button onclick="window.cerrarModalFirma()" class="text-gray-400 hover:text-gray-600 p-1">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Área de Trazo protegida -->
+            <div class="p-4 bg-gray-100 flex flex-col items-center">
+                <div class="w-full bg-white rounded-xl border-2 border-dashed border-gray-300 relative shadow-inner overflow-hidden" style="touch-action: none;">
+                    <canvas id="activeSignaturePad" class="w-full h-48 block" width="500" height="240" style="touch-action: none;"></canvas>
+                    <div class="absolute bottom-2 right-2 text-[10px] text-gray-300 pointer-events-none select-none">Firme aquí</div>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-2 text-center">La firma quedará guardada de forma permanente en el dispositivo.</p>
+            </div>
+
+            <!-- Botones del Modal -->
+            <div class="p-3 bg-white border-t border-gray-200 flex justify-between items-center gap-2">
+                <button onclick="window.limpiarTrazoModal()" class="px-3 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1 active:scale-95 transition">
+                    <i class="fas fa-eraser"></i> Limpiar
+                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="window.cerrarModalFirma()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                        Cancelar
+                    </button>
+                    <button onclick="window.guardarFirmaModal()" class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-1.5 active:scale-95 transition">
+                        <i class="fas fa-check"></i> Aceptar y Guardar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -334,7 +417,7 @@
             logs.push({ status: 1, startTime: now, endTime: null, place: "Inicio", observation: "", gps: null });
         }
 
-        // Calcula dinámicamente el inicio del periodo de 24h (Art. 4.5)
+        // Calcula dinámicamente el inicio del periodo de 24h tras un descanso de 8h (Art. 4.5)
         function getShiftStartTime(logList) {
             if (!logList || logList.length === 0) return Date.now();
             let ultimoDescansoIndex = -1;
@@ -358,7 +441,7 @@
             return new Date(startTime).getHours();
         }
 
-        // Persistencia y recuperación de inputs
+        // Persistencia de inputs
         const ids = [
             'driverName', 'employeeNumber', 'license', 'licenseExp', 
             'unitId', 'brandModel', 'plates', 'mode', 'folio', 
@@ -380,6 +463,7 @@
                 localStorage.setItem('nom087_' + id, e.target.value);
                 if (id === 'driverName' && e.target.value.trim()) {
                     localStorage.setItem('nombreOperadorActual', e.target.value.trim());
+                    actualizarNombreOperadorUI();
                 }
                 sincronizarSilenciosoDebounced();
             });
@@ -423,6 +507,7 @@
             employeeNumberInput.dispatchEvent(new Event('input', { bubbles: true }));
             applyingCatalogOperator = false;
             hideOperatorSuggestions();
+            actualizarNombreOperadorUI();
         }
 
         function showOperatorSuggestions(query) {
@@ -444,6 +529,13 @@
             });
             operatorList.classList.remove('hidden');
             driverNameInput.setAttribute('aria-expanded', 'true');
+        }
+
+        function actualizarNombreOperadorUI() {
+            const lbl = document.getElementById('labelDriverSig');
+            if (!lbl) return;
+            const op = getSelectedCatalogOperator();
+            lbl.textContent = op ? `${op.nombre} (#${op.numero})` : (driverNameInput.value.trim() || 'Sin operador asignado');
         }
 
         if (driverNameInput && employeeNumberInput && operatorList) {
@@ -559,7 +651,7 @@
             }
         };
 
-        // --- CAMBIO DE ESTADO Y AUTO-SINCRONIZACIÓN SILENCIOSA ---
+        // --- CAMBIO DE ESTADO Y AUTO-SINCRONIZACIÓN ---
         window.changeStatus = async (st) => {
             if (currentStatus === st) return;
             const now = Date.now();
@@ -571,7 +663,6 @@
             await attachGpsToLog(newLog, false);
             updateUI();
 
-            // Sincronización automática silenciosa
             sincronizarSilencioso();
 
             if (st === 5) {
@@ -631,6 +722,8 @@
 
                 localStorage.removeItem('nom087_logs');
                 localStorage.removeItem('nom087_folio');
+                localStorage.removeItem('nom087_signatureOp');
+                localStorage.removeItem('nom087_signatureSup');
                 const clearIds = ['origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada', 'kmInicio', 'kmFin'];
                 clearIds.forEach(id => {
                     const el = document.getElementById(id);
@@ -640,6 +733,173 @@
                 location.reload();
             }
         };
+
+        // --- SISTEMA DE FIRMAS PERSISTENTES CON MODAL ---
+        let currentSigType = 'op'; // 'op' o 'sup'
+        let sigPadCanvas = document.getElementById('activeSignaturePad');
+        let sigPadCtx = sigPadCanvas ? sigPadCanvas.getContext('2d') : null;
+        let isPainting = false;
+        let hasStroke = false;
+
+        function initModalCanvasEvents() {
+            if (!sigPadCanvas || !sigPadCtx) return;
+
+            const start = (e) => {
+                e.preventDefault();
+                isPainting = true;
+                hasStroke = true;
+                sigPadCtx.beginPath();
+                const pos = getCanvasPos(e);
+                sigPadCtx.moveTo(pos.x, pos.y);
+            };
+
+            const move = (e) => {
+                if (!isPainting) return;
+                e.preventDefault();
+                const pos = getCanvasPos(e);
+                sigPadCtx.lineWidth = 2.5;
+                sigPadCtx.strokeStyle = "#000000";
+                sigPadCtx.lineCap = "round";
+                sigPadCtx.lineJoin = "round";
+                sigPadCtx.lineTo(pos.x, pos.y);
+                sigPadCtx.stroke();
+            };
+
+            const end = () => { isPainting = false; };
+
+            function getCanvasPos(e) {
+                const rect = sigPadCanvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const scaleX = sigPadCanvas.width / rect.width;
+                const scaleY = sigPadCanvas.height / rect.height;
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
+                };
+            }
+
+            sigPadCanvas.addEventListener('mousedown', start, { passive: false });
+            sigPadCanvas.addEventListener('mousemove', move, { passive: false });
+            sigPadCanvas.addEventListener('mouseup', end);
+            sigPadCanvas.addEventListener('mouseleave', end);
+
+            sigPadCanvas.addEventListener('touchstart', start, { passive: false });
+            sigPadCanvas.addEventListener('touchmove', move, { passive: false });
+            sigPadCanvas.addEventListener('touchend', end);
+        }
+
+        window.limpiarTrazoModal = function() {
+            if (!sigPadCanvas || !sigPadCtx) return;
+            sigPadCtx.fillStyle = "#ffffff";
+            sigPadCtx.fillRect(0, 0, sigPadCanvas.width, sigPadCanvas.height);
+            hasStroke = false;
+        };
+
+        window.abrirModalFirma = function(tipo) {
+            currentSigType = tipo;
+            const modal = document.getElementById('signatureModal');
+            const title = document.getElementById('modalSigTitle');
+            if (modal) modal.classList.remove('hidden');
+
+            if (tipo === 'op') {
+                const op = getSelectedCatalogOperator();
+                title.textContent = op ? `Firma: ${op.nombre}` : "Firma del Conductor";
+            } else {
+                title.textContent = "Firma del Supervisor / Permisionario";
+            }
+
+            // Preparar lienzo con fondo blanco limpio
+            setTimeout(() => {
+                window.limpiarTrazoModal();
+            }, 50);
+        };
+
+        window.cerrarModalFirma = function() {
+            const modal = document.getElementById('signatureModal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.guardarFirmaModal = function() {
+            if (!hasStroke) {
+                alert("⚠️ Por favor dibuje su firma antes de guardar.");
+                return;
+            }
+            const dataUrl = sigPadCanvas.toDataURL("image/jpeg", 0.7);
+            if (currentSigType === 'op') {
+                localStorage.setItem('nom087_signatureOp', dataUrl);
+            } else {
+                localStorage.setItem('nom087_signatureSup', dataUrl);
+            }
+            window.cerrarModalFirma();
+            actualizarFirmasUI();
+            sincronizarSilencioso();
+        };
+
+        window.borrarFirmaGuardada = function(tipo) {
+            if (confirm("¿Deseas borrar esta firma guardada?")) {
+                if (tipo === 'op') {
+                    localStorage.removeItem('nom087_signatureOp');
+                } else {
+                    localStorage.removeItem('nom087_signatureSup');
+                }
+                actualizarFirmasUI();
+                sincronizarSilencioso();
+            }
+        };
+
+        function actualizarFirmasUI() {
+            const sigOp = localStorage.getItem('nom087_signatureOp');
+            const sigSup = localStorage.getItem('nom087_signatureSup');
+
+            // Conductor
+            const badgeOp = document.getElementById('badgeSigOp');
+            const containerOp = document.getElementById('previewSigOpContainer');
+            const imgOp = document.getElementById('imgSigOp');
+            const btnTextOp = document.getElementById('btnSignOpText');
+            const btnDelOp = document.getElementById('btnDeleteSigOp');
+
+            if (sigOp) {
+                badgeOp.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1";
+                badgeOp.innerHTML = '<i class="fas fa-check-circle"></i> Firmado';
+                containerOp.classList.remove('hidden');
+                imgOp.src = sigOp;
+                btnTextOp.textContent = "Modificar Firma";
+                btnDelOp.classList.remove('hidden');
+            } else {
+                badgeOp.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1";
+                badgeOp.innerHTML = '<i class="fas fa-pen"></i> Sin firmar';
+                containerOp.classList.add('hidden');
+                imgOp.src = "";
+                btnTextOp.textContent = "Capturar Firma";
+                btnDelOp.classList.add('hidden');
+            }
+
+            // Supervisor
+            const badgeSup = document.getElementById('badgeSigSup');
+            const containerSup = document.getElementById('previewSigSupContainer');
+            const imgSup = document.getElementById('imgSigSup');
+            const btnTextSup = document.getElementById('btnSignSupText');
+            const btnDelSup = document.getElementById('btnDeleteSigSup');
+
+            if (sigSup) {
+                badgeSup.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1";
+                badgeSup.innerHTML = '<i class="fas fa-check-circle"></i> Firmado';
+                containerSup.classList.remove('hidden');
+                imgSup.src = sigSup;
+                btnTextSup.textContent = "Modificar Firma";
+                btnDelSup.classList.remove('hidden');
+            } else {
+                badgeSup.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1";
+                badgeSup.innerHTML = '<i class="fas fa-pen"></i> Sin firmar';
+                containerSup.classList.add('hidden');
+                imgSup.src = "";
+                btnTextSup.textContent = "Capturar Firma";
+                btnDelSup.classList.add('hidden');
+            }
+
+            actualizarNombreOperadorUI();
+        }
 
         // --- ACTUALIZACIÓN DE UI Y GRÁFICA DINÁMICA ---
         function updateUI() {
@@ -681,7 +941,7 @@
             const countBadge = document.getElementById('logCountBadge');
             if (countBadge) countBadge.textContent = String(logs.length);
 
-            // Cálculo legal de 14h en el ciclo de 24h actual
+            // Cálculo legal de 14h en ciclo dinámico de 24h
             const shiftStart = getShiftStartTime(logs);
             const limite24h = shiftStart + (24 * 60 * 60 * 1000);
             let driveMins = 0;
@@ -704,7 +964,7 @@
             if (driveMins > 13 * 60) document.getElementById('alertBox')?.classList.remove('hidden');
             else document.getElementById('alertBox')?.classList.add('hidden');
 
-            // Alerta 5 horas continuas (NOM-087 Art. 4.1)
+            // Alerta 5 horas continuas
             let continuousDrive = 0;
             if (logs.length > 0) {
                 for (let i = logs.length - 1; i >= 0; i--) {
@@ -714,7 +974,7 @@
                     } else if (logs[i].status === 1 || logs[i].status === 2) {
                         const breakEnd = logs[i].endTime || now;
                         const breakDur = Math.floor((breakEnd - logs[i].startTime) / 60000);
-                        if (breakDur >= 30) break; // Pausa >= 30 min reinicia conteo
+                        if (breakDur >= 30) break;
                     }
                 }
             }
@@ -725,7 +985,6 @@
             drawChart();
         }
 
-        // Dibuja gráfica con horas dinámicas
         function drawChart() {
             const cvs = document.getElementById('logChart');
             if (!cvs) return;
@@ -745,13 +1004,11 @@
 
             const shiftStartH = getShiftStartHour(logs);
 
-            // Eje de horas (24 divisiones)
             for (let i = 0; i <= 24; i++) { 
                 let x = p + ((w - p) / 24) * i; 
                 ctx.beginPath(); ctx.moveTo(x, p); ctx.lineTo(x, h - p); ctx.strokeStyle = "#e5e7eb"; ctx.stroke(); 
             }
 
-            // Actualizar etiquetas en pantalla
             const axisContainer = document.getElementById('chartXAxisLabels');
             if (axisContainer) {
                 axisContainer.innerHTML = '';
@@ -787,39 +1044,6 @@
             });
             ctx.stroke();
         }
-
-        // --- FIRMAS DIGITALES ---
-        const pads = { op: { c: document.getElementById('signaturePad') }, sup: { c: document.getElementById('supervisorPad') } };
-        function clearPadToWhite(canvas, ctx) {
-            if (!canvas || !ctx) return;
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        Object.keys(pads).forEach(k => {
-            const p = pads[k]; if (!p.c) return;
-            p.ctx = p.c.getContext('2d'); p.paint = false;
-            clearPadToWhite(p.c, p.ctx);
-
-            const start = (e) => { e.preventDefault(); p.paint = true; p.ctx.beginPath(); draw(e, k); };
-            const end = () => p.paint = false;
-            const draw = (e, key) => {
-                if (!p.paint) return; e.preventDefault();
-                const r = p.c.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
-                p.ctx.lineWidth = 2; p.ctx.strokeStyle = "#000000"; p.ctx.lineCap = 'round';
-                p.ctx.lineTo(x, y); p.ctx.stroke(); p.ctx.beginPath(); p.ctx.moveTo(x, y);
-            };
-            ['mousedown', 'touchstart'].forEach(ev => p.c.addEventListener(ev, start, { passive: false }));
-            ['mousemove', 'touchmove'].forEach(ev => p.c.addEventListener(ev, (e) => draw(e, k), { passive: false }));
-            ['mouseup', 'touchend', 'mouseleave'].forEach(ev => p.c.addEventListener(ev, end));
-        });
-
-        window.clearSig = (k) => { 
-            const p = pads[k]; 
-            if (p && p.c) clearPadToWhite(p.c, p.ctx); 
-        };
 
         // --- GENERADOR DE PDF OFICIAL (NOM-087) ---
         window.generarPDFSeguro = async function() {
@@ -889,7 +1113,6 @@
             row("KM FIN:", document.getElementById('kmFin').value, 168, 27);
             y += 8;
             
-            // Puntos intermedios y horas de viaje
             const puntos = document.getElementById('puntosIntermedios').value;
             row("PUNTOS INTERMEDIOS / RUTA:", puntos || "Directo por carretera federal", 14, 181);
             y += 8;
@@ -905,7 +1128,6 @@
             }
             y += 2;
 
-            // Rejilla de 24 horas sincronizada con el inicio real de turno
             const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
                 doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
                 doc.setTextColor(0); doc.setFont("helvetica", "bold"); doc.text(label, 105, startY + 3.5, { align: "center" });
@@ -1018,22 +1240,26 @@
                 y += 4;
             });
 
-            // Firmas
+            // Estampado de Firmas Recuperadas de Almacenamiento Local
             if (y > 220) { doc.addPage(); y = 30; }
             y += 10;
             
             doc.setDrawColor(0);
-            const opSig = document.getElementById('signaturePad').toDataURL("image/jpeg", 0.7);
-            const supSig = document.getElementById('supervisorPad').toDataURL("image/jpeg", 0.7);
+            const sigOpData = localStorage.getItem('nom087_signatureOp');
+            const sigSupData = localStorage.getItem('nom087_signatureSup');
 
             doc.line(30, y + 20, 80, y + 20);
-            doc.addImage(opSig, 'JPEG', 35, y, 40, 18);
+            if (sigOpData) {
+                try { doc.addImage(sigOpData, 'JPEG', 35, y, 40, 18); } catch (e) {}
+            }
             doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y + 23, { align: "center" });
             doc.setFontSize(5); doc.text(selectedOperator.nombre, 55, y + 26, { align: "center" });
             doc.text("Lic. Federal: " + (document.getElementById('license').value || ""), 55, y + 29, { align: "center" });
 
             doc.line(120, y + 20, 170, y + 20);
-            doc.addImage(supSig, 'JPEG', 125, y, 40, 18);
+            if (sigSupData) {
+                try { doc.addImage(sigSupData, 'JPEG', 125, y, 40, 18); } catch (e) {}
+            }
             doc.setFontSize(7); doc.text("FIRMA SUPERVISOR / DESPACHADOR", 145, y + 23, { align: "center" });
 
             // Declaratoria bajo protesta
@@ -1110,13 +1336,8 @@
         function buildBitacoraPayload() {
             const rawFolio = document.getElementById('folio').value || "S/F";
             const operator = getSelectedCatalogOperator();
-            let signatureOp = "", signatureSup = "";
-            try {
-                const opPad = document.getElementById('signaturePad');
-                if (opPad) signatureOp = opPad.toDataURL("image/jpeg", 0.7);
-                const supPad = document.getElementById('supervisorPad');
-                if (supPad) signatureSup = supPad.toDataURL("image/jpeg", 0.7);
-            } catch (e) {}
+            const signatureOp = localStorage.getItem('nom087_signatureOp') || "";
+            const signatureSup = localStorage.getItem('nom087_signatureSup') || "";
 
             return {
                 folio: rawFolio.trim(),
@@ -1236,6 +1457,9 @@
             window.closeObs();
         };
 
+        // Inicializaciones al cargar la página
+        initModalCanvasEvents();
+        actualizarFirmasUI();
         updateUI(); 
 
         window.addEventListener('online', () => {
