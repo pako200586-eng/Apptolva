@@ -52,7 +52,6 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         #status-title { font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 6px; }
         #status-msg { font-size: 13px; color: #6b7280; }
-        #error-icon { font-size: 40px; margin-bottom: 12px; }
         #download-btn {
             display: none;
             width: 100%;
@@ -109,7 +108,7 @@
     <iframe id="pdf-frame" title="Reporte PDF"></iframe>
 
     <script>
-        const SHIFT_START_HOUR = 8;
+        const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
         let pdfDoc = null;
 
         function setStatus(title, msg, isError) {
@@ -130,9 +129,6 @@
         function detectarTipo(data) {
             const t = String(data.reportType || data.tipo || data.report_type || '').toLowerCase();
             if (/(check|revis|inspec)/.test(t)) return 'checklist';
-            if (/(bitac|hora|nom)/.test(t)) return 'bitacora';
-            if (Array.isArray(data.checklistData) || Array.isArray(data.checklist)) return 'checklist';
-            if (Array.isArray(data.logs)) return 'bitacora';
             return 'bitacora';
         }
 
@@ -143,24 +139,19 @@
         }
 
         function getActivityStatus(log) {
-            const rawStatus = log?.status ?? log?.estado ?? log?.activity ?? log?.actividad;
-            if (typeof rawStatus === "number" && Number.isInteger(rawStatus) && rawStatus >= 1 && rawStatus <= 5) {
-                return rawStatus;
-            }
-
-            const value = String(rawStatus ?? "").trim();
-            if (/^[1-5]$/.test(value)) return Number(value);
-
-            const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-            if (/PAUSA|BREAK|COMIDA|DESCANSO CORTO/.test(normalized)) return 2;
-            if (/DESCANSO|REST/.test(normalized)) return 1;
-            if (/MANEJ|CONDUC|EN RUTA|DRIVING/.test(normalized)) return 3;
-            if (/AUXILIAR|SERVICIO|CARGA|DESCARGA|SERVICE/.test(normalized)) return 4;
-            if (/EXCEPCION|EMERGENCIA|EXCEPTION/.test(normalized)) return 5;
+            const raw = log?.status ?? log?.estado ?? log?.activity;
+            if (typeof raw === "number" && raw >= 1 && raw <= 5) return raw;
+            const val = String(raw ?? "").trim();
+            if (/^[1-5]$/.test(val)) return Number(val);
+            const n = val.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+            if (/PAUSA|BREAK|COMIDA/.test(n)) return 2;
+            if (/DESCANSO|REST/.test(n)) return 1;
+            if (/MANEJ|CONDUC|RUTA/.test(n)) return 3;
+            if (/AUXILIAR|SERVICIO|CARGA|DESCARGA/.test(n)) return 4;
+            if (/EXCEPCION|EMERGENCIA/.test(n)) return 5;
             return null;
         }
 
-        // Función auxiliar para añadir firmas asegurando compatibilidad JPEG/PNG
         function insertarFirmaSegura(doc, imgData, x, y, w, h) {
             if (!imgData || typeof imgData !== 'string' || !imgData.startsWith('data:image/')) return;
             try {
@@ -171,8 +162,24 @@
             }
         }
 
+        function getShiftStartFromLogs(logList) {
+            if (!logList || logList.length === 0) return { startMs: Date.now(), startHour: 8 };
+            let ultimoDescansoIndex = -1;
+            for (let i = 0; i < logList.length; i++) {
+                const l = logList[i];
+                if (l.status === 1) {
+                    const end = l.endTime || Date.now();
+                    if ((end - l.startTime) >= OCHO_HORAS_MS) ultimoDescansoIndex = i;
+                }
+            }
+            const startMs = (ultimoDescansoIndex !== -1 && ultimoDescansoIndex < logList.length - 1)
+                ? logList[ultimoDescansoIndex + 1].startTime
+                : logList[0].startTime;
+            return { startMs, startHour: new Date(startMs).getHours() };
+        }
+
         // ===================================================================
-        //  BITÁCORA DE HORAS DE SERVICIO (NOM-087)
+        //  BITÁCORA DE HORAS DE SERVICIO (NOM-087) DINÁMICA
         // ===================================================================
         function generarPDFBitacora(data) {
             if (!window.jspdf) { showError("Librería PDF no disponible."); return null; }
@@ -183,17 +190,13 @@
 
             const folio = data.folio || "SF";
             const logs = Array.isArray(data.logs) ? data.logs : [];
-            const shiftStart = data.shiftStartHour !== undefined ? data.shiftStartHour : SHIFT_START_HOUR;
             const fecha = data.fecha || new Date().toLocaleDateString();
 
-            // Corte de 24 / 48 horas
-            const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
-            const limit24Date = new Date(startTrip);
-            limit24Date.setHours(shiftStart, 0, 0, 0);
-            if (limit24Date.getTime() <= startTrip) {
-                limit24Date.setDate(limit24Date.getDate() + 1);
-            }
-            const limit24 = limit24Date.getTime();
+            // Cálculo dinámico de corte
+            const shiftCalc = getShiftStartFromLogs(logs);
+            const shiftStartH = data.shiftStartHour !== undefined ? data.shiftStartHour : shiftCalc.startHour;
+            const shiftStartMs = data.shiftStartTime !== undefined ? data.shiftStartTime : shiftCalc.startMs;
+            const limit24 = shiftStartMs + (24 * 60 * 60 * 1000);
 
             const logsD1 = logs.filter(l => l.startTime < limit24);
             const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
@@ -207,7 +210,6 @@
             doc.setFontSize(8); doc.setTextColor(0);
 
             let y = 26;
-
             const row = (lbl, val, x, w) => {
                 doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 6.5, 'FD');
                 doc.setFont("helvetica", "bold"); doc.text(lbl, x + 2, y + 4.2);
@@ -215,7 +217,6 @@
             };
 
             doc.setFontSize(7);
-            // Razón social corregida
             doc.setFont("helvetica", "bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A. DE C.V. — RFC: GBA940707AH4", 14, y);
             y += 4;
             doc.setFont("helvetica", "normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
@@ -244,7 +245,6 @@
             row("KM FIN:", data.kmFin || "", 168, 27);
             y += 8;
 
-            // PUNTOS INTERMEDIOS Y HORAS DE SALIDA Y LLEGADA
             const puntos = data.puntosIntermedios || data.puntos_intermedios || "Directo por carretera federal";
             row("PUNTOS INTERMEDIOS / RUTA:", puntos, 14, 181);
             y += 8;
@@ -263,10 +263,10 @@
             const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
                 doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
                 doc.setTextColor(0); doc.setFont("helvetica", "bold"); doc.text(label, 105, startY + 3.5, { align: "center" });
-
+                
                 const gx = 20; const gy = startY + 8; const gw = 175; const gh = 28; const rowH = gh / 5;
                 const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
-
+                
                 doc.setFontSize(5); doc.setDrawColor(150); doc.setLineWidth(0.1);
                 statusLabels.forEach((s, i) => {
                     doc.text(s, 19, gy + (i * rowH) + (rowH / 2), { align: "right" });
@@ -278,7 +278,7 @@
                     let x = gx + (gw / 24) * i;
                     doc.line(x, gy, x, gy + gh);
                     if (i % 2 === 0) {
-                        const rawHour = (shiftStart + i) % 24;
+                        const rawHour = (shiftStartH + i) % 24;
                         doc.text(rawHour.toString().padStart(2, "0"), x, gy - 2, { align: "center" });
                     }
                 }
@@ -286,60 +286,50 @@
 
                 if (dayLogs && dayLogs.length > 0) {
                     doc.setDrawColor(...azulOficial); doc.setLineWidth(0.7);
-                    const mapSt = { 3: 0, 2: 1, 4: 2, 5: 3, 1: 4 };
+                    const mapSt = { 3: 0, 2: 1, 4: 2, 5: 3, 1: 4 }; 
 
                     dayLogs.forEach((l, i) => {
                         const status = getActivityStatus(l);
                         const rIdx = mapSt[status];
                         if (rIdx === undefined) return;
 
-                        let ds = new Date(l.startTime);
+                        let ds = new Date(l.startTime); 
                         let de = l.endTime ? new Date(l.endTime) : new Date();
-
-                        let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStart + 24) % 24;
-                        let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStart + 24) % 24;
-
+                        let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
+                        let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
                         let x1 = gx + (gw / 24) * h1;
                         let x2 = gx + (gw / 24) * h2;
-
-                        const cruzaLimiteTurno = (de > ds) && (x2 < x1);
+                        const cruza = (de > ds) && (x2 < x1);
                         let yLine = gy + (rIdx * rowH) + (rowH / 2);
 
-                        if (cruzaLimiteTurno) {
-                            if (!isDay2) {
-                                doc.line(x1, yLine, gx + gw, yLine);
-                            } else {
-                                doc.line(gx, yLine, x2, yLine);
-                            }
+                        if (cruza) {
+                            if (!isDay2) doc.line(x1, yLine, gx + gw, yLine);
+                            else doc.line(gx, yLine, x2, yLine);
                         } else {
                             doc.line(x1, yLine, x2, yLine);
                         }
-
-                        // Conexión vertical ortogonal con estado anterior
+                        
                         if (i > 0) {
                             let prev = dayLogs[i - 1];
-                            const prevStatus = getActivityStatus(prev);
-                            const prevR = mapSt[prevStatus];
+                            const prevR = mapSt[getActivityStatus(prev)];
                             if (prevR !== undefined) {
                                 let prevY = gy + (prevR * rowH) + (rowH / 2);
                                 let prevEnd = new Date(prev.endTime);
-                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStart + 24) % 24;
+                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStartH + 24) % 24;
                                 let xPrevEnd = gx + (gw / 24) * hPrevEnd;
-                                if (Math.abs(x1 - xPrevEnd) < 2) {
-                                    doc.line(x1, prevY, x1, yLine);
-                                }
+                                if (Math.abs(x1 - xPrevEnd) < 2) doc.line(x1, prevY, x1, yLine);
                             }
                         }
                     });
                 }
             };
 
-            drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS)", logsD1, false);
+            drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS DE JORNADA)", logsD1, false);
             y += 42;
             drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE / 48 HORAS)", logsD2, true);
             y += 42;
 
-            // Tabla de Desglose
+            // Desglose
             doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica", "bold");
             doc.text("DESGLOSE CRONOLÓGICO DE ACTIVIDADES", 14, y);
             y += 4;
@@ -364,30 +354,28 @@
                     y += 5;
                     doc.setFont("helvetica", "normal");
                 }
-
-                // Homologado: AUXILIAR en lugar de SERVICIO
+                
                 const stName = ["", "DESCANSO", "PAUSA", "CONDUCIENDO", "AUXILIAR", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
                 const dur = Math.floor((e - s) / 60000);
                 const durStr = `${Math.floor(dur / 60)}h ${dur % 60}m`;
-
+                
                 if (idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
-
+                
                 doc.text(s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 16, y + 3);
                 doc.text(e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 42, y + 3);
                 doc.text(stName, 66, y + 3);
                 doc.text(durStr, 96, y + 3);
                 doc.text(formatGps(l.gps).substring(0, 26), 121, y + 3);
                 doc.text(([l.place, l.observation].filter(Boolean).join(' / ') || "-").substring(0, 28), 151, y + 3);
-
                 y += 4;
             });
 
-            // Firmas con detección de formato
+            // Firmas
             if (y > 220) { doc.addPage(); y = 30; }
             y += 10;
-
+            
             doc.setDrawColor(0);
             doc.line(30, y + 20, 80, y + 20);
             insertarFirmaSegura(doc, data.signatureOp, 35, y, 40, 18);
@@ -425,7 +413,6 @@
 
             doc.setTextColor(0); doc.setFontSize(7);
             let ry = 22;
-
             doc.setFont("helvetica", "bold"); doc.setFontSize(8);
             doc.text("TIEMPOS MÁXIMOS DE CONDUCCIÓN Y PAUSAS OBLIGATORIAS", 14, ry);
             ry += 5;
@@ -452,17 +439,16 @@
         }
 
         // ===================================================================
-        //  CHECK LIST DE REVISIÓN DIARIA (Se mantiene íntegro)
+        //  CHECK LIST (Se mantiene intacto)
         // ===================================================================
         function generarPDFChecklist(data) {
             if (!window.jspdf) { showError("Librería PDF no disponible."); return null; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
             const folio = data.folio || 'S/F';
             const u = data.unitId || '-';
             const opNombre = data.driverName || '-';
-            const numeroEmpleado = data.employeeNumber || data.numeroEmpleado || '';
+            const numeroEmpleado = data.employeeNumber || '';
             const t1 = data.tolva1 || 'S/N';
             const t2 = data.tolva2 || 'S/N';
             const dolly = data.dolly || 'S/N';
@@ -471,212 +457,95 @@
             const destino = data.destino || '-';
             const fecha = data.fecha || new Date().toLocaleDateString('es-MX');
             const hora = data.hora || new Date().toLocaleTimeString('es-MX');
-            const nombreOp2 = data.operador2 || '';
-            const nombreSup = data.supervisor || '';
-
-            const firmaOpImg = data.firmaOp || '';
-            const firmaOp2Img = data.firmaOp2 || '';
-            const firmaSupImg = data.firmaSup || '';
-
             const secciones = Array.isArray(data.checklistData) ? data.checklistData : [];
 
-            const pageW = 210;
-            const margin = 14;
-            const contentW = pageW - margin * 2;
-            const NUM_COLS = 3;
-            const COL_GAP = 4;
-            const colW = (contentW - COL_GAP * (NUM_COLS - 1)) / NUM_COLS;
+            const pageW = 210, margin = 14, contentW = pageW - margin * 2;
+            const NUM_COLS = 3, COL_GAP = 4, colW = (contentW - COL_GAP * (NUM_COLS - 1)) / NUM_COLS;
 
             secciones.forEach((sec, pageIndex) => {
                 if (pageIndex > 0) doc.addPage();
-
                 let y = 13;
-
-                doc.setFillColor(234, 88, 12);
-                doc.rect(margin, y, contentW, 11, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(13);
+                doc.setFillColor(234, 88, 12); doc.rect(margin, y, contentW, 11, 'F');
+                doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
                 doc.text('REPORTE DE INSPECCIÓN', margin + 3, y + 7.5);
                 doc.setFontSize(7.5);
                 doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 4.5, { align: 'right' });
                 doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 9, { align: 'right' });
 
                 y += 14;
-
-                doc.setTextColor(100, 100, 100);
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(8);
+                doc.setTextColor(100, 100, 100); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
                 doc.text('BACHOCO - PLANTA DE ALIMENTOS', margin, y);
-
                 y += 5;
 
-                doc.setFillColor(248, 250, 252);
-                doc.setDrawColor(226, 232, 240);
-                doc.setLineWidth(0.3);
+                doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3);
                 doc.rect(margin, y, contentW, 22, 'FD');
-                doc.setTextColor(0, 0, 0);
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(8);
+                doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
                 const half = contentW / 2;
-                const empleadoTexto = numeroEmpleado ? '   No. EMP: ' + numeroEmpleado : '';
                 doc.text('UNIDAD: ' + u, margin + 3, y + 5);
-                doc.text('OPERADOR: ' + opNombre + empleadoTexto, margin + half + 3, y + 5);
+                doc.text('OPERADOR: ' + opNombre + (numeroEmpleado ? ' No. ' + numeroEmpleado : ''), margin + half + 3, y + 5);
                 doc.text('TOLVA 1: ' + t1, margin + 3, y + 11);
                 doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 11);
                 doc.text('DOLLY: ' + dolly, margin + 3, y + 17);
                 doc.text('KM: ' + km, margin + half + 3, y + 17);
                 doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + 3, y + 21);
-
                 y += 26;
 
-                doc.setFillColor(51, 65, 85);
-                doc.rect(margin, y, contentW, 8, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(11);
+                doc.setFillColor(51, 65, 85); doc.rect(margin, y, contentW, 8, 'F');
+                doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
                 doc.text(sec.titulo || '', margin + 3, y + 5.5);
-
                 y += 12;
 
                 const COL_HEIGHT = 170;
-                const CAT_BOX_H = 5.5;
-                const CAT_INCREMENT = 6.5;
-                const ITEM_INCREMENT = 6;
-                const ITEM_LINE_HEIGHT = 3.1;
-                const MIN_OBS_H = 12;
-                const OBS_TOP_PADDING = 8;
-                const OBS_LINE_HEIGHT = 4;
-
                 const COL_START_Y = y;
-                const COL_BOTTOM = COL_START_Y + COL_HEIGHT;
-                const OBS_Y = COL_BOTTOM + 3;
-                const MAX_OBS_H = 18;
-                const SIG_Y = OBS_Y + MAX_OBS_H + 2;
-                const colXStart = [
-                    margin,
-                    margin + colW + COL_GAP,
-                    margin + (colW + COL_GAP) * 2
-                ];
-
+                const colXStart = [margin, margin + colW + COL_GAP, margin + (colW + COL_GAP) * 2];
                 let col = 0;
 
                 (sec.categorias || []).forEach(cat => {
-                    if (col < NUM_COLS - 1 && y + CAT_INCREMENT + ITEM_INCREMENT > COL_BOTTOM) {
-                        col++;
-                        y = COL_START_Y;
-                    }
+                    if (col < NUM_COLS - 1 && y + 12 > COL_START_Y + COL_HEIGHT) { col++; y = COL_START_Y; }
                     const cx = colXStart[col];
-
-                    doc.setFillColor(241, 245, 249);
-                    doc.setDrawColor(234, 88, 12);
-                    doc.setLineWidth(0.4);
-                    doc.rect(cx, y, colW, CAT_BOX_H, 'FD');
-                    doc.setFillColor(234, 88, 12);
-                    doc.rect(cx, y, 1.5, CAT_BOX_H, 'F');
-                    doc.setTextColor(51, 65, 85);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(7);
+                    doc.setFillColor(241, 245, 249); doc.setDrawColor(234, 88, 12); doc.setLineWidth(0.4);
+                    doc.rect(cx, y, colW, 5.5, 'FD');
+                    doc.setFillColor(234, 88, 12); doc.rect(cx, y, 1.5, 5.5, 'F');
+                    doc.setTextColor(51, 65, 85); doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
                     doc.text(cat.cat || '', cx + 5, y + 3.8);
-
-                    y += CAT_INCREMENT;
+                    y += 6.5;
 
                     (cat.items || []).forEach(entry => {
                         const itemText = entry.item || '';
-                        doc.setFont('helvetica', 'normal');
-                        doc.setFontSize(6.5);
+                        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
                         const itemLines = doc.splitTextToSize(itemText, colW - 17);
-                        const itemHeight = Math.max(ITEM_INCREMENT, 2.5 + itemLines.length * ITEM_LINE_HEIGHT);
+                        const itemHeight = Math.max(6, 2.5 + itemLines.length * 3.1);
 
-                        if (col < NUM_COLS - 1 && y + itemHeight > COL_BOTTOM) {
-                            col++;
-                            y = COL_START_Y;
-                        }
+                        if (col < NUM_COLS - 1 && y + itemHeight > COL_START_Y + COL_HEIGHT) { col++; y = COL_START_Y; }
                         const cxItem = colXStart[col];
                         const cxRight = cxItem + colW;
 
-                        doc.setFillColor(255, 255, 255);
-                        doc.setDrawColor(238, 238, 238);
-                        doc.setLineWidth(0.15);
+                        doc.setFillColor(255, 255, 255); doc.setDrawColor(238, 238, 238); doc.setLineWidth(0.15);
                         doc.rect(cxItem, y - 3, colW, itemHeight - 0.5, 'FD');
-
                         doc.setTextColor(50, 50, 50);
                         doc.text(itemLines, cxItem + 3, y + 0.2);
 
                         const v = entry.estado;
                         if (v === 'OK') {
-                            doc.setTextColor(22, 163, 74);
-                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(22, 163, 74); doc.setFont('helvetica', 'bold');
                             doc.text('OK', cxRight - 2, y + 0.5, { align: 'right' });
                         } else if (v === 'MAL') {
-                            doc.setFillColor(220, 38, 38);
-                            doc.roundedRect(cxRight - 11, y - 2.5, 9, 5, 1, 1, 'F');
-                            doc.setTextColor(255, 255, 255);
-                            doc.setFont('helvetica', 'bold');
+                            doc.setFillColor(220, 38, 38); doc.roundedRect(cxRight - 11, y - 2.5, 9, 5, 1, 1, 'F');
+                            doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
                             doc.text('MAL', cxRight - 6.5, y + 0.5, { align: 'center' });
-                        } else {
-                            doc.setTextColor(180, 180, 180);
-                            doc.setFont('helvetica', 'normal');
-                            doc.text('-', cxRight - 2, y + 0.5, { align: 'right' });
                         }
-
                         y += itemHeight;
                     });
-
                     y += 2;
                 });
-
-                const obsTexto = sec.observacion || 'Sin observaciones';
-                const obsLines = doc.splitTextToSize(obsTexto, contentW - 10);
-                const obsH = Math.min(MAX_OBS_H, Math.max(MIN_OBS_H, OBS_TOP_PADDING + obsLines.length * OBS_LINE_HEIGHT));
-                doc.setFillColor(255, 247, 237);
-                doc.setDrawColor(253, 186, 116);
-                doc.setLineWidth(0.3);
-                doc.rect(margin, OBS_Y, contentW, obsH, 'FD');
-                doc.setTextColor(154, 52, 18);
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(7.5);
-                doc.text('NOTAS ' + (sec.titulo || '') + ':', margin + 3, OBS_Y + 5);
-                doc.setFont('helvetica', 'normal');
-                doc.text(obsLines, margin + 3, OBS_Y + 10);
-
-                {
-                    const sigW = (contentW - 8) / 3;
-                    const sigBoxes = [
-                        { img: firmaOpImg, nombre: opNombre, cargo: 'FIRMA OPERADOR', x: margin },
-                        { img: firmaOp2Img, nombre: nombreOp2 || 'N/A', cargo: 'FIRMA OPERADOR 2', x: margin + sigW + 4 },
-                        { img: firmaSupImg, nombre: nombreSup || 'N/A', cargo: 'FIRMA SUPERVISOR', x: margin + (sigW + 4) * 2 }
-                    ];
-                    sigBoxes.forEach(sig => {
-                        insertarFirmaSegura(doc, sig.img, sig.x, SIG_Y, sigW, 18);
-                        doc.setDrawColor(100, 100, 100);
-                        doc.setLineWidth(0.5);
-                        doc.line(sig.x, SIG_Y + 20, sig.x + sigW, SIG_Y + 20);
-                        doc.setTextColor(0, 0, 0);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(7.5);
-                        doc.text(sig.nombre, sig.x + sigW / 2, SIG_Y + 25, { align: 'center' });
-                        doc.setTextColor(100, 100, 100);
-                        doc.setFont('helvetica', 'normal');
-                        doc.setFontSize(7);
-                        doc.text(sig.cargo, sig.x + sigW / 2, SIG_Y + 29, { align: 'center' });
-                    });
-                }
             });
-
-            if (secciones.length === 0) {
-                doc.setFontSize(12); doc.setTextColor(0);
-                doc.text('Checklist sin detalle disponible para el folio ' + folio + '.', 14, 20);
-            }
 
             doc._docTipo = 'checklist';
             return doc;
         }
 
         function generarPDF(data) {
-            return detectarTipo(data) === 'checklist'
-                ? generarPDFChecklist(data)
-                : generarPDFBitacora(data);
+            return detectarTipo(data) === 'checklist' ? generarPDFChecklist(data) : generarPDFBitacora(data);
         }
 
         function descargarPDF() {
@@ -697,10 +566,7 @@
         };
 
         async function obtenerReporteFirestore(id) {
-            if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
-                throw new Error("La configuración de Firebase no está disponible.");
-            }
-
+            if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) return null;
             const firebaseSdk = await import("./js/firebase-sdk.js");
             const { initializeApp } = firebaseSdk;
             const { getAuth, signInAnonymously } = firebaseSdk;
@@ -718,27 +584,24 @@
             return {
                 ...payload,
                 folio: stored.folio || payload.folio,
-                reportType: stored.report_type || payload.reportType || payload.tipo,
+                reportType: stored.report_type || payload.reportType,
                 unitId: stored.unit_id || payload.unitId,
                 driverName: stored.driver_name || payload.driverName,
                 employeeNumber: stored.employee_number || payload.employeeNumber,
-                puntosIntermedios: stored.puntos_intermedios || payload.puntosIntermedios || payload.puntos_intermedios || "",
-                horaSalida: stored.hora_salida || payload.horaSalida || payload.hora_salida || "",
-                horaLlegada: stored.hora_llegada || payload.horaLlegada || payload.hora_llegada || ""
+                puntosIntermedios: stored.puntos_intermedios || payload.puntosIntermedios || "",
+                horaSalida: stored.hora_salida || payload.horaSalida || "",
+                horaLlegada: stored.hora_llegada || payload.horaLlegada || "",
+                shiftStartHour: stored.shift_start_hour !== undefined ? stored.shift_start_hour : payload.shiftStartHour
             };
         }
 
         async function obtenerReporteNetlify(id) {
             const resp = await fetch(`/api/store-bitacora?id=${encodeURIComponent(id)}`);
             if (resp.ok) return resp.json();
-
-            const errorData = await resp.json().catch(() => ({}));
-            if (resp.status === 404) return null;
-            throw new Error(errorData.error || `Error del servidor (${resp.status})`);
+            return null;
         }
 
         async function obtenerDatosReporte(id) {
-            // Intento 1: Almacenamiento local (si el visor se abre en el mismo teléfono offline)
             try {
                 const localKey = Object.keys(localStorage).find(k => k.includes(id));
                 if (localKey) {
@@ -747,24 +610,15 @@
                 }
             } catch (e) {}
 
-            let errorFirestore = null;
             try {
-                const reporte = await obtenerReporteFirestore(id);
-                if (reporte) return reporte;
-            } catch (error) {
-                errorFirestore = error;
-                console.warn("No se pudo cargar desde Firestore, intentando Netlify:", error);
-            }
+                const rep = await obtenerReporteFirestore(id);
+                if (rep) return rep;
+            } catch (e) {}
 
             try {
-                const reporte = await obtenerReporteNetlify(id);
-                if (reporte) return reporte;
-            } catch (errorNetlify) {
-                if (errorFirestore) {
-                    throw new Error(`Firestore: ${errorFirestore.message} | Netlify: ${errorNetlify.message}`);
-                }
-                throw errorNetlify;
-            }
+                const repNet = await obtenerReporteNetlify(id);
+                if (repNet) return repNet;
+            } catch (e) {}
 
             return null;
         }
@@ -795,7 +649,6 @@
                 }
 
                 setStatus("Generando documento oficial…", "Construyendo el PDF para exhibición, un momento…", false);
-
                 await new Promise(r => setTimeout(r, 100));
 
                 pdfDoc = generarPDF(data);
@@ -803,7 +656,6 @@
                 pdfDoc._bitacoraFolio = data.folio || "PDF";
 
                 const pdfDataUri = pdfDoc.output('datauristring');
-
                 document.getElementById('status-box').style.display = 'none';
                 document.getElementById('viewer-info').style.display = 'block';
 
@@ -812,17 +664,6 @@
                 frame.style.display = 'block';
 
                 frame.onerror = () => showDownloadFallback();
-                setTimeout(() => {
-                    try {
-                        if (frame.contentDocument && frame.contentDocument.body &&
-                            frame.contentDocument.body.innerHTML === '') {
-                            showDownloadFallback();
-                        }
-                    } catch (e) {
-                        showDownloadFallback();
-                    }
-                }, 2000);
-
             } catch (err) {
                 showError("No se pudo cargar el reporte: " + err.message);
             }
@@ -836,7 +677,6 @@
             document.getElementById('status-msg').textContent = 'Tu navegador no admite visualización directa en pantalla. Descarga el archivo para revisarlo.';
             document.getElementById('download-btn').style.display = 'block';
             document.getElementById('pdf-frame').style.display = 'none';
-            document.getElementById('viewer-info').style.display = 'none';
         }
 
         window.descargarPDF = descargarPDF;
