@@ -988,7 +988,7 @@
             }
 
             // Validar firma del operador obligatoria
-            const firmaOpImg = localStorage.getItem('apptolva_sig_op');
+            const firmaOpImg = localStorage.getItem('apptolva_sig_op') || '';
             if (!firmaOpImg) {
                 return alert("⚠️ Falta la Firma del Operador. Presiona 'Capturar Firma' para firmar.");
             }
@@ -1020,12 +1020,11 @@
                 
                 document.getElementById('revFolio').value = folio;
 
-                const emptyImg = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-                const firmaOp2Img = localStorage.getItem('apptolva_sig_op2') || emptyImg;
-                const firmaSupImg = localStorage.getItem('apptolva_sig_sup') || emptyImg;
+                const firmaOp2Img = localStorage.getItem('apptolva_sig_op2') || '';
+                const firmaSupImg = localStorage.getItem('apptolva_sig_sup') || '';
                 
-                const nombreOp2 = document.getElementById('nombreOp2Texto').value || "";
-                const nombreSup = document.getElementById('nombreSupTexto').value || "";
+                const nombreOp2 = document.getElementById('nombreOp2Texto')?.value || "";
+                const nombreSup = document.getElementById('nombreSupTexto')?.value || "";
 
                 const t1 = document.getElementById('revTolva1').value || 'S/N';
                 const t2 = document.getElementById('revTolva2').value || 'S/N';
@@ -1213,7 +1212,7 @@
                     doc.setFont('helvetica', 'normal');
                     doc.text(obsLines, margin + 3, OBS_Y + 10);
 
-                    // Firmas en PDF
+                    // --- FIRMAS EN PDF (SIN FONDOS VERDES NI ERRORES) ---
                     {
                         const sigW = (contentW - 8) / 3;
                         const sigBoxes = [
@@ -1222,11 +1221,17 @@
                             {img: firmaSupImg, nombre: nombreSup || 'N/A', cargo: 'FIRMA SUPERVISOR', x: margin + (sigW + 4) * 2}
                         ];
                         sigBoxes.forEach(sig => {
-                            if (typeof sig.img === 'string' && sig.img.startsWith('data:image/')) {
+                            const esFirmaValida = typeof sig.img === 'string' &&
+                                                  (sig.img.startsWith('data:image/png') || sig.img.startsWith('data:image/jpeg')) &&
+                                                  sig.img.length > 200;
+
+                            if (esFirmaValida) {
                                 try {
-                                    const fmt = sig.img.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
-                                    doc.addImage(sig.img, fmt, sig.x, SIG_Y, sigW, 18, undefined, 'FAST');
-                                } catch(e) {}
+                                    const formato = sig.img.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
+                                    doc.addImage(sig.img, formato, sig.x, SIG_Y, sigW, 18, undefined, 'FAST');
+                                } catch(e) {
+                                    console.warn('Error al estampar firma ' + sig.cargo + ':', e);
+                                }
                             }
                             doc.setDrawColor(100, 100, 100);
                             doc.setLineWidth(0.5);
