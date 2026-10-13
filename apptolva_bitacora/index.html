@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ea580c">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="AppTolva">
-    <title>Soporte Operadores</title>
+    <title>Soporte Operadores | AppTolva</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
@@ -26,12 +26,11 @@
     <script src="./js/confetti.min.js"></script>
     <script src="./js/signature_pad.min.js"></script>
     <script src="./js/jspdf.min.js"></script>
-    <!-- <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet"> -->
     <link rel="stylesheet" href="./css/fontawesome.min.css">
     
     <style>
         :root { color-scheme: light; }
-        body { font-family: 'Roboto', sans-serif; background-color: #f8fafc; padding-bottom: 40px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding-bottom: 40px; }
         input, textarea, select {
             background-color: #fff;
             color: #1f2937;
@@ -60,11 +59,6 @@
         .carousel-slide { min-width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-size: cover; background-position: center; position: relative; }
         .carousel-text { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; padding: 10px; font-size: 14px; font-weight: bold; text-align: center; }
 
-        /* FIRMAS */
-        .signature-pad { border: 2px dashed #cbd5e1; border-radius: 8px; background-color: #fff; width: 100%; height: 120px; touch-action: none; }
-        .sig-wrapper { position: relative; margin-bottom: 10px; }
-        .clear-btn { position: absolute; top: 5px; right: 5px; background: #ef4444; color: white; font-size: 9px; padding: 3px 6px; border-radius: 4px; font-weight: bold; z-index: 10; }
-        
         /* MENU PRINCIPAL BOTONES */
         .menu-btn { transition: transform 0.1s; }
         .menu-btn:active { transform: scale(0.95); }
@@ -72,7 +66,6 @@
         /* AUTO-SAVE INDICATOR */
         #save-indicator { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 20px; font-size: 10px; display: none; z-index: 100; }
 
-        /* IMPRESIÓN: solo la evaluación, formato documento limpio */
         @media print {
             body { padding: 0; background: #fff; }
             header, #login-overlay, #save-indicator, #progContainer, .no-print { display: none !important; }
@@ -85,37 +78,35 @@
     <div id="save-indicator"><i class="fas fa-save mr-1"></i> Guardado</div>
 
     <div id="login-overlay">
-    <div class="bg-white p-8 rounded-xl shadow-2xl w-80 text-center">
-        <div class="bg-orange-100 text-orange-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="fas fa-graduation-cap text-3xl"></i>
-        </div>
-        <h2 class="text-xl font-black text-slate-800 mb-1">APPTOLVA 🚛 PA CHAPO</h2>
-        <p class="text-[10px] text-gray-500 mb-4 font-bold uppercase tracking-widest">FLOTA PROPIA</p>
-        
-        <input type="password" id="passInput" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-2xl tracking-widest mb-4 font-bold outline-none focus:border-orange-500" placeholder="PIN" maxlength="4">
-        
-        <p id="errorMsg" class="hidden text-xs font-bold text-red-600 mb-3">PIN incorrecto. Inténtalo de nuevo.</p>
-        <button onclick="checkLogin()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition uppercase">Entrar</button>
-        
-        <div class="mt-6 pt-4 border-t border-gray-100 text-left">
-            <p class="text-[9px] text-gray-400 leading-tight">
-                <strong>AVISO LEGAL:</strong> Este es un sitio de uso interno exclusivo para capacitación. No se solicita información de terceros ni contraseñas de Google.
-            </p>
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-80 text-center">
+            <div class="bg-orange-100 text-orange-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-graduation-cap text-3xl"></i>
+            </div>
+            <h2 class="text-xl font-black text-slate-800 mb-1">APPTOLVA 🚛 PA CHAPO</h2>
+            <p class="text-[10px] text-gray-500 mb-4 font-bold uppercase tracking-widest">FLOTA PROPIA</p>
+            
+            <input type="password" id="passInput" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-2xl tracking-widest mb-4 font-bold outline-none focus:border-orange-500" placeholder="PIN" maxlength="4">
+            
+            <p id="errorMsg" class="hidden text-xs font-bold text-red-600 mb-3">PIN incorrecto. Inténtalo de nuevo.</p>
+            <button onclick="checkLogin()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition uppercase">Entrar</button>
+            
+            <div class="mt-6 pt-4 border-t border-gray-100 text-left">
+                <p class="text-[9px] text-gray-400 leading-tight">
+                    <strong>AVISO LEGAL:</strong> Sitio de uso interno para operación y capacitación en flota de autotransporte.
+                </p>
+            </div>
         </div>
     </div>
-</div>
-
 
     <header class="bg-[#ea580c] text-white p-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
         <div class="flex items-center gap-3">
-            <button onclick="nav('menu')" class="text-white hover:text-orange-200 transition active:scale-90">
+            <button onclick="nav('menu')" class="text-white hover:text-orange-200 transition active:scale-90" title="Menú Principal">
                 <i class="fas fa-home text-2xl"></i>
             </button>
             <div>
-            <h1 class="text-xl font-black tracking-wide italic leading-none">FLOTA <span class="text-[10px] bg-white text-[#ea580c] px-1 rounded not-italic ml-1 align-top">PROPIA</span></h1>
-<p class="text-[9px] font-bold uppercase text-orange-100 leading-none mt-1">BACHOCO</p>
-
-                <p class="text-[9px] font-bold uppercase text-orange-100 leading-none mt-1">PA Chapo</p>
+                <h1 class="text-xl font-black tracking-wide italic leading-none">FLOTA <span class="text-[10px] bg-white text-[#ea580c] px-1 rounded not-italic ml-1 align-top">PROPIA</span></h1>
+                <p class="text-[9px] font-bold uppercase text-orange-100 leading-none mt-1">GRUPO BACHOCO, S.A. DE C.V.</p>
+                <p class="text-[9px] font-bold uppercase text-orange-100 leading-none mt-0.5">PA Chapo</p>
             </div>
         </div>
         
@@ -126,9 +117,10 @@
         </div>
     </header>
 
+    <!-- MENÚ PRINCIPAL -->
     <main id="view-menu" class="section-content p-6 max-w-lg mx-auto">
         <div class="text-center mb-6 mt-4">
-            <h2 class="text-2xl font-bold text-gray-700"> Operador</h2>
+            <h2 class="text-2xl font-bold text-gray-700">Operador</h2>
             <p class="text-sm text-gray-500">Selecciona una actividad:</p>
             <div id="draft-notice" class="hidden mt-2 bg-blue-100 text-blue-800 text-xs p-2 rounded border border-blue-200">
                 <i class="fas fa-info-circle"></i> Tienes una revisión guardada pendiente.
@@ -136,76 +128,63 @@
         </div>
 
         <div class="grid grid-cols-2 gap-4">            
-    
-    <!-- ============================================================== -->
-    <!-- 1. CHECK LIST DIARIO (ANCHO COMPLETO - PRIORIDAD ALTA) -->
-    <!-- ============================================================== -->
-    <button onclick="nav('rev')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-500 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
-        <div class="flex items-center gap-3 mb-1">
-            <i class="fas fa-clipboard-check text-4xl text-orange-500"></i>
+            <!-- 1. CHECK LIST DIARIO -->
+            <button onclick="nav('rev')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-500 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
+                <div class="flex items-center gap-3 mb-1">
+                    <i class="fas fa-clipboard-check text-4xl text-orange-500"></i>
+                </div>
+                <span class="font-bold text-gray-700 text-sm text-center mt-2">CHECK LIST DIARIO</span>            
+                <span class="text-[10px] text-gray-400">Revisión 360°</span>
+            </button>
+
+            <!-- 2. BITÁCORA NOM-087 -->
+            <button onclick="window.location.href='bitacora_master.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-600 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
+                <div class="flex items-center gap-3 mb-2">
+                    <i class="fas fa-clock text-3xl text-orange-600"></i>
+                    <i class="fas fa-truck-moving text-2xl text-orange-400"></i>
+                </div>
+                <span class="font-bold text-gray-700 text-sm text-center">BITÁCORA DE HORAS</span>            
+                <span class="text-[10px] text-orange-600 font-bold bg-orange-100 px-2 rounded-full mt-1">NOM-087-SCT-2-2017</span>
+            </button>
+
+            <!-- 3. Procedimiento de Descarga -->
+            <button onclick="nav('guia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-blue-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+                <i class="fas fa-tasks text-3xl text-blue-500 mb-2"></i>                
+                <span class="font-bold text-gray-700 text-xs text-center leading-tight">PROCEDIMIENTO DE DESCARGA</span>            
+            </button>
+
+            <!-- 4. Asistente IA -->
+            <button onclick="nav('ia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-purple-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+                <i class="fas fa-robot text-3xl text-purple-500 mb-2"></i>                
+                <span class="font-bold text-gray-700 text-xs text-center">ASISTENTE IA</span>            
+            </button>
+
+            <!-- 5. Reporte de Fallas -->
+            <button onclick="window.location.href='emergencia.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-red-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
+                <i class="fas fa-exclamation-triangle text-3xl text-red-500 mb-2"></i>                
+                <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
+            </button>
+
+            <!-- 6. Evaluación -->
+            <button onclick="window.location.href='evaluaciones.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
+                <i class="fas fa-user-check text-3xl text-green-500 mb-2"></i>
+                <span class="font-bold text-gray-700 text-xs text-center">EVALUACIÓN</span>
+            </button>
+
+            <!-- 7. Panel Administrativo -->
+            <button onclick="window.location.href='admin.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-800 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02] col-span-2">
+                <i class="fas fa-user-shield text-3xl text-green-800 mb-2"></i>
+                <span class="font-bold text-gray-700 text-xs text-center">PANEL ADMINISTRATIVO</span>
+            </button>
+
+            <!-- Botón Reset -->
+            <button onclick="borrarDatosLocales()" class="menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">                
+                <i class="fas fa-trash mr-2"></i> Iniciar Check List Nuevo (Borrar Guardado)            
+            </button>        
         </div>
-        <span class="font-bold text-gray-700 text-sm text-center mt-2">CHECK LIST DIARIO</span>            
-        <span class="text-[10px] text-gray-400">Revisión 360°</span>
-    </button>
+    </main>
 
-    <!-- ============================================================== -->
-    <!-- 2. BITÁCORA NOM-087 (ANCHO COMPLETO - PRIORIDAD ALTA) -->
-    <!-- ============================================================== -->
-    <button onclick="window.location.href='bitacora_master.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-600 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
-        <div class="flex items-center gap-3 mb-2">
-            <!-- Icono de Reloj y Camión -->
-            <i class="fas fa-clock text-3xl text-orange-600"></i>
-            <i class="fas fa-truck-moving text-2xl text-orange-400"></i>
-        </div>
-        <span class="font-bold text-gray-700 text-sm text-center">BITÁCORA DE HORAS</span>            
-        <span class="text-[10px] text-orange-600 font-bold bg-orange-100 px-2 rounded-full mt-1">NOM-087-SCT-2-2017</span>
-    </button>
-
-    <!-- ============================================================== -->
-    <!-- SECUNDARIOS (FILA 1) -->
-    <!-- ============================================================== -->
-    
-    <!-- 3. Procedimiento de Descarga (Antes Guía) -->
-    <button onclick="nav('guia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-blue-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
-        <i class="fas fa-tasks text-3xl text-blue-500 mb-2"></i>                
-        <span class="font-bold text-gray-700 text-xs text-center leading-tight">PROCEDIMIENTO DE DESCARGA</span>            
-    </button>
-
-    <!-- 4. Asistente IA -->
-    <button onclick="nav('ia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-purple-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
-        <i class="fas fa-robot text-3xl text-purple-500 mb-2"></i>                
-        <span class="font-bold text-gray-700 text-xs text-center">ASISTENTE IA</span>            
-    </button>
-
-    <!-- ============================================================== -->
-    <!-- SECUNDARIOS (FILA 2) -->
-    <!-- ============================================================== -->
-
-    <!-- 5. Reporte de Fallas -->
-    <button onclick="window.location.href='emergencia.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-red-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
-        <i class="fas fa-exclamation-triangle text-3xl text-red-500 mb-2"></i>                
-        <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
-    </button>
-
-    <!-- 6. Evaluación -->
-    <button onclick="window.location.href='evaluaciones.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
-        <i class="fas fa-user-check text-3xl text-green-500 mb-2"></i>
-        <span class="font-bold text-gray-700 text-xs text-center">EVALUACIÓN</span>
-    </button>
-
-    <!-- 7. Panel Administrativo -->
-    <button onclick="window.location.href='admin.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-800 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02] col-span-2">
-        <i class="fas fa-user-shield text-3xl text-green-800 mb-2"></i>
-        <span class="font-bold text-gray-700 text-xs text-center">PANEL ADMINISTRATIVO</span>
-    </button>
-
-    <!-- Botón de Reset (Al final) -->
-    <button onclick="borrarDatosLocales()" class="menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">                
-        <i class="fas fa-trash mr-2"></i> Iniciar Check List Nuevo (Borrar Guardado)            
-    </button>        
-</div>
-</main>
-
+    <!-- GUÍA DE DESCARGA -->
     <main id="view-guia" class="section-content p-4 max-w-lg mx-auto">
         <div class="carousel">
             <div class="carousel-track" id="track">
@@ -222,6 +201,7 @@
         <button id="btnFinishGuide" onclick="finishGuide()" class="hidden w-full mt-6 bg-green-600 text-white font-bold py-4 rounded-lg shadow-lg text-lg active:scale-95 transition-transform">✅ FINALIZAR DESCARGA</button>
     </main>
 
+    <!-- CHECK LIST DIARIO -->
     <main id="view-rev" class="section-content p-4 max-w-lg mx-auto">
         <div id="pdf-content" class="bg-white p-4 rounded-xl shadow-sm border border-slate-300">
             <h2 class="font-bold text-lg text-slate-800 border-b pb-2 mb-4 text-center">
@@ -268,26 +248,92 @@
 
             <div id="revListContainer" class="space-y-6 mb-6"></div>
 
+            <!-- FIRMAS DIGITALES COMPACTAS (MODAL PROFESIONAL) -->
             <div class="border-t pt-4 mt-4">
-                <label class="text-[10px] font-bold text-gray-500 uppercase mt-4 block mb-2">Firmas Digitales (Obligatorias):</label>
-                <div class="grid grid-cols-1 gap-6 mb-4">
-                    <div class="sig-wrapper">
-                        <label class="text-[10px] font-bold text-orange-600 block mb-1">1. FIRMA OPERADOR:</label>
-                        <button onclick="limpiarFirma('op')" class="clear-btn">BORRAR</button>
-                        <canvas id="sig-canvas-op" class="signature-pad"></canvas>
-                        <input type="text" id="nombreOpTexto" class="w-full mt-1 p-2 border rounded text-xs text-center font-bold bg-slate-50 save-me" placeholder="Nombre Operador">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-[10px] font-bold text-gray-600 uppercase flex items-center gap-1.5">
+                        <i class="fas fa-file-signature text-orange-600"></i> Firmas Digitales de Conformidad
+                    </label>
+                    <span class="text-[9px] text-gray-400">Protegidas contra rayones</span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 mb-4">
+                    <!-- 1. Firma Operador -->
+                    <div class="border rounded-xl p-3 bg-slate-50 flex flex-col justify-between" id="cardSigOp">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="text-xs font-bold text-gray-800">1. Firma Operador (Obligatoria)</p>
+                                <p id="labelOpNombre" class="text-[11px] text-gray-500 font-medium">Sin operador asignado</p>
+                            </div>
+                            <span id="badgeSigOp" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1">
+                                <i class="fas fa-pen"></i> Sin firmar
+                            </span>
+                        </div>
+                        
+                        <div id="previewSigOpContainer" class="hidden my-2 bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-center min-h-[60px]">
+                            <img id="imgSigOp" src="" alt="Firma Operador" class="max-h-14 max-w-full object-contain pointer-events-none select-none">
+                        </div>
+
+                        <div class="flex items-center gap-2 mt-2">
+                            <button onclick="abrirModalFirma('op')" type="button" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition" id="btnSignOp">
+                                <i class="fas fa-signature"></i> <span id="btnSignOpText">Capturar Firma</span>
+                            </button>
+                            <button onclick="borrarFirmaGuardada('op')" type="button" id="btnDeleteSigOp" class="hidden text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-2 rounded-lg border border-red-200 hover:bg-red-50 active:scale-95 transition" title="Borrar firma">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="sig-wrapper">
-                        <label class="text-[10px] font-bold text-orange-600 block mb-1">2. FIRMA OPERADOR 2 (Opcional):</label>
-                        <button onclick="limpiarFirma('op2')" class="clear-btn">BORRAR</button>
-                        <canvas id="sig-canvas-op2" class="signature-pad"></canvas>
-                        <input type="text" id="nombreOp2Texto" class="w-full mt-1 p-2 border rounded text-xs text-center font-bold bg-slate-50 save-me" placeholder="Nombre Operador 2">
+
+                    <!-- 2. Firma Operador 2 (Opcional) -->
+                    <div class="border rounded-xl p-3 bg-slate-50 flex flex-col justify-between" id="cardSigOp2">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="text-xs font-bold text-gray-800">2. Firma Operador 2 (Opcional / Relevo)</p>
+                                <input type="text" id="nombreOp2Texto" class="mt-1 p-1.5 border rounded text-xs font-bold bg-white save-me w-full" placeholder="Nombre Operador 2 (Opcional)">
+                            </div>
+                            <span id="badgeSigOp2" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1">
+                                <i class="fas fa-pen"></i> Sin firmar
+                            </span>
+                        </div>
+                        
+                        <div id="previewSigOp2Container" class="hidden my-2 bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-center min-h-[60px]">
+                            <img id="imgSigOp2" src="" alt="Firma Operador 2" class="max-h-14 max-w-full object-contain pointer-events-none select-none">
+                        </div>
+
+                        <div class="flex items-center gap-2 mt-2">
+                            <button onclick="abrirModalFirma('op2')" type="button" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition" id="btnSignOp2">
+                                <i class="fas fa-signature"></i> <span id="btnSignOp2Text">Capturar Firma</span>
+                            </button>
+                            <button onclick="borrarFirmaGuardada('op2')" type="button" id="btnDeleteSigOp2" class="hidden text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-2 rounded-lg border border-red-200 hover:bg-red-50 active:scale-95 transition" title="Borrar firma">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="sig-wrapper">
-                        <label class="text-[10px] font-bold text-orange-600 block mb-1">3. FIRMA SUPERVISOR:</label>
-                        <button onclick="limpiarFirma('sup')" class="clear-btn">BORRAR</button>
-                        <canvas id="sig-canvas-sup" class="signature-pad"></canvas>
-                        <input type="text" id="nombreSupTexto" class="w-full mt-1 p-2 border rounded text-xs text-center font-bold bg-slate-50 save-me" placeholder="Nombre Supervisor">
+
+                    <!-- 3. Firma Supervisor -->
+                    <div class="border rounded-xl p-3 bg-slate-50 flex flex-col justify-between" id="cardSigSup">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="text-xs font-bold text-gray-800">3. Firma Supervisor / Despacho</p>
+                                <input type="text" id="nombreSupTexto" class="mt-1 p-1.5 border rounded text-xs font-bold bg-white save-me w-full" placeholder="Nombre Supervisor / Despachador">
+                            </div>
+                            <span id="badgeSigSup" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1">
+                                <i class="fas fa-pen"></i> Sin firmar
+                            </span>
+                        </div>
+                        
+                        <div id="previewSigSupContainer" class="hidden my-2 bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-center min-h-[60px]">
+                            <img id="imgSigSup" src="" alt="Firma Supervisor" class="max-h-14 max-w-full object-contain pointer-events-none select-none">
+                        </div>
+
+                        <div class="flex items-center gap-2 mt-2">
+                            <button onclick="abrirModalFirma('sup')" type="button" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition" id="btnSignSup">
+                                <i class="fas fa-signature"></i> <span id="btnSignSupText">Capturar Firma</span>
+                            </button>
+                            <button onclick="borrarFirmaGuardada('sup')" type="button" id="btnDeleteSigSup" class="hidden text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-2 rounded-lg border border-red-200 hover:bg-red-50 active:scale-95 transition" title="Borrar firma">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -307,6 +353,44 @@
         <div class="h-10"></div>
     </main>
 
+    <!-- MODAL DE FIRMA DIGITAL DEDICADO -->
+    <div id="signatureModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col animate-in fade-in duration-150">
+            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-gray-800 text-sm" id="modalSigTitle">Firma Digital</h3>
+                    <p class="text-[11px] text-gray-500">Firme claramente dentro del recuadro con su dedo o lápiz táctil.</p>
+                </div>
+                <button onclick="cerrarModalFirma()" class="text-gray-400 hover:text-gray-600 p-1">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-4 bg-gray-100 flex flex-col items-center">
+                <div class="w-full bg-white rounded-xl border-2 border-dashed border-gray-300 relative shadow-inner overflow-hidden" style="touch-action: none;">
+                    <canvas id="activeSignaturePad" class="w-full h-48 block" width="500" height="240" style="touch-action: none;"></canvas>
+                    <div class="absolute bottom-2 right-2 text-[10px] text-gray-300 pointer-events-none select-none">Firme aquí</div>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-2 text-center">La firma queda protegida contra rayones y se almacena en el dispositivo.</p>
+            </div>
+
+            <div class="p-3 bg-white border-t border-gray-200 flex justify-between items-center gap-2">
+                <button onclick="limpiarTrazoModal()" class="px-3 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1 active:scale-95 transition">
+                    <i class="fas fa-eraser"></i> Limpiar
+                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="cerrarModalFirma()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                        Cancelar
+                    </button>
+                    <button onclick="guardarFirmaModal()" class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-1.5 active:scale-95 transition">
+                        <i class="fas fa-check"></i> Aceptar y Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ASISTENTE IA -->
     <main id="view-ia" class="section-content p-4 max-w-lg mx-auto">
         <div class="flex flex-col h-[75vh] bg-white rounded-xl shadow border border-gray-300 overflow-hidden">
             <div class="bg-gray-100 p-3 border-b flex items-center justify-between">
@@ -314,33 +398,26 @@
                 <button onclick="clearChat()" class="text-xs text-red-500 font-bold">BORRAR</button>
             </div>
             <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 text-sm">
-                <div class="bg-orange-600 text-white p-3 rounded-lg rounded-tl-none self-start max-w-[90%] shadow text-xs">Soy el Asistente. Pregúntame sobre coples, presiones o fallas.</div>
+                <div class="bg-orange-600 text-white p-3 rounded-lg rounded-tl-none self-start max-w-[90%] shadow text-xs">Soy el Asistente. Pregúntame sobre coples, presiones o fallas de descarga.</div>
             </div>
             <div class="p-3 bg-white border-t flex gap-2">
                 <input type="text" id="aiInput" class="flex-1 p-3 bg-gray-100 border rounded-full text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="Escribe tu duda...">
-                <button onclick="sendAI()" class="bg-orange-600 text-white w-10 h-10 rounded-full shadow flex items-center justify-center active:scale-90"><i class="fas fa-microphone"></i></button>
+                <button onclick="sendAI()" class="bg-orange-600 text-white w-10 h-10 rounded-full shadow flex items-center justify-center active:scale-90"><i class="fas fa-paper-plane"></i></button>
             </div>
         </div>
     </main>
 
-
-
     <script>
-        // --- VARIABLES GLOBALES Y CLAVES ---
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
         const FIRESTORE_PENDING_REPORT_ID_KEY = 'apptolva_pending_firestore_report_id';
         const FIRESTORE_PENDING_REPORT_DRAFT_KEY = 'apptolva_pending_firestore_report_draft';
         
-        // --- 1. INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                initSignaturePads();
-            } catch(e) { console.warn("Canvas error: ", e); }
-            
-            try {
+                initModalCanvasEvents();
+                actualizarFirmasUI();
                 cargarDatosGuardados();
                 
-                // Asignar auto-guardado
                 const inputs = document.querySelectorAll('.save-me, textarea');
                 inputs.forEach(input => {
                     input.addEventListener('input', autoGuardar);
@@ -348,7 +425,7 @@
             } catch(e) { console.warn("Init error: ", e); }
         });
 
-        // --- 2. SISTEMA DE AUTO-GUARDADO ---
+        // --- SISTEMA DE AUTO-GUARDADO ---
         function autoGuardar() {
             try {
                 revResults = filtrarResultadosChecklist(revResults);
@@ -388,6 +465,7 @@
                     const notice = document.getElementById('draft-notice');
                     if(notice) notice.classList.remove('hidden');
                 }
+                actualizarLabelOp();
             } catch(e) { console.error("LoadSave error"); }
         }
 
@@ -396,11 +474,13 @@
                 localStorage.removeItem(STORAGE_KEY);
                 localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
                 localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
+                localStorage.removeItem('apptolva_sig_op');
+                localStorage.removeItem('apptolva_sig_op2');
+                localStorage.removeItem('apptolva_sig_sup');
                 location.reload();
             }
         }
 
-        // --- 3. LOGIN SYSTEM ---
         function checkLogin() {
             try {
                 const pass = document.getElementById('passInput').value;
@@ -415,7 +495,7 @@
             }
         }
 
-        // --- 4. CARRUSEL ---
+        // --- CARRUSEL ---
         let slideIndex = 0;
         const track = document.getElementById('track');
         function showSlides() {
@@ -428,79 +508,14 @@
 
         // --- CONFIGURACIÓN DE IA ---
         const systemPrompt = `
-        Eres Asistente Experto en Tolvas Bachoco. Ayuda concisa y técnica. Propósito Central:
-Actuar como un experto en mecánica de tolvas de descarga para diagnosticar, prevenir y solucionar fallas operacionales, asistiendo a los usuarios con guías técnicas precisas y seguras.
-
-Metas Operativas:
-Identificar con precisión fallas comunes durante el proceso de descarga.
-Proporcionar instrucciones detalladas (paso a paso) para reparaciones mecánicas y planes de mantenimiento preventivo.
-Protocolo de Interacción (Comportamientos y Reglas):
-
-1. Inicio y Diagnóstico:
-Saludo: Preséntese como el "Asistente de Descarga" especializado en mecánica.
-Recolección de Datos:
-Pregunte al usuario por los síntomas específicos (ruidos, vibraciones) durante la descarga.
-Solicite el tipo de material que se está descargando para evaluar posibles obstrucciones (mecánicas o de flujo).
-2. Solución y Reparación Técnica:
-Análisis de Fallas: Ofrecer un listado de posibles causas técnicas (ej. fallos en el sistema hidráulico, desgaste de compuertas, problemas en el vibrador).
-Procedimiento de Reparación:
-Indicar las herramientas requeridas.
-Explicar el procedimiento de reparación de forma concisa, priorizando en todo momento la Seguridad Industrial.
-Prevención: Sugerir rutinas de mantenimiento preventivo para evitar la recurrencia de la falla.
-3. Estilo y Tono de Comunicación:
-Tono General: Profesional, técnico, serio y enfocado en la solución inmediata. (Simulando la interacción de un jefe de taller con un técnico de campo).
-Lenguaje: Utilizar terminología mecánica precisa (ej. Coples, chumaseras, válvulas de alivio). Mantener el lenguaje técnico, pero accesible para un operador de maquinaria.
-Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos.
-        
-
-        BASE DE CONOCIMIENTO TÉCNICO:(VERDADES ABSOLUTAS)
-        A) DATOS CLAVE:
-        - Presión Hidráulica Normal: 1500 a 2000 PSI.(MAS DE 2500 PSI ES PELIGROSO)
+        Eres Asistente Experto en Tolvas Bachoco. Ayuda concisa y técnica en mecánica de tolvas de descarga.
+        - Presión Hidráulica Normal: 1500 a 2000 PSI (Más de 2500 PSI es peligroso).
         - Secuencia Arranque: PTO -> 1000 RPM -> Sinfín (4) -> Arrastre (3).
         - Secuencia Apagado: Inversa (3 -> 4 -> PTO).
         - El Cople: Fusible mecánico. Si zumba y no gira, es el cople.
-        - Seguridad: 10m lejos de cables alta tensión.
-        - Nunca te apartes del banco de controles para reaccionar rapido al asolvamiento.
-        - Asegura que no este lleno el silo para evitar asolvamientos.
-        - Las chumaseras en mal estado son causa de asolvamiento por falta de grasa o tiempo de vida.
-        
-    
-
-        B) DOCUMENTACIÓN OFICIAL (RESUMEN): (MEMORIZA ESTO)
-        [FICHA DE OPERACIÓN: DESCARGA DE CARRO TOLVA]
-        1. REGLAS DE ORO: ¡MIRA ARRIBA! Mantén 10 metros de cables. Terreno firme. Freno puesto. NUNCA apoyes pluma en silo.
-        2. PANEL: Palanca 1 (Elevación), 2 (Giro), 3 (Arrastre), 4 (Sinfín).
-        3. SECUENCIA: (NO FALLES)
-           - PTO: Clutch a fondo -> Botón PTO -> Soltar (900-1000 RPM).
-           - Posicionar pluma.
-           - Activar: 1º Palanca 4 (Sinfín), 2º Palanca 3 (Arrastre).
-           - Compuertas: Abrir de ATRÁS hacia ADELANTE.
-           - Presión: 1500-2000 PSI.
-        4. APAGADO: Cerrar compuertas -> Apagar Palanca 3 -> Apagar Palanca 4 -> Guardar pluma -> Desactivar PTO.
-
-        [MANUAL DE PROCEDIMIENTOS 06-PA-PR-1.44]
-        - Normas: Colocarse a un costado de silos. Inspeccionar terreno. Conducir en línea recta. Validar líneas eléctricas (10m).
-        - No colocar en superficie blanda (riesgo volcamiento).
-        - Velocidad motor: 900-1000 RPM.
-        - Ajustar velocidad transportador hasta que material retroceda en mirillas, luego reducir.
-        - Responsables: Superintendente, Jefe de flota, Supervisor Mantto.
-        - DIAGRAMA DE FLUJO (RESUMEN): Inicio -> Inspeccionar área -> Posicionar unidad -> Validar cables (10m) -> Frenos y aire -> Activar PTO (1000 RPM) -> Elevar pluma -> Posicionar (sin tocar) -> Establecer RPM (1050-1100) -> Arrancar Sinfín (4) y Arrastre (3) -> Abrir compuerta -> Monitorear presión (1500-2000 PSI) -> Al vaciar, cerrar compuertas -> Apagar Arrastre luego Sinfín -> Guardar pluma -> Fin.
-        - RESPONSABILIDADES:
-        - Superintendente: Asegurar la correcta operación y solicitar evidencias.
-        - Operador Master: Capacitar operadores nuevos y retroalimenta. Evitar daños en silos.
-        - Operador Master: Impartir procedimiento a nuevos ingresos y realizar viajes de reconocimiento. 
-
-        CONTACTOS:
-        - Logística: 9211098696
-        - Mantenimiento: 9212683079
-        - OP.MASTER HARRY 9212682626
-
-        GUARDRAILS:
-        - Solo temas de mecánica/operación tolvas.
+        - Seguridad: 10m lejos de cables de alta tensión.
         `;
-        // (Resumido para ahorrar espacio, funciona igual)
 
-        // GUÍA
         const guideSteps = [
             {t:"Llegada: Entregar docs y pasar Arco de Lavado.", img:"arco1.jpg"},
             {t:"Terreno firme, nivelado y unidad recta.", img:"suelo.jpg"},
@@ -516,7 +531,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             {t:"Final: Cerrar todo, pernos, pluma abajo.", img:"descfin.jpg"}
         ];
 
-        // --- CHECKLIST DATA ---
         const commonTolvaItems = [
             {cat:"SISTEMA HIDRÁULICO", i:["Nivel de aceite", "Fugas", "Filtros", "Mangueras", "Manometros", "Válvulas"]},
             {cat:"DOCUMENTOS", i:["Permiso Federal", "Placas Fisicas", "Certificación Fis-Mec", "Tarjeta Circulación", "Engomado Fis-Mec"]},
@@ -578,7 +592,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             );
         }
 
-        // LÓGICA
         let currentRevTab = 'tracto';
         let revResults = {};
         let obsData = { tracto: "", tolva1: "", dolly: "", tolva2: "" };
@@ -623,18 +636,13 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             const view = document.getElementById('view-'+id);
             if(view) {
                 view.classList.add('active');
-            } else {
-                console.error("View not found: " + id);
             }
-            
             const prog = document.getElementById('progContainer');
             if(prog) prog.style.display = id === 'guia' ? 'block' : 'none';
-            
-            if(id === 'rev') setTimeout(resizeCanvas, 200);
             if(id === 'guia') renderGuide();
+            if(id === 'rev') actualizarFirmasUI();
         }
 
-        // GUÍA
         function renderGuide() {
             const c = document.getElementById('checklistContainer');
             if(c.innerHTML !== "") return; 
@@ -661,7 +669,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
         }
         function finishGuide() { confetti(); alert("¡Descarga Exitosa!"); nav('rev'); }
 
-        // REVISIÓN
         function setRevTab(mode) {
             currentRevTab = mode;
             ['tracto','tolva1','dolly','tolva2'].forEach(m => {
@@ -686,7 +693,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
             
             c.innerHTML += `<div class="bg-blue-50 p-2 text-center text-xs font-bold text-blue-800 mb-3 rounded border border-blue-200">${label}</div>`;
 
-            // BOTÓN MARCAR TODO BIEN
             c.innerHTML += `
                 <div class="flex justify-between items-center mb-4 bg-orange-50 p-2 rounded border border-orange-100">
                     <span class="text-xs font-bold text-orange-800">¿Todo en orden?</span>
@@ -715,7 +721,6 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
                 });
             }
 
-            // OBSERVACIONES
             c.innerHTML += `
                 <div class="mt-4 p-3 bg-orange-50 border border-orange-200 rounded">
                     <label class="text-[10px] font-bold text-orange-800 block mb-1">OBSERVACIONES ${label}:</label>
@@ -751,85 +756,253 @@ Claridad: Limitar la extensión de cada respuesta a un máximo de tres párrafos
 
         function saveObs(key, val) {
             obsData[key] = val;
+            autoGuardar();
         }
 
-        // --- FIRMAS ---
-        let signaturePadOp, signaturePadOp2, signaturePadSup;
-        
-        function initSignaturePads() {
-            const canvasOp = document.getElementById('sig-canvas-op');
-            if(canvasOp) signaturePadOp = new SignaturePad(canvasOp, { backgroundColor: 'rgb(255, 255, 255)' });
-            
-            const canvasOp2 = document.getElementById('sig-canvas-op2');
-            if(canvasOp2) signaturePadOp2 = new SignaturePad(canvasOp2, { backgroundColor: 'rgb(255, 255, 255)' });
+        // ============================================================
+        // --- SISTEMA DE FIRMAS DIGITALES CON MODAL (BLINDADO) ---
+        // ============================================================
+        let currentSigType = 'op'; // 'op', 'op2', 'sup'
+        let modalCanvas = null;
+        let modalCtx = null;
+        let isPainting = false;
+        let hasStroke = false;
 
-            const canvasSup = document.getElementById('sig-canvas-sup');
-            if(canvasSup) signaturePadSup = new SignaturePad(canvasSup, { backgroundColor: 'rgb(255, 255, 255)' });
-        }
-        
-        function resizeCanvas() {
-            if(!signaturePadOp) return;
-            const ratio = Math.max(window.devicePixelRatio || 1, 1);
-            
-            [
-                {pad: signaturePadOp, el: 'sig-canvas-op'},
-                {pad: signaturePadOp2, el: 'sig-canvas-op2'},
-                {pad: signaturePadSup, el: 'sig-canvas-sup'}
-            ].forEach(item => {
-                const canvas = document.getElementById(item.el);
-                if(canvas && item.pad) {
-                    const data = item.pad.toData();
-                    canvas.width = canvas.offsetWidth * ratio;
-                    canvas.height = canvas.offsetHeight * ratio;
-                    canvas.getContext("2d").scale(ratio, ratio);
-                    item.pad.clear();
-                    item.pad.fromData(data);
-                }
-            });
-        }
-        
-        window.addEventListener("resize", resizeCanvas);
-        document.addEventListener('DOMContentLoaded', initSignaturePads);
+        function initModalCanvasEvents() {
+            modalCanvas = document.getElementById('activeSignaturePad');
+            if (!modalCanvas) return;
+            modalCtx = modalCanvas.getContext('2d');
 
-        function limpiarFirma(quien) {
-            if(quien === 'op' && signaturePadOp) signaturePadOp.clear();
-            if(quien === 'op2' && signaturePadOp2) signaturePadOp2.clear();
-            if(quien === 'sup' && signaturePadSup) signaturePadSup.clear();
+            const start = (e) => {
+                e.preventDefault();
+                isPainting = true;
+                hasStroke = true;
+                modalCtx.beginPath();
+                const pos = getCanvasPos(e);
+                modalCtx.moveTo(pos.x, pos.y);
+            };
+
+            const move = (e) => {
+                if (!isPainting) return;
+                e.preventDefault();
+                const pos = getCanvasPos(e);
+                modalCtx.lineWidth = 2.5;
+                modalCtx.strokeStyle = "#000000";
+                modalCtx.lineCap = "round";
+                modalCtx.lineJoin = "round";
+                modalCtx.lineTo(pos.x, pos.y);
+                modalCtx.stroke();
+            };
+
+            const end = () => { isPainting = false; };
+
+            function getCanvasPos(e) {
+                const rect = modalCanvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const scaleX = modalCanvas.width / rect.width;
+                const scaleY = modalCanvas.height / rect.height;
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
+                };
+            }
+
+            modalCanvas.addEventListener('mousedown', start, { passive: false });
+            modalCanvas.addEventListener('mousemove', move, { passive: false });
+            modalCanvas.addEventListener('mouseup', end);
+            modalCanvas.addEventListener('mouseleave', end);
+
+            modalCanvas.addEventListener('touchstart', start, { passive: false });
+            modalCanvas.addEventListener('touchmove', move, { passive: false });
+            modalCanvas.addEventListener('touchend', end);
         }
 
-        // --- REPORTE GENERADOR (V9.2 - FOLIO AUTOMÁTICO AL FINAL) ---
+        function limpiarTrazoModal() {
+            if (!modalCanvas || !modalCtx) return;
+            modalCtx.fillStyle = "#ffffff";
+            modalCtx.fillRect(0, 0, modalCanvas.width, modalCanvas.height);
+            hasStroke = false;
+        }
+
+        function abrirModalFirma(tipo) {
+            currentSigType = tipo;
+            const modal = document.getElementById('signatureModal');
+            const title = document.getElementById('modalSigTitle');
+            if (modal) modal.classList.remove('hidden');
+
+            if (tipo === 'op') {
+                const opNombre = document.getElementById('revOperador')?.value.trim();
+                title.textContent = opNombre ? `Firma del Operador: ${opNombre}` : "1. Firma del Operador";
+            } else if (tipo === 'op2') {
+                const op2Nombre = document.getElementById('nombreOp2Texto')?.value.trim();
+                title.textContent = op2Nombre ? `Firma Operador 2: ${op2Nombre}` : "2. Firma Operador 2 (Opcional)";
+            } else {
+                const supNombre = document.getElementById('nombreSupTexto')?.value.trim();
+                title.textContent = supNombre ? `Firma Supervisor: ${supNombre}` : "3. Firma Supervisor / Despacho";
+            }
+
+            setTimeout(() => {
+                limpiarTrazoModal();
+            }, 50);
+        }
+
+        function cerrarModalFirma() {
+            const modal = document.getElementById('signatureModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function guardarFirmaModal() {
+            if (!hasStroke) {
+                alert("⚠️ Por favor dibuje su firma en el recuadro antes de guardar.");
+                return;
+            }
+            const dataUrl = modalCanvas.toDataURL("image/png");
+            if (currentSigType === 'op') {
+                localStorage.setItem('apptolva_sig_op', dataUrl);
+            } else if (currentSigType === 'op2') {
+                localStorage.setItem('apptolva_sig_op2', dataUrl);
+            } else {
+                localStorage.setItem('apptolva_sig_sup', dataUrl);
+            }
+            cerrarModalFirma();
+            actualizarFirmasUI();
+            autoGuardar();
+        }
+
+        function borrarFirmaGuardada(tipo) {
+            if (confirm("¿Deseas borrar esta firma guardada?")) {
+                if (tipo === 'op') localStorage.removeItem('apptolva_sig_op');
+                if (tipo === 'op2') localStorage.removeItem('apptolva_sig_op2');
+                if (tipo === 'sup') localStorage.removeItem('apptolva_sig_sup');
+                actualizarFirmasUI();
+                autoGuardar();
+            }
+        }
+
+        function actualizarFirmasUI() {
+            const sigOp = localStorage.getItem('apptolva_sig_op');
+            const sigOp2 = localStorage.getItem('apptolva_sig_op2');
+            const sigSup = localStorage.getItem('apptolva_sig_sup');
+
+            // 1. Operador
+            const badgeOp = document.getElementById('badgeSigOp');
+            const containerOp = document.getElementById('previewSigOpContainer');
+            const imgOp = document.getElementById('imgSigOp');
+            const btnTextOp = document.getElementById('btnSignOpText');
+            const btnDelOp = document.getElementById('btnDeleteSigOp');
+
+            if (sigOp) {
+                badgeOp.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1";
+                badgeOp.innerHTML = '<i class="fas fa-check-circle"></i> Firmado';
+                containerOp.classList.remove('hidden');
+                imgOp.src = sigOp;
+                btnTextOp.textContent = "Modificar Firma";
+                btnDelOp.classList.remove('hidden');
+            } else {
+                badgeOp.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1";
+                badgeOp.innerHTML = '<i class="fas fa-pen"></i> Sin firmar';
+                containerOp.classList.add('hidden');
+                imgOp.src = "";
+                btnTextOp.textContent = "Capturar Firma";
+                btnDelOp.classList.add('hidden');
+            }
+
+            // 2. Operador 2
+            const badgeOp2 = document.getElementById('badgeSigOp2');
+            const containerOp2 = document.getElementById('previewSigOp2Container');
+            const imgOp2 = document.getElementById('imgSigOp2');
+            const btnTextOp2 = document.getElementById('btnSignOp2Text');
+            const btnDelOp2 = document.getElementById('btnDeleteSigOp2');
+
+            if (sigOp2) {
+                badgeOp2.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1";
+                badgeOp2.innerHTML = '<i class="fas fa-check-circle"></i> Firmado';
+                containerOp2.classList.remove('hidden');
+                imgOp2.src = sigOp2;
+                btnTextOp2.textContent = "Modificar Firma";
+                btnDelOp2.classList.remove('hidden');
+            } else {
+                badgeOp2.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1";
+                badgeOp2.innerHTML = '<i class="fas fa-pen"></i> Sin firmar';
+                containerOp2.classList.add('hidden');
+                imgOp2.src = "";
+                btnTextOp2.textContent = "Capturar Firma";
+                btnDelOp2.classList.add('hidden');
+            }
+
+            // 3. Supervisor
+            const badgeSup = document.getElementById('badgeSigSup');
+            const containerSup = document.getElementById('previewSigSupContainer');
+            const imgSup = document.getElementById('imgSigSup');
+            const btnTextSup = document.getElementById('btnSignSupText');
+            const btnDelSup = document.getElementById('btnDeleteSigSup');
+
+            if (sigSup) {
+                badgeSup.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1";
+                badgeSup.innerHTML = '<i class="fas fa-check-circle"></i> Firmado';
+                containerSup.classList.remove('hidden');
+                imgSup.src = sigSup;
+                btnTextSup.textContent = "Modificar Firma";
+                btnDelSup.classList.remove('hidden');
+            } else {
+                badgeSup.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1";
+                badgeSup.innerHTML = '<i class="fas fa-pen"></i> Sin firmar';
+                containerSup.classList.add('hidden');
+                imgSup.src = "";
+                btnTextSup.textContent = "Capturar Firma";
+                btnDelSup.classList.add('hidden');
+            }
+
+            actualizarLabelOp();
+        }
+
+        function actualizarLabelOp() {
+            const lbl = document.getElementById('labelOpNombre');
+            const nombre = document.getElementById('revOperador')?.value.trim();
+            const num = document.getElementById('revEmpleado')?.value.trim();
+            if (lbl) {
+                lbl.textContent = nombre ? `${nombre} ${num ? '(#'+num+')' : ''}` : 'Sin operador asignado';
+            }
+        }
+
+        // ============================================================
+        // --- PROCESAMIENTO Y ENVÍO DEL REPORTE FINAL ---
+        // ============================================================
         async function procesarFinal() {
             const u = document.getElementById('revUnidad').value.trim();
-            const opNombre = document.getElementById('nombreOpTexto').value.trim();
+            const opNombre = document.getElementById('revOperador').value.trim();
             const numeroEmpleado = document.getElementById('revEmpleado').value.trim();
 
-            // NUEVA VALIDACIÓN ESTRICTA
-if (!u || !opNombre || !numeroEmpleado) {
-    return alert("⚠️ Error: Son obligatorios la Unidad, Nombre del Operador y Número de Empleado.");
-}
+            if (!u || !opNombre || !numeroEmpleado) {
+                return alert("⚠️ Error: Son obligatorios la Unidad, Nombre del Operador y Número de Empleado.");
+            }
 
-const catalogoOperadores = window.CATALOGO_OPERADORES;
-const operadorOficial = catalogoOperadores && catalogoOperadores[numeroEmpleado];
-if (!operadorOficial) {
-    return alert("⚠️ Selecciona un operador válido del catálogo usando su número de empleado.");
-}
-if (opNombre.trim().toUpperCase() !== operadorOficial.nombre.toUpperCase()) {
-    return alert("⚠️ El nombre del operador no coincide con el catálogo. Selecciónalo nuevamente desde la lista.");
-}
+            const catalogoOperadores = window.CATALOGO_OPERADORES;
+            const operadorOficial = catalogoOperadores && catalogoOperadores[numeroEmpleado];
+            if (!operadorOficial) {
+                return alert("⚠️ Selecciona un operador válido del catálogo usando su número de empleado.");
+            }
+            if (opNombre.trim().toUpperCase() !== operadorOficial.nombre.toUpperCase()) {
+                return alert("⚠️ El nombre del operador no coincide con el catálogo oficial.");
+            }
 
+            // Validar firma del operador obligatoria
+            const firmaOpImg = localStorage.getItem('apptolva_sig_op');
+            if (!firmaOpImg) {
+                return alert("⚠️ Falta la Firma del Operador. Presiona 'Capturar Firma' para firmar.");
+            }
+
+            const btn = document.getElementById('btnFinal');
+            const msg = document.getElementById('statusMsg');
+            const originalText = btn.innerHTML;
             
-const btn = document.getElementById('btnFinal');
-const msg = document.getElementById('statusMsg');
-const originalText = btn.innerHTML;
-            
-            // 1. ESTADO DE CARGA Y BLOQUEO
             btn.disabled = true;
             btn.textContent = 'Enviando reporte, no cierre la pantalla...';
             btn.classList.add('opacity-75');
             msg.classList.remove('hidden');
 
             try {
-                // 2. PEDIMOS EL FOLIO A LA NUBE (O generamos offline)
                 let folio = "PENDIENTE";
                 if (navigator.onLine && typeof window.reservarFolioCloud === 'function') {
                     try {
@@ -837,23 +1010,19 @@ const originalText = btn.innerHTML;
                         folio = "F-" + nuevoNumero;
                         msg.innerText = `✅ Folio ${folio} asignado. Generando PDF...`;
                     } catch(e) { 
-                        console.warn("Fallo nube, usando offline");
                         folio = "ERR-" + Math.floor(Date.now() / 1000).toString().slice(-6);
                     }
                 } else {
                     folio = "OFF-" + Math.floor(Date.now() / 1000).toString().slice(-6);
                     msg.innerText = `⚠️ Modo Offline. Folio temporal: ${folio}`;
-                    await new Promise(r => setTimeout(r, 1500));
+                    await new Promise(r => setTimeout(r, 1000));
                 }
                 
-                // Actualizamos visualmente el input (aunque ya nos vamos)
                 document.getElementById('revFolio').value = folio;
 
-                // 3. GENERAMOS EL DOCUMENTO
                 const emptyImg = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-                const firmaOpImg = signaturePadOp && !signaturePadOp.isEmpty() ? signaturePadOp.toDataURL() : emptyImg;
-                const firmaOp2Img = signaturePadOp2 && !signaturePadOp2.isEmpty() ? signaturePadOp2.toDataURL() : emptyImg;
-                const firmaSupImg = signaturePadSup && !signaturePadSup.isEmpty() ? signaturePadSup.toDataURL() : emptyImg;
+                const firmaOp2Img = localStorage.getItem('apptolva_sig_op2') || emptyImg;
+                const firmaSupImg = localStorage.getItem('apptolva_sig_sup') || emptyImg;
                 
                 const nombreOp2 = document.getElementById('nombreOp2Texto').value || "";
                 const nombreSup = document.getElementById('nombreSupTexto').value || "";
@@ -863,7 +1032,7 @@ const originalText = btn.innerHTML;
                 const dolly = document.getElementById('revDolly').value || 'S/N';
                 revResults = filtrarResultadosChecklist(revResults);
 
-                // GENERACIÓN DE PDF (4 páginas, una por componente)
+                // --- GENERACIÓN DEL PDF OFICIAL ---
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
@@ -894,31 +1063,25 @@ const originalText = btn.innerHTML;
 
                 secciones.forEach((sec, pageIndex) => {
                     if (pageIndex > 0) doc.addPage();
-
                     let y = 13;
 
-                    // --- ENCABEZADO ---
                     doc.setFillColor(234, 88, 12);
                     doc.rect(margin, y, contentW, 11, 'F');
                     doc.setTextColor(255, 255, 255);
                     doc.setFont('helvetica', 'bold');
                     doc.setFontSize(13);
-                    doc.text('REPORTE DE INSPECCIÓN', margin + 3, y + 7.5);
+                    doc.text('REPORTE DE INSPECCIÓN 360°', margin + 3, y + 7.5);
                     doc.setFontSize(7.5);
                     doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 4.5, {align: 'right'});
                     doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 9, {align: 'right'});
 
                     y += 14;
-
-                    // Subtítulo empresa
                     doc.setTextColor(100, 100, 100);
                     doc.setFont('helvetica', 'normal');
                     doc.setFontSize(8);
-                    doc.text('BACHOCO - PLANTA DE ALIMENTOS', margin, y);
+                    doc.text('GRUPO BACHOCO, S.A. DE C.V. — PLANTA DE ALIMENTOS', margin, y);
 
                     y += 5;
-
-                    // --- DATOS DE UNIDAD ---
                     doc.setFillColor(248, 250, 252);
                     doc.setDrawColor(226, 232, 240);
                     doc.setLineWidth(0.3);
@@ -937,8 +1100,6 @@ const originalText = btn.innerHTML;
                     doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + 3, y + 21);
 
                     y += 26;
-
-                    // --- TÍTULO DE SECCIÓN ---
                     doc.setFillColor(51, 65, 85);
                     doc.rect(margin, y, contentW, 8, 'F');
                     doc.setTextColor(255, 255, 255);
@@ -948,21 +1109,20 @@ const originalText = btn.innerHTML;
 
                     y += 12;
 
-                    // --- ÍTEMS DEL CHECKLIST (distribución en 3 columnas) ---
-                    const COL_HEIGHT = 170;              // altura útil de cada columna en mm
-                    const CAT_BOX_H = 5.5;               // altura del recuadro de categoría
-                    const CAT_INCREMENT = 6.5;           // avance de Y tras dibujar cabecera de categoría
-                    const ITEM_INCREMENT = 6;            // avance mínimo de Y tras dibujar cada ítem
-                    const ITEM_LINE_HEIGHT = 3.1;        // interlineado para nombres largos de fallas
-                    const MIN_OBS_H = 12;                // altura mínima del bloque de observaciones
-                    const OBS_TOP_PADDING = 8;           // margen superior dentro del bloque de observaciones
-                    const OBS_LINE_HEIGHT = 4;           // altura de cada línea de texto en observaciones
+                    const COL_HEIGHT = 170;
+                    const CAT_BOX_H = 5.5;
+                    const CAT_INCREMENT = 6.5;
+                    const ITEM_INCREMENT = 6;
+                    const ITEM_LINE_HEIGHT = 3.1;
+                    const MIN_OBS_H = 12;
+                    const OBS_TOP_PADDING = 8;
+                    const OBS_LINE_HEIGHT = 4;
 
-                    const COL_START_Y = y;               // y ≈ 70 después del encabezado
+                    const COL_START_Y = y;
                     const COL_BOTTOM = COL_START_Y + COL_HEIGHT;
-                    const OBS_Y = COL_BOTTOM + 3;        // posición fija para observaciones
-                    const MAX_OBS_H = 18;                // altura máxima del bloque de observaciones
-                    const SIG_Y = OBS_Y + MAX_OBS_H + 2; // posición fija para firmas
+                    const OBS_Y = COL_BOTTOM + 3;
+                    const MAX_OBS_H = 18;
+                    const SIG_Y = OBS_Y + MAX_OBS_H + 2;
                     const colXStart = [
                         margin,
                         margin + colW + COL_GAP,
@@ -973,14 +1133,12 @@ const originalText = btn.innerHTML;
 
                     if (revData[sec.id]) {
                         revData[sec.id].forEach(cat => {
-                            // Mover a la siguiente columna si la cabecera + al menos un ítem no caben
                             if (col < NUM_COLS - 1 && y + CAT_INCREMENT + ITEM_INCREMENT > COL_BOTTOM) {
                                 col++;
                                 y = COL_START_Y;
                             }
                             const cx = colXStart[col];
 
-                            // Título de categoría
                             doc.setFillColor(241, 245, 249);
                             doc.setDrawColor(234, 88, 12);
                             doc.setLineWidth(0.4);
@@ -1000,7 +1158,6 @@ const originalText = btn.innerHTML;
                                 const itemLines = doc.splitTextToSize(item, colW - 17);
                                 const itemHeight = Math.max(ITEM_INCREMENT, 2.5 + itemLines.length * ITEM_LINE_HEIGHT);
 
-                                // Mover a la siguiente columna si el ítem no cabe
                                 if (col < NUM_COLS - 1 && y + itemHeight > COL_BOTTOM) {
                                     col++;
                                     y = COL_START_Y;
@@ -1041,7 +1198,7 @@ const originalText = btn.innerHTML;
                         });
                     }
 
-                    // --- OBSERVACIONES (posición fija en la parte inferior de la página) ---
+                    // Observaciones
                     const obsTexto = obsData[sec.id] || 'Sin observaciones';
                     const obsLines = doc.splitTextToSize(obsTexto, contentW - 10);
                     const obsH = Math.min(MAX_OBS_H, Math.max(MIN_OBS_H, OBS_TOP_PADDING + obsLines.length * OBS_LINE_HEIGHT));
@@ -1056,7 +1213,7 @@ const originalText = btn.innerHTML;
                     doc.setFont('helvetica', 'normal');
                     doc.text(obsLines, margin + 3, OBS_Y + 10);
 
-                    // --- FIRMAS (en todas las páginas, posición fija) ---
+                    // Firmas en PDF
                     {
                         const sigW = (contentW - 8) / 3;
                         const sigBoxes = [
@@ -1065,9 +1222,11 @@ const originalText = btn.innerHTML;
                             {img: firmaSupImg, nombre: nombreSup || 'N/A', cargo: 'FIRMA SUPERVISOR', x: margin + (sigW + 4) * 2}
                         ];
                         sigBoxes.forEach(sig => {
-                            const hasPngImage = typeof sig.img === 'string' && sig.img.startsWith('data:image/png');
-                            if (hasPngImage) {
-                                try { doc.addImage(sig.img, 'PNG', sig.x, SIG_Y, sigW, 18, undefined, 'FAST'); } catch(e) { console.warn('Error al agregar firma ' + sig.cargo + ':', e); }
+                            if (typeof sig.img === 'string' && sig.img.startsWith('data:image/')) {
+                                try {
+                                    const fmt = sig.img.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
+                                    doc.addImage(sig.img, fmt, sig.x, SIG_Y, sigW, 18, undefined, 'FAST');
+                                } catch(e) {}
                             }
                             doc.setDrawColor(100, 100, 100);
                             doc.setLineWidth(0.5);
@@ -1086,20 +1245,18 @@ const originalText = btn.innerHTML;
 
                 doc.save('REPORTE_' + u + '_' + opNombre + '.pdf');
 
-                // 4. PREPARACIÓN DEL REPORTE PARA FIRESTORE
+                // Enviar a Firestore
                 msg.classList.remove('hidden');
                 msg.innerText = '📡 Guardando reporte en Firebase...';
 
                 const checklistArr = Object.entries(revResults).map(([item, estado]) => ({ item, estado }));
                 const fallasDetectadas = Object.keys(revResults).filter((k) => revResults[k] === 'MAL');
-                // Número económico capturado por componente (S/N si el input quedó vacío).
                 const numeroPorComponente = {
                     tracto: (u && u.trim()) ? u.trim() : 'S/N',
                     tolva1: t1,
                     dolly: dolly,
                     tolva2: t2
                 };
-                // Tickets individuales por cada falla detectada.
                 const ticketsFallas = [];
                 const nombresComponente = {
                     tracto: 'Tracto',
@@ -1122,7 +1279,6 @@ const originalText = btn.innerHTML;
                     });
                 });
 
-                // Estructura autocontenida para que el panel /admin reproduzca el PDF idéntico al del operador.
                 const checklistData = secciones.map((sec) => ({
                     id: sec.id,
                     titulo: sec.titulo,
@@ -1132,6 +1288,7 @@ const originalText = btn.innerHTML;
                         items: cat.i.map((item) => ({ item, estado: revResults[sec.id + '-' + item] || '' }))
                     }))
                 }));
+
                 const reportePayload = {
                     folio: folio,
                     unitId: u,
@@ -1161,7 +1318,6 @@ const originalText = btn.innerHTML;
                     priority: fallasDetectadas.length ? "alta" : "baja"
                 };
 
-                // GUARDADO DIRECTO EN FIREBASE FIRESTORE
                 if (typeof window.guardarReporteEnFirestore === 'function') {
                     let reporteId = localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY);
                     if (!reporteId) {
@@ -1171,26 +1327,29 @@ const originalText = btn.innerHTML;
                     }
                     const resFirestore = await window.guardarReporteEnFirestore(reportePayload, reporteId);
                     if (resFirestore.status === 'pending') {
-                        msg.innerText = '📴 Reporte guardado localmente. Se sincronizará automáticamente al recuperar conexión.';
+                        msg.innerText = '📴 Reporte guardado localmente. Se sincronizará al volver la conexión.';
                         btn.disabled = true;
                         btn.textContent = 'Reporte pendiente de sincronización';
-                        alert("📴 El reporte quedó guardado localmente y se sincronizará con Firebase al recuperar conexión. Mantén esta página abierta para confirmar la sincronización.");
+                        alert("📴 El reporte quedó guardado en el dispositivo y se sincronizará automáticamente con Firebase al recuperar conexión.");
                         return;
                     }
                 } else {
                     throw new Error('El módulo de guardado en Firebase no está inicializado.');
                 }
 
-                // LIMPIEZA POST-REPORTE
+                // Limpieza de datos locales tras guardar con éxito
                 localStorage.removeItem(STORAGE_KEY);
                 localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
                 localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
-                alert("✅ REPORTE GUARDADO EN FIREBASE\n\nFolio: " + folio + "\n\nEl reporte está disponible en el panel de supervisión. El PDF se descargó en tu dispositivo.");
+                localStorage.removeItem('apptolva_sig_op');
+                localStorage.removeItem('apptolva_sig_op2');
+                localStorage.removeItem('apptolva_sig_sup');
+                alert("✅ REPORTE GUARDADO EN FIREBASE\n\nFolio: " + folio + "\n\nEl reporte está disponible en el panel. El PDF se descargó en tu dispositivo.");
                 location.reload();
 
             } catch (error) {
                 console.error(error);
-                alert("❌ ERROR DE ENVÍO: No se completó el reporte. Revisa tu conexión e intenta nuevamente sin cerrar la pantalla.");
+                alert("❌ ERROR DE ENVÍO: Revisa tu conexión e intenta nuevamente.");
                 restaurarBoton(btn, originalText, msg);
             }
         }
@@ -1205,12 +1364,10 @@ const originalText = btn.innerHTML;
         async function solicitarSincronizacionPendiente() {
             if (!('serviceWorker' in navigator)) return;
             try {
-                const registration = await navigator.serviceWorker.ready;
-                const worker = navigator.serviceWorker.controller || registration.active;
+                const reg = await navigator.serviceWorker.ready;
+                const worker = navigator.serviceWorker.controller || reg.active;
                 worker?.postMessage({ type: "SYNC_NOW" });
-            } catch (error) {
-                console.error("No se pudo reintentar la sincronización pendiente:", error);
-            }
+            } catch (error) {}
         }
 
         window.addEventListener('online', solicitarSincronizacionPendiente);
@@ -1219,38 +1376,17 @@ const originalText = btn.innerHTML;
             const { id } = event.detail || {};
             if (!id || localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY) !== id) return;
 
-            const pendingDraft = localStorage.getItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY) || "";
-            const currentDraft = localStorage.getItem(STORAGE_KEY) || "";
-            const draftChangedWhilePending = currentDraft !== pendingDraft;
-            if (!draftChangedWhilePending) localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STORAGE_KEY);
             localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
             localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
-            alert(draftChangedWhilePending
-                ? "✅ REPORTE SINCRONIZADO CON FIREBASE\n\nEl reporte está en el panel. También conservé los cambios nuevos del borrador."
-                : "✅ REPORTE SINCRONIZADO CON FIREBASE\n\nYa está disponible en el panel de supervisión.");
+            localStorage.removeItem('apptolva_sig_op');
+            localStorage.removeItem('apptolva_sig_op2');
+            localStorage.removeItem('apptolva_sig_sup');
+            alert("✅ REPORTE SINCRONIZADO CON FIREBASE\n\nYa está disponible en el panel de supervisión.");
             location.reload();
         });
 
-        window.addEventListener('firestore-report-sync-error', (event) => {
-            const { id, message: errorMessage } = event.detail || {};
-            if (!id || localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY) !== id) return;
-
-            const btn = document.getElementById('btnFinal');
-            const msg = document.getElementById('statusMsg');
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Reintentar sincronización';
-                btn.classList.remove('opacity-75');
-            }
-            if (msg) {
-                msg.innerText = 'No se confirmó la sincronización con Firebase. El borrador sigue guardado en este dispositivo.';
-                msg.classList.remove('hidden');
-            }
-            console.error("Error al sincronizar reporte pendiente:", errorMessage);
-            alert("⚠️ Firebase no confirmó el reporte: " + (errorMessage || "Error desconocido") + "\n\nEl borrador se conservó. Revisa la conexión e intenta de nuevo.");
-        });
-
-        // --- IA CON VOZ ---
+        // --- ASISTENTE IA ---
         async function sendAI() {
             const inp = document.getElementById('aiInput');
             const box = document.getElementById('chatBox');
@@ -1263,7 +1399,6 @@ const originalText = btn.innerHTML;
                         ${q}
                     </div>
                 </div>`;
-            
             inp.value = ''; 
             box.scrollTop = box.scrollHeight;
 
@@ -1289,7 +1424,6 @@ const originalText = btn.innerHTML;
                 const txt = d.candidates?.[0]?.content?.parts?.[0]?.text || "Falla en comunicación.";
                 box.innerHTML += `<div class="flex justify-start mb-2"><div class="bg-orange-600 text-white p-3 rounded-lg rounded-tl-none max-w-[95%] text-sm shadow-md leading-relaxed"><i class="fas fa-tools text-orange-200 mr-1"></i> ${formatText(txt)}</div></div>`;
                 speak(txt);
-
             } catch(e) {
                 if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
                 box.innerHTML += `<div class="text-red-500 text-xs text-center my-2">⚠️ Error: ${e.message}</div>`;
@@ -1307,12 +1441,10 @@ const originalText = btn.innerHTML;
                 window.speechSynthesis.speak(utterance);
             }
         }
-        
         function clearChat() { document.getElementById('chatBox').innerHTML = ''; }
-
-
     </script>
 
+    <!-- FIREBASE -->
     <script type="module">
         import { initializeApp } from "./js/firebase-sdk.js";
         import {
@@ -1326,10 +1458,8 @@ const originalText = btn.innerHTML;
         } from "./js/firebase-sdk.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
        
-       
-       // CONFIGURACIÓN OFICIAL
         const firebaseConfig = {
-            apiKey: "__FIREBASE_API_KEY__",
+            apiKey: "AIzaSyB-zX1PF3_Ei567UgYoYozOCttCN75PwO4",
             authDomain: "gen-lang-client-0015118308.firebaseapp.com",
             projectId: "gen-lang-client-0015118308",
             storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
@@ -1339,218 +1469,151 @@ const originalText = btn.innerHTML;
         };
 
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
-            console.warn("Firebase: API key no configurada. Funciones de nube deshabilitadas.");
-            // Sin configuración, los reportes permanecen en el borrador local hasta reintentar.
+            console.warn("Firebase: API key no configurada.");
             window.reservarFolioCloud = null;
         } else {
-
-        const app = initializeApp(firebaseConfig);
-        const db = initializeFirestore(app, {
-            localCache: persistentLocalCache({
-                tabManager: persistentMultipleTabManager()
-            })
-        });
-
-// --- BLOQUE DE SEGURIDAD NUEVO ---
-            
+            const app = initializeApp(firebaseConfig);
+            const db = initializeFirestore(app, {
+                localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+            });
             const auth = getAuth(app);
-
             let signInPromise = null;
 
             function iniciarSesionAnonima() {
                 if (!signInPromise) {
                     signInPromise = signInAnonymously(auth)
                         .then((credential) => credential.user)
-                        .finally(() => {
-                            signInPromise = null;
-                        });
+                        .finally(() => { signInPromise = null; });
                 }
                 return signInPromise;
             }
 
             function esperarAuthListo() {
                 if (auth.currentUser) return Promise.resolve(auth.currentUser);
-
                 return new Promise((resolve, reject) => {
-                    let detenerObservacion = () => {};
+                    let detener = () => {};
                     let timeout;
-                    let inicioSesionEnCurso = false;
-                    let finalizado = false;
-
-                    const terminar = (callback, value) => {
-                        if (finalizado) return;
-                        finalizado = true;
+                    let iniciado = false;
+                    let fin = false;
+                    const terminar = (cb, val) => {
+                        if (fin) return;
+                        fin = true;
                         clearTimeout(timeout);
-                        detenerObservacion();
-                        callback(value);
+                        detener();
+                        cb(val);
                     };
-
                     timeout = setTimeout(() => {
-                        terminar(reject, new Error("Tiempo de espera agotado al conectar con Firebase Authentication."));
+                        terminar(reject, new Error("Tiempo de espera agotado en Firebase Auth."));
                     }, 10000);
-
-                    detenerObservacion = onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            terminar(resolve, user);
-                            return;
-                        }
-                        if (inicioSesionEnCurso) return;
-
-                        inicioSesionEnCurso = true;
-                        iniciarSesionAnonima().then(
-                            (user) => terminar(resolve, user),
-                            (error) => terminar(reject, error)
-                        );
-                    }, (error) => terminar(reject, error));
+                    detener = onAuthStateChanged(auth, (user) => {
+                        if (user) { terminar(resolve, user); return; }
+                        if (iniciado) return;
+                        iniciado = true;
+                        iniciarSesionAnonima().then((u) => terminar(resolve, u), (err) => terminar(reject, err));
+                    }, (err) => terminar(reject, err));
                 });
             }
 
-// EL ESCÁNER PERMANENTE: Revisa si ya hay pase o si necesita uno nuevo
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        // SI TIENE PASE (Usuario detectado)
-        console.log("¡Vigilante autoriza! Gafete activo:", user.uid);
-        
-        // AQUÍ VAN TUS FOLIOS, AHORA SÍ 100% SEGUROS
-        try {
-             obtenerFolioChecklist(); 
-             obtenerSiguienteFolio(); 
-        } catch(e) {
-             console.log("Cargando folios..."); 
-        }
-        
-    } else {
-        // SI NO TIENE PASE, LO CREAMOS INMEDIATAMENTE
-        console.log("Sin gafete. Solicitando uno nuevo...");
-        iniciarSesionAnonima().catch((error) => {
-            console.error("Error crítico al dar gafete:", error);
-        });
-    }
-});
-
-        const pendingReportIdKey = "apptolva_pending_firestore_report_id";
-        const observersByReportId = new Map();
-
-        function observarSincronizacionReporte(id) {
-            if (observersByReportId.has(id)) return;
-
-            const reportRef = doc(db, "bitacora_reports", id);
-            const unsubscribe = onSnapshot(reportRef, { includeMetadataChanges: true }, (snapshot) => {
-                if (!snapshot.exists()) return;
-                if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
-
-                unsubscribe();
-                observersByReportId.delete(id);
-                window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
-            }, (error) => {
-                unsubscribe();
-                observersByReportId.delete(id);
-                window.dispatchEvent(new CustomEvent("firestore-report-sync-error", {
-                    detail: { id, message: error.message }
-                }));
+            onAuthStateChanged(auth, (user) => {
+                if (!user) iniciarSesionAnonima().catch(console.error);
             });
-            observersByReportId.set(id, unsubscribe);
-        }
 
-        const pendingReportId = localStorage.getItem(pendingReportIdKey);
-        if (pendingReportId) {
-            esperarAuthListo().then(() => observarSincronizacionReporte(pendingReportId)).catch((error) => {
-                window.dispatchEvent(new CustomEvent("firestore-report-sync-error", {
-                    detail: { id: pendingReportId, message: error.message }
-                }));
-            });
-        }
+            const pendingReportIdKey = "apptolva_pending_firestore_report_id";
+            const observersByReportId = new Map();
 
-        // FUNCIÓN INTERNA PARA RESERVAR FOLIO AL MOMENTO DE GUARDAR
-        window.reservarFolioCloud = async function() {
-            return await runTransaction(db, async (transaction) => {
-                const referenciaContador = doc(db, "sistema", "contadores");
-                const snapshot = await transaction.get(referenciaContador);
-                let siguiente = 1000;
-                if (snapshot.exists()) {
-                    siguiente = (snapshot.data().folio_actual || 1000) + 1;
-                }
-                transaction.set(referenciaContador, { folio_actual: siguiente }, { merge: true });
-                return siguiente;
-            });
-        }
-
-        // Guarda con un ID estable para que un reintento no cree otro reporte.
-        window.guardarReporteEnFirestore = async function(reportePayload, id) {
-            await esperarAuthListo();
-            if (!id) throw new Error("Falta el identificador estable del reporte.");
-
-            const docRef = doc(db, "bitacora_reports", id);
-            const data = {
-                id: id,
-                folio: reportePayload.folio || "",
-                report_type: reportePayload.reportType || "checklist",
-                unit_id: reportePayload.unitId || "",
-                driver_name: reportePayload.driverName || "",
-                license: reportePayload.license || "",
-                priority: reportePayload.priority || "baja",
-                payload: reportePayload,
-                created_at: new Date().toISOString()
-            };
-            const payloadBytes = new Blob([JSON.stringify(data)]).size;
-            if (payloadBytes > 800000) {
-                throw new Error(`El reporte excede el tamaño permitido (${Math.round(payloadBytes / 1024)} KB). Reduce el tamaño de las firmas.`);
+            function observarSincronizacionReporte(id) {
+                if (observersByReportId.has(id)) return;
+                const reportRef = doc(db, "bitacora_reports", id);
+                const unsubscribe = onSnapshot(reportRef, { includeMetadataChanges: true }, (snapshot) => {
+                    if (!snapshot.exists()) return;
+                    if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
+                    unsubscribe();
+                    observersByReportId.delete(id);
+                    window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
+                }, (error) => {
+                    unsubscribe();
+                    observersByReportId.delete(id);
+                    window.dispatchEvent(new CustomEvent("firestore-report-sync-error", { detail: { id, message: error.message } }));
+                });
+                observersByReportId.set(id, unsubscribe);
             }
 
-            let unsubscribePendingSnapshot = () => {};
-            const writePendingLocally = new Promise((resolve, reject) => {
-                unsubscribePendingSnapshot = onSnapshot(
-                    docRef,
-                    { includeMetadataChanges: true },
-                    (snapshot) => {
-                        if (snapshot.exists() && snapshot.metadata.hasPendingWrites) {
-                            unsubscribePendingSnapshot();
+            const pendingReportId = localStorage.getItem(pendingReportIdKey);
+            if (pendingReportId) {
+                esperarAuthListo().then(() => observarSincronizacionReporte(pendingReportId)).catch(console.error);
+            }
+
+            window.reservarFolioCloud = async function() {
+                return await runTransaction(db, async (transaction) => {
+                    const ref = doc(db, "sistema", "contadores");
+                    const snap = await transaction.get(ref);
+                    let sig = 1000;
+                    if (snap.exists()) sig = (snap.data().folio_actual || 1000) + 1;
+                    transaction.set(ref, { folio_actual: sig }, { merge: true });
+                    return sig;
+                });
+            };
+
+            window.guardarReporteEnFirestore = async function(reportePayload, id) {
+                await esperarAuthListo();
+                if (!id) throw new Error("Falta el identificador del reporte.");
+
+                const docRef = doc(db, "bitacora_reports", id);
+                const data = {
+                    id: id,
+                    folio: reportePayload.folio || "",
+                    report_type: reportePayload.reportType || "checklist",
+                    unit_id: reportePayload.unitId || "",
+                    driver_name: reportePayload.driverName || "",
+                    license: reportePayload.license || "",
+                    priority: reportePayload.priority || "baja",
+                    payload: reportePayload,
+                    created_at: new Date().toISOString()
+                };
+
+                const payloadBytes = new Blob([JSON.stringify(data)]).size;
+                if (payloadBytes > 800000) {
+                    throw new Error(`El reporte excede el tamaño permitido (${Math.round(payloadBytes / 1024)} KB).`);
+                }
+
+                let unsub = () => {};
+                const writePendingLocally = new Promise((resolve, reject) => {
+                    unsub = onSnapshot(docRef, { includeMetadataChanges: true }, (snap) => {
+                        if (snap.exists() && snap.metadata.hasPendingWrites) {
+                            unsub();
                             resolve();
                         }
-                    },
-                    (error) => {
-                        unsubscribePendingSnapshot();
-                        reject(error);
-                    }
-                );
-            });
+                    }, (err) => { unsub(); reject(err); });
+                });
 
-            const writePromise = setDoc(docRef, data);
-            let writeResult;
-            try {
-                writeResult = await Promise.race([
-                    writePromise.then(() => "synced"),
-                    writePendingLocally.then(() => "pending")
-                ]);
-            } finally {
-                unsubscribePendingSnapshot();
-            }
+                const writePromise = setDoc(docRef, data);
+                let writeResult;
+                try {
+                    writeResult = await Promise.race([
+                        writePromise.then(() => "synced"),
+                        writePendingLocally.then(() => "pending")
+                    ]);
+                } finally {
+                    unsub();
+                }
 
-            if (writeResult === "pending") {
-                observarSincronizacionReporte(id);
-                return { id, url: `./viewer.html?id=${id}`, status: "pending" };
-            }
-
-            return { id, url: `./viewer.html?id=${id}`, status: "synced" };
-        };
-        
-        console.log("Sistema Nube: Listo para asignar folios bajo demanda.");
-        } // end else (Firebase configurado)
+                if (writeResult === "pending") {
+                    observarSincronizacionReporte(id);
+                    return { id, url: `./viewer.html?id=${id}`, status: "pending" };
+                }
+                return { id, url: `./viewer.html?id=${id}`, status: "synced" };
+            };
+        }
     </script>
-    <!-- ============================================================ -->
-    <!-- CATÁLOGO OFICIAL Y AUTOCOMPLETADO MAESTRO DE OPERADORES      -->
-    <!-- ============================================================ -->
+
+    <!-- AUTOCOMPLETADO MAESTRO DE OPERADORES -->
     <script src="./js/catalogoOperadores.js"></script>
     <script>
     (function() {
         function iniciarCatalogoOperadores() {
             const catalogo = window.CATALOGO_OPERADORES;
-            if (!catalogo) {
-                console.warn("Catálogo de operadores aún no disponible en window.");
-                return;
-            }
+            if (!catalogo) return;
 
-            // 1. Generar la lista desplegable con los 65 operadores oficiales
             let dl = document.getElementById('listaOperadoresBachoco');
             if (!dl) {
                 dl = document.createElement('datalist');
@@ -1563,14 +1626,10 @@ onAuthStateChanged(auth, (user) => {
                 document.body.appendChild(dl);
             }
 
-            // 2. Localizar los campos de Checklist y Bitácora
-            const inputNum = document.getElementById('revEmpleado');        // Checklist: No. Empleado
-            const inputNombre = document.getElementById('revOperador');      // Checklist: Nombre Operador
-            const inputBitacora = document.getElementById('nombreOpTexto');  // Bitácora: Firma Operador
+            const inputNum = document.getElementById('revEmpleado');
+            const inputNombre = document.getElementById('revOperador');
 
-            // Conectar el menú desplegable a los campos de nombre
             if (inputNombre) inputNombre.setAttribute('list', 'listaOperadoresBachoco');
-            if (inputBitacora) inputBitacora.setAttribute('list', 'listaOperadoresBachoco');
 
             let sincronizando = false;
             let numeroAplicado = "";
@@ -1578,23 +1637,14 @@ onAuthStateChanged(auth, (user) => {
             function notificarCambio(input) {
                 if (!input) return;
                 sincronizando = true;
-                try {
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                } finally {
-                    sincronizando = false;
-                }
+                try { input.dispatchEvent(new Event('input', { bubbles: true })); }
+                finally { sincronizando = false; }
             }
 
             function normalizarTexto(texto) {
-                return String(texto || "")
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .trim()
-                    .replace(/\s+/g, " ")
-                    .toUpperCase();
+                return String(texto || "").normalize('NFD').replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
             }
 
-            // 3. Sincronización al escribir o detectar el Número de Empleado
             function aplicarOperadorPorNumero(numStr) {
                 if (sincronizando) return false;
                 const num = (numStr || "").trim();
@@ -1604,106 +1654,58 @@ onAuthStateChanged(auth, (user) => {
                     if (inputNombre) {
                         inputNombre.value = op.nombre;
                         inputNombre.readOnly = true;
-                        inputNombre.style.backgroundColor = '#f0fdf4'; // Verde tenue de verificación
+                        inputNombre.style.backgroundColor = '#f0fdf4';
                         inputNombre.style.borderColor = '#86efac';
                         notificarCambio(inputNombre);
                     }
-                    if (inputBitacora) {
-                        inputBitacora.value = op.nombre;
-                        inputBitacora.readOnly = true;
-                        inputBitacora.style.backgroundColor = '#f0fdf4';
-                        inputBitacora.style.borderColor = '#86efac';
-                        notificarCambio(inputBitacora);
-                    }
+                    actualizarLabelOp();
                     return true;
                 } else {
-                    const operadorAnterior = catalogo[numeroAplicado];
+                    const opAnt = catalogo[numeroAplicado];
                     numeroAplicado = "";
                     if (inputNombre && inputNombre.readOnly) {
                         inputNombre.readOnly = false;
                         inputNombre.style.backgroundColor = '';
                         inputNombre.style.borderColor = '';
                     }
-                    if (inputBitacora && inputBitacora.readOnly) {
-                        inputBitacora.readOnly = false;
-                        inputBitacora.style.backgroundColor = '';
-                        inputBitacora.style.borderColor = '';
+                    if (opAnt && inputNombre && inputNombre.value === opAnt.nombre) {
+                        inputNombre.value = "";
+                        notificarCambio(inputNombre);
                     }
-                    if (operadorAnterior) {
-                        if (inputNombre && inputNombre.value === operadorAnterior.nombre) {
-                            inputNombre.value = "";
-                            notificarCambio(inputNombre);
-                        }
-                        if (inputBitacora && inputBitacora.value === operadorAnterior.nombre) {
-                            inputBitacora.value = "";
-                            notificarCambio(inputBitacora);
-                        }
-                    }
+                    actualizarLabelOp();
                     return false;
                 }
             }
 
-            // 4. Sincronización si el operador escribe su nombre por costumbre
             function resolverDesdeTexto(texto) {
                 if (sincronizando || !texto) return;
                 const str = texto.trim();
-
-                // Caso A: Selecciona del datalist ("221417 - AMBROSIO SOLIS...")
                 const match = str.match(/^(\d+)\s*[-–]\s*(.+)$/);
                 if (match && catalogo[match[1]]) {
-                    if (inputNum) {
-                        inputNum.value = match[1];
-                        notificarCambio(inputNum);
-                    }
+                    if (inputNum) { inputNum.value = match[1]; notificarCambio(inputNum); }
                     aplicarOperadorPorNumero(match[1]);
                     return;
                 }
-
-                // Caso B: Tecleó el nombre oficial completo
                 const upper = normalizarTexto(str);
                 for (const [num, op] of Object.entries(catalogo)) {
                     if (normalizarTexto(op.nombre) === upper) {
-                        if (inputNum) {
-                            inputNum.value = num;
-                            notificarCambio(inputNum);
-                        }
+                        if (inputNum) { inputNum.value = num; notificarCambio(inputNum); }
                         aplicarOperadorPorNumero(num);
                         return;
                     }
                 }
             }
 
-            // 5. Escuchadores de eventos en tiempo real
             if (inputNum) {
-                inputNum.addEventListener('input', (e) => {
-                    if (!sincronizando) aplicarOperadorPorNumero(e.target.value);
-                });
-                inputNum.addEventListener('change', (e) => {
-                    if (!sincronizando) aplicarOperadorPorNumero(e.target.value);
-                });
+                inputNum.addEventListener('input', (e) => { if (!sincronizando) aplicarOperadorPorNumero(e.target.value); });
+                inputNum.addEventListener('change', (e) => { if (!sincronizando) aplicarOperadorPorNumero(e.target.value); });
                 if (inputNum.value) aplicarOperadorPorNumero(inputNum.value);
             }
 
             if (inputNombre) {
-                inputNombre.addEventListener('change', (e) => {
-                    if (!sincronizando && !inputNombre.readOnly) resolverDesdeTexto(e.target.value);
-                });
-                inputNombre.addEventListener('input', (e) => {
-                    if (!sincronizando && !inputNombre.readOnly) resolverDesdeTexto(e.target.value);
-                });
+                inputNombre.addEventListener('change', (e) => { if (!sincronizando && !inputNombre.readOnly) resolverDesdeTexto(e.target.value); });
+                inputNombre.addEventListener('input', (e) => { if (!sincronizando && !inputNombre.readOnly) resolverDesdeTexto(e.target.value); });
                 if (!inputNum || !inputNum.value) resolverDesdeTexto(inputNombre.value);
-            }
-
-            if (inputBitacora) {
-                inputBitacora.addEventListener('change', (e) => {
-                    if (!sincronizando && !inputBitacora.readOnly) resolverDesdeTexto(e.target.value);
-                });
-                inputBitacora.addEventListener('input', (e) => {
-                    if (!sincronizando && !inputBitacora.readOnly) resolverDesdeTexto(e.target.value);
-                });
-                if ((!inputNum || !inputNum.value) && (!inputNombre || !inputNombre.value)) {
-                    resolverDesdeTexto(inputBitacora.value);
-                }
             }
         }
 
@@ -1714,6 +1716,5 @@ onAuthStateChanged(auth, (user) => {
         }
     })();
     </script>
-
 </body>
 </html>
