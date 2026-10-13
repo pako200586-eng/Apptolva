@@ -31,7 +31,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         header h1 { font-size: 15px; font-weight: 800; letter-spacing: 0.3px; }
-        header p { font-size: 10px; opacity: 0.85; margin-top: 2px; }
+        header p { font-size: 10px; opacity: 0.9; margin-top: 2px; }
         #status-box {
             margin: 24px 16px;
             background: #fff;
@@ -91,12 +91,12 @@
     <header>
         <div>
             <h1 id="viewer-heading">📋 AppTolva</h1>
-            <p>GRUPO BACHOCO · Exhibición Electrónica · Av. Tecnológico 401, Celaya, Gto.</p>
+            <p>GRUPO BACHOCO, S.A. DE C.V. · Exhibición Electrónica Oficial · Av. Tecnológico 401, Celaya, Gto.</p>
         </div>
     </header>
 
     <div id="viewer-info">
-        <strong>Vista de solo lectura</strong> — Generada desde el dispositivo del operador.
+        <strong>Vista Oficial de Exhibición Digital</strong> — Cumplimiento NOM-087-SCT-2-2017.
     </div>
 
     <div id="status-box">
@@ -127,9 +127,8 @@
             document.getElementById('status-msg').textContent = msg;
         }
 
-        // Determina qué documento corresponde según el tipo enviado por el operador.
         function detectarTipo(data) {
-            const t = String(data.reportType || data.tipo || '').toLowerCase();
+            const t = String(data.reportType || data.tipo || data.report_type || '').toLowerCase();
             if (/(check|revis|inspec)/.test(t)) return 'checklist';
             if (/(bitac|hora|nom)/.test(t)) return 'bitacora';
             if (Array.isArray(data.checklistData) || Array.isArray(data.checklist)) return 'checklist';
@@ -156,13 +155,24 @@
             if (/PAUSA|BREAK|COMIDA|DESCANSO CORTO/.test(normalized)) return 2;
             if (/DESCANSO|REST/.test(normalized)) return 1;
             if (/MANEJ|CONDUC|EN RUTA|DRIVING/.test(normalized)) return 3;
-            if (/SERVICIO|AUXILIAR|CARGA|DESCARGA|SERVICE/.test(normalized)) return 4;
+            if (/AUXILIAR|SERVICIO|CARGA|DESCARGA|SERVICE/.test(normalized)) return 4;
             if (/EXCEPCION|EMERGENCIA|EXCEPTION/.test(normalized)) return 5;
             return null;
         }
 
+        // Función auxiliar para añadir firmas asegurando compatibilidad JPEG/PNG
+        function insertarFirmaSegura(doc, imgData, x, y, w, h) {
+            if (!imgData || typeof imgData !== 'string' || !imgData.startsWith('data:image/')) return;
+            try {
+                const formato = imgData.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
+                doc.addImage(imgData, formato, x, y, w, h);
+            } catch (e) {
+                console.warn("No se pudo estampar firma en PDF:", e);
+            }
+        }
+
         // ===================================================================
-        //  BITÁCORA DE HORAS DE SERVICIO (NOM-087) — idéntica a la del operador
+        //  BITÁCORA DE HORAS DE SERVICIO (NOM-087)
         // ===================================================================
         function generarPDFBitacora(data) {
             if (!window.jspdf) { showError("Librería PDF no disponible."); return null; }
@@ -176,7 +186,7 @@
             const shiftStart = data.shiftStartHour !== undefined ? data.shiftStartHour : SHIFT_START_HOUR;
             const fecha = data.fecha || new Date().toLocaleDateString();
 
-            // --- LÓGICA DE CORTE 48 HORAS ---
+            // Corte de 24 / 48 horas
             const startTrip = logs.length > 0 ? logs[0].startTime : new Date().getTime();
             const limit24Date = new Date(startTrip);
             limit24Date.setHours(shiftStart, 0, 0, 0);
@@ -188,61 +198,73 @@
             const logsD1 = logs.filter(l => l.startTime < limit24);
             const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
 
-            // --- PÁGINA 1: DATOS Y GRÁFICAS ---
+            // Encabezado
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
             doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica", "bold");
             doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 10, { align: "center" });
             doc.setFontSize(7); doc.setFont("helvetica", "normal");
-            doc.text("NOM-087-SCT-2-2017 | Norma Oficial Mexicana de Tiempos de Conducción y Descanso", 105, 16, { align: "center" });
-            doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(0);
+            doc.text("NOM-087-SCT-2-2017 | Tiempos de Conducción y Pausas en Autotransporte Federal", 105, 16, { align: "center" });
+            doc.setFontSize(8); doc.setTextColor(0);
 
             let y = 26;
 
             const row = (lbl, val, x, w) => {
-                doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 7, 'FD');
-                doc.setFont("helvetica", "bold"); doc.text(lbl, x + 2, y + 4.5);
-                doc.setFont("helvetica", "normal"); doc.text(val || "", x + w - 2, y + 4.5, { align: "right" });
+                doc.setDrawColor(200); doc.setFillColor(245); doc.rect(x, y, w, 6.5, 'FD');
+                doc.setFont("helvetica", "bold"); doc.text(lbl, x + 2, y + 4.2);
+                doc.setFont("helvetica", "normal"); doc.text(String(val || ""), x + w - 2, y + 4.2, { align: "right" });
             };
 
             doc.setFontSize(7);
-            doc.setFont("helvetica", "bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A.B. DE C.V. — RFC: GBA940707AH4", 14, y);
+            // Razón social corregida
+            doc.setFont("helvetica", "bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A. DE C.V. — RFC: GBA940707AH4", 14, y);
             y += 4;
-            doc.setFont("helvetica", "normal"); doc.text("Domicilio: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
+            doc.setFont("helvetica", "normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
             y += 5;
+            
             row("FOLIO:", folio, 14, 35);
-            row("FECHA:", fecha, 51, 35);
+            row("FECHA EMISIÓN:", fecha, 51, 35);
             row("PERMISO SCT:", data.permisoSCT || "", 88, 45);
             row("TIPO PERMISO:", data.tipoPermiso || "", 135, 60);
-            y += 9;
+            y += 8;
             row("UNIDAD:", data.unitId || "", 14, 32);
             row("MARCA/MOD:", data.brandModel || "", 48, 38);
             row("PLACAS:", data.plates || "", 88, 32);
             row("CONFIG:", data.mode || "", 122, 25);
             row("VIN:", data.vin || "", 149, 46);
-            y += 9;
-            row("OPERADOR:", data.driverName || "", 14, 60);
-            row("LICENCIA:", data.license || "", 76, 40);
-            row("VIG. LIC:", data.licenseExp || "", 118, 35);
-            row("TIPO CARGA:", data.tipoCarga || "", 155, 40);
-            y += 9;
+            y += 8;
+            row("OPERADOR:", (data.driverName || "") + (data.employeeNumber ? ` (No. ${data.employeeNumber})` : ""), 14, 181);
+            y += 8;
+            row("LICENCIA:", data.license || "", 14, 60);
+            row("VIG. LICENCIA:", data.licenseExp || "", 76, 60);
+            row("TIPO DE CARGA:", data.tipoCarga || "", 138, 57);
+            y += 8;
             row("ORIGEN:", data.origin || "", 14, 60);
             row("DESTINO:", data.destination || "", 76, 60);
             row("KM INICIO:", data.kmInicio || "", 138, 28);
             row("KM FIN:", data.kmFin || "", 168, 27);
-            y += 9;
+            y += 8;
+
+            // PUNTOS INTERMEDIOS Y HORAS DE SALIDA Y LLEGADA
+            const puntos = data.puntosIntermedios || data.puntos_intermedios || "Directo por carretera federal";
+            row("PUNTOS INTERMEDIOS / RUTA:", puntos, 14, 181);
+            y += 8;
+            row("HORA SALIDA:", data.horaSalida || data.hora_salida || "No registrada", 14, 90);
+            row("HORA LLEGADA (ESTIMADA/REAL):", data.horaLlegada || data.hora_llegada || "En ruta", 106, 89);
+            y += 8;
+
             const coCond = data.coConductor;
             if (coCond && String(coCond).trim()) {
                 row("CO-CONDUCTOR:", coCond, 14, 92);
                 row("LIC. CO-COND:", data.coLicencia || "", 108, 87);
-                y += 9;
+                y += 8;
             }
-            y += 3;
+            y += 2;
 
             const drawLegalGrid = (startY, label, dayLogs, isDay2) => {
                 doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
                 doc.setTextColor(0); doc.setFont("helvetica", "bold"); doc.text(label, 105, startY + 3.5, { align: "center" });
 
-                const gx = 20; const gy = startY + 8; const gw = 175; const gh = 30; const rowH = gh / 5;
+                const gx = 20; const gy = startY + 8; const gw = 175; const gh = 28; const rowH = gh / 5;
                 const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
 
                 doc.setFontSize(5); doc.setDrawColor(150); doc.setLineWidth(0.1);
@@ -281,13 +303,11 @@
                         let x2 = gx + (gw / 24) * h2;
 
                         const cruzaLimiteTurno = (de > ds) && (x2 < x1);
-
                         let yLine = gy + (rIdx * rowH) + (rowH / 2);
 
                         if (cruzaLimiteTurno) {
                             if (!isDay2) {
-                                const xShiftEnd = gx + gw;
-                                doc.line(x1, yLine, xShiftEnd, yLine);
+                                doc.line(x1, yLine, gx + gw, yLine);
                             } else {
                                 doc.line(gx, yLine, x2, yLine);
                             }
@@ -295,17 +315,19 @@
                             doc.line(x1, yLine, x2, yLine);
                         }
 
+                        // Conexión vertical ortogonal con estado anterior
                         if (i > 0) {
                             let prev = dayLogs[i - 1];
                             const prevStatus = getActivityStatus(prev);
                             const prevR = mapSt[prevStatus];
-                            if (prevR === undefined) return;
-                            let prevY = gy + (prevR * rowH) + (rowH / 2);
-                            let prevEnd = new Date(prev.endTime);
-                            let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStart + 24) % 24;
-                            let xPrevEnd = gx + (gw / 24) * hPrevEnd;
-                            if (Math.abs(x1 - xPrevEnd) < 2) {
-                                doc.line(x1, prevY, x1, yLine);
+                            if (prevR !== undefined) {
+                                let prevY = gy + (prevR * rowH) + (rowH / 2);
+                                let prevEnd = new Date(prev.endTime);
+                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStart + 24) % 24;
+                                let xPrevEnd = gx + (gw / 24) * hPrevEnd;
+                                if (Math.abs(x1 - xPrevEnd) < 2) {
+                                    doc.line(x1, prevY, x1, yLine);
+                                }
                             }
                         }
                     });
@@ -313,13 +335,13 @@
             };
 
             drawLegalGrid(y, "DÍA 1 (PRIMERAS 24 HORAS)", logsD1, false);
-            y += 45;
-            drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE)", logsD2, true);
-            y += 45;
+            y += 42;
+            drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE / 48 HORAS)", logsD2, true);
+            y += 42;
 
-            // --- TABLA DE DESGLOSE ---
+            // Tabla de Desglose
             doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica", "bold");
-            doc.text("DESGLOSE DE ACTIVIDADES", 14, y);
+            doc.text("DESGLOSE CRONOLÓGICO DE ACTIVIDADES", 14, y);
             y += 4;
 
             doc.setFillColor(220); doc.rect(14, y, 181, 5, 'F');
@@ -343,7 +365,8 @@
                     doc.setFont("helvetica", "normal");
                 }
 
-                const stName = ["", "DESCANSO", "PAUSA", "MANEJANDO", "SERVICIO", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
+                // Homologado: AUXILIAR en lugar de SERVICIO
+                const stName = ["", "DESCANSO", "PAUSA", "CONDUCIENDO", "AUXILIAR", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
                 const dur = Math.floor((e - s) / 60000);
@@ -361,69 +384,62 @@
                 y += 4;
             });
 
-            // --- FIRMAS ---
-            if (y > 230) { doc.addPage(); y = 30; }
+            // Firmas con detección de formato
+            if (y > 220) { doc.addPage(); y = 30; }
             y += 10;
 
             doc.setDrawColor(0);
             doc.line(30, y + 20, 80, y + 20);
-            if (data.signatureOp) {
-                try { doc.addImage(data.signatureOp, 'PNG', 35, y, 40, 18); } catch (e) { /* skip if invalid */ }
-            }
+            insertarFirmaSegura(doc, data.signatureOp, 35, y, 40, 18);
             doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y + 23, { align: "center" });
             doc.setFontSize(5); doc.text(data.driverName || "", 55, y + 26, { align: "center" });
-            doc.text("Lic. Fed.: " + (data.license || ""), 55, y + 29, { align: "center" });
+            doc.text("Lic. Federal: " + (data.license || ""), 55, y + 29, { align: "center" });
 
             doc.line(120, y + 20, 170, y + 20);
-            if (data.signatureSup) {
-                try { doc.addImage(data.signatureSup, 'PNG', 125, y, 40, 18); } catch (e) { /* skip if invalid */ }
-            }
+            insertarFirmaSegura(doc, data.signatureSup, 125, y, 40, 18);
             doc.setFontSize(7); doc.text("FIRMA SUPERVISOR / DESPACHADOR", 145, y + 23, { align: "center" });
 
-            // Declaratoria bajo protesta de decir verdad
-            y += 34;
+            // Declaratoria bajo protesta
+            y += 33;
             doc.setFontSize(5); doc.setTextColor(0);
             doc.setFont("helvetica", "bold");
             doc.text("DECLARATORIA BAJO PROTESTA DE DECIR VERDAD", 105, y, { align: "center" });
             doc.setFont("helvetica", "normal");
-            y += 4;
+            y += 3.5;
             const declaratoria = doc.splitTextToSize(
-                "El conductor que suscribe la presente bitácora DECLARA BAJO PROTESTA DE DECIR VERDAD que los datos, tiempos de conducción, " +
-                "descansos y demás información aquí contenida son verídicos y reflejan fielmente sus actividades durante el periodo registrado, " +
-                "en cumplimiento con la NOM-087-SCT-2-2017 y demás disposiciones aplicables en materia de autotransporte federal. " +
-                "Esta bitácora deberá conservarse por un periodo mínimo de 30 días naturales conforme a lo establecido por la norma.", 180);
+                "El conductor y el permisionario que suscriben la presente bitácora DECLARAN BAJO PROTESTA DE DECIR VERDAD que los datos, tiempos de conducción, " +
+                "pausas, descansos, itinerario y registros son fidedignos y reflejan sus actividades reales durante el periodo comprendido, en estricto " +
+                "cumplimiento con la Norma Oficial Mexicana NOM-087-SCT-2-2017 y las leyes federales de autotransporte. " +
+                "Esta bitácora se conservará por un periodo mínimo legal de 30 días naturales.", 180);
             doc.text(declaratoria, 105, y, { align: "center" });
-            y += declaratoria.length * 3 + 3;
+            y += declaratoria.length * 3 + 2;
 
             doc.setFontSize(4); doc.setTextColor(120);
-            doc.text("Documento generado digitalmente conforme a NOM-087-SCT-2-2017 — Válido como bitácora de horas de servicio.", 105, y, { align: "center" });
-            doc.text("GRUPO BACHOCO, S.A.B. DE C.V. — Permisionario de Autotransporte Federal de Carga — Folio: " + folio, 105, y + 3, { align: "center" });
+            doc.text("GRUPO BACHOCO, S.A. DE C.V. — Permisionario de Autotransporte Federal — Folio: " + folio + " — " + new Date().toISOString(), 105, y + 2, { align: "center" });
 
-            // --- PÁGINA 2: REGLAMENTO ---
+            // Página 2: Resumen legal NOM-087
             doc.addPage();
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 15, 'F');
             doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-            doc.text("RESUMEN DE OBLIGACIONES — NOM-087-SCT-2-2017", 105, 10, { align: "center" });
+            doc.text("RESUMEN DE OBLIGACIONES LEGALES — NOM-087-SCT-2-2017", 105, 10, { align: "center" });
 
             doc.setTextColor(0); doc.setFontSize(7);
             let ry = 22;
 
             doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-            doc.text("TIEMPOS DE CONDUCCIÓN Y DESCANSO OBLIGATORIOS", 14, ry);
+            doc.text("TIEMPOS MÁXIMOS DE CONDUCCIÓN Y PAUSAS OBLIGATORIAS", 14, ry);
             ry += 5;
 
             doc.setFontSize(7); doc.setFont("helvetica", "normal");
             const rules = [
-                "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: El conductor no podrá conducir más de 5 horas continuas sin realizar una pausa obligatoria de al menos 30 minutos.",
-                "4.2 PAUSAS NO ACUMULABLES: Los periodos de pausa no son acumulables. No se puede fraccionar la pausa de 30 minutos en periodos menores.",
-                "4.3 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo total de conducción en un periodo de 24 horas no podrá exceder las 14 horas.",
-                "4.4 DESCANSO OBLIGATORIO: Después de un periodo máximo de 14 horas de conducción, el conductor deberá tomar un descanso mínimo de 8 horas continuas antes de reanudar la conducción.",
-                "4.5 PERIODO DE 24 HORAS: El periodo de 24 horas se contará a partir del momento en que el conductor inicie la conducción después de un descanso de al menos 8 horas.",
-                "4.6 CO-CONDUCTOR (RELEVO): En caso de contar con co-conductor, cada conductor deberá llevar su propia bitácora. El tiempo como copiloto no cuenta como tiempo de descanso.",
-                "4.7 EXCEPCIONES: El tiempo de conducción podrá prolongarse únicamente por avería mecánica, condiciones climatológicas adversas, perturbación del tránsito u otras causas de fuerza mayor, debiendo anotarse como excepción justificada con observación detallada.",
-                "4.8 BITÁCORA OBLIGATORIA: Todo conductor de autotransporte federal deberá portar la bitácora de horas de servicio durante el viaje. La bitácora deberá estar disponible para inspección por parte de la autoridad en todo momento.",
-                "4.9 CONSERVACIÓN: La empresa y el conductor deberán conservar las bitácoras por un periodo mínimo de 30 días naturales contados a partir de la fecha de registro.",
-                "4.10 RESPONSABILIDAD: El permisionario es corresponsable del cumplimiento de los tiempos de conducción y descanso de sus operadores."
+                "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: Máximo 5 horas continuas de conducción, tras las cuales se debe tomar una pausa de al menos 30 minutos ininterrumpidos.",
+                "4.2 PAUSAS NO FRACCIONABLES: Las pausas obligatorias de 30 minutos no se pueden fraccionar ni acumular.",
+                "4.3 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo total no excederá de 14 horas en un periodo de 24 horas.",
+                "4.4 DESCANSO OBLIGATORIO: Al completar la jornada de 14 horas o al término de la jornada, descanso mínimo de 8 horas continuas.",
+                "4.5 ITINERARIO Y PUNTOS INTERMEDIOS: El conductor debe asentar la ruta, escalas intermedias y horas de salida y llegada para validación de la autoridad federal.",
+                "4.6 CO-CONDUCTOR: En relevo, cada conductor llevará su propia bitácora individual. El tiempo de copiloto no sustituye el descanso de 8 horas.",
+                "4.7 EXCEPCIONES: La conducción solo se prolongará por fuerza mayor justificada y anotada textualmente en la bitácora.",
+                "4.8 PORTABILIDAD DE LA BITÁCORA: Deberá portarse en la unidad física o digitalmente para inspección de la Guardia Nacional / SCT en todo momento."
             ];
             rules.forEach(r => {
                 const split = doc.splitTextToSize(r, 180);
@@ -431,33 +447,12 @@
                 ry += (split.length * 3.5) + 3;
             });
 
-            ry += 3;
-            doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-            doc.text("FUNDAMENTO LEGAL Y SANCIONES", 14, ry);
-            ry += 5;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(6);
-            const sanciones = [
-                "• Ley de Caminos, Puentes y Autotransporte Federal — Art. 36, 74 BIS.",
-                "• Reglamento de Autotransporte Federal y Servicios Auxiliares — Art. 46.",
-                "• NOM-087-SCT-2-2017: Tiempos de conducción y descanso para conductores de autotransporte federal.",
-                "• El incumplimiento de esta norma es motivo de sanción administrativa, retención de unidad y responsabilidad civil/penal en caso de siniestro.",
-                "• La falsificación o alteración de datos en la bitácora constituye una infracción grave conforme a la legislación vigente."
-            ];
-            sanciones.forEach(s => {
-                const split = doc.splitTextToSize(s, 180);
-                doc.text(split, 14, ry);
-                ry += (split.length * 3) + 2;
-            });
-
-            doc.setFontSize(4); doc.setTextColor(120);
-            doc.text("Este documento es un resumen informativo. Consulte la NOM-087-SCT-2-2017 completa publicada en el DOF para el texto íntegro de la norma.", 105, 280, { align: "center" });
-
             doc._docTipo = 'bitacora';
             return doc;
         }
 
         // ===================================================================
-        //  CHECK LIST DE REVISIÓN DIARIA — idéntico al de la app del operador
+        //  CHECK LIST DE REVISIÓN DIARIA (Se mantiene íntegro)
         // ===================================================================
         function generarPDFChecklist(data) {
             if (!window.jspdf) { showError("Librería PDF no disponible."); return null; }
@@ -483,7 +478,6 @@
             const firmaOp2Img = data.firmaOp2 || '';
             const firmaSupImg = data.firmaSup || '';
 
-            // Secciones autocontenidas enviadas por el operador.
             const secciones = Array.isArray(data.checklistData) ? data.checklistData : [];
 
             const pageW = 210;
@@ -498,7 +492,6 @@
 
                 let y = 13;
 
-                // --- ENCABEZADO ---
                 doc.setFillColor(234, 88, 12);
                 doc.rect(margin, y, contentW, 11, 'F');
                 doc.setTextColor(255, 255, 255);
@@ -518,7 +511,6 @@
 
                 y += 5;
 
-                // --- DATOS DE UNIDAD ---
                 doc.setFillColor(248, 250, 252);
                 doc.setDrawColor(226, 232, 240);
                 doc.setLineWidth(0.3);
@@ -538,7 +530,6 @@
 
                 y += 26;
 
-                // --- TÍTULO DE SECCIÓN ---
                 doc.setFillColor(51, 65, 85);
                 doc.rect(margin, y, contentW, 8, 'F');
                 doc.setTextColor(255, 255, 255);
@@ -548,7 +539,6 @@
 
                 y += 12;
 
-                // --- ÍTEMS DEL CHECKLIST (distribución en 3 columnas) ---
                 const COL_HEIGHT = 170;
                 const CAT_BOX_H = 5.5;
                 const CAT_INCREMENT = 6.5;
@@ -636,7 +626,6 @@
                     y += 2;
                 });
 
-                // --- OBSERVACIONES ---
                 const obsTexto = sec.observacion || 'Sin observaciones';
                 const obsLines = doc.splitTextToSize(obsTexto, contentW - 10);
                 const obsH = Math.min(MAX_OBS_H, Math.max(MIN_OBS_H, OBS_TOP_PADDING + obsLines.length * OBS_LINE_HEIGHT));
@@ -651,7 +640,6 @@
                 doc.setFont('helvetica', 'normal');
                 doc.text(obsLines, margin + 3, OBS_Y + 10);
 
-                // --- FIRMAS ---
                 {
                     const sigW = (contentW - 8) / 3;
                     const sigBoxes = [
@@ -660,10 +648,7 @@
                         { img: firmaSupImg, nombre: nombreSup || 'N/A', cargo: 'FIRMA SUPERVISOR', x: margin + (sigW + 4) * 2 }
                     ];
                     sigBoxes.forEach(sig => {
-                        const hasPngImage = typeof sig.img === 'string' && sig.img.startsWith('data:image/png');
-                        if (hasPngImage) {
-                            try { doc.addImage(sig.img, 'PNG', sig.x, SIG_Y, sigW, 18, undefined, 'FAST'); } catch (e) { /* skip if invalid */ }
-                        }
+                        insertarFirmaSegura(doc, sig.img, sig.x, SIG_Y, sigW, 18);
                         doc.setDrawColor(100, 100, 100);
                         doc.setLineWidth(0.5);
                         doc.line(sig.x, SIG_Y + 20, sig.x + sigW, SIG_Y + 20);
@@ -679,7 +664,6 @@
                 }
             });
 
-            // Si por alguna razón no llegó la estructura, dejamos una hoja informativa.
             if (secciones.length === 0) {
                 doc.setFontSize(12); doc.setTextColor(0);
                 doc.text('Checklist sin detalle disponible para el folio ' + folio + '.', 14, 20);
@@ -699,7 +683,7 @@
             if (!pdfDoc) return;
             const folio = pdfDoc._bitacoraFolio || "PDF";
             const prefijo = pdfDoc._docTipo === 'checklist' ? 'Checklist' : 'Bitacora';
-            pdfDoc.save(`${prefijo}_${folio}.pdf`);
+            pdfDoc.save(`${prefijo}_${folio.replace(/[\\/]/g, '-')}.pdf`);
         }
 
         const firebaseConfig = {
@@ -736,7 +720,11 @@
                 folio: stored.folio || payload.folio,
                 reportType: stored.report_type || payload.reportType || payload.tipo,
                 unitId: stored.unit_id || payload.unitId,
-                driverName: stored.driver_name || payload.driverName
+                driverName: stored.driver_name || payload.driverName,
+                employeeNumber: stored.employee_number || payload.employeeNumber,
+                puntosIntermedios: stored.puntos_intermedios || payload.puntosIntermedios || payload.puntos_intermedios || "",
+                horaSalida: stored.hora_salida || payload.horaSalida || payload.hora_salida || "",
+                horaLlegada: stored.hora_llegada || payload.horaLlegada || payload.hora_llegada || ""
             };
         }
 
@@ -750,13 +738,22 @@
         }
 
         async function obtenerDatosReporte(id) {
+            // Intento 1: Almacenamiento local (si el visor se abre en el mismo teléfono offline)
+            try {
+                const localKey = Object.keys(localStorage).find(k => k.includes(id));
+                if (localKey) {
+                    const localData = JSON.parse(localStorage.getItem(localKey));
+                    if (localData) return localData.payload || localData;
+                }
+            } catch (e) {}
+
             let errorFirestore = null;
             try {
                 const reporte = await obtenerReporteFirestore(id);
                 if (reporte) return reporte;
             } catch (error) {
                 errorFirestore = error;
-                console.warn("No se pudo cargar el reporte desde Firestore; se intentará el respaldo de Netlify.", error);
+                console.warn("No se pudo cargar desde Firestore, intentando Netlify:", error);
             }
 
             try {
@@ -764,14 +761,11 @@
                 if (reporte) return reporte;
             } catch (errorNetlify) {
                 if (errorFirestore) {
-                    throw new Error(`Firestore: ${errorFirestore.message} Netlify: ${errorNetlify.message}`);
+                    throw new Error(`Firestore: ${errorFirestore.message} | Netlify: ${errorNetlify.message}`);
                 }
                 throw errorNetlify;
             }
 
-            if (errorFirestore) {
-                throw new Error(`No se encontró el reporte en Netlify y Firestore no está disponible: ${errorFirestore.message}`);
-            }
             return null;
         }
 
@@ -780,28 +774,27 @@
             const id = params.get('id');
 
             if (!id) {
-                showError("No se proporcionó un ID de reporte. Escanea el código QR correctamente.");
+                showError("No se proporcionó un ID de reporte. Escanea el código QR de la unidad.");
                 return;
             }
 
             try {
                 const data = await obtenerDatosReporte(id);
                 if (!data) {
-                    showError("El reporte no fue encontrado en Firestore ni en el respaldo histórico de Netlify.");
+                    showError("El reporte no fue encontrado en el servidor. Verifica que haya sido sincronizado.");
                     return;
                 }
                 const tipo = detectarTipo(data);
 
-                // Ajustar encabezado y título según el tipo de documento.
                 if (tipo === 'checklist') {
                     document.title = 'Check List de Revisión Diaria | AppTolva';
                     document.getElementById('viewer-heading').textContent = '📋 Check List de Revisión Diaria';
                 } else {
                     document.title = 'Bitácora NOM-087 | AppTolva';
-                    document.getElementById('viewer-heading').textContent = '📋 Bitácora NOM-087';
+                    document.getElementById('viewer-heading').textContent = '📋 Bitácora Oficial NOM-087';
                 }
 
-                setStatus("Generando PDF…", "Construyendo el documento, un momento…", false);
+                setStatus("Generando documento oficial…", "Construyendo el PDF para exhibición, un momento…", false);
 
                 await new Promise(r => setTimeout(r, 100));
 
@@ -818,9 +811,7 @@
                 frame.src = pdfDataUri;
                 frame.style.display = 'block';
 
-                frame.onerror = () => {
-                    showDownloadFallback();
-                };
+                frame.onerror = () => showDownloadFallback();
                 setTimeout(() => {
                     try {
                         if (frame.contentDocument && frame.contentDocument.body &&
@@ -842,7 +833,7 @@
             document.getElementById('spinner').style.display = 'none';
             document.getElementById('status-title').textContent = '✅ Documento Listo';
             document.getElementById('status-title').style.color = '#16a34a';
-            document.getElementById('status-msg').textContent = 'Tu navegador no puede mostrar el PDF en línea. Descárgalo para verlo.';
+            document.getElementById('status-msg').textContent = 'Tu navegador no admite visualización directa en pantalla. Descarga el archivo para revisarlo.';
             document.getElementById('download-btn').style.display = 'block';
             document.getElementById('pdf-frame').style.display = 'none';
             document.getElementById('viewer-info').style.display = 'none';
