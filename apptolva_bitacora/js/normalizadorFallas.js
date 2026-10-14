@@ -165,6 +165,7 @@
           componenteKey: comp.key,
           sistema: categoriaFinal,
           categoria: categoriaFinal,
+          itemReportado: itemCheck.item,
           descripcion,
           itemOficial: clasificacion.itemOficial,
           origen: fraseCoincidente ? 'CHECKLIST + OBSERVACIÓN' : 'CHECKLIST'
@@ -187,6 +188,7 @@
             componenteKey: comp.key,
             sistema: clasificacion.categoria,
             categoria: clasificacion.categoria,
+            itemReportado: frase,
             descripcion: `${clasificacion.itemOficial} (Reportado en nota: "${frase}")`,
             itemOficial: clasificacion.itemOficial,
             origen: 'OBSERVACIÓN OPERADOR'

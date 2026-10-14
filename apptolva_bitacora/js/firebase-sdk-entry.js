@@ -11,9 +11,11 @@ export {
 } from "firebase/auth";
 export {
   collection,
+  documentId,
   doc,
   getDoc,
   getDocs,
+  getDocsFromServer,
   getFirestore,
   initializeFirestore,
   limit,

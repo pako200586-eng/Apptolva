@@ -93,8 +93,25 @@
         <div class="mt-3 flex flex-wrap gap-2">
           <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv mr-2"></i>Excel CSV (Resumen checklist)</button>
           <button id="exportPdf" class="rounded-md border border-[#7c2d12] px-3 py-2 text-sm font-bold text-[#7c2d12]"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+          <button id="auditFirestoreBtn" class="rounded-md border border-slate-500 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Medir almacenamiento Firestore</button>
           <span id="syncState" class="ml-auto text-xs font-bold uppercase tracking-wide text-slate-500">Conectado a Firebase Firestore</span>
         </div>
+        <section id="firestoreAudit" class="mt-4 hidden rounded-lg border border-slate-200 bg-slate-50 p-4" aria-live="polite">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="font-black text-slate-800">Inventario de almacenamiento Firestore</h2>
+            <button id="downloadFirestoreAudit" class="hidden rounded-md border border-[#294936] px-3 py-2 text-xs font-bold text-[#294936]">Descargar resumen CSV</button>
+          </div>
+          <p id="firestoreAuditStatus" class="mt-2 text-sm text-slate-600"></p>
+          <div class="mt-3 overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+              <thead class="bg-white text-left text-xs uppercase tracking-wide text-slate-600">
+                <tr><th class="px-3 py-2">Colección</th><th class="px-3 py-2 text-right">Documentos leídos</th><th class="px-3 py-2 text-right">JSON aprox.</th></tr>
+              </thead>
+              <tbody id="firestoreAuditRows" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+          <p class="mt-3 text-xs text-slate-500">El tamaño es una estimación del JSON serializado, no del almacenamiento facturable de Firestore: no incluye índices ni metadatos internos. La auditoría lee todos los documentos de las colecciones indicadas y puede generar cargos de lectura. No exporta datos personales ni modifica o elimina registros.</p>
+        </section>
       </div>
 
       <!-- PESTAÑAS DE NAVEGACIÓN (MANTENIMIENTO) -->
@@ -206,6 +223,30 @@
             <div class="panel-card rounded-lg border-green-200 p-4 text-center"><p class="text-xs font-bold uppercase text-green-700">Fallas realizadas</p><strong id="kpiRealizadas" class="text-3xl text-green-700">0</strong></div>
             <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Tasa de efectividad</p><strong id="kpiTasa" class="text-3xl text-[#294936]">0%</strong></div>
           </div>
+
+          <details class="panel-card overflow-hidden rounded-lg">
+            <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 font-black text-[#7c2d12]">
+              <span>Reincidencias por unidad</span>
+              <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700"><strong id="kpiFallasRecurrentes">0</strong> patrones repetidos</span>
+            </summary>
+            <p class="px-4 pb-3 text-xs text-slate-500">Agrupa fallas del checklist por unidad, componente, categoría y elemento. Cada folio cuenta una sola vez; la OT vinculada solo aporta su estado. Se aplican los filtros actuales.</p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-orange-100 text-sm">
+                <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
+                  <tr>
+                    <th class="px-4 py-3">Unidad</th>
+                    <th class="px-4 py-3">Componente</th>
+                    <th class="px-4 py-3">Sistema / falla</th>
+                    <th class="px-4 py-3 text-right">Incidencias</th>
+                    <th class="px-4 py-3">Folios</th>
+                    <th class="px-4 py-3">Último evento</th>
+                    <th class="px-4 py-3">Estado OT</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaFallasRecurrentes" class="divide-y divide-orange-50"></tbody>
+              </table>
+            </div>
+          </details>
 
           <div class="grid gap-5 lg:grid-cols-2">
             <div class="panel-card rounded-lg p-4">
@@ -332,10 +373,13 @@
       query as fsQuery,
       where as fsWhere,
       orderBy as fsOrderBy,
+      documentId as fsDocumentId,
       limit as fsLimit,
       getDocs,
+      getDocsFromServer,
       getDoc,
       doc,
+      startAfter as fsStartAfter,
       setDoc,
       updateDoc,
       runTransaction
@@ -357,6 +401,135 @@
 
     const state = { user: null, role: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '' };
     const $ = (id) => document.getElementById(id);
+    const COLECCIONES_AUDITORIA_FIRESTORE = [
+      'bitacora_reports',
+      'ordenes_trabajo',
+      'ot_seguimiento',
+      'ot_por_reporte'
+    ];
+    let ultimoInventarioFirestore = null;
+
+    function formatoBytes(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function fechaAuditoria(valor) {
+      if (valor && typeof valor.toDate === 'function') return valor.toDate();
+      if (!valor) return null;
+      const fecha = new Date(valor);
+      return Number.isNaN(fecha.getTime()) ? null : fecha;
+    }
+
+    async function auditarColeccionFirestore(nombre, indiceColeccion) {
+      const tamanoPagina = 200;
+      const stats = { coleccion: nombre, documentos: 0, bytesJson: 0, fechaMinima: null, fechaMaxima: null };
+      let cursor = null;
+
+      while (true) {
+        const constraints = [fsOrderBy(fsDocumentId()), fsLimit(tamanoPagina)];
+        if (cursor) constraints.push(fsStartAfter(cursor));
+        const snapshot = await getDocsFromServer(fsQuery(collection(db, nombre), ...constraints));
+
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const json = JSON.stringify({ id: docSnap.id, ...data });
+          stats.documentos += 1;
+          stats.bytesJson += new TextEncoder().encode(json).length;
+
+          const fecha = fechaAuditoria(
+            data.created_at || data.fecha_apertura || data.fecha || data.updated_at
+          );
+          if (fecha && (!stats.fechaMinima || fecha < stats.fechaMinima)) stats.fechaMinima = fecha;
+          if (fecha && (!stats.fechaMaxima || fecha > stats.fechaMaxima)) stats.fechaMaxima = fecha;
+        });
+
+        if (snapshot.empty || snapshot.size < tamanoPagina) break;
+        cursor = snapshot.docs[snapshot.docs.length - 1];
+        $('firestoreAuditStatus').textContent =
+          `Auditoría ${indiceColeccion + 1}/${COLECCIONES_AUDITORIA_FIRESTORE.length}: ${nombre} · ${stats.documentos} documentos leídos...`;
+      }
+
+      return stats;
+    }
+
+    function renderInventarioFirestore(inventario) {
+      const totalDocumentos = inventario.reduce((total, item) => total + item.documentos, 0);
+      const totalBytes = inventario.reduce((total, item) => total + item.bytesJson, 0);
+      $('firestoreAuditRows').innerHTML = inventario.map((item) => `
+        <tr>
+          <td class="px-3 py-2 font-bold text-slate-700">${escapeHtml(item.coleccion)}</td>
+          <td class="px-3 py-2 text-right">${item.documentos.toLocaleString('es-MX')}</td>
+          <td class="px-3 py-2 text-right">${formatoBytes(item.bytesJson)}</td>
+        </tr>`).join('') + `
+        <tr class="bg-white font-black">
+          <td class="px-3 py-2">Total</td>
+          <td class="px-3 py-2 text-right">${totalDocumentos.toLocaleString('es-MX')}</td>
+          <td class="px-3 py-2 text-right">${formatoBytes(totalBytes)}</td>
+        </tr>`;
+      $('firestoreAuditStatus').textContent =
+        `Auditoría completa · ${totalDocumentos.toLocaleString('es-MX')} documentos · ${formatoBytes(totalBytes)} de JSON aproximado · ${formatDate(inventario.generatedAt)}`;
+      $('downloadFirestoreAudit').classList.remove('hidden');
+    }
+
+    $('auditFirestoreBtn').addEventListener('click', async () => {
+      if (!state.user) {
+        showToast('Inicia sesión para medir Firestore.');
+        return;
+      }
+      if (!navigator.onLine) {
+        showToast('La auditoría necesita conexión para leer todas las colecciones desde Firestore.');
+        return;
+      }
+      const confirmar = window.confirm(
+        'Esta auditoría leerá todos los documentos de bitacora_reports, ordenes_trabajo, ot_seguimiento y ot_por_reporte. Firestore puede cobrar estas lecturas; el costo depende del volumen. Solo calculará conteos y tamaño JSON aproximado: no exportará datos ni modificará o eliminará registros. ¿Continuar?'
+      );
+      if (!confirmar) return;
+
+      const boton = $('auditFirestoreBtn');
+      boton.disabled = true;
+      $('firestoreAudit').classList.remove('hidden');
+      $('downloadFirestoreAudit').classList.add('hidden');
+      $('firestoreAuditRows').replaceChildren();
+      $('firestoreAuditStatus').textContent = 'Iniciando auditoría de Firestore...';
+      try {
+        const inventario = [];
+        for (const [indice, nombre] of COLECCIONES_AUDITORIA_FIRESTORE.entries()) {
+          $('firestoreAuditStatus').textContent =
+            `Auditoría ${indice + 1}/${COLECCIONES_AUDITORIA_FIRESTORE.length}: ${nombre} · iniciando...`;
+          inventario.push(await auditarColeccionFirestore(nombre, indice));
+        }
+        inventario.generatedAt = new Date().toISOString();
+        ultimoInventarioFirestore = inventario;
+        renderInventarioFirestore(inventario);
+      } catch (error) {
+        console.error('No se pudo completar la auditoría de Firestore:', error);
+        $('firestoreAuditStatus').textContent = `La auditoría no se completó: ${error.message}`;
+        showToast('No se pudo completar la auditoría de Firestore.');
+      } finally {
+        boton.disabled = false;
+      }
+    });
+
+    $('downloadFirestoreAudit').addEventListener('click', () => {
+      if (!ultimoInventarioFirestore) return;
+      const csv = [
+        ['coleccion', 'documentos_leidos', 'bytes_json_aproximados'],
+        ...ultimoInventarioFirestore.map((item) => [item.coleccion, item.documentos, item.bytesJson]),
+        ['TOTAL',
+          ultimoInventarioFirestore.reduce((total, item) => total + item.documentos, 0),
+          ultimoInventarioFirestore.reduce((total, item) => total + item.bytesJson, 0)]
+      ].map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+      const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `inventario-firestore-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
 
     function filters() {
       const params = new URLSearchParams();
@@ -705,7 +878,7 @@
         if (resultado[key]) {
           resultado[key].push({
             categoria: f.categoria || f.sistema || 'GENERAL',
-            item: f.descripcion || f.itemOficial
+            item: f.itemReportado || f.descripcion || f.itemOficial
           });
         }
       });
@@ -1603,6 +1776,87 @@
       return { checklists, celdas: [...celdas.values()], porUnidad, porDia };
     }
 
+    function calcularFallasRecurrentes(checklists) {
+      const grupos = new Map();
+      const ordenPorReporte = new Map((dashState.ordenes || [])
+        .filter((orden) => orden.reporte_id)
+        .map((orden) => [String(orden.reporte_id), orden]));
+      const nombreComponente = new Map(COMPONENTES.map(({ key, nombre }) => [key, nombre]));
+
+      checklists.forEach((report) => {
+        const economicos = numerosEconomicos(report);
+        const fallas = fallasPorComponente(report);
+        const folio = String(report.folio || report.payload?.folio || report.id).trim();
+        const fechaMs = new Date(report.createdAt).getTime();
+
+        COMPONENTES.forEach(({ key }) => {
+          const unidad = String(economicos[key] || 'S/N').trim().toUpperCase();
+          if (!unidad || unidad === 'S/N') return;
+
+          fallas[key].forEach((falla) => {
+            const sistema = String(falla.categoria || 'GENERAL').trim();
+            const elemento = String(falla.item || 'Falla sin detalle').trim();
+            const clave = [unidad, key, sinAcentos(sistema), sinAcentos(elemento)]
+              .join('|');
+            let grupo = grupos.get(clave);
+            if (!grupo) {
+              grupo = {
+                unidad,
+                componente: nombreComponente.get(key) || key,
+                sistema,
+                elemento,
+                reportes: new Set(),
+                folios: [],
+                ultimaFecha: 0,
+                ultimaOrden: null
+              };
+              grupos.set(clave, grupo);
+            }
+
+            if (grupo.reportes.has(String(report.id))) return;
+            grupo.reportes.add(String(report.id));
+            grupo.folios.push(folio);
+            if (Number.isFinite(fechaMs) && fechaMs > grupo.ultimaFecha) {
+              grupo.ultimaFecha = fechaMs;
+              grupo.ultimaOrden = ordenPorReporte.get(String(report.id)) || null;
+            }
+          });
+        });
+      });
+
+      return [...grupos.values()]
+        .filter((grupo) => grupo.reportes.size >= 2)
+        .map((grupo) => ({
+          ...grupo,
+          incidencias: grupo.reportes.size,
+          folios: grupo.folios.slice(-4),
+          ultimaFechaFmt: grupo.ultimaFecha
+            ? new Date(grupo.ultimaFecha).toLocaleDateString('es-MX')
+            : 'Sin fecha',
+          estadoOt: grupo.ultimaOrden
+            ? `OT-${grupo.ultimaOrden.folio_ot || 's/n'} · ${grupo.ultimaOrden.estatus || 'NUEVA'}`
+            : (dashState.ordenes ? 'Sin OT vinculada' : 'OT no consultada')
+        }))
+        .sort((a, b) => b.incidencias - a.incidencias || b.ultimaFecha - a.ultimaFecha);
+    }
+
+    function renderFallasRecurrentes(checklists) {
+      const recurrentes = calcularFallasRecurrentes(checklists);
+      $('kpiFallasRecurrentes').textContent = recurrentes.length;
+      $('tablaFallasRecurrentes').innerHTML = recurrentes.length
+        ? recurrentes.map((falla) => `
+          <tr class="hover:bg-orange-50/70">
+            <td class="px-4 py-3 font-black text-slate-800">${escapeHtml(falla.unidad)}</td>
+            <td class="px-4 py-3">${escapeHtml(falla.componente)}</td>
+            <td class="px-4 py-3"><strong class="block text-slate-700">${escapeHtml(falla.sistema)}</strong><span class="text-xs text-slate-500">${escapeHtml(falla.elemento)}</span></td>
+            <td class="px-4 py-3 text-right font-black text-red-700">${falla.incidencias}</td>
+            <td class="px-4 py-3">${escapeHtml(falla.folios.join(', '))}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${escapeHtml(falla.ultimaFechaFmt)}</td>
+            <td class="px-4 py-3">${escapeHtml(falla.estadoOt)}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="7" class="px-4 py-6 text-center font-bold text-slate-500">No hay fallas repetidas para los filtros actuales.</td></tr>';
+    }
+
     function renderDashboard() {
       if ($('vista-dashboard').classList.contains('hidden')) return;
       const { checklists, celdas, porUnidad, porDia } = calcularMetricas();
@@ -1611,6 +1865,7 @@
       const realizadas = sumar(celdas, 'realizadas');
       const pendientes = reportadas - realizadas;
 
+      renderFallasRecurrentes(checklists);
       $('kpiChecklist').textContent = checklists.length;
       $('kpiFallas').textContent = reportadas;
       $('kpiPendientes').textContent = pendientes;
