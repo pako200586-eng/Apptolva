@@ -1006,7 +1006,7 @@
 
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
             try {
-                const logoResp = await fetch('./img/ot/logo.jpg');
+                const logoResp = await fetch('./img/logo-bachoco.jpg');
                 if (logoResp.ok) {
                     const logoUrl = await new Promise((res, rej) => {
                         const fr = new FileReader();
@@ -1014,8 +1014,8 @@
                         fr.onerror = rej;
                         logoResp.blob().then(b => fr.readAsDataURL(b), rej);
                     });
-                    doc.setFillColor(255, 255, 255); doc.rect(4, 3.5, 36, 15, 'F');
-                    doc.addImage(logoUrl, 'JPEG', 5, 4, 34, 13.1, undefined, 'FAST');
+                    doc.setFillColor(255, 255, 255); doc.rect(3, 4, 42, 14, 'F');
+                    doc.addImage(logoUrl, 'JPEG', 4, 5.2, 40, 10.8, undefined, 'FAST');
                 }
             } catch (e) { /* el PDF se genera sin logo si no está disponible */ }
             doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica", "bold");

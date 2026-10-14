@@ -1050,7 +1050,7 @@
 
                 let logoUrl = null;
                 try {
-                    const logoResp = await fetch('./img/ot/logo.jpg');
+                    const logoResp = await fetch('./img/logo-bachoco.jpg');
                     if (logoResp.ok) {
                         logoUrl = await new Promise((res, rej) => {
                             const fr = new FileReader();
@@ -1078,7 +1078,7 @@
                     let y = 13;
 
                     if (logoUrl) {
-                        try { doc.addImage(logoUrl, 'JPEG', pageW - margin - 25, 1.5, 25, 9.6, undefined, 'FAST'); } catch (e) {}
+                        try { doc.addImage(logoUrl, 'JPEG', pageW - margin - 32, 2, 32, 8.7, undefined, 'FAST'); } catch (e) {}
                     }
                     doc.setFillColor(234, 88, 12);
                     doc.rect(margin, y, contentW, 11, 'F');

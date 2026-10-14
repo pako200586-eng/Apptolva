@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v69"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v70"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -38,6 +38,7 @@ const OFFLINE_URLS = [
   "./js/procesadorInspeccion.js",
   "./js/generarPDF_OT.js",
   "./img/ot/logo.jpg",
+  "./img/logo-bachoco.jpg",
   "./img/ot/tracto.jpg",
   "./img/ot/tolva1.jpg",
   "./img/ot/tolva2.jpg",
