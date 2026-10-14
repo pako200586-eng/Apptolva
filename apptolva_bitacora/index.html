@@ -1077,15 +1077,15 @@
                     if (pageIndex > 0) doc.addPage();
                     let y = 13;
 
-                    if (logoUrl) {
-                        try { doc.addImage(logoUrl, 'JPEG', pageW - margin - 32, 2, 32, 8.7, undefined, 'FAST'); } catch (e) {}
-                    }
                     doc.setFillColor(234, 88, 12);
                     doc.rect(margin, y, contentW, 11, 'F');
+                    if (logoUrl) {
+                        doc.setFillColor(255, 255, 255);
+                        doc.rect(margin + 1, y + 1, 38, 9, 'F');
+                        try { doc.addImage(logoUrl, 'JPEG', margin + 1.5, y + 1.3, 33, 8.4, undefined, 'FAST'); } catch (e) {}
+                    }
                     doc.setTextColor(255, 255, 255);
                     doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(13);
-                    doc.text('REPORTE DE INSPECCIÓN 360°', margin + 3, y + 7.5);
                     doc.setFontSize(7.5);
                     doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 4.5, {align: 'right'});
                     doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 9, {align: 'right'});
