@@ -440,7 +440,6 @@
         const driverNameInput = document.getElementById('driverName');
         const employeeNumberInput = document.getElementById('employeeNumber');
         const operatorList = document.getElementById('listaOperadoresNOM087');
-        let selectedOperatorNumber = "";
         let applyingCatalogOperator = false;
 
         function normalizeOperatorText(value) {
@@ -466,7 +465,6 @@
             const operator = window.CATALOGO_OPERADORES && window.CATALOGO_OPERADORES[numero];
             if (!operator) return;
             applyingCatalogOperator = true;
-            selectedOperatorNumber = numero;
             driverNameInput.value = operator.nombre;
             employeeNumberInput.value = numero;
             driverNameInput.classList.add('border-green-400', 'bg-green-50');
@@ -513,6 +511,10 @@
             }
             driverNameInput.addEventListener('input', () => {
                 if (applyingCatalogOperator) return;
+                employeeNumberInput.value = "";
+                employeeNumberInput.dispatchEvent(new Event('input', { bubbles: true }));
+                driverNameInput.classList.remove('border-green-400', 'bg-green-50');
+                actualizarNombreOperadorUI();
                 showOperatorSuggestions(driverNameInput.value);
             });
             document.addEventListener('click', (e) => {
@@ -671,6 +673,10 @@
         }
 
         window.terminarTurno48h = async function() {
+            if (!getSelectedCatalogOperator()) {
+                alert("⚠️ Selecciona al operador del catálogo oficial antes de finalizar el turno.");
+                return;
+            }
             if (confirm("⚠️ ¿FINALIZAR VIAJE / TERMINAR TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nLa bitácora se respaldará en la nube y se iniciará un periodo en ceros.")) {
                 try {
                     if (navigator.onLine && typeof window.guardarBitacoraEnFirestore === "function") {
@@ -1264,8 +1270,8 @@
                 empresa: "GRUPO BACHOCO, S.A. DE C.V.",
                 unitId: document.getElementById('unitId').value.trim(),
                 plates: document.getElementById('plates').value || "",
-                driverName: operator ? operator.nombre : document.getElementById('driverName').value.trim(),
-                employeeNumber: operator ? operator.numero : "",
+                driverName: operator?.nombre || "",
+                employeeNumber: operator?.numero || "",
                 license: document.getElementById('license').value.trim(),
                 licenseExp: document.getElementById('licenseExp')?.value || "",
                 brandModel: document.getElementById('brandModel')?.value || "",
@@ -1443,6 +1449,17 @@
             };
 
             window.guardarBitacoraEnFirestore = async function(payload) {
+                const employeeNumber = String(payload.employeeNumber || "").trim();
+                const operator = window.CATALOGO_OPERADORES?.[employeeNumber];
+                if (!operator) {
+                    throw new Error("Selecciona al operador del catálogo oficial antes de sincronizar la bitácora.");
+                }
+                payload = {
+                    ...payload,
+                    driverName: operator.nombre,
+                    employeeNumber
+                };
+
                 if (!payload.folio || payload.folio === "S/F") {
                     const asignado = await window.generarFolioFirebase();
                     if (asignado) payload.folio = asignado;
