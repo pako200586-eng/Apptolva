@@ -1048,6 +1048,19 @@
                 const COL_GAP = 4;
                 const colW = (contentW - COL_GAP * (NUM_COLS - 1)) / NUM_COLS;
 
+                let logoUrl = null;
+                try {
+                    const logoResp = await fetch('./img/ot/logo.jpg');
+                    if (logoResp.ok) {
+                        logoUrl = await new Promise((res, rej) => {
+                            const fr = new FileReader();
+                            fr.onload = () => res(fr.result);
+                            fr.onerror = rej;
+                            logoResp.blob().then(b => fr.readAsDataURL(b), rej);
+                        });
+                    }
+                } catch (e) { /* el PDF se genera sin logo si no está disponible */ }
+
                 const seccionesFull = [
                     {id: 'tracto', titulo: 'TRACTO CAMIÓN'},
                     {id: 'tolva1', titulo: '1ra TOLVA'},
@@ -1064,6 +1077,9 @@
                     if (pageIndex > 0) doc.addPage();
                     let y = 13;
 
+                    if (logoUrl) {
+                        try { doc.addImage(logoUrl, 'JPEG', pageW - margin - 25, 1.5, 25, 9.6, undefined, 'FAST'); } catch (e) {}
+                    }
                     doc.setFillColor(234, 88, 12);
                     doc.rect(margin, y, contentW, 11, 'F');
                     doc.setTextColor(255, 255, 255);

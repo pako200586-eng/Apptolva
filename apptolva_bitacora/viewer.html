@@ -595,12 +595,6 @@
             };
         }
 
-        async function obtenerReporteNetlify(id) {
-            const resp = await fetch(`/api/store-bitacora?id=${encodeURIComponent(id)}`);
-            if (resp.ok) return resp.json();
-            return null;
-        }
-
         async function obtenerDatosReporte(id) {
             try {
                 const localKey = Object.keys(localStorage).find(k => k.includes(id));
@@ -613,11 +607,6 @@
             try {
                 const rep = await obtenerReporteFirestore(id);
                 if (rep) return rep;
-            } catch (e) {}
-
-            try {
-                const repNet = await obtenerReporteNetlify(id);
-                if (repNet) return repNet;
             } catch (e) {}
 
             return null;

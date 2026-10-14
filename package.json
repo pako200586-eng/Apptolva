@@ -2,12 +2,7 @@
   "name": "appsflotapropiachapo",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "@netlify/blobs": "^8.1.0",
-    "@netlify/database": "^1.0.0",
-    "drizzle-kit": "^1.0.0-beta.22",
-    "drizzle-orm": "^1.0.0-beta.22"
-  },
+  "dependencies": {},
   "devDependencies": {
     "esbuild": "^0.28.2",
     "firebase": "^11.2.0"

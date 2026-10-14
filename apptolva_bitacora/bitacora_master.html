@@ -1005,6 +1005,19 @@
             const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
 
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
+            try {
+                const logoResp = await fetch('./img/ot/logo.jpg');
+                if (logoResp.ok) {
+                    const logoUrl = await new Promise((res, rej) => {
+                        const fr = new FileReader();
+                        fr.onload = () => res(fr.result);
+                        fr.onerror = rej;
+                        logoResp.blob().then(b => fr.readAsDataURL(b), rej);
+                    });
+                    doc.setFillColor(255, 255, 255); doc.rect(4, 3.5, 36, 15, 'F');
+                    doc.addImage(logoUrl, 'JPEG', 5, 4, 34, 13.1, undefined, 'FAST');
+                }
+            } catch (e) { /* el PDF se genera sin logo si no está disponible */ }
             doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica", "bold");
             doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 10, { align: "center" });
             doc.setFontSize(7); doc.setFont("helvetica", "normal");
