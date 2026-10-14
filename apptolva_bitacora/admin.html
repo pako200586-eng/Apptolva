@@ -94,6 +94,7 @@
           <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv mr-2"></i>Excel CSV (Resumen checklist)</button>
           <button id="exportPdf" class="rounded-md border border-[#7c2d12] px-3 py-2 text-sm font-bold text-[#7c2d12]"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
           <button id="auditFirestoreBtn" class="hidden rounded-md border border-slate-500 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Medir almacenamiento Firestore</button>
+          <button id="backupFirestoreBtn" class="hidden rounded-md border border-slate-500 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"><i class="fas fa-download mr-2"></i>Respaldo Firestore (JSON)</button>
           <span id="syncState" class="ml-auto text-xs font-bold uppercase tracking-wide text-slate-500">Conectado a Firebase Firestore</span>
         </div>
         <section id="firestoreAudit" class="mt-4 hidden rounded-lg border border-slate-200 bg-slate-50 p-4" aria-live="polite">
@@ -520,6 +521,61 @@
       }
     });
 
+    $('backupFirestoreBtn').addEventListener('click', async () => {
+      if (!state.user || state.role !== 'admin') {
+        showToast('Solo un administrador puede respaldar Firestore.');
+        return;
+      }
+      if (!navigator.onLine) {
+        showToast('El respaldo necesita conexión.');
+        return;
+      }
+      if (!window.confirm('El respaldo leerá TODOS los documentos de bitacora_reports, ordenes_trabajo, ot_seguimiento y ot_por_reporte (unas 2,400 lecturas, ~35 MB) y descargará un archivo JSON. No modifica ni elimina nada. ¿Continuar?')) return;
+
+      const boton = $('backupFirestoreBtn');
+      boton.disabled = true;
+      $('firestoreAudit').classList.remove('hidden');
+      try {
+        const partes = [`{"generado":${JSON.stringify(new Date().toISOString())},"colecciones":{`];
+        let total = 0;
+        for (const [indice, nombre] of COLECCIONES_AUDITORIA_FIRESTORE.entries()) {
+          partes.push(`${indice ? ',' : ''}${JSON.stringify(nombre)}:[`);
+          let cursor = null;
+          let primero = true;
+          while (true) {
+            const constraints = [fsOrderBy(fsDocumentId()), fsLimit(200)];
+            if (cursor) constraints.push(fsStartAfter(cursor));
+            const snapshot = await getDocsFromServer(fsQuery(collection(db, nombre), ...constraints));
+            snapshot.forEach((docSnap) => {
+              partes.push(`${primero ? '' : ','}${JSON.stringify({ _id: docSnap.id, ...docSnap.data() })}`);
+              primero = false;
+              total += 1;
+            });
+            $('firestoreAuditStatus').textContent = `Respaldo ${indice + 1}/${COLECCIONES_AUDITORIA_FIRESTORE.length}: ${nombre} · ${total} documentos...`;
+            if (snapshot.size < 200) break;
+            cursor = snapshot.docs[snapshot.docs.length - 1];
+          }
+          partes.push(']');
+        }
+        partes.push('}}');
+        const url = URL.createObjectURL(new Blob(partes, { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `respaldo-firestore-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        $('firestoreAuditStatus').textContent = `Respaldo descargado · ${total.toLocaleString('es-MX')} documentos.`;
+      } catch (error) {
+        console.error('No se pudo completar el respaldo:', error);
+        $('firestoreAuditStatus').textContent = `El respaldo no se completó: ${error.message}`;
+        showToast('No se pudo completar el respaldo de Firestore.');
+      } finally {
+        boton.disabled = false;
+      }
+    });
+
     $('downloadFirestoreAudit').addEventListener('click', () => {
       if (state.role !== 'admin' || !ultimoInventarioFirestore) return;
       const csv = [
@@ -598,6 +654,9 @@
         element.disabled = !esAdmin;
       });
       $('auditFirestoreBtn').classList.toggle('hidden', !esAdmin);
+      $('backupFirestoreBtn').classList.toggle('hidden', !esAdmin);
+      $('cargarMasAntiguos').classList.toggle('hidden', !esAdmin);
+      if (!esAdmin && state.windowDays > VENTANA_PASO_DIAS) state.windowDays = VENTANA_PASO_DIAS;
       if (!esAdmin) {
         $('firestoreAudit').classList.add('hidden');
         $('downloadFirestoreAudit').classList.add('hidden');
@@ -820,6 +879,10 @@
     });
 
     $('cargarMasAntiguos').addEventListener('click', async () => {
+      if (state.role !== 'admin') {
+        showToast('Solo un administrador puede cargar reportes más antiguos.');
+        return;
+      }
       state.windowDays += VENTANA_PASO_DIAS;
       state.tableSignature = '';
       try {
@@ -843,7 +906,7 @@
         const diasNecesarios = state.appliedFilters.from
           ? Math.ceil((Date.now() - new Date(`${state.appliedFilters.from}T00:00:00`).getTime()) / 86400000) + 1
           : 0;
-        if (diasNecesarios > state.windowDays) {
+        if (diasNecesarios > state.windowDays && state.role === 'admin') {
           state.windowDays = diasNecesarios;
           state.allReports = null;
         }
