@@ -60,7 +60,6 @@
     <!-- Navbar con Estado de Sincronización Integrado -->
     <nav class="bg-gradient-to-r from-orange-600 to-[#F28B00] text-white p-2 shadow-lg sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
-            
             <div class="flex items-center gap-2">
                 <button onclick="window.history.back()" class="bg-white/20 hover:bg-white/30 p-2 rounded-lg text-white border border-white/10 active:scale-95 transition" title="Volver al Menú">
                     <i class="fas fa-home text-lg"></i>
@@ -73,13 +72,10 @@
                     <i class="fas fa-cloud text-gray-300" id="cloudIcon"></i>
                     <span id="cloudText" class="hidden xs:inline">Local</span>
                 </div>
-
                 <div class="bg-black/20 px-2 py-1 rounded-full text-[10px] font-mono" id="clockDisplay">00:00</div>
-                
                 <button onclick="generarPDFSeguro()" class="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center gap-1 active:scale-95 transition border border-orange-200">
                     <i class="fas fa-file-contract"></i> PDF
                 </button>
-                
                 <button onclick="generarQRSeguro()" id="qrBtn" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center active:scale-95 transition border border-gray-600" title="Exhibir QR oficial">
                     <i class="fas fa-qrcode text-lg"></i>
                 </button>
@@ -92,7 +88,6 @@
     </div>
         
     <div class="container mx-auto p-4 max-w-4xl space-y-4">
-     
        <!-- 1. Carátula Oficial NOM-087 -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
             <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 flex justify-between items-center">
@@ -100,8 +95,6 @@
                 <i class="fas fa-shield-alt text-orange-500"></i>
             </div>
             <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                
-                <!-- Permisionario: S.A. de C.V. -->
                 <div class="col-span-2 md:col-span-4 bg-orange-50 p-3 rounded-lg border border-orange-100 mb-2">
                     <p class="text-[10px] text-orange-500 font-bold uppercase">Permisionario / Empresa de Autotransporte Federal</p>
                     <p class="font-bold text-gray-800">GRUPO BACHOCO, S.A. DE C.V.</p>
@@ -167,11 +160,9 @@
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Km Inicio</label><input type="number" id="kmInicio" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="0"></div>
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Km Fin</label><input type="number" id="kmFin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="0"></div>
 
-                <!-- Origen y Destino -->
                 <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Origen</label><input type="text" id="origin" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="PA CHAPO / Planta Celaya"></div>
                 <div class="col-span-1 md:col-span-2"><label class="text-xs text-gray-400 block mb-1">Destino Final</label><input type="text" id="destination" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Cedis / Granja..."></div>
 
-                <!-- Puntos Intermedios e Itinerario Legal -->
                 <div class="col-span-2 md:col-span-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
                     <label class="text-xs font-bold text-gray-700 block mb-1"><i class="fas fa-route text-orange-500 mr-1"></i> Puntos Intermedios / Escalas / Maniobras de Ruta</label>
                     <input type="text" id="puntosIntermedios" class="bachoco-input w-full rounded-lg p-2 border border-gray-300 text-xs" placeholder="Ej. Agua Fría 3 (Desenganche), Caseta Palmillas, Querétaro...">
@@ -187,13 +178,12 @@
                     </div>
                 </div>
 
-                <!-- Co-conductor -->
                 <div class="col-span-2"><label class="text-xs text-gray-400 block mb-1">Co-conductor (si aplica relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre co-conductor (opcional)"></div>
                 <div><label class="text-xs text-gray-400 block mb-1">Licencia Co-conductor</label><input type="text" id="coLicencia" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="(opcional)"></div>
             </div>
         </div>
 
-        <!-- 2. Botones de Acción (Estado 4: Auxiliar) -->
+        <!-- 2. Botones de Acción -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
             <button onclick="window.changeStatus(1)" id="btn-1" class="status-btn bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center gap-2 group border border-transparent">
                 <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-active:bg-red-500 group-active:text-white transition"><i class="fas fa-home text-lg"></i></div>
@@ -217,13 +207,12 @@
             </button>
         </div>
 
-        <!-- Alerta 14h en el ciclo de 24h -->
+        <!-- Alertas -->
         <div id="alertBox" class="hidden bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-exclamation-triangle mt-1"></i>
             <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h de Conducción</p><p id="alertMsg" class="text-xs">Te acercas al límite máximo de 14 horas de conducción en tu jornada de 24h. Debes tomar tu descanso obligatorio de 8 horas continuas.</p></div>
         </div>
 
-        <!-- Alerta 5 horas continuas -->
         <div id="alertBox5h" class="hidden bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-clock mt-1"></i>
             <div><p class="font-bold text-sm">¡Pausa Obligatoria de 30 min! (NOM-087 Art. 4.1)</p><p class="text-xs">Superaste 4.5 horas de manejo continuo. Debes realizar una pausa mínima de 30 minutos ininterrumpidos antes de las 5 horas.</p></div>
@@ -266,7 +255,7 @@
             <div id="logList" class="divide-y divide-gray-100 max-h-60 overflow-y-auto"></div>
         </div>
 
-        <!-- 5. FIRMAS DIGITALES COMPACTAS (SISTEMA MODAL PROFESIONAL) -->
+        <!-- 5. FIRMAS DIGITALES COMPACTAS -->
         <div class="bg-white rounded-xl shadow-md p-4 border border-gray-100 mb-8">
             <div class="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
                 <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2">
@@ -276,7 +265,6 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <!-- Tarjeta Firma Conductor -->
                 <div class="border rounded-xl p-3 bg-gray-50 flex flex-col justify-between" id="cardSigOp">
                     <div class="flex justify-between items-start mb-2">
                         <div>
@@ -287,12 +275,9 @@
                             <i class="fas fa-pen"></i> Sin firmar
                         </span>
                     </div>
-                    
-                    <!-- Vista previa protegida contra toques accidentales -->
                     <div id="previewSigOpContainer" class="hidden my-2 bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-center relative min-h-[65px]">
                         <img id="imgSigOp" src="" alt="Firma Conductor" class="max-h-16 max-w-full object-contain pointer-events-none select-none">
                     </div>
-
                     <div class="flex items-center gap-2 mt-2">
                         <button onclick="window.abrirModalFirma('op')" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition" id="btnSignOp">
                             <i class="fas fa-signature"></i> <span id="btnSignOpText">Capturar Firma</span>
@@ -303,7 +288,6 @@
                     </div>
                 </div>
 
-                <!-- Tarjeta Firma Supervisor -->
                 <div class="border rounded-xl p-3 bg-gray-50 flex flex-col justify-between" id="cardSigSup">
                     <div class="flex justify-between items-start mb-2">
                         <div>
@@ -314,11 +298,9 @@
                             <i class="fas fa-pen"></i> Sin firmar
                         </span>
                     </div>
-                    
                     <div id="previewSigSupContainer" class="hidden my-2 bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-center relative min-h-[65px]">
                         <img id="imgSigSup" src="" alt="Firma Supervisor" class="max-h-16 max-w-full object-contain pointer-events-none select-none">
                     </div>
-
                     <div class="flex items-center gap-2 mt-2">
                         <button onclick="window.abrirModalFirma('sup')" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition" id="btnSignSup">
                             <i class="fas fa-signature"></i> <span id="btnSignSupText">Capturar Firma</span>
@@ -335,7 +317,6 @@
     <!-- MODAL DE CAPTURA DE FIRMA DEDICADO -->
     <div id="signatureModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
         <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col animate-in fade-in duration-150">
-            <!-- Header del Modal -->
             <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                 <div>
                     <h3 class="font-bold text-gray-800 text-sm" id="modalSigTitle">Firma Digital</h3>
@@ -345,8 +326,6 @@
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
-
-            <!-- Área de Trazo protegida -->
             <div class="p-4 bg-gray-100 flex flex-col items-center">
                 <div class="w-full bg-white rounded-xl border-2 border-dashed border-gray-300 relative shadow-inner overflow-hidden" style="touch-action: none;">
                     <canvas id="activeSignaturePad" class="w-full h-48 block" width="500" height="240" style="touch-action: none;"></canvas>
@@ -354,8 +333,6 @@
                 </div>
                 <p class="text-[10px] text-gray-400 mt-2 text-center">La firma quedará guardada de forma permanente en el dispositivo.</p>
             </div>
-
-            <!-- Botones del Modal -->
             <div class="p-3 bg-white border-t border-gray-200 flex justify-between items-center gap-2">
                 <button onclick="window.limpiarTrazoModal()" class="px-3 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1 active:scale-95 transition">
                     <i class="fas fa-eraser"></i> Limpiar
@@ -388,14 +365,11 @@
     <div id="qrModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[70] animate-in fade-in duration-200">
         <div class="bg-white rounded-2xl p-6 w-11/12 max-w-sm shadow-2xl text-center relative">
             <button onclick="window.closeQR()" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-2"><i class="fas fa-times text-xl"></i></button>
-            
             <h3 class="font-bold text-gray-800 text-lg mb-1"><i class="fas fa-shield-alt text-orange-500 mr-1"></i> Bitácora Digital NOM-087</h3>
             <p class="text-[10px] text-gray-400 mb-3 uppercase tracking-widest">Inspección de Guardia Nacional / SICT</p>
-            
             <div class="bg-white p-2 rounded-lg inline-block border-2 border-gray-100 shadow-inner mb-3">
                 <div id="qrcode" class="flex justify-center items-center" style="min-height:200px;min-width:200px;"></div>
             </div>
-            
             <div class="text-left text-xs bg-gray-50 p-3 rounded border border-gray-200 max-h-32 overflow-y-auto font-mono">
                 <div id="qrTextContent"><span style="color:#F28B00;font-weight:bold">Procesando bitácora…</span></div>
             </div>
@@ -408,7 +382,6 @@
         const LICENSE_EXP_WARNING_DAYS = 15;
         const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 
-        // --- 1. LÓGICA DE DATOS Y TURNO DINÁMICO (NOM-087) ---
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
         let currentStatus = logs.length > 0 ? logs[logs.length - 1].status : 1;
 
@@ -417,17 +390,14 @@
             logs.push({ status: 1, startTime: now, endTime: null, place: "Inicio", observation: "", gps: null });
         }
 
-        // Calcula dinámicamente el inicio del periodo de 24h tras un descanso de 8h (Art. 4.5)
         function getShiftStartTime(logList) {
             if (!logList || logList.length === 0) return Date.now();
             let ultimoDescansoIndex = -1;
             for (let i = 0; i < logList.length; i++) {
                 const l = logList[i];
-                if (l.status === 1) { // Descanso
+                if (l.status === 1) {
                     const end = l.endTime || Date.now();
-                    if ((end - l.startTime) >= OCHO_HORAS_MS) {
-                        ultimoDescansoIndex = i;
-                    }
+                    if ((end - l.startTime) >= OCHO_HORAS_MS) ultimoDescansoIndex = i;
                 }
             }
             if (ultimoDescansoIndex !== -1 && ultimoDescansoIndex < logList.length - 1) {
@@ -437,11 +407,9 @@
         }
 
         function getShiftStartHour(logList) {
-            const startTime = getShiftStartTime(logList);
-            return new Date(startTime).getHours();
+            return new Date(getShiftStartTime(logList)).getHours();
         }
 
-        // Persistencia de inputs
         const ids = [
             'driverName', 'employeeNumber', 'license', 'licenseExp', 
             'unitId', 'brandModel', 'plates', 'mode', 'folio', 
@@ -469,7 +437,6 @@
             });
         });
 
-        // --- CATÁLOGO DE OPERADORES ---
         const driverNameInput = document.getElementById('driverName');
         const employeeNumberInput = document.getElementById('employeeNumber');
         const operatorList = document.getElementById('listaOperadoresNOM087');
@@ -553,7 +520,6 @@
             });
         }
 
-        // Reloj
         setInterval(() => {
             const now = new Date();
             const clock = document.getElementById('clockDisplay');
@@ -561,11 +527,7 @@
         }, 1000);
 
         function guardarLocal() {
-            try {
-                localStorage.setItem('nom087_logs', JSON.stringify(logs));
-            } catch (e) {
-                console.error("Almacenamiento lleno:", e);
-            }
+            try { localStorage.setItem('nom087_logs', JSON.stringify(logs)); } catch (e) { console.error("Almacenamiento lleno:", e); }
             updateUI();
         }
 
@@ -651,7 +613,6 @@
             }
         };
 
-        // --- CAMBIO DE ESTADO Y AUTO-SINCRONIZACIÓN ---
         window.changeStatus = async (st) => {
             if (currentStatus === st) return;
             const now = Date.now();
@@ -662,7 +623,6 @@
             guardarLocal();
             await attachGpsToLog(newLog, false);
             updateUI();
-
             sincronizarSilencioso();
 
             if (st === 5) {
@@ -677,7 +637,6 @@
             const icon = document.getElementById('cloudIcon');
             const text = document.getElementById('cloudText');
             if (!icon || !text) return;
-
             if (estado === "syncing") {
                 icon.className = "fas fa-spinner fa-spin text-amber-300";
                 text.textContent = "Guardando";
@@ -734,8 +693,7 @@
             }
         };
 
-        // --- SISTEMA DE FIRMAS PERSISTENTES CON MODAL ---
-        let currentSigType = 'op'; // 'op' o 'sup'
+        let currentSigType = 'op';
         let sigPadCanvas = document.getElementById('activeSignaturePad');
         let sigPadCtx = sigPadCanvas ? sigPadCanvas.getContext('2d') : null;
         let isPainting = false;
@@ -743,7 +701,6 @@
 
         function initModalCanvasEvents() {
             if (!sigPadCanvas || !sigPadCtx) return;
-
             const start = (e) => {
                 e.preventDefault();
                 isPainting = true;
@@ -752,7 +709,6 @@
                 const pos = getCanvasPos(e);
                 sigPadCtx.moveTo(pos.x, pos.y);
             };
-
             const move = (e) => {
                 if (!isPainting) return;
                 e.preventDefault();
@@ -764,7 +720,6 @@
                 sigPadCtx.lineTo(pos.x, pos.y);
                 sigPadCtx.stroke();
             };
-
             const end = () => { isPainting = false; };
 
             function getCanvasPos(e) {
@@ -773,17 +728,13 @@
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
                 const scaleX = sigPadCanvas.width / rect.width;
                 const scaleY = sigPadCanvas.height / rect.height;
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
-                };
+                return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
             }
 
             sigPadCanvas.addEventListener('mousedown', start, { passive: false });
             sigPadCanvas.addEventListener('mousemove', move, { passive: false });
             sigPadCanvas.addEventListener('mouseup', end);
             sigPadCanvas.addEventListener('mouseleave', end);
-
             sigPadCanvas.addEventListener('touchstart', start, { passive: false });
             sigPadCanvas.addEventListener('touchmove', move, { passive: false });
             sigPadCanvas.addEventListener('touchend', end);
@@ -801,18 +752,13 @@
             const modal = document.getElementById('signatureModal');
             const title = document.getElementById('modalSigTitle');
             if (modal) modal.classList.remove('hidden');
-
             if (tipo === 'op') {
                 const op = getSelectedCatalogOperator();
                 title.textContent = op ? `Firma: ${op.nombre}` : "Firma del Conductor";
             } else {
                 title.textContent = "Firma del Supervisor / Permisionario";
             }
-
-            // Preparar lienzo con fondo blanco limpio
-            setTimeout(() => {
-                window.limpiarTrazoModal();
-            }, 50);
+            setTimeout(() => { window.limpiarTrazoModal(); }, 50);
         };
 
         window.cerrarModalFirma = function() {
@@ -821,16 +767,10 @@
         };
 
         window.guardarFirmaModal = function() {
-            if (!hasStroke) {
-                alert("⚠️ Por favor dibuje su firma antes de guardar.");
-                return;
-            }
+            if (!hasStroke) { alert("⚠️ Por favor dibuje su firma antes de guardar."); return; }
             const dataUrl = sigPadCanvas.toDataURL("image/jpeg", 0.7);
-            if (currentSigType === 'op') {
-                localStorage.setItem('nom087_signatureOp', dataUrl);
-            } else {
-                localStorage.setItem('nom087_signatureSup', dataUrl);
-            }
+            if (currentSigType === 'op') localStorage.setItem('nom087_signatureOp', dataUrl);
+            else localStorage.setItem('nom087_signatureSup', dataUrl);
             window.cerrarModalFirma();
             actualizarFirmasUI();
             sincronizarSilencioso();
@@ -838,11 +778,8 @@
 
         window.borrarFirmaGuardada = function(tipo) {
             if (confirm("¿Deseas borrar esta firma guardada?")) {
-                if (tipo === 'op') {
-                    localStorage.removeItem('nom087_signatureOp');
-                } else {
-                    localStorage.removeItem('nom087_signatureSup');
-                }
+                if (tipo === 'op') localStorage.removeItem('nom087_signatureOp');
+                else localStorage.removeItem('nom087_signatureSup');
                 actualizarFirmasUI();
                 sincronizarSilencioso();
             }
@@ -852,7 +789,6 @@
             const sigOp = localStorage.getItem('nom087_signatureOp');
             const sigSup = localStorage.getItem('nom087_signatureSup');
 
-            // Conductor
             const badgeOp = document.getElementById('badgeSigOp');
             const containerOp = document.getElementById('previewSigOpContainer');
             const imgOp = document.getElementById('imgSigOp');
@@ -875,7 +811,6 @@
                 btnDelOp.classList.add('hidden');
             }
 
-            // Supervisor
             const badgeSup = document.getElementById('badgeSigSup');
             const containerSup = document.getElementById('previewSigSupContainer');
             const imgSup = document.getElementById('imgSigSup');
@@ -901,7 +836,6 @@
             actualizarNombreOperadorUI();
         }
 
-        // --- ACTUALIZACIÓN DE UI Y GRÁFICA DINÁMICA ---
         function updateUI() {
             document.querySelectorAll('.status-btn').forEach(b => {
                 b.classList.remove('active');
@@ -941,7 +875,6 @@
             const countBadge = document.getElementById('logCountBadge');
             if (countBadge) countBadge.textContent = String(logs.length);
 
-            // Cálculo legal de 14h en ciclo dinámico de 24h
             const shiftStart = getShiftStartTime(logs);
             const limite24h = shiftStart + (24 * 60 * 60 * 1000);
             let driveMins = 0;
@@ -964,7 +897,6 @@
             if (driveMins > 13 * 60) document.getElementById('alertBox')?.classList.remove('hidden');
             else document.getElementById('alertBox')?.classList.add('hidden');
 
-            // Alerta 5 horas continuas
             let continuousDrive = 0;
             if (logs.length > 0) {
                 for (let i = logs.length - 1; i >= 0; i--) {
@@ -1045,16 +977,13 @@
             ctx.stroke();
         }
 
-        // --- GENERADOR DE PDF OFICIAL (NOM-087) ---
         window.generarPDFSeguro = async function() {
             const selectedOperator = getSelectedCatalogOperator();
             if (!selectedOperator) {
                 alert("⚠️ Selecciona al operador del catálogo oficial antes de generar el PDF.");
                 return;
             }
-            if (!window.jspdf) { 
-                alert("⚠️ Error: Librería PDF no disponible."); return; 
-            }
+            if (!window.jspdf) { alert("⚠️ Error: Librería PDF no disponible."); return; }
             
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -1069,7 +998,6 @@
             const logsD1 = logs.filter(l => l.startTime < limit24);
             const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
 
-            // Encabezado
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
             doc.setTextColor(255); doc.setFontSize(13); doc.setFont("helvetica", "bold");
             doc.text("BITÁCORA DE HORAS DE SERVICIO", 105, 10, { align: "center" });
@@ -1197,7 +1125,6 @@
             drawLegalGrid(y, "DÍA 2 (CONTINUACIÓN DE VIAJE / 48 HORAS)", logsD2, true);
             y += 42;
 
-            // Desglose
             doc.setFontSize(9); doc.setTextColor(...naranja); doc.setFont("helvetica", "bold");
             doc.text("DESGLOSE CRONOLÓGICO DE ACTIVIDADES", 14, y);
             y += 4;
@@ -1240,7 +1167,6 @@
                 y += 4;
             });
 
-            // Estampado de Firmas Recuperadas de Almacenamiento Local
             if (y > 220) { doc.addPage(); y = 30; }
             y += 10;
             
@@ -1249,23 +1175,17 @@
             const sigSupData = localStorage.getItem('nom087_signatureSup');
 
             doc.line(30, y + 20, 80, y + 20);
-            if (sigOpData) {
-                try { doc.addImage(sigOpData, 'JPEG', 35, y, 40, 18); } catch (e) {}
-            }
+            if (sigOpData) { try { doc.addImage(sigOpData, 'JPEG', 35, y, 40, 18); } catch (e) {} }
             doc.setFontSize(7); doc.text("FIRMA CONDUCTOR", 55, y + 23, { align: "center" });
             doc.setFontSize(5); doc.text(selectedOperator.nombre, 55, y + 26, { align: "center" });
             doc.text("Lic. Federal: " + (document.getElementById('license').value || ""), 55, y + 29, { align: "center" });
 
             doc.line(120, y + 20, 170, y + 20);
-            if (sigSupData) {
-                try { doc.addImage(sigSupData, 'JPEG', 125, y, 40, 18); } catch (e) {}
-            }
+            if (sigSupData) { try { doc.addImage(sigSupData, 'JPEG', 125, y, 40, 18); } catch (e) {} }
             doc.setFontSize(7); doc.text("FIRMA SUPERVISOR / DESPACHADOR", 145, y + 23, { align: "center" });
 
-            // Declaratoria bajo protesta
             y += 33;
-            doc.setFontSize(5); doc.setTextColor(0);
-            doc.setFont("helvetica", "bold");
+            doc.setFontSize(5); doc.setTextColor(0); doc.setFont("helvetica", "bold");
             doc.text("DECLARATORIA BAJO PROTESTA DE DECIR VERDAD", 105, y, { align: "center" });
             doc.setFont("helvetica", "normal");
             y += 3.5;
@@ -1280,7 +1200,6 @@
             doc.setFontSize(4); doc.setTextColor(120);
             doc.text("GRUPO BACHOCO, S.A. DE C.V. — Permisionario de Autotransporte Federal — Folio: " + folio + " — " + new Date().toISOString(), 105, y + 2, { align: "center" });
 
-            // Página 2: Resumen legal NOM-087
             doc.addPage();
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 15, 'F');
             doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
@@ -1312,7 +1231,6 @@
             doc.save(`Bitacora_${folio.replace(/[\\/]/g, '-')}.pdf`);
         };
 
-        // --- GENERADOR DE QR HÍBRIDO ---
         function buildFullOfflineQrData(payload) {
             const totalDrive = document.getElementById('totalDriving')?.innerText || '0h 0m';
             const statusNames = ["", "Descanso", "Pausa", "Conduciendo", "Auxiliar", "Excepción"];
@@ -1386,12 +1304,7 @@
         function showOfflineQrModal(payload, mensaje) {
             const qrText = buildFullOfflineQrData(payload);
             document.getElementById('qrcode').innerHTML = "";
-            new QRCode(document.getElementById("qrcode"), { 
-                text: qrText, 
-                width: 200, 
-                height: 200, 
-                correctLevel: QRCode.CorrectLevel.L 
-            });
+            new QRCode(document.getElementById("qrcode"), { text: qrText, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.L });
             document.getElementById('qrTextContent').innerHTML =
                 `<span style="color:#F28B00;font-weight:bold">${mensaje || 'QR de Inspección Directa (Offline)'}</span><br>` +
                 `<span style="font-size:10px;color:#4b5563;white-space:pre-wrap">${qrText}</span>`;
@@ -1424,12 +1337,7 @@
                 const viewerUrl = syncResult.url;
 
                 document.getElementById('qrcode').innerHTML = "";
-                new QRCode(document.getElementById("qrcode"), {
-                    text: viewerUrl,
-                    width: 200,
-                    height: 200,
-                    correctLevel: QRCode.CorrectLevel.M
-                });
+                new QRCode(document.getElementById("qrcode"), { text: viewerUrl, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
                 document.getElementById('qrTextContent').innerHTML =
                     `<span style="color:#16a34a;font-weight:bold">✅ Sincronizado en la nube</span><br>` +
                     `<span style="font-size:10px;color:#4b5563;word-break:break-all">${viewerUrl}</span><br>` +
@@ -1457,14 +1365,11 @@
             window.closeObs();
         };
 
-        // Inicializaciones al cargar la página
         initModalCanvasEvents();
         actualizarFirmasUI();
         updateUI(); 
 
-        window.addEventListener('online', () => {
-            sincronizarSilencioso();
-        });
+        window.addEventListener('online', () => { sincronizarSilencioso(); });
     </script>
 
     <!-- 3. CONFIGURACIÓN FIREBASE Y FOLIO AUTOMÁTICO -->
@@ -1538,10 +1443,22 @@
             };
 
             window.guardarBitacoraEnFirestore = async function(payload) {
-                const reportIdKey = `nom087_firestore_report_${encodeURIComponent(payload.folio)}`;
-                let reportId = localStorage.getItem(reportIdKey) || crypto.randomUUID().replace(/-/g, "");
-                localStorage.setItem(reportIdKey, reportId);
+                if (!payload.folio || payload.folio === "S/F") {
+                    const asignado = await window.generarFolioFirebase();
+                    if (asignado) payload.folio = asignado;
+                }
 
+                const folioKey = encodeURIComponent(payload.folio || "sin_folio");
+                const reportIdKey = `nom087_firestore_report_${folioKey}`;
+                const createdAtKey = `nom087_created_at_${folioKey}`;
+
+                let reportId = localStorage.getItem(reportIdKey) || crypto.randomUUID().replace(/-/g, "");
+                let createdAt = localStorage.getItem(createdAtKey) || new Date().toISOString();
+
+                localStorage.setItem(reportIdKey, reportId);
+                localStorage.setItem(createdAtKey, createdAt);
+
+                const ahoraIso = new Date().toISOString();
                 const reportRef = doc(db, "bitacora_reports", reportId);
                 const data = {
                     id: reportId,
@@ -1559,7 +1476,8 @@
                     priority: "baja",
                     sync_status: "sincronizado",
                     payload,
-                    updated_at: new Date().toISOString()
+                    created_at: createdAt,
+                    updated_at: ahoraIso
                 };
 
                 await setDoc(reportRef, data, { merge: true });
