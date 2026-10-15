@@ -216,7 +216,7 @@
 
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Checklists hoy</p><strong id="kpiChecklistHoy" class="text-3xl text-slate-800">0</strong></div>
-            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Fallas nuevas</p><strong id="kpiFallasNuevas" class="text-3xl text-[#7c2d12]">0</strong><p class="text-[10px] font-bold text-slate-400">Sin OT generada</p></div>
+            <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Fallas nuevas</p><strong id="kpiFallasNuevas" class="text-3xl text-[#7c2d12]">0</strong><p class="text-[10px] font-bold text-slate-400">Pendientes sin OT</p></div>
             <div class="panel-card rounded-lg border-red-200 p-4 text-center"><p class="text-xs font-bold uppercase text-red-700">OT abiertas</p><strong id="kpiOtAbiertas" class="text-3xl text-red-600">0</strong></div>
             <div class="panel-card rounded-lg border-green-200 p-4 text-center"><p class="text-xs font-bold uppercase text-green-700">OT terminadas / cerradas</p><strong id="kpiOtCerradas" class="text-3xl text-green-700">0</strong></div>
             <div class="panel-card rounded-lg p-4 text-center"><p class="text-xs font-bold uppercase text-slate-500">Unidades en atención</p><strong id="kpiUnidadesDetenidas" class="text-3xl text-[#294936]">0</strong><p class="text-[10px] font-bold text-slate-400">Con OT abierta en taller</p></div>
@@ -759,6 +759,22 @@
       return Number.isNaN(parsed.getTime()) ? new Date(0).toISOString() : parsed.toISOString();
     }
 
+    function resumenReportes(lista) {
+      const hoy = new Date();
+      const esHoy = (valor) => {
+        const f = new Date(valor);
+        return !Number.isNaN(f.getTime()) && f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth() && f.getDate() === hoy.getDate();
+      };
+      return {
+        total: lista.length,
+        checklist: lista.filter((r) => r.type === 'checklist').length,
+        bitacoras: lista.filter((r) => r.type === 'bitacora').length,
+        hoy: lista.filter((r) => esHoy(r.createdAt)).length,
+        operadores: new Set(lista.map((r) => r.driverName).filter(Boolean)).size,
+        unidades: new Set(lista.map((r) => r.unitId).filter(Boolean)).size
+      };
+    }
+
     // CARGA DIRECTA DESDE FIREBASE FIRESTORE (Incluye checklists y bitácoras con o sin created_at)
     async function cargarDatos(params = filtrosAplicados(), options = {}) {
       if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
@@ -812,20 +828,7 @@
           coincideFiltroGlobal(rep, { unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type' })
         );
 
-        const hoy = new Date();
-        const esHoy = (valor) => {
-          const f = new Date(valor);
-          return !isNaN(f.getTime()) && f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth() && f.getDate() === hoy.getDate();
-        };
-
-        const summary = {
-          total: rawReports.length,
-          checklist: rawReports.filter((r) => r.type === 'checklist').length,
-          bitacoras: rawReports.filter((r) => r.type === 'bitacora').length,
-          hoy: rawReports.filter((r) => esHoy(r.createdAt)).length,
-          operadores: new Set(rawReports.map((r) => r.driverName).filter(Boolean)).size,
-          unidades: new Set(rawReports.map((r) => r.unitId).filter(Boolean)).size
-        };
+        const summary = resumenReportes(filteredReports);
 
         render({
           summary,
@@ -902,49 +905,50 @@
         type: params.get('type') || 'todos'
       };
 
+      const boton = $('applyFilters');
+      boton.disabled = true;
       try {
-        const diasNecesarios = state.appliedFilters.from
-          ? Math.ceil((Date.now() - new Date(`${state.appliedFilters.from}T00:00:00`).getTime()) / 86400000) + 1
+        // Con solo "hasta" también hay que alcanzar esa fecha dentro de la ventana consultada
+        const fechaLimite = state.appliedFilters.from || state.appliedFilters.to;
+        const diasNecesarios = fechaLimite
+          ? Math.ceil((Date.now() - new Date(`${fechaLimite}T00:00:00`).getTime()) / 86400000) + 1
           : 0;
-        if (diasNecesarios > state.windowDays && state.role === 'admin') {
-          state.windowDays = diasNecesarios;
-          state.allReports = null;
+        if (diasNecesarios > state.windowDays) {
+          if (state.role === 'admin') {
+            state.windowDays = diasNecesarios;
+            state.allReports = null;
+          } else {
+            showToast(`Solo se consultan los últimos ${state.windowDays} días; las fechas anteriores no tendrán resultados.`);
+          }
         }
-        if (!state.allReports) await cargarDatos();
+        let recargado = false;
+        if (!state.allReports) {
+          await cargarDatos();
+          recargado = true;
+        }
         if (!state.allReports) throw new Error('No se pudieron cargar los reportes para aplicar los filtros.');
         if (!dashState.ordenes) await obtenerOrdenes();
 
-        const rawReports = state.allReports || [];
-        const filteredReports = rawReports.filter((report) =>
-          coincideFiltroGlobal(report, {
-            unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type'
-          })
-        );
-        const hoy = new Date();
-        const esHoy = (value) => {
-          const fecha = new Date(value);
-          return !Number.isNaN(fecha.getTime())
-            && fecha.getFullYear() === hoy.getFullYear()
-            && fecha.getMonth() === hoy.getMonth()
-            && fecha.getDate() === hoy.getDate();
-        };
-        render({
-          summary: {
-            total: rawReports.length,
-            checklist: rawReports.filter((report) => report.type === 'checklist').length,
-            bitacoras: rawReports.filter((report) => report.type === 'bitacora').length,
-            hoy: rawReports.filter((report) => esHoy(report.createdAt)).length,
-            operadores: new Set(rawReports.map((report) => report.driverName).filter(Boolean)).size,
-            unidades: new Set(rawReports.map((report) => report.unitId).filter(Boolean)).size
-          },
-          reports: filteredReports,
-          generatedAt: new Date().toISOString(),
-          filtered: true
-        });
+        // Si cargarDatos acaba de ejecutarse, ya renderizó con los filtros aplicados
+        if (!recargado) {
+          const filteredReports = state.allReports.filter((report) =>
+            coincideFiltroGlobal(report, {
+              unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type'
+            })
+          );
+          render({
+            summary: resumenReportes(filteredReports),
+            reports: filteredReports,
+            generatedAt: new Date().toISOString(),
+            filtered: true
+          });
+        }
         await Promise.all([cargarFallas(), cargarOrdenes()]);
         renderDashboard();
       } catch (error) {
         showToast(error.message);
+      } finally {
+        boton.disabled = false;
       }
     });
 
@@ -1837,14 +1841,15 @@
       const ordenesList = dashState.ordenes || [];
       const otPorReporte = new Map();
       const reparacionesCerradas = new Set();
+      const reparacionesEnCurso = new Set();
+      let fallasNuevas = 0;
 
       ordenesList.forEach((orden) => {
         if (orden.reporte_id) otPorReporte.set(String(orden.reporte_id), orden);
-        if (ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) {
-          const unidad = String(orden.unidad || '').toUpperCase().trim();
-          const categoria = categoriaKey(orden.sistema || orden.categoria || '');
-          reparacionesCerradas.add(`${unidad}|${categoria}`);
-        }
+        const unidad = String(orden.unidad || '').toUpperCase().trim();
+        const categoria = categoriaKey(orden.sistema || orden.categoria || '');
+        if (ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) reparacionesCerradas.add(`${unidad}|${categoria}`);
+        else reparacionesEnCurso.add(`${unidad}|${categoria}`);
       });
 
       checklists.forEach((report) => {
@@ -1873,6 +1878,8 @@
             if (estaRealizada) {
               celda.realizadas += 1;
               registroDia.realizadas = (registroDia.realizadas || 0) + 1;
+            } else if (!otAsociada && !reparacionesEnCurso.has(claveReparacion)) {
+              fallasNuevas += 1;
             }
 
             celdas.set(id, celda);
@@ -1889,7 +1896,7 @@
         celda.realizadas = Math.min(celda.reportadas, celda.realizadas);
       });
 
-      return { checklists, celdas: [...celdas.values()], porUnidad, porDia };
+      return { checklists, celdas: [...celdas.values()], porUnidad, porDia, fallasNuevas };
     }
 
     function calcularFallasRecurrentes(checklists) {
@@ -1975,7 +1982,7 @@
 
     function renderDashboard() {
       if ($('vista-dashboard').classList.contains('hidden')) return;
-      const { checklists, celdas, porUnidad, porDia } = calcularMetricas();
+      const { checklists, celdas, porUnidad, porDia, fallasNuevas } = calcularMetricas();
       const sumar = (lista, campo) => lista.reduce((s, x) => s + x[campo], 0);
       const reportadas = sumar(celdas, 'reportadas');
       const realizadas = sumar(celdas, 'realizadas');
@@ -1999,13 +2006,6 @@
       const ordenes = ordenesFiltradas();
       const otAbiertas = ordenes.filter((orden) => !ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)));
       const otCerradas = ordenes.filter((orden) => ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)));
-      const reportesConOT = new Set((dashState.ordenes || []).map((orden) => String(orden.reporte_id || '')).filter(Boolean));
-      let fallasNuevas = 0;
-      checklists.forEach((report) => {
-        if (reportesConOT.has(String(report.id))) return;
-        const porComp = fallasPorComponente(report);
-        COMPONENTES.forEach(({ key }) => { fallasNuevas += porComp[key].length; });
-      });
 
       $('kpiChecklistHoy').textContent = checklists.filter((report) => esHoy(report.createdAt)).length;
       $('kpiFallasNuevas').textContent = fallasNuevas;
