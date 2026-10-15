@@ -29,24 +29,29 @@
       {
         categoria: 'FRENOS',
         itemOficial: 'Balatas / Rotochamber / Matracas / Sin fuga de aire / Compresor',
-        terminosTaller: ['balata', 'freno', 'rotochamber', 'chambers', 'matraca', 'fuga de aire', 'fuga por siroco', 'valvula repartidora', 'compresor', 'manguera de frenos']
+        terminosTaller: ['balata', 'freno', 'rotochamber', 'chamber', 'matraca', 'fuga de aire', 'fuga por siroco', 'valvula repartidora', 'compresor', 'manguera de frenos']
       }
     ],
     TOLVAS: [
       {
+        categoria: 'ACCESORIOS',
+        itemOficial: 'Banderolas / Perno rey / Manivelas / Extintor / Torreta / Engrasado general',
+        terminosTaller: ['banderola', 'perno rey', 'manivela', 'extintor', 'torreta', 'engrasado', 'engrasada', 'engrasar', 'falta grasa']
+      },
+      {
         categoria: 'ESTRUCTURA Y SISTEMA DE DESCARGA',
-        itemOficial: 'Pluma / Tapas / Tolva / Manivelas / Gusano / Chumacera',
-        terminosTaller: ['bazuca', 'gusano', 'gusano de la bazuca', 'sinfin', 'motor vertical', 'chumacera', 'balero', 'balero de bazuca', 'manivela', 'patines', 'patin', 'tapa floja', 'tapas', 'seguro de tapa', 'linea de vida', 'escalera', 'pasamanos', 'golpe en cuerpo', 'cuerpo de tolva', 'fuga de grano', 'compuerta']
+        itemOficial: 'Pluma / Tapas / Tolva / Gusano / Chumacera',
+        terminosTaller: ['bazuca', 'gusano', 'gusano de la bazuca', 'sinfin', 'motor vertical', 'chumacera', 'chumasera', 'balero', 'balero de bazuca', 'patines', 'tapa floja', 'tapas', 'seguro de tapa', 'linea de vida', 'escalera', 'pasamanos', 'golpe en cuerpo', 'cuerpo de tolva', 'fuga de grano', 'compuerta']
       },
       {
         categoria: 'SISTEMA HIDRÁULICO',
-        itemOficial: 'Nivel de aceite / Fugas / Mangueras / Banco de válvulas / Manómetros',
-        terminosTaller: ['banco de valvulas', 'manguera hidraulica', 'fuga de hidraulico', 'piston', 'gato', 'palanca de descarga', 'valvula hidraulica', 'manometro', 'toma de fuerza']
+        itemOficial: 'Nivel de aceite / Fugas / Mangueras / Banco de válvulas / Manómetros / Cople',
+        terminosTaller: ['banco de valvulas', 'manguera hidraulica', 'fuga de hidraulico', 'piston', 'gato', 'palanca de descarga', 'valvula hidraulica', 'manometro', 'toma de fuerza', 'cople', 'coples']
       },
       {
         categoria: 'SUSPENSIÓN',
-        itemOficial: 'Bolsa de aire / Válvulas de suspensión / Amortiguadores',
-        terminosTaller: ['bolsa de suspension', 'valvula niveladora', 'amortiguador de remolque', 'buje de tirante', 'balancin', 'cambiar llantas', 'llanta ponchada', 'llanta lisa']
+        itemOficial: 'Bolsa de aire / Válvulas de suspensión / Amortiguadores / Perno de patín',
+        terminosTaller: ['perno de patin', 'perno del patin', 'perno patin', 'bolsa de suspension', 'valvula niveladora', 'amortiguador de remolque', 'buje de tirante', 'balancin', 'cambiar llantas', 'llanta ponchada', 'llanta lisa']
       },
       {
         categoria: 'FRENOS',
@@ -73,7 +78,7 @@
       {
         categoria: 'FRENOS',
         itemOficial: 'Matracas autoajuste / Chambers / Balatas / Fugas',
-        terminosTaller: ['matraca autoajuste', 'matracas', 'chambers', 'fuga en mangueras de aire', 'valvula relay']
+        terminosTaller: ['matraca autoajuste', 'matracas', 'chamber', 'fuga en mangueras de aire', 'valvula relay']
       },
       {
         categoria: 'ELÉCTRICO',

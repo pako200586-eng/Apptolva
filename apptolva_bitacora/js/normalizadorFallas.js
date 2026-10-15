@@ -26,6 +26,50 @@
     return maestro[catKey] || [];
   }
 
+  const CATEGORIA_GENERAL = 'GENERAL / REVISIÓN TALLER';
+
+  const PALABRAS_GENERICAS = new Set([
+    'cambiar', 'checar', 'revisar', 'poner', 'falta', 'general', 'estado', 'posicion',
+    'lado', 'izquierdo', 'derecho', 'izquierda', 'derecha', 'sistema', 'mismo', 'cambio',
+    'reparar', 'arreglar', 'revision', 'dañado', 'danado', 'dañada', 'danada'
+  ]);
+
+  function raices(texto) {
+    return (normalizarTexto(texto).match(/[a-z0-9]{5,}/g) || [])
+      .filter((palabra) => !PALABRAS_GENERICAS.has(palabra))
+      .map((palabra) => palabra.slice(0, 6));
+  }
+
+  function compartePalabra(frase, item) {
+    const raicesItem = new Set(raices(item));
+    return raices(frase).some((raiz) => raicesItem.has(raiz));
+  }
+
+  function mismaCategoria(a, b) {
+    const x = normalizarTexto(a);
+    const y = normalizarTexto(b);
+    return x === y || x.includes(y) || y.includes(x) || x.split(/[\s/]+/)[0] === y.split(/[\s/]+/)[0];
+  }
+
+  function clasificarTodas(frase, catalogo) {
+    const fraseNorm = normalizarTexto(frase);
+    return catalogo.filter((regla) => (Array.isArray(regla.terminosTaller) ? regla.terminosTaller : [])
+      .some((termino) => fraseNorm.includes(normalizarTexto(termino))));
+  }
+
+  function agregarDetalle(falla, frase) {
+    const norm = normalizarTexto(frase);
+    if (!falla.detalles.some((d) => normalizarTexto(d) === norm)) falla.detalles.push(frase);
+  }
+
+  function describirFalla(falla) {
+    const detalle = falla.detalles.map((d) => `"${d}"`).join('; ');
+    if (falla.origen === 'CHECKLIST') return falla.itemReportado || falla.itemOficial;
+    if (falla.origen === 'CHECKLIST + OBSERVACIÓN') return `${falla.itemReportado} (Detalle operador: ${detalle})`;
+    if (falla.categoria === CATEGORIA_GENERAL) return `Reportado en nota: ${detalle}`;
+    return `${falla.itemOficial} (Reportado en nota: ${detalle})`;
+  }
+
   function clasificarTexto(frase, catalogo) {
     const fraseNorm = normalizarTexto(frase);
 
@@ -138,62 +182,89 @@
       }
 
       const frasesNota = tieneNotaValida
-        ? textoNota.split(/[,;\n]+/)
+        ? textoNota.split(/[,;\n]+|\.{2,}|\.\s+/)
           .map((frase) => frase.trim())
           .filter((frase) => frase.length >= 3 && !TEXTOS_DESCARTABLES.includes(normalizarTexto(frase)))
         : [];
 
-      const fallasDelCheck = fallasChecklist[comp.key] || [];
+      const fallasComp = [];
+      const vistas = new Set();
 
-      fallasDelCheck.forEach((itemCheck) => {
+      (fallasChecklist[comp.key] || []).forEach((itemCheck) => {
         const clasificacion = clasificarTexto(itemCheck.item, catalogo);
-        const categoriaFinal = clasificacion.categoria !== 'GENERAL / REVISIÓN TALLER'
+        const categoriaFinal = clasificacion.categoria !== CATEGORIA_GENERAL
           ? clasificacion.categoria
           : (String(itemCheck.categoriaSugerida || 'GENERAL').toUpperCase());
 
-        const fraseCoincidente = frasesNota.find((frase) => {
-          const fNorm = normalizarTexto(frase);
-          return fNorm.includes(normalizarTexto(itemCheck.item)) || fNorm.includes(normalizarTexto(categoriaFinal));
-        });
+        const clave = `${normalizarTexto(categoriaFinal)}|${normalizarTexto(itemCheck.item)}`;
+        if (vistas.has(clave)) return;
+        vistas.add(clave);
 
-        const descripcion = fraseCoincidente
-          ? `${clasificacion.itemOficial} (Detalle operador: "${fraseCoincidente}")`
-          : (clasificacion.itemOficial || itemCheck.item);
-
-        fallasOficiales.push({
+        fallasComp.push({
           componente: comp.nombre,
           componenteKey: comp.key,
           sistema: categoriaFinal,
           categoria: categoriaFinal,
           itemReportado: itemCheck.item,
-          descripcion,
           itemOficial: clasificacion.itemOficial,
-          origen: fraseCoincidente ? 'CHECKLIST + OBSERVACIÓN' : 'CHECKLIST'
+          detalles: [],
+          origen: 'CHECKLIST'
         });
       });
 
+      // Cada frase de la nota se relaciona con las fallas ya marcadas (por palabra o por categoría del catálogo)
+      const soloNota = new Map();
       frasesNota.forEach((frase) => {
-        const clasificacion = clasificarTexto(frase, catalogo);
-        const yaExisteEnChecklist = fallasOficiales.some((falla) => (
-          falla.componenteKey === comp.key
-          && (
-            normalizarTexto(falla.descripcion).includes(normalizarTexto(frase))
-            || falla.itemOficial === clasificacion.itemOficial
-          )
-        ));
+        const destinos = new Set(fallasComp.filter((f) => compartePalabra(frase, f.itemReportado)));
+        const categoriasCatalogo = clasificarTodas(frase, catalogo);
 
-        if (!yaExisteEnChecklist) {
-          fallasOficiales.push({
+        categoriasCatalogo.forEach((regla) => {
+          const yaCubierta = [...destinos].some((f) => mismaCategoria(f.categoria, regla.categoria));
+          if (yaCubierta) return;
+          const delChecklist = fallasComp.find((f) => mismaCategoria(f.categoria, regla.categoria));
+          if (delChecklist) {
+            destinos.add(delChecklist);
+            return;
+          }
+          const previa = soloNota.get(regla.categoria) || {
             componente: comp.nombre,
             componenteKey: comp.key,
-            sistema: clasificacion.categoria,
-            categoria: clasificacion.categoria,
-            itemReportado: frase,
-            descripcion: `${clasificacion.itemOficial} (Reportado en nota: "${frase}")`,
-            itemOficial: clasificacion.itemOficial,
+            sistema: regla.categoria,
+            categoria: regla.categoria,
+            itemReportado: regla.itemOficial,
+            itemOficial: regla.itemOficial,
+            detalles: [],
             origen: 'OBSERVACIÓN OPERADOR'
-          });
+          };
+          agregarDetalle(previa, frase);
+          soloNota.set(regla.categoria, previa);
+        });
+
+        if (!destinos.size && !categoriasCatalogo.length) {
+          const general = soloNota.get(CATEGORIA_GENERAL) || {
+            componente: comp.nombre,
+            componenteKey: comp.key,
+            sistema: CATEGORIA_GENERAL,
+            categoria: CATEGORIA_GENERAL,
+            itemReportado: frase,
+            itemOficial: frase,
+            detalles: [],
+            origen: 'OBSERVACIÓN OPERADOR'
+          };
+          agregarDetalle(general, frase);
+          soloNota.set(CATEGORIA_GENERAL, general);
         }
+
+        destinos.forEach((falla) => {
+          agregarDetalle(falla, frase);
+          falla.origen = 'CHECKLIST + OBSERVACIÓN';
+        });
+      });
+
+      [...fallasComp, ...soloNota.values()].forEach((falla) => {
+        falla.descripcion = describirFalla(falla);
+        delete falla.detalles;
+        fallasOficiales.push(falla);
       });
     });
 
