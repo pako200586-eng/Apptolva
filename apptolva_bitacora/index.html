@@ -536,7 +536,7 @@
             {cat:"DOCUMENTOS", i:["Permiso Federal", "Placas Fisicas", "Certificación Fis-Mec", "Tarjeta Circulación", "Engomado Fis-Mec"]},
             {cat:"ESTRUCTURA", i:["Tapas", "Tolva", "Pluma", "Línea de vida", "Pasamanos", "Compartimentos", "Banco de válvulas"]},
             {cat:"ELÉCTRICO", i:["Luces", "Estado de los cables", "Enchufes 7 vias", "Conectores"]},
-            {cat:"SUSPENSIÓN", i:["Bolsa de aire", "Válvulas de suspensión", "Amortiguadores"]},
+            {cat:"SUSPENSIÓN", i:["Bolsa de aire", "Válvulas de suspensión", "Amortiguadores", "Llantas"]},
             {cat:"ACCESORIOS", i:["Banderolas", "Etiquetas de seguridad"]},
             {cat:"FRENOS", i:["Mangueras", "Balatas", "Rotochambers", "Matracas", "Levas", "ABS"]}
         ];
@@ -1078,43 +1078,45 @@
                     let y = 13;
 
                     doc.setFillColor(234, 88, 12);
-                    doc.rect(margin, y, contentW, 11, 'F');
+                    doc.rect(margin, y, contentW, 12, 'F');
                     if (logoUrl) {
                         doc.setFillColor(255, 255, 255);
-                        doc.rect(margin + 1, y + 1, 38, 9, 'F');
-                        try { doc.addImage(logoUrl, 'JPEG', margin + 1.5, y + 1.3, 33, 8.4, undefined, 'FAST'); } catch (e) {}
+                        doc.rect(margin + 1, y + 1, 40, 10, 'F');
+                        try { doc.addImage(logoUrl, 'JPEG', margin + 2, y + 1.4, 36.9, 10 - 0.8, undefined, 'FAST'); } catch (e) {}
+                    } else {
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(13);
+                        doc.text('BACHOCO', margin + 3, y + 8);
                     }
                     doc.setTextColor(255, 255, 255);
                     doc.setFont('helvetica', 'bold');
                     doc.setFontSize(7.5);
-                    doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 4.5, {align: 'right'});
-                    doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 9, {align: 'right'});
+                    doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 5, {align: 'right'});
+                    doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 10, {align: 'right'});
 
-                    y += 14;
-                    doc.setTextColor(100, 100, 100);
-                    doc.setFont('helvetica', 'normal');
-                    doc.setFontSize(8);
-                    doc.text('GRUPO BACHOCO, S.A. DE C.V. — PLANTA DE ALIMENTOS', margin, y);
-
-                    y += 5;
+                    y += 16;
                     doc.setFillColor(248, 250, 252);
                     doc.setDrawColor(226, 232, 240);
                     doc.setLineWidth(0.3);
-                    doc.rect(margin, y, contentW, 22, 'FD');
+                    doc.rect(margin, y, contentW, 31, 'FD');
                     doc.setTextColor(0, 0, 0);
                     doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(8);
+                    doc.setFontSize(9);
                     const half = contentW / 2;
-                    const empleadoTexto = numeroEmpleado ? '   No. EMP: ' + numeroEmpleado : '';
-                    doc.text('UNIDAD: ' + u, margin + 3, y + 5);
-                    doc.text('OPERADOR: ' + opNombre + empleadoTexto, margin + half + 3, y + 5);
-                    doc.text('TOLVA 1: ' + t1, margin + 3, y + 11);
-                    doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 11);
-                    doc.text('DOLLY: ' + dolly, margin + 3, y + 17);
-                    doc.text('KM: ' + km, margin + half + 3, y + 17);
-                    doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + 3, y + 21);
+                    const empleadoTexto = numeroEmpleado ? '   |   No. EMP: ' + numeroEmpleado : '';
+                    doc.text('OPERADOR: ' + opNombre + empleadoTexto, pageW / 2, y + 6, {align: 'center'});
+                    doc.setDrawColor(226, 232, 240);
+                    doc.line(margin + 3, y + 9, margin + contentW - 3, y + 9);
+                    doc.setFontSize(8);
+                    doc.text('UNIDAD: ' + u, margin + 3, y + 14.5);
+                    doc.text('KM: ' + km, margin + half + 3, y + 14.5);
+                    doc.text('TOLVA 1: ' + t1, margin + 3, y + 20);
+                    doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 20);
+                    doc.text('DOLLY: ' + dolly, margin + 3, y + 25.5);
+                    doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + half + 3, y + 25.5);
 
-                    y += 26;
+                    y += 35;
                     doc.setFillColor(51, 65, 85);
                     doc.rect(margin, y, contentW, 8, 'F');
                     doc.setTextColor(255, 255, 255);
@@ -1124,10 +1126,10 @@
 
                     y += 12;
 
-                    const COL_HEIGHT = 170;
-                    const CAT_BOX_H = 5.5;
-                    const CAT_INCREMENT = 6.5;
-                    const ITEM_INCREMENT = 6;
+                    const COL_HEIGHT = 164;
+                    const CAT_BOX_H = 6;
+                    const CAT_INCREMENT = 9.5;
+                    const ITEM_INCREMENT = 5.6;
                     const ITEM_LINE_HEIGHT = 3.1;
                     const MIN_OBS_H = 12;
                     const OBS_TOP_PADDING = 8;
@@ -1163,7 +1165,7 @@
                             doc.setTextColor(51, 65, 85);
                             doc.setFont('helvetica', 'bold');
                             doc.setFontSize(7);
-                            doc.text(cat.cat, cx + 5, y + 3.8);
+                            doc.text(cat.cat, cx + 5, y + 4.1);
 
                             y += CAT_INCREMENT;
 

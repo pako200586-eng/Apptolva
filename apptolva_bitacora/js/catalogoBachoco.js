@@ -9,7 +9,7 @@
       {
         categoria: 'SUSPENSIÓN',
         itemOficial: 'Bolsas de aire / Muelles / Amortiguadores / Birlos / Tacones',
-        terminosTaller: ['tacones de cabina', 'tacones', 'bolsa ponchada', 'bolsa de aire', 'muelle', 'hoja rota', 'amortiguador', 'birlo degollado', 'tuerca floja', 'birlos']
+        terminosTaller: ['tacones de cabina', 'tacones', 'bolsa ponchada', 'bolsa de aire', 'muelle', 'hoja rota', 'amortiguador', 'birlo degollado', 'tuerca floja', 'birlos', 'llanta', 'llantas']
       },
       {
         categoria: 'ELÉCTRICO',
@@ -51,7 +51,7 @@
       {
         categoria: 'SUSPENSIÓN',
         itemOficial: 'Bolsa de aire / Válvulas de suspensión / Amortiguadores / Perno de patín',
-        terminosTaller: ['perno de patin', 'perno del patin', 'perno patin', 'bolsa de suspension', 'valvula niveladora', 'amortiguador de remolque', 'buje de tirante', 'balancin', 'cambiar llantas', 'llanta ponchada', 'llanta lisa']
+        terminosTaller: ['perno de patin', 'perno del patin', 'perno patin', 'bolsa de suspension', 'valvula niveladora', 'amortiguador de remolque', 'buje de tirante', 'balancin', 'cambiar llantas', 'llanta', 'llanta ponchada', 'llanta lisa']
       },
       {
         categoria: 'FRENOS',
@@ -73,7 +73,7 @@
       {
         categoria: 'SUSPENSIÓN',
         itemOficial: 'Cámara de Suspensión / Amortiguadores / Birlos / Llantas',
-        terminosTaller: ['camara de suspension', 'llantas', 'llanta desgastada', 'birlo flojo', 'tuerca de dolly', 'amortiguadores de dolly']
+        terminosTaller: ['camara de suspension', 'llanta', 'llantas', 'llanta desgastada', 'birlo flojo', 'tuerca de dolly', 'amortiguadores de dolly']
       },
       {
         categoria: 'FRENOS',
