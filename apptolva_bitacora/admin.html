@@ -1340,6 +1340,7 @@
     function tarjetaFallaHtml(reporte, fallas, observaciones) {
       const inc = `INC-${String(reporte.id || '').slice(0, 6).toUpperCase() || 'S/N'}`;
       const fecha = reporte.createdAt ? new Date(reporte.createdAt).toLocaleDateString('es-MX') : 'Sin fecha';
+      const eco = numerosEconomicos(reporte);
 
       const listaFallas = fallas.map((falla) => `
         <li class="flex items-start gap-2 text-sm">
@@ -1358,6 +1359,7 @@
           <div>
             <p class="text-xs font-black text-slate-400">${escapeHtml(inc)} · Folio ${escapeHtml(reporte.folio || 'S/F')}</p>
             <h3 class="text-lg font-black text-[#7c2d12]">Unidad ${escapeHtml(reporte.unitId || 'N/A')}</h3>
+            <p class="text-xs font-bold text-slate-600">Tolva 1: ${escapeHtml(eco.tolva1)} · Dolly: ${escapeHtml(eco.dolly)} · Tolva 2: ${escapeHtml(eco.tolva2)}</p>
             <p class="text-xs font-bold text-slate-500">Operador: ${escapeHtml(reporte.driverName || 'N/A')} · ${escapeHtml(fecha)}</p>
           </div>
           <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>

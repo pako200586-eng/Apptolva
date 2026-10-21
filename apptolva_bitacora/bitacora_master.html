@@ -382,6 +382,22 @@
         const LICENSE_EXP_WARNING_DAYS = 15;
         const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 
+        // Respaldo en memoria: en iOS setItem puede lanzar QuotaExceededError y la firma se perdía.
+        const _sigMem = {};
+        function setSig(key, val) {
+            _sigMem[key] = val;
+            try { localStorage.setItem(key, val); return true; } catch (e) { return false; }
+        }
+        function getSig(key) { return _sigMem[key] || localStorage.getItem(key); }
+        function delSig(key) { delete _sigMem[key]; localStorage.removeItem(key); }
+
+        // Pide a iOS/Safari no purgar el almacenamiento de la PWA.
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+        // iOS suspende la app sin avisar: guardar al ocultarse.
+        const flushLogs = () => { try { localStorage.setItem('nom087_logs', JSON.stringify(logs)); } catch (e) {} };
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushLogs(); });
+        window.addEventListener('pagehide', flushLogs);
+
         let logs = JSON.parse(localStorage.getItem('nom087_logs')) || [];
         let currentStatus = logs.length > 0 ? logs[logs.length - 1].status : 1;
 
@@ -775,8 +791,10 @@
         window.guardarFirmaModal = function() {
             if (!hasStroke) { alert("⚠️ Por favor dibuje su firma antes de guardar."); return; }
             const dataUrl = sigPadCanvas.toDataURL("image/jpeg", 0.7);
-            if (currentSigType === 'op') localStorage.setItem('nom087_signatureOp', dataUrl);
-            else localStorage.setItem('nom087_signatureSup', dataUrl);
+            const key = currentSigType === 'op' ? 'nom087_signatureOp' : 'nom087_signatureSup';
+            if (!setSig(key, dataUrl)) {
+                alert("⚠️ La memoria del dispositivo está llena. La firma se conserva solo mientras la app esté abierta; genera el PDF antes de salir.");
+            }
             window.cerrarModalFirma();
             actualizarFirmasUI();
             sincronizarSilencioso();
@@ -784,16 +802,15 @@
 
         window.borrarFirmaGuardada = function(tipo) {
             if (confirm("¿Deseas borrar esta firma guardada?")) {
-                if (tipo === 'op') localStorage.removeItem('nom087_signatureOp');
-                else localStorage.removeItem('nom087_signatureSup');
+                delSig(tipo === 'op' ? 'nom087_signatureOp' : 'nom087_signatureSup');
                 actualizarFirmasUI();
                 sincronizarSilencioso();
             }
         };
 
         function actualizarFirmasUI() {
-            const sigOp = localStorage.getItem('nom087_signatureOp');
-            const sigSup = localStorage.getItem('nom087_signatureSup');
+            const sigOp = getSig('nom087_signatureOp');
+            const sigSup = getSig('nom087_signatureSup');
 
             const badgeOp = document.getElementById('badgeSigOp');
             const containerOp = document.getElementById('previewSigOpContainer');
@@ -1190,8 +1207,8 @@
             y += 10;
             
             doc.setDrawColor(0);
-            const sigOpData = localStorage.getItem('nom087_signatureOp');
-            const sigSupData = localStorage.getItem('nom087_signatureSup');
+            const sigOpData = getSig('nom087_signatureOp');
+            const sigSupData = getSig('nom087_signatureSup');
 
             doc.line(30, y + 20, 80, y + 20);
             if (sigOpData) { try { doc.addImage(sigOpData, 'JPEG', 35, y, 40, 18); } catch (e) {} }
@@ -1273,8 +1290,8 @@
         function buildBitacoraPayload() {
             const rawFolio = document.getElementById('folio').value || "S/F";
             const operator = getSelectedCatalogOperator();
-            const signatureOp = localStorage.getItem('nom087_signatureOp') || "";
-            const signatureSup = localStorage.getItem('nom087_signatureSup') || "";
+            const signatureOp = getSig('nom087_signatureOp') || "";
+            const signatureSup = getSig('nom087_signatureSup') || "";
 
             return {
                 folio: rawFolio.trim(),

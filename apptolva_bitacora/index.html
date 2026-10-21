@@ -411,7 +411,22 @@
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
         const FIRESTORE_PENDING_REPORT_ID_KEY = 'apptolva_pending_firestore_report_id';
         const FIRESTORE_PENDING_REPORT_DRAFT_KEY = 'apptolva_pending_firestore_report_draft';
-        
+
+        // Respaldo en memoria: en iOS setItem puede lanzar QuotaExceededError y la firma se perdía.
+        const _sigMem = {};
+        function setSig(key, val) {
+            _sigMem[key] = val;
+            try { localStorage.setItem(key, val); return true; } catch (e) { return false; }
+        }
+        function getSig(key) { return _sigMem[key] || localStorage.getItem(key); }
+        function delSig(key) { delete _sigMem[key]; localStorage.removeItem(key); }
+
+        // Pide a iOS/Safari no purgar el almacenamiento de la PWA.
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+        // iOS suspende la app sin avisar: guardar al ocultarse.
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoGuardar(); });
+        window.addEventListener('pagehide', () => autoGuardar());
+
         document.addEventListener('DOMContentLoaded', function() {
             try {
                 initModalCanvasEvents();
@@ -858,12 +873,9 @@
                 return;
             }
             const dataUrl = modalCanvas.toDataURL("image/png");
-            if (currentSigType === 'op') {
-                localStorage.setItem('apptolva_sig_op', dataUrl);
-            } else if (currentSigType === 'op2') {
-                localStorage.setItem('apptolva_sig_op2', dataUrl);
-            } else {
-                localStorage.setItem('apptolva_sig_sup', dataUrl);
+            const key = currentSigType === 'op' ? 'apptolva_sig_op' : currentSigType === 'op2' ? 'apptolva_sig_op2' : 'apptolva_sig_sup';
+            if (!setSig(key, dataUrl)) {
+                alert("⚠️ La memoria del dispositivo está llena. La firma se conserva solo mientras la app esté abierta; genera el PDF antes de salir.");
             }
             cerrarModalFirma();
             actualizarFirmasUI();
@@ -872,18 +884,18 @@
 
         function borrarFirmaGuardada(tipo) {
             if (confirm("¿Deseas borrar esta firma guardada?")) {
-                if (tipo === 'op') localStorage.removeItem('apptolva_sig_op');
-                if (tipo === 'op2') localStorage.removeItem('apptolva_sig_op2');
-                if (tipo === 'sup') localStorage.removeItem('apptolva_sig_sup');
+                if (tipo === 'op') delSig('apptolva_sig_op');
+                if (tipo === 'op2') delSig('apptolva_sig_op2');
+                if (tipo === 'sup') delSig('apptolva_sig_sup');
                 actualizarFirmasUI();
                 autoGuardar();
             }
         }
 
         function actualizarFirmasUI() {
-            const sigOp = localStorage.getItem('apptolva_sig_op');
-            const sigOp2 = localStorage.getItem('apptolva_sig_op2');
-            const sigSup = localStorage.getItem('apptolva_sig_sup');
+            const sigOp = getSig('apptolva_sig_op');
+            const sigOp2 = getSig('apptolva_sig_op2');
+            const sigSup = getSig('apptolva_sig_sup');
 
             // 1. Operador
             const badgeOp = document.getElementById('badgeSigOp');
@@ -988,7 +1000,7 @@
             }
 
             // Validar firma del operador obligatoria
-            const firmaOpImg = localStorage.getItem('apptolva_sig_op') || '';
+            const firmaOpImg = getSig('apptolva_sig_op') || '';
             if (!firmaOpImg) {
                 return alert("⚠️ Falta la Firma del Operador. Presiona 'Capturar Firma' para firmar.");
             }
@@ -1020,8 +1032,8 @@
                 
                 document.getElementById('revFolio').value = folio;
 
-                const firmaOp2Img = localStorage.getItem('apptolva_sig_op2') || '';
-                const firmaSupImg = localStorage.getItem('apptolva_sig_sup') || '';
+                const firmaOp2Img = getSig('apptolva_sig_op2') || '';
+                const firmaSupImg = getSig('apptolva_sig_sup') || '';
                 
                 const nombreOp2 = document.getElementById('nombreOp2Texto')?.value || "";
                 const nombreSup = document.getElementById('nombreSupTexto')?.value || "";
