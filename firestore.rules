@@ -156,8 +156,16 @@ service cloud.firestore {
     match /bitacora_reports/{reportId} {
       allow get: if signedIn();
       allow list: if isPanelUser();
-      allow create: if isAnonymousOperator() || isAdmin();
-      allow update, delete: if false;
+      // El operador anónimo escribe solo sus propios reportes. Un reporte con turnoCerrado = true queda inmutable.
+      allow create: if (isAnonymousOperator()
+          && request.resource.data.owner_uid == request.auth.uid)
+        || isAdmin();
+      allow update: if isAnonymousOperator()
+        && resource.data.owner_uid == request.auth.uid
+        && resource.data.turnoCerrado != true
+        && request.resource.data.owner_uid == resource.data.owner_uid
+        && request.resource.data.created_at == resource.data.created_at;
+      allow delete: if false;
     }
 
     match /usuarios/{email} {

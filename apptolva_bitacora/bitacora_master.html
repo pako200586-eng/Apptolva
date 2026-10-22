@@ -210,12 +210,12 @@
         <!-- Alertas -->
         <div id="alertBox" class="hidden bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-exclamation-triangle mt-1"></i>
-            <div><p class="font-bold text-sm">¡Alerta de Fatiga! Límite 14h de Conducción</p><p id="alertMsg" class="text-xs">Te acercas al límite máximo de 14 horas de conducción en tu jornada de 24h. Debes tomar tu descanso obligatorio de 8 horas continuas.</p></div>
+            <div><p class="font-bold text-sm">Límite de 14 h de conducción (NOM-087 4.7)</p><p id="alertMsg" class="text-xs">Llevas más de 13 horas de conducción en 24 horas. El límite es de 14 horas.</p></div>
         </div>
 
         <div id="alertBox5h" class="hidden bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r shadow-sm flex items-start gap-3">
             <i class="fas fa-clock mt-1"></i>
-            <div><p class="font-bold text-sm">¡Pausa Obligatoria de 30 min! (NOM-087 Art. 4.1)</p><p class="text-xs">Superaste 4.5 horas de manejo continuo. Debes realizar una pausa mínima de 30 minutos ininterrumpidos antes de las 5 horas.</p></div>
+            <div><p class="font-bold text-sm">Pausa de 30 min requerida (NOM-087 4.1)</p><p id="alertBox5hMsg" class="text-xs">Llevas más de 4.5 horas de manejo continuo. Antes de cumplir 5 horas debes acumular 30 min de pausa (puede ser fraccionada dentro de 5.5 horas).</p></div>
         </div>
 
         <!-- Evidencia GPS -->
@@ -241,7 +241,7 @@
             <div class="relative w-full border rounded-lg overflow-hidden"><canvas id="logChart" width="800" height="250"></canvas></div>
             <div id="chartXAxisLabels" class="flex justify-between text-[10px] text-gray-500 px-2 mt-1 font-mono font-bold"></div>
             
-            <button onclick="terminarTurno48h()" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
+            <button type="button" id="btnTerminarTurno" class="mt-3 w-full bg-red-600 text-white font-bold py-3 rounded-lg text-xs shadow-sm active:scale-95 transition touch-manipulation select-none flex justify-center items-center gap-2 border border-red-800 hover:bg-red-700">
                 <i class="fas fa-flag-checkered text-lg"></i> FINALIZAR VIAJE / TERMINAR TURNO Y RESPALDAR
             </button>
         </div>
@@ -352,7 +352,7 @@
     <!-- Modal Notas -->
     <div id="obsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
         <div class="bg-white rounded-xl p-5 w-11/12 max-w-sm shadow-2xl">
-            <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-gray-800">Agregar Justificación / Nota</h3><button onclick="window.closeObs()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button></div>
+            <div class="flex justify-between items-center mb-3"><h3 id="obsTitle" class="font-bold text-gray-800">Agregar Justificación / Nota</h3><button onclick="window.closeObs()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button></div>
             <textarea id="obsText" class="w-full border-2 border-gray-200 rounded-lg p-3 h-24 text-sm focus:border-orange-500 outline-none resize-none" placeholder="Excepción, retén, maniobra de desenganche, avería..."></textarea>
             <div class="flex justify-end gap-2 mt-4">
                 <button onclick="window.closeObs()" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
@@ -419,11 +419,55 @@
             if (ultimoDescansoIndex !== -1 && ultimoDescansoIndex < logList.length - 1) {
                 return logList[ultimoDescansoIndex + 1].startTime;
             }
+            // Descanso de 8 h que aún es el último registro: la nueva jornada empieza al terminarlo.
+            if (ultimoDescansoIndex !== -1) {
+                return logList[ultimoDescansoIndex].endTime || Date.now();
+            }
             return logList[0].startTime;
         }
 
         function getShiftStartHour(logList) {
             return new Date(getShiftStartTime(logList)).getHours();
+        }
+
+        // Límites NOM-087: 4.7 (máximo 14 h de conducción en 24 h) y 4.1 (5 h continuas, con pausa acumulada de 30 min).
+        const LIMITE_24H_MIN = 14 * 60;
+        const LIMITE_CONTINUO_MIN = 5 * 60;
+        const MIN_JUSTIFICACION_CHARS = 10;
+        function excepcionSinJustificar() {
+            const ultimo = logs[logs.length - 1];
+            return !!ultimo && ultimo.status === 5 && (!ultimo.observation || ultimo.observation.trim().length < MIN_JUSTIFICACION_CHARS);
+        }
+        function calcularLimitesConduccion(now) {
+            const shiftStart = getShiftStartTime(logs);
+            const limite24h = shiftStart + (24 * 60 * 60 * 1000);
+            let driveMins = 0;
+            logs.forEach(l => {
+                if (l.status === 3) {
+                    const start = l.startTime;
+                    const end = l.endTime || now;
+                    if (end > shiftStart && start < limite24h) {
+                        const s = Math.max(start, shiftStart);
+                        const e = Math.min(end, limite24h, now);
+                        if (e > s) driveMins += Math.floor((e - s) / 60000);
+                    }
+                }
+            });
+
+            // Las pausas se suman hacia atrás hasta completar 30 min; solo el manejo posterior cuenta como continuo.
+            let continuousDrive = 0;
+            let pausaAcumulada = 0;
+            for (let i = logs.length - 1; i >= 0; i--) {
+                const end = logs[i].endTime || now;
+                const dur = Math.floor((end - logs[i].startTime) / 60000);
+                if (logs[i].status === 3) {
+                    continuousDrive += dur;
+                } else if (logs[i].status === 1 || logs[i].status === 2) {
+                    pausaAcumulada += dur;
+                    if (pausaAcumulada >= 30) break;
+                }
+            }
+            return { driveMins, continuousDrive };
         }
 
         const ids = [
@@ -438,7 +482,7 @@
             const el = document.getElementById(id);
             if (!el) return;
             const val = localStorage.getItem('nom087_' + id);
-            if (val && (id !== 'folio' || /^(?:FB\d+|OFF-\d{6})$/.test(val))) {
+            if (val && (id !== 'folio' || /^(?:FB\d+|OFF-(?:[0-9A-F]{8}|\d{6}))$/.test(val))) {
                 el.value = val;
             } else if (id === 'folio' && val) {
                 localStorage.removeItem('nom087_folio');
@@ -634,6 +678,22 @@
         window.changeStatus = async (st) => {
             if (currentStatus === st) return;
             const now = Date.now();
+            if (currentStatus === 5 && st !== 5 && excepcionSinJustificar()) {
+                alert("⚠️ NOM-087 8.2.1 IX: debes justificar el caso de excepción antes de salir de este estado.");
+                window.openObs();
+                return;
+            }
+            if (st === 3) {
+                const { driveMins, continuousDrive } = calcularLimitesConduccion(now);
+                if (driveMins >= LIMITE_24H_MIN) {
+                    alert("⛔ NOM-087 4.7: ya llegaste a 14 horas de conducción en 24 horas. Registra un descanso de 8 horas continuas (4.6) antes de volver a conducir.");
+                    return;
+                }
+                if (continuousDrive >= LIMITE_CONTINUO_MIN) {
+                    alert("⛔ NOM-087 4.1: llevas 5 horas de manejo continuo sin la pausa de 30 minutos. Registra la pausa antes de volver a conducir.");
+                    return;
+                }
+            }
             if (logs.length > 0) logs[logs.length - 1].endTime = now;
             const newLog = { status: st, startTime: now, endTime: null, place: "En Ruta", observation: "", gps: null };
             logs.push(newLog);
@@ -645,7 +705,7 @@
 
             if (st === 5) {
                 setTimeout(() => {
-                    alert("⚠️ NOM-087 Art. 4.7: El estado de EXCEPCIÓN exige justificación obligatoria (avería, clima adverso, congestión). Por favor registra la causa.");
+                    alert("⚠️ NOM-087 8.2.1 IX: el estado de EXCEPCIÓN exige justificación obligatoria (avería, clima adverso, congestión, etc.). Registra la causa para poder continuar.");
                     window.openObs();
                 }, 300);
             }
@@ -688,32 +748,93 @@
             }
         }
 
-        window.terminarTurno48h = async function() {
+        // Cola local de cierres de turno: sobrevive a recargas y a la falta de red.
+        const CIERRES_PENDIENTES_KEY = 'nom087_cierres_pendientes';
+        let turnoEnProceso = false;
+
+        function leerCierresPendientes() {
+            try { return JSON.parse(localStorage.getItem(CIERRES_PENDIENTES_KEY)) || []; } catch (e) { return []; }
+        }
+
+        function guardarCierresPendientes(lista) {
+            try { localStorage.setItem(CIERRES_PENDIENTES_KEY, JSON.stringify(lista)); return true; } catch (e) { return false; }
+        }
+
+        // Envía a la nube los cierres pendientes. Si no hay red, se quedan en la cola y se reintentan.
+        function sincronizarCierresPendientes() {
+            if (!navigator.onLine || typeof window.guardarBitacoraEnFirestore !== "function") {
+                if (leerCierresPendientes().length) setCloudStatus("offline");
+                return;
+            }
+            leerCierresPendientes().forEach((cierre) => {
+                window.guardarBitacoraEnFirestore(cierre.payload)
+                    .then(() => {
+                        guardarCierresPendientes(leerCierresPendientes().filter(c => c.id !== cierre.id));
+                        setCloudStatus(leerCierresPendientes().length ? "offline" : "synced");
+                    })
+                    .catch(() => setCloudStatus("offline"));
+            });
+        }
+
+        // Reinicia el periodo sin recargar la página: el turno anterior ya quedó en la cola local.
+        function iniciarNuevoPeriodo() {
+            logs = [{ status: 1, startTime: Date.now(), endTime: null, place: "Inicio", observation: "", gps: null }];
+            currentStatus = 1;
+            localStorage.removeItem('nom087_logs');
+            ['origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada', 'kmInicio', 'kmFin'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+                localStorage.removeItem('nom087_' + id);
+            });
+            document.getElementById('folio').value = '';
+            localStorage.removeItem('nom087_folio');
+            delSig('nom087_signatureOp');
+            delSig('nom087_signatureSup');
+            guardarLocal();
+            actualizarFirmasUI();
+            window.generarFolioFirebase?.();
+        }
+
+        // Cierre optimista: la UI y el log se cierran de inmediato; la nube se actualiza después.
+        window.terminarTurno48h = function() {
+            if (turnoEnProceso) return;
             if (!getSelectedCatalogOperator()) {
                 alert("⚠️ Selecciona al operador del catálogo oficial antes de finalizar el turno.");
                 return;
             }
-            if (confirm("⚠️ ¿FINALIZAR VIAJE / TERMINAR TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nLa bitácora se respaldará en la nube y se iniciará un periodo en ceros.")) {
-                try {
-                    if (navigator.onLine && typeof window.guardarBitacoraEnFirestore === "function") {
-                        const payload = buildBitacoraPayload();
-                        await window.guardarBitacoraEnFirestore(payload);
-                    }
-                } catch (e) {}
+            if (!confirm("⚠️ ¿FINALIZAR VIAJE / TERMINAR TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nLa bitácora se respaldará en la nube y se iniciará un periodo en ceros.")) return;
 
-                localStorage.removeItem('nom087_logs');
-                localStorage.removeItem('nom087_folio');
-                localStorage.removeItem('nom087_signatureOp');
-                localStorage.removeItem('nom087_signatureSup');
-                const clearIds = ['origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada', 'kmInicio', 'kmFin'];
-                clearIds.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.value = '';
-                    localStorage.removeItem('nom087_' + id);
-                });
-                location.reload();
+            turnoEnProceso = true;
+            const ultimo = logs[logs.length - 1];
+            const endTimeOriginal = ultimo ? ultimo.endTime : null;
+            try {
+                const corteMs = Date.now();
+                const horaCorte = new Date(corteMs).toISOString();
+                if (ultimo && !ultimo.endTime) ultimo.endTime = corteMs;
+
+                const cierre = {
+                    id: crypto.randomUUID(),
+                    horaCorte,
+                    payload: { ...buildBitacoraPayload(), turnoCerrado: true, horaCorte }
+                };
+
+                if (!guardarCierresPendientes([...leerCierresPendientes(), cierre])) {
+                    if (ultimo) ultimo.endTime = endTimeOriginal;
+                    alert("⚠️ La memoria del dispositivo está llena. Genera el PDF y libera espacio antes de finalizar el turno.");
+                    return;
+                }
+
+                iniciarNuevoPeriodo();
+                sincronizarCierresPendientes();
+            } finally {
+                turnoEnProceso = false;
             }
         };
+
+        document.getElementById('btnTerminarTurno')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.terminarTurno48h();
+        });
 
         let currentSigType = 'op';
         let sigPadCanvas = document.getElementById('activeSignaturePad');
@@ -898,44 +1019,33 @@
             const countBadge = document.getElementById('logCountBadge');
             if (countBadge) countBadge.textContent = String(logs.length);
 
-            const shiftStart = getShiftStartTime(logs);
-            const limite24h = shiftStart + (24 * 60 * 60 * 1000);
-            let driveMins = 0;
-
-            logs.forEach(l => {
-                if (l.status === 3) {
-                    let start = l.startTime;
-                    let end = l.endTime || now;
-                    if (end > shiftStart && start < limite24h) {
-                        const s = Math.max(start, shiftStart);
-                        const e = Math.min(end, limite24h, now);
-                        if (e > s) driveMins += Math.floor((e - s) / 60000);
-                    }
-                }
-            });
+            const { driveMins, continuousDrive } = calcularLimitesConduccion(now);
 
             const dmElem = document.getElementById('totalDriving');
             if (dmElem) dmElem.innerText = `${Math.floor(driveMins / 60)}h ${driveMins % 60}m`;
 
-            if (driveMins > 13 * 60) document.getElementById('alertBox')?.classList.remove('hidden');
-            else document.getElementById('alertBox')?.classList.add('hidden');
-
-            let continuousDrive = 0;
-            if (logs.length > 0) {
-                for (let i = logs.length - 1; i >= 0; i--) {
-                    if (logs[i].status === 3) {
-                        const end = logs[i].endTime || now;
-                        continuousDrive += Math.floor((end - logs[i].startTime) / 60000);
-                    } else if (logs[i].status === 1 || logs[i].status === 2) {
-                        const breakEnd = logs[i].endTime || now;
-                        const breakDur = Math.floor((breakEnd - logs[i].startTime) / 60000);
-                        if (breakDur >= 30) break;
-                    }
-                }
+            const alertaFatiga = document.getElementById('alertBox');
+            const alertaFatigaMsg = document.getElementById('alertMsg');
+            if (driveMins >= LIMITE_24H_MIN) {
+                alertaFatiga?.classList.remove('hidden');
+                if (alertaFatigaMsg) alertaFatigaMsg.textContent = "Llegaste a 14 horas de conducción en 24 horas (NOM-087 4.7). No puedes volver a conducir hasta registrar un descanso de 8 horas continuas (4.6).";
+            } else if (driveMins > 13 * 60) {
+                alertaFatiga?.classList.remove('hidden');
+                if (alertaFatigaMsg) alertaFatigaMsg.textContent = "Llevas más de 13 horas de conducción en 24 horas. El límite es de 14 horas (NOM-087 4.7).";
+            } else {
+                alertaFatiga?.classList.add('hidden');
             }
 
-            if (continuousDrive > 270) document.getElementById('alertBox5h')?.classList.remove('hidden');
-            else document.getElementById('alertBox5h')?.classList.add('hidden');
+            const alertaEl = document.getElementById('alertBox5h');
+            const alertaMsg = document.getElementById('alertBox5hMsg');
+            if (continuousDrive > 270 && alertaEl) {
+                alertaEl.classList.remove('hidden');
+                if (alertaMsg) alertaMsg.textContent = continuousDrive > 300
+                    ? "Excediste 5 horas de manejo continuo sin la pausa de 30 min. Detente y registra la pausa ahora."
+                    : "Llevas más de 4.5 horas de manejo continuo. Antes de cumplir 5 horas debes acumular 30 min de pausa (puede ser fraccionada dentro de 5.5 horas).";
+            } else {
+                alertaEl?.classList.add('hidden');
+            }
 
             drawChart();
         }
@@ -1249,11 +1359,11 @@
 
             doc.setFontSize(7); doc.setFont("helvetica", "normal");
             const rules = [
-                "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: Máximo 5 horas continuas de conducción, tras las cuales se debe tomar una pausa de al menos 30 minutos ininterrumpidos.",
-                "4.2 PAUSAS NO FRACCIONABLES: Las pausas obligatorias de 30 minutos no se pueden fraccionar ni acumular.",
-                "4.3 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo total no excederá de 14 horas en un periodo de 24 horas.",
-                "4.4 DESCANSO OBLIGATORIO: Al completar la jornada de 14 horas o al término de la jornada, descanso mínimo de 8 horas continuas.",
-                "4.5 ITINERARIO Y PUNTOS INTERMEDIOS: El conductor debe asentar la ruta, escalas intermedias y horas de salida y llegada para validación de la autoridad federal.",
+                "4.1 TIEMPO MÁXIMO DE CONDUCCIÓN CONTINUA: Tras 5 horas continuas de conducción, o dentro de un lapso de 5 horas y media, el conductor debe realizar una pausa de 30 minutos.",
+                "4.2 PERIODOS DE PAUSA NO ACUMULABLES: Los periodos de pausa no pueden acumularse entre sí; la pausa puede fraccionarse dentro del lapso de 5 horas y media.",
+                "4.6 DESCANSO EN RUTAS DE HASTA 14 HORAS: Si la ruta implica hasta 14 horas de conducción, el conductor debe tener un descanso mínimo de 8 horas continuas, sin perjuicio de las pausas de 4.1 y 4.2.",
+                "4.7 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo de conducción no excederá de 14 horas en 24 horas.",
+                "REGISTRO DE RUTA: El conductor debe asentar la ruta, escalas intermedias y horas de salida y llegada para validación de la autoridad federal.",
                 "4.6 CO-CONDUCTOR: En relevo, cada conductor llevará su propia bitácora individual. El tiempo de copiloto no sustituye el descanso de 8 horas.",
                 "4.7 EXCEPCIONES: La conducción solo se prolongará por fuerza mayor justificada y anotada textualmente en la bitácora.",
                 "4.8 PORTABILIDAD DE LA BITÁCORA: Deberá portarse en la unidad física o digitalmente para inspección de la Guardia Nacional / SCT en todo momento."
@@ -1384,28 +1494,42 @@
         };
 
         window.closeQR = () => document.getElementById('qrModal').classList.add('hidden');
-        window.closeObs = () => document.getElementById('obsModal').classList.add('hidden');
+        window.closeObs = () => {
+            if (excepcionSinJustificar()) {
+                alert("⚠️ Debes escribir la justificación de la excepción (mínimo 10 caracteres) antes de cerrar.");
+                return;
+            }
+            document.getElementById('obsModal').classList.add('hidden');
+        };
         window.openObs = function() {
             const obsText = document.getElementById('obsText');
             if (!obsText) return;
+            const enExcepcion = excepcionSinJustificar() || (logs.length > 0 && logs[logs.length - 1].status === 5);
             obsText.value = logs.length > 0 ? (logs[logs.length - 1].observation || '') : '';
+            const titulo = document.getElementById('obsTitle');
+            if (titulo) titulo.textContent = enExcepcion ? 'Justificación obligatoria de Excepción' : 'Agregar Justificación / Nota';
             document.getElementById('obsModal').classList.remove('hidden');
         };
         window.saveObs = function() {
             const obsText = document.getElementById('obsText');
-            if (obsText && logs.length > 0) {
-                logs[logs.length - 1].observation = obsText.value.trim();
-                guardarLocal();
-                sincronizarSilencioso();
+            if (!obsText || logs.length === 0) return window.closeObs();
+            const texto = obsText.value.trim();
+            const ultimo = logs[logs.length - 1];
+            if (ultimo.status === 5 && texto.length < MIN_JUSTIFICACION_CHARS) {
+                alert(`⚠️ La justificación de la excepción debe tener al menos ${MIN_JUSTIFICACION_CHARS} caracteres.`);
+                return;
             }
-            window.closeObs();
+            ultimo.observation = texto;
+            guardarLocal();
+            sincronizarSilencioso();
+            document.getElementById('obsModal').classList.add('hidden');
         };
 
         initModalCanvasEvents();
         actualizarFirmasUI();
         updateUI(); 
 
-        window.addEventListener('online', () => { sincronizarSilencioso(); });
+        window.addEventListener('online', () => { sincronizarSilencioso(); sincronizarCierresPendientes(); });
     </script>
 
     <!-- 3. CONFIGURACIÓN FIREBASE Y FOLIO AUTOMÁTICO -->
@@ -1417,6 +1541,7 @@
             persistentLocalCache,
             persistentMultipleTabManager,
             runTransaction,
+            serverTimestamp,
             setDoc
         } from "./js/firebase-sdk.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
@@ -1431,11 +1556,24 @@
             measurementId: "G-SK8TYXT3JD"
         };
 
+        // Folio provisional (sin red): OFF- + 8 caracteres aleatorios. Se reemplaza por FB al sincronizar.
+        const esFolioProvisional = (f) => /^OFF-/.test(f || "");
+        const nuevoFolioProvisional = () => "OFF-" + crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+        // Identificador estable del dispositivo, para saber desde qué equipo se capturó cada registro.
+        const obtenerDeviceId = () => {
+            let id = localStorage.getItem('nom087_device_id');
+            if (!id) {
+                id = crypto.randomUUID();
+                localStorage.setItem('nom087_device_id', id);
+            }
+            return id;
+        };
+
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
             window.generarFolioFirebase = function() {
                 const inputFolio = document.getElementById('folio');
-                if (!inputFolio || inputFolio.value) return;
-                const folio = "OFF-" + new Date().getTime().toString().slice(-6);
+                if (!inputFolio || inputFolio.value.trim()) return;
+                const folio = nuevoFolioProvisional();
                 inputFolio.value = folio;
                 localStorage.setItem('nom087_folio', folio);
             };
@@ -1447,31 +1585,44 @@
             });
             const auth = getAuth(app);
 
+            // Asigna el folio FB secuencial. Si ya existe un OFF- ya resuelto, reutiliza el mismo FB (idempotente).
+            window.resolverFolioDefinitivo = async function(folioProvisional = "") {
+                const mapKey = folioProvisional ? 'nom087_folio_map_' + folioProvisional : null;
+                if (mapKey && localStorage.getItem(mapKey)) return localStorage.getItem(mapKey);
+                const folio = await runTransaction(db, async (transaction) => {
+                    const counterRef = doc(db, "sistema", "contadores");
+                    const sfDoc = await transaction.get(counterRef);
+                    let newSeq = 1000;
+                    if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
+                    transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
+                    return `FB${newSeq}`;
+                });
+                if (mapKey) localStorage.setItem(mapKey, folio);
+                return folio;
+            };
+
             window.generarFolioFirebase = async function() {
                 const inputFolio = document.getElementById('folio');
-                if (!inputFolio || inputFolio.value.trim()) return inputFolio?.value;
-                
+                if (!inputFolio) return;
+                const actual = inputFolio.value.trim();
+                if (actual && !esFolioProvisional(actual)) return actual;
+
                 if (!navigator.onLine) {
-                    const offlineFolio = "OFF-" + new Date().getTime().toString().slice(-6);
+                    if (actual) return actual;
+                    const offlineFolio = nuevoFolioProvisional();
                     inputFolio.value = offlineFolio;
                     localStorage.setItem('nom087_folio', offlineFolio);
                     return offlineFolio;
                 }
 
                 try {
-                    const newFolio = await runTransaction(db, async (transaction) => {
-                        const counterRef = doc(db, "sistema", "contadores");
-                        const sfDoc = await transaction.get(counterRef);
-                        let newSeq = 1000;
-                        if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
-                        transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
-                        return `FB${newSeq}`;
-                    });
+                    const newFolio = await window.resolverFolioDefinitivo(actual);
                     inputFolio.value = newFolio;
                     localStorage.setItem('nom087_folio', newFolio);
                     return newFolio;
                 } catch(error) {
-                    const offlineFolio = "OFF-" + new Date().getTime().toString().slice(-6);
+                    if (actual) return actual;
+                    const offlineFolio = nuevoFolioProvisional();
                     inputFolio.value = offlineFolio;
                     localStorage.setItem('nom087_folio', offlineFolio);
                     return offlineFolio;
@@ -1490,7 +1641,10 @@
                     employeeNumber
                 };
 
-                if (!payload.folio || payload.folio === "S/F") {
+                const folioOriginal = payload.folio || "";
+                if (esFolioProvisional(folioOriginal)) {
+                    payload = { ...payload, folio: await window.resolverFolioDefinitivo(folioOriginal) };
+                } else if (!folioOriginal || folioOriginal === "S/F") {
                     const asignado = await window.generarFolioFirebase();
                     if (asignado) payload.folio = asignado;
                 }
@@ -1498,18 +1652,31 @@
                 const folioKey = encodeURIComponent(payload.folio || "sin_folio");
                 const reportIdKey = `nom087_firestore_report_${folioKey}`;
                 const createdAtKey = `nom087_created_at_${folioKey}`;
+                const ownerUid = auth.currentUser?.uid;
+                if (!ownerUid) throw new Error("Sesión anónima no disponible; reintentando.");
+                const ownerKey = `nom087_firestore_owner_${folioKey}`;
 
+                // Si la sesión anónima cambió, el documento anterior no es actualizable: se crea uno nuevo.
+                if (localStorage.getItem(ownerKey) !== ownerUid) {
+                    localStorage.removeItem(reportIdKey);
+                    localStorage.removeItem(createdAtKey);
+                }
                 let reportId = localStorage.getItem(reportIdKey) || crypto.randomUUID().replace(/-/g, "");
                 let createdAt = localStorage.getItem(createdAtKey) || new Date().toISOString();
 
                 localStorage.setItem(reportIdKey, reportId);
                 localStorage.setItem(createdAtKey, createdAt);
+                localStorage.setItem(ownerKey, ownerUid);
 
                 const ahoraIso = new Date().toISOString();
                 const reportRef = doc(db, "bitacora_reports", reportId);
+                const serverCreatedKey = `nom087_server_created_${reportId}`;
                 const data = {
                     id: reportId,
+                    owner_uid: ownerUid,
+                    turnoCerrado: payload.turnoCerrado === true,
                     folio: payload.folio || "",
+                    folio_provisional: esFolioProvisional(folioOriginal) ? folioOriginal : "",
                     report_type: "bitacora",
                     unit_id: payload.unitId || "",
                     driver_name: payload.driverName || "",
@@ -1524,10 +1691,14 @@
                     sync_status: "sincronizado",
                     payload,
                     created_at: createdAt,
-                    updated_at: ahoraIso
+                    updated_at: ahoraIso,
+                    device_id: obtenerDeviceId(),
+                    server_updated_at: serverTimestamp(),
+                    ...(localStorage.getItem(serverCreatedKey) ? {} : { server_created_at: serverTimestamp() })
                 };
 
                 await setDoc(reportRef, data, { merge: true });
+                localStorage.setItem(serverCreatedKey, "1");
                 return {
                     id: reportId,
                     url: new URL(`./viewer.html?id=${reportId}`, window.location.href).href,
@@ -1538,6 +1709,7 @@
             onAuthStateChanged(auth, (user) => {
                 if (!user) signInAnonymously(auth).catch(console.error);
                 window.generarFolioFirebase();
+                if (user) sincronizarCierresPendientes();
             });
         }
     </script>
