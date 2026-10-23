@@ -379,6 +379,8 @@
 
     <script>
         const GPS_TIMEOUT_MS = 8000;
+        const GPS_REINTENTOS = 1;
+        const GPS_PRECISION_MINIMA_M = 100;
         const LICENSE_EXP_WARNING_DAYS = 15;
         const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 
@@ -641,24 +643,52 @@
             }
         }
 
-        function getGpsEvidence() {
+        const GPS_ESTADOS = {
+            pendiente: "GPS pendiente",
+            capturado: "GPS",
+            baja_precision: "GPS baja precisión",
+            sin_senal: "Sin señal GPS",
+            permiso_denegado: "Permiso de ubicación denegado",
+            no_disponible: "GPS no disponible"
+        };
+
+        function getGpsEvidence(intento = 0) {
             return new Promise((resolve) => {
                 if (!navigator.geolocation) {
-                    resolve({ gps: null, message: "GPS no disponible." });
+                    resolve({ gps: null, estado: "no_disponible", message: "GPS no disponible en este dispositivo." });
                     return;
                 }
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => resolve({
-                        gps: {
-                            lat: pos.coords.latitude,
-                            lng: pos.coords.longitude,
-                            accuracy: pos.coords.accuracy,
-                            capturedAt: new Date().toISOString()
-                        },
-                        message: "GPS capturado correctamente."
-                    }),
-                    () => resolve({ gps: null, message: "Sin señal GPS." }),
-                    { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 60000 }
+                    (pos) => {
+                        const accuracy = pos.coords.accuracy;
+                        const baja = accuracy > GPS_PRECISION_MINIMA_M;
+                        resolve({
+                            gps: {
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude,
+                                accuracy,
+                                capturedAt: new Date().toISOString()
+                            },
+                            estado: baja ? "baja_precision" : "capturado",
+                            message: baja
+                                ? `GPS con baja precisión (±${Math.round(accuracy)} m).`
+                                : "GPS capturado correctamente."
+                        });
+                    },
+                    async (err) => {
+                        if (intento < GPS_REINTENTOS) {
+                            resolve(await getGpsEvidence(intento + 1));
+                            return;
+                        }
+                        const denegado = err.code === 1;
+                        resolve({
+                            gps: null,
+                            estado: denegado ? "permiso_denegado" : "sin_senal",
+                            message: denegado ? "Permiso de ubicación denegado." : "Sin señal GPS."
+                        });
+                    },
+                    // maximumAge: 0 evita usar una posición vieja como evidencia de un cambio de estado.
+                    { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 0 }
                 );
             });
         }
@@ -669,8 +699,11 @@
             const res = await getGpsEvidence();
             if (res.gps) {
                 log.gps = res.gps;
-                localStorage.setItem('nom087_logs', JSON.stringify(logs));
+                log.gpsStatus = res.estado;
+            } else if (!log.gps) {
+                log.gpsStatus = res.estado;
             }
+            localStorage.setItem('nom087_logs', JSON.stringify(logs));
             if (showStatus) updateGpsStatus(res.gps, res.message);
             return res.gps;
         }
@@ -706,13 +739,17 @@
                 }
             }
             if (logs.length > 0) logs[logs.length - 1].endTime = now;
-            const newLog = { status: st, startTime: now, endTime: null, place: "En Ruta", observation: "", gps: null };
+            const newLog = { status: st, startTime: now, endTime: null, place: "En Ruta", observation: "", gps: null, gpsStatus: "pendiente" };
             logs.push(newLog);
             currentStatus = st;
             guardarLocal();
-            await attachGpsToLog(newLog, false);
             updateUI();
             sincronizarSilencioso();
+            // El GPS no bloquea el cambio de estado: si llega tarde, el registro se completa en segundo plano.
+            attachGpsToLog(newLog, false).then(() => {
+                updateUI();
+                sincronizarSilencioso();
+            });
 
             if (st === 5) {
                 setTimeout(() => {
@@ -1020,8 +1057,8 @@
                 }
 
                 const gpsBadge = l.gps
-                    ? `<div class="gps-pill bg-green-50 text-green-700 border border-green-200 mt-1"><i class="fas fa-map-marker-alt"></i>${formatGps(l.gps)}</div>`
-                    : `<div class="gps-pill bg-gray-50 text-gray-400 border border-gray-200 mt-1"><i class="fas fa-map-marker-alt"></i>Sin GPS</div>`;
+                    ? `<div class="gps-pill ${l.gpsStatus === "baja_precision" ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : "bg-green-50 text-green-700 border border-green-200"} mt-1"><i class="fas fa-map-marker-alt"></i>${formatGps(l.gps)}</div>`
+                    : `<div class="gps-pill bg-gray-50 text-gray-400 border border-gray-200 mt-1"><i class="fas fa-map-marker-alt"></i>${GPS_ESTADOS[l.gpsStatus] || "Sin GPS"}</div>`;
 
                 const obsNote = l.observation && l.observation.trim()
                     ? `<div class="text-[11px] text-orange-700 bg-orange-50 border border-orange-100 rounded px-2 py-1 mt-1 flex items-start gap-1"><i class="fas fa-sticky-note mt-0.5"></i><span>${escapeHtml(l.observation.trim())}</span></div>`
