@@ -156,16 +156,20 @@ service cloud.firestore {
     match /bitacora_reports/{reportId} {
       allow get: if signedIn();
       allow list: if isPanelUser();
-      // El operador anónimo escribe solo sus propios reportes. Un reporte con turnoCerrado = true queda inmutable.
-      allow create: if (isAnonymousOperator()
-          && request.resource.data.owner_uid == request.auth.uid)
-        || isAdmin();
+      // Checklist: permite create aunque aún no envíe owner_uid (compatibilidad).
+      // Bitácora: conserva la protección por owner_uid.
+      allow create: if isAdmin()
+        || (isAnonymousOperator()
+          && (
+            request.resource.data.get('report_type', '') == 'checklist'
+            || request.resource.data.owner_uid == request.auth.uid
+          ));
+
       allow update: if isAnonymousOperator()
         && resource.data.owner_uid == request.auth.uid
         && resource.data.turnoCerrado != true
         && request.resource.data.owner_uid == resource.data.owner_uid
         && request.resource.data.created_at == resource.data.created_at
-        // La bitácora de cambios solo puede crecer; nunca se reescribe ni se borra.
         && request.resource.data.get('auditoria', []).size() >= resource.data.get('auditoria', []).size();
       allow delete: if false;
     }
