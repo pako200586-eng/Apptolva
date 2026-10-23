@@ -588,6 +588,17 @@
             if (clock) clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }, 1000);
 
+        // Bitácora de cambios: toda modificación de un registro ya capturado queda asentada aquí.
+        const AUDITORIA_KEY = 'nom087_auditoria';
+        function leerAuditoria() {
+            try { return JSON.parse(localStorage.getItem(AUDITORIA_KEY)) || []; } catch (e) { return []; }
+        }
+        function registrarAuditoria(tipo, detalle) {
+            const lista = leerAuditoria();
+            lista.push({ ts: new Date().toISOString(), tipo, ...detalle });
+            try { localStorage.setItem(AUDITORIA_KEY, JSON.stringify(lista)); return true; } catch (e) { return false; }
+        }
+
         function guardarLocal() {
             try { localStorage.setItem('nom087_logs', JSON.stringify(logs)); } catch (e) { console.error("Almacenamiento lleno:", e); }
             updateUI();
@@ -781,6 +792,7 @@
             logs = [{ status: 1, startTime: Date.now(), endTime: null, place: "Inicio", observation: "", gps: null }];
             currentStatus = 1;
             localStorage.removeItem('nom087_logs');
+            localStorage.removeItem(AUDITORIA_KEY);
             ['origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada', 'kmInicio', 'kmFin'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
@@ -815,7 +827,12 @@
                 const cierre = {
                     id: crypto.randomUUID(),
                     horaCorte,
-                    payload: { ...buildBitacoraPayload(), turnoCerrado: true, horaCorte }
+                    payload: {
+                        ...buildBitacoraPayload(),
+                        turnoCerrado: true,
+                        horaCorte,
+                        auditoria: [...leerAuditoria(), { ts: horaCorte, tipo: "cierre_turno", horaCorte }]
+                    }
                 };
 
                 if (!guardarCierresPendientes([...leerCierresPendientes(), cierre])) {
@@ -1408,6 +1425,7 @@
                 reportType: "bitacora",
                 fecha: new Date().toLocaleDateString(),
                 empresa: "GRUPO BACHOCO, S.A. DE C.V.",
+                auditoria: leerAuditoria(),
                 unitId: document.getElementById('unitId').value.trim(),
                 plates: document.getElementById('plates').value || "",
                 driverName: operator?.nombre || "",
@@ -1518,6 +1536,10 @@
             if (ultimo.status === 5 && texto.length < MIN_JUSTIFICACION_CHARS) {
                 alert(`⚠️ La justificación de la excepción debe tener al menos ${MIN_JUSTIFICACION_CHARS} caracteres.`);
                 return;
+            }
+            const anterior = ultimo.observation || "";
+            if (anterior !== texto) {
+                registrarAuditoria("observacion_editada", { indice: logs.length - 1, antes: anterior, despues: texto });
             }
             ultimo.observation = texto;
             guardarLocal();
@@ -1675,6 +1697,7 @@
                     id: reportId,
                     owner_uid: ownerUid,
                     turnoCerrado: payload.turnoCerrado === true,
+                    auditoria: Array.isArray(payload.auditoria) ? payload.auditoria : [],
                     folio: payload.folio || "",
                     folio_provisional: esFolioProvisional(folioOriginal) ? folioOriginal : "",
                     report_type: "bitacora",

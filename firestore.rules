@@ -164,7 +164,9 @@ service cloud.firestore {
         && resource.data.owner_uid == request.auth.uid
         && resource.data.turnoCerrado != true
         && request.resource.data.owner_uid == resource.data.owner_uid
-        && request.resource.data.created_at == resource.data.created_at;
+        && request.resource.data.created_at == resource.data.created_at
+        // La bitácora de cambios solo puede crecer; nunca se reescribe ni se borra.
+        && request.resource.data.get('auditoria', []).size() >= resource.data.get('auditoria', []).size();
       allow delete: if false;
     }
 
