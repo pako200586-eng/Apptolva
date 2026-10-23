@@ -1590,12 +1590,13 @@
             };
 
             window.guardarReporteEnFirestore = async function(reportePayload, id) {
-                await esperarAuthListo();
+                const user = await esperarAuthListo();
                 if (!id) throw new Error("Falta el identificador del reporte.");
 
                 const docRef = doc(db, "bitacora_reports", id);
                 const data = {
                     id: id,
+                    owner_uid: user.uid,
                     folio: reportePayload.folio || "",
                     report_type: reportePayload.reportType || "checklist",
                     unit_id: reportePayload.unitId || "",
