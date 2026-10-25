@@ -68,6 +68,12 @@
             </div>
 
             <div class="flex items-center gap-2">
+                <select id="tripulacion" class="bg-black/20 text-white rounded-full px-2 py-1 text-[10px] font-bold border-0 outline-none" title="Tripulación de la unidad">
+                    <option value="INDIVIDUAL" class="text-gray-800">1 operador</option><option value="DOBLE" class="text-gray-800">2 operadores</option>
+                </select>
+                <select id="rolCabina" class="hidden bg-black/20 text-white rounded-full px-2 py-1 text-[10px] font-bold border-0 outline-none" title="Mi rol en cabina">
+                    <option value="VOLANTE" class="text-gray-800">Volante</option><option value="COPILOTO" class="text-gray-800">Copiloto</option>
+                </select>
                 <div id="cloudSyncIndicator" class="bg-black/20 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5" title="Estado de la conexión y sincronización">
                     <i class="fas fa-cloud text-gray-300" id="cloudIcon"></i>
                     <span id="cloudText" class="hidden xs:inline">Local</span>
@@ -127,24 +133,7 @@
                 <div>
                     <label class="text-xs font-bold text-gray-500 block mb-1">Configuración</label>
                     <select id="mode" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
-                </div>
-
-                <div>
-                    <label class="text-xs font-bold text-gray-500 block mb-1">Tripulación</label>
-                    <select id="tripulacion" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
-                        <option value="INDIVIDUAL">1 operador</option><option value="DOBLE">2 operadores (relevo)</option>
-                    </select>
-                </div>
-                <div id="rolCabinaWrap" class="hidden">
-                    <label class="text-xs font-bold text-gray-500 block mb-1">Mi rol en cabina</label>
-                    <select id="rolCabina" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
-                        <option value="VOLANTE">Al volante</option><option value="COPILOTO">Copiloto / camarote</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-gray-500 block mb-1">Sugerir por GPS</label>
-                    <select id="detectarMovimiento" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
-                        <option value="SI">Sí (app abierta)</option><option value="NO">No</option>
+                        <option value="Sencillo">Sencillo</option><option value="Full">Full</option><option value="Torton">Torton</option>
                     </select>
                 </div>
 
@@ -506,7 +495,7 @@
             'origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada',
             'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 
             'kmInicio', 'kmFin', 'coConductor', 'coLicencia',
-            'tripulacion', 'rolCabina', 'detectarMovimiento'
+            'tripulacion', 'rolCabina'
         ];
         
         ids.forEach(id => {
@@ -1367,8 +1356,7 @@
         }
 
         function gestionarGps() {
-            const quiere = document.getElementById('detectarMovimiento')?.value === 'SI'
-                && document.visibilityState === 'visible' && logs.length > 0 && 'geolocation' in navigator;
+            const quiere = document.visibilityState === 'visible' && logs.length > 0 && 'geolocation' in navigator;
             if (quiere && gpsWatchId === null) {
                 gpsWatchId = navigator.geolocation.watchPosition(alRecibirPosicion, () => {},
                     { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
@@ -1380,7 +1368,7 @@
 
         function monitorTick() {
             const tripulacion = document.getElementById('tripulacion');
-            document.getElementById('rolCabinaWrap')?.classList.toggle('hidden', tripulacion?.value !== 'DOBLE');
+            document.getElementById('rolCabina')?.classList.toggle('hidden', tripulacion?.value !== 'DOBLE');
             gestionarWakeLock();
             gestionarGps();
             evaluarLimitesConduccion();
@@ -1397,7 +1385,7 @@
 
         setInterval(monitorTick, 15000);
         document.addEventListener('visibilitychange', monitorTick);
-        ['tripulacion', 'rolCabina', 'detectarMovimiento'].forEach(id =>
+        ['tripulacion', 'rolCabina'].forEach(id =>
             document.getElementById(id)?.addEventListener('input', monitorTick));
         navigator.serviceWorker?.addEventListener('message', (e) => {
             if (e.data?.type === 'ACCION_NOTIFICACION') ejecutarAccionNotificacion(e.data.accion, e.data.ts);
