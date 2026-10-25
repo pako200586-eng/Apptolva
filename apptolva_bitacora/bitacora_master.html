@@ -127,7 +127,24 @@
                 <div>
                     <label class="text-xs font-bold text-gray-500 block mb-1">Configuración</label>
                     <select id="mode" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
-                        <option value="Sencillo">Sencillo</option><option value="Full">Full</option><option value="Torton">Torton</option>
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-gray-500 block mb-1">Tripulación</label>
+                    <select id="tripulacion" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
+                        <option value="INDIVIDUAL">1 operador</option><option value="DOBLE">2 operadores (relevo)</option>
+                    </select>
+                </div>
+                <div id="rolCabinaWrap" class="hidden">
+                    <label class="text-xs font-bold text-gray-500 block mb-1">Mi rol en cabina</label>
+                    <select id="rolCabina" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
+                        <option value="VOLANTE">Al volante</option><option value="COPILOTO">Copiloto / camarote</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 block mb-1">Sugerir por GPS</label>
+                    <select id="detectarMovimiento" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
+                        <option value="SI">Sí (app abierta)</option><option value="NO">No</option>
                     </select>
                 </div>
 
@@ -488,7 +505,8 @@
             'unitId', 'brandModel', 'plates', 'mode', 'folio', 
             'origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada',
             'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 
-            'kmInicio', 'kmFin', 'coConductor', 'coLicencia'
+            'kmInicio', 'kmFin', 'coConductor', 'coLicencia',
+            'tripulacion', 'rolCabina', 'detectarMovimiento'
         ];
         
         ids.forEach(id => {
@@ -732,6 +750,7 @@
 
         window.changeStatus = async (st) => {
             if (currentStatus === st) return;
+            if (typeof solicitarPermisoNotificaciones === "function") solicitarPermisoNotificaciones();
             const now = Date.now();
             if (currentStatus === 5 && st !== 5 && excepcionSinJustificar()) {
                 alert("⚠️ NOM-087 8.2.1 IX: debes justificar el caso de excepción antes de salir de este estado.");
@@ -1185,6 +1204,212 @@
             });
             ctx.stroke();
         }
+
+        // ===== Alertas NOM-087, Wake Lock y sugerencia de movimiento por GPS =====
+        // Todo se calcula con marcas de tiempo absolutas; nada depende de contadores que el SO pueda congelar.
+        const MONITOR = {
+            VEL_RUTA_KMH: 25, CONFIRMA_MOV_MS: 2 * 60000,
+            VEL_DETENIDO_KMH: 3, CONFIRMA_DETENIDO_MS: 5 * 60000,
+            PRECISION_MAX_M: 50, MUESTRA_VIGENCIA_MS: 60000,
+            ENFRIAMIENTO_MS: 10 * 60000, ACCION_VIGENCIA_MS: 15 * 60000
+        };
+        let wakeLock = null, wakeLockPendiente = false;
+        let alerta270 = false, alerta300 = false;
+        let gpsWatchId = null, ultimaPos = null, ultimaVel = null;
+        let movDesde = null, detenidoDesde = null, ultimaSugerenciaMs = 0;
+
+        window.solicitarPermisoNotificaciones = function() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => {});
+            }
+        };
+
+        async function notificarApp(titulo, cuerpo, tag, acciones) {
+            if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                await reg.showNotification(titulo, {
+                    body: cuerpo,
+                    icon: './icon-192x192.png',
+                    badge: './favicon-32x32.png',
+                    tag,
+                    renotify: true,
+                    requireInteraction: true,
+                    vibrate: [500, 200, 500, 200, 800],
+                    actions: acciones || [],
+                    data: { ts: Date.now() }
+                });
+            } catch (e) { /* sin notificación: queda el aviso en pantalla */ }
+        }
+
+        function mostrarSugerencia(mensaje, botones) {
+            document.getElementById('bannerSugerencia')?.remove();
+            const el = document.createElement('div');
+            el.id = 'bannerSugerencia';
+            el.className = 'fixed bottom-4 left-3 right-3 z-[90] bg-white border-l-4 border-orange-500 rounded-lg shadow-xl p-3 text-sm';
+            const p = document.createElement('p');
+            p.className = 'font-bold text-gray-800 mb-2';
+            p.textContent = mensaje;
+            const fila = document.createElement('div');
+            fila.className = 'flex gap-2 flex-wrap';
+            [...botones, { texto: 'Ahora no', accion: null }].forEach((b, i, arr) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = b.texto;
+                btn.className = i === arr.length - 1
+                    ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 text-gray-700'
+                    : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 text-white';
+                btn.onclick = () => { el.remove(); if (b.accion) b.accion(); };
+                fila.appendChild(btn);
+            });
+            el.append(p, fila);
+            document.body.appendChild(el);
+        }
+
+        function marcarCopiloto() {
+            const rol = document.getElementById('rolCabina');
+            if (!rol) return;
+            rol.value = 'COPILOTO';
+            rol.dispatchEvent(new Event('input'));
+        }
+
+        async function gestionarWakeLock() {
+            const necesita = currentStatus === 3 && document.visibilityState === 'visible';
+            if (necesita && !wakeLock && !wakeLockPendiente && 'wakeLock' in navigator) {
+                wakeLockPendiente = true;
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
+                } catch (e) { /* batería baja o no permitido */ }
+                wakeLockPendiente = false;
+            } else if (!necesita && wakeLock) {
+                wakeLock.release().catch(() => {});
+                wakeLock = null;
+            }
+        }
+
+        function evaluarLimitesConduccion() {
+            if (currentStatus !== 3) { alerta270 = alerta300 = false; return; }
+            const { continuousDrive } = calcularLimitesConduccion(Date.now());
+            if (continuousDrive < 270) { alerta270 = alerta300 = false; return; }
+            if (continuousDrive >= 300 && !alerta300) {
+                alerta300 = alerta270 = true;
+                notificarApp('🚨 Límite NOM-087: 5 horas de manejo continuo',
+                    'Detente y registra una pausa de 30 minutos ahora.', 'limite-5h',
+                    [{ action: 'iniciar_pausa', title: '⏸️ Iniciar pausa' }]);
+            } else if (!alerta270) {
+                alerta270 = true;
+                notificarApp('⚠️ 4 h 30 min de manejo continuo',
+                    'Te quedan menos de 30 minutos para la pausa obligatoria. Busca un paradero seguro.', 'limite-4h30',
+                    [{ action: 'iniciar_pausa', title: '⏸️ Iniciar pausa' }]);
+            }
+        }
+
+        function distanciaMetros(a, b) {
+            const R = 6371000, rad = x => x * Math.PI / 180;
+            const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+            const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(h));
+        }
+
+        function alRecibirPosicion(pos) {
+            const c = pos.coords;
+            const actual = { lat: c.latitude, lng: c.longitude, t: pos.timestamp };
+            let kmh = (typeof c.speed === 'number' && c.speed >= 0) ? c.speed * 3.6 : null;
+            // Muchos teléfonos no reportan speed: se calcula con distancia y tiempo entre muestras.
+            if (kmh === null && ultimaPos && actual.t > ultimaPos.t) {
+                kmh = (distanciaMetros(ultimaPos, actual) / ((actual.t - ultimaPos.t) / 1000)) * 3.6;
+            }
+            ultimaPos = actual;
+            ultimaVel = (kmh !== null && c.accuracy <= MONITOR.PRECISION_MAX_M) ? { kmh, ms: Date.now() } : null;
+            evaluarMovimiento();
+        }
+
+        function evaluarMovimiento() {
+            const ahora = Date.now();
+            const copiloto = document.getElementById('tripulacion')?.value === 'DOBLE'
+                && document.getElementById('rolCabina')?.value === 'COPILOTO';
+            if (copiloto || !ultimaVel || ahora - ultimaVel.ms > MONITOR.MUESTRA_VIGENCIA_MS) {
+                movDesde = detenidoDesde = null;
+                return;
+            }
+            const kmh = ultimaVel.kmh;
+            const enfriado = ahora - ultimaSugerenciaMs > MONITOR.ENFRIAMIENTO_MS;
+
+            if (currentStatus !== 3) {
+                detenidoDesde = null;
+                if (kmh < MONITOR.VEL_RUTA_KMH) { movDesde = null; return; }
+                if (!movDesde) movDesde = ahora;
+                if (ahora - movDesde < MONITOR.CONFIRMA_MOV_MS || !enfriado) return;
+                movDesde = null;
+                ultimaSugerenciaMs = ahora;
+                const doble = document.getElementById('tripulacion')?.value === 'DOBLE';
+                const msg = `Movimiento en ruta detectado (${Math.round(kmh)} km/h). Tu bitácora sigue en otro estado.`;
+                const botones = [{ texto: doble ? 'Voy al volante' : 'Registrar CONDUCIENDO', accion: () => window.changeStatus(3) }];
+                const acciones = [{ action: 'voy_volante', title: '🟢 Registrar CONDUCIENDO' }];
+                if (doble) {
+                    botones.push({ texto: 'Soy copiloto', accion: marcarCopiloto });
+                    acciones.push({ action: 'soy_copiloto', title: '💺 Soy copiloto' });
+                }
+                mostrarSugerencia(msg, botones);
+                notificarApp('🚛 Movimiento detectado', msg + (doble ? ' ¿Vas al volante?' : ''), 'mov-detectado', acciones);
+            } else {
+                movDesde = null;
+                if (kmh >= MONITOR.VEL_DETENIDO_KMH) { detenidoDesde = null; return; }
+                if (!detenidoDesde) detenidoDesde = ahora;
+                if (ahora - detenidoDesde < MONITOR.CONFIRMA_DETENIDO_MS || !enfriado) return;
+                detenidoDesde = null;
+                ultimaSugerenciaMs = ahora;
+                const msg = 'La unidad lleva más de 5 minutos detenida. ¿Registrar una pausa?';
+                mostrarSugerencia(msg, [{ texto: 'Registrar PAUSA', accion: () => window.changeStatus(2) }]);
+                notificarApp('⏸️ Unidad detenida', msg, 'unidad-detenida', [{ action: 'iniciar_pausa', title: '⏸️ Registrar pausa' }]);
+            }
+        }
+
+        function gestionarGps() {
+            const quiere = document.getElementById('detectarMovimiento')?.value === 'SI'
+                && document.visibilityState === 'visible' && logs.length > 0 && 'geolocation' in navigator;
+            if (quiere && gpsWatchId === null) {
+                gpsWatchId = navigator.geolocation.watchPosition(alRecibirPosicion, () => {},
+                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+            } else if (!quiere && gpsWatchId !== null) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null; ultimaPos = ultimaVel = null; movDesde = detenidoDesde = null;
+            }
+        }
+
+        function monitorTick() {
+            const tripulacion = document.getElementById('tripulacion');
+            document.getElementById('rolCabinaWrap')?.classList.toggle('hidden', tripulacion?.value !== 'DOBLE');
+            gestionarWakeLock();
+            gestionarGps();
+            evaluarLimitesConduccion();
+            evaluarMovimiento();
+        }
+
+        function ejecutarAccionNotificacion(accion, ts) {
+            if (!ts || Date.now() - Number(ts) > MONITOR.ACCION_VIGENCIA_MS) return;
+            if (accion === 'iniciar_pausa') window.changeStatus(2);
+            else if (accion === 'voy_volante') window.changeStatus(3);
+            else if (accion === 'soy_copiloto') marcarCopiloto();
+            monitorTick();
+        }
+
+        setInterval(monitorTick, 15000);
+        document.addEventListener('visibilitychange', monitorTick);
+        ['tripulacion', 'rolCabina', 'detectarMovimiento'].forEach(id =>
+            document.getElementById(id)?.addEventListener('input', monitorTick));
+        navigator.serviceWorker?.addEventListener('message', (e) => {
+            if (e.data?.type === 'ACCION_NOTIFICACION') ejecutarAccionNotificacion(e.data.accion, e.data.ts);
+        });
+        (function accionPorUrl() {
+            const q = new URLSearchParams(location.search);
+            const accion = q.get('accionBitacora');
+            if (!accion) return;
+            history.replaceState(null, '', location.pathname);
+            ejecutarAccionNotificacion(accion, q.get('ts'));
+        })();
+        monitorTick();
 
         let vinStream = null, vinScanActivo = false;
         window.cerrarEscanerVIN = function() {
