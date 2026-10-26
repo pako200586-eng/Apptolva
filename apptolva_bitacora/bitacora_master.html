@@ -67,19 +67,19 @@
                 <div class="hidden sm:block text-xs font-bold tracking-wide">NOM-087 · Bitácora Digital</div>
             </div>
 
-            <div class="flex items-center gap-2">
-                <select id="tripulacion" class="bg-black/20 text-white rounded-full px-2 py-1 text-[10px] font-bold border-0 outline-none" title="Tripulación de la unidad">
-                    <option value="INDIVIDUAL" class="text-gray-800">1 operador</option><option value="DOBLE" class="text-gray-800">2 operadores</option>
+            <div class="flex items-center gap-1.5">
+                <select id="tripulacion" class="bg-black/20 text-white rounded-full px-1.5 py-1 text-[10px] font-bold border-0 outline-none max-w-[64px]" title="Tripulación de la unidad">
+                    <option value="INDIVIDUAL" class="text-gray-800">1 op.</option><option value="DOBLE" class="text-gray-800">2 ops.</option>
                 </select>
-                <select id="rolCabina" class="hidden bg-black/20 text-white rounded-full px-2 py-1 text-[10px] font-bold border-0 outline-none" title="Mi rol en cabina">
-                    <option value="VOLANTE" class="text-gray-800">Volante</option><option value="COPILOTO" class="text-gray-800">Copiloto</option>
+                <select id="rolCabina" class="hidden bg-black/20 text-white rounded-full px-1.5 py-1 text-[10px] font-bold border-0 outline-none max-w-[64px]" title="Mi rol en cabina">
+                    <option value="VOLANTE" class="text-gray-800">Volante</option><option value="COPILOTO" class="text-gray-800">Copil.</option>
                 </select>
                 <div id="cloudSyncIndicator" class="bg-black/20 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5" title="Estado de la conexión y sincronización">
                     <i class="fas fa-cloud text-gray-300" id="cloudIcon"></i>
                     <span id="cloudText" class="hidden xs:inline">Local</span>
                 </div>
                 <div class="bg-black/20 px-2 py-1 rounded-full text-[10px] font-mono" id="clockDisplay">00:00</div>
-                <button onclick="generarPDFSeguro()" class="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center gap-1 active:scale-95 transition border border-orange-200">
+                                <button onclick="generarPDFSeguro()" class="bg-white text-orange-600 px-2.5 py-1.5 rounded-lg font-bold text-xs shadow flex items-center gap-1 active:scale-95 transition border border-orange-200">
                     <i class="fas fa-file-contract"></i> PDF
                 </button>
                 <button onclick="generarQRSeguro()" id="qrBtn" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center active:scale-95 transition border border-gray-600" title="Exhibir QR oficial">
@@ -195,8 +195,8 @@
                     </div>
                 </div>
 
-                <div class="col-span-2"><label class="text-xs text-gray-400 block mb-1">Co-conductor (si aplica relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre co-conductor (opcional)"></div>
-                <div><label class="text-xs text-gray-400 block mb-1">Licencia Co-conductor</label><input type="text" id="coLicencia" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="(opcional)"></div>
+                <div id="coConductorWrap" class="col-span-2 hidden"><label class="text-xs text-gray-400 block mb-1">Co-conductor (relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre co-conductor"></div>
+                <div id="coLicenciaWrap" class="hidden"><label class="text-xs text-gray-400 block mb-1">Licencia Co-conductor</label><input type="text" id="coLicencia" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="Licencia"></div>
             </div>
         </div>
 
@@ -438,9 +438,9 @@
             if (ultimoDescansoIndex !== -1 && ultimoDescansoIndex < logList.length - 1) {
                 return logList[ultimoDescansoIndex + 1].startTime;
             }
-            // Descanso de 8 h que aún es el último registro: la nueva jornada empieza al terminarlo.
+            // Descanso de 8 h que aún es el último registro: se ancla al inicio del descanso para que la gráfica no se desplace mientras sigue corriendo.
             if (ultimoDescansoIndex !== -1) {
-                return logList[ultimoDescansoIndex].endTime || Date.now();
+                return logList[ultimoDescansoIndex].startTime;
             }
             return logList[0].startTime;
         }
@@ -1369,6 +1369,8 @@
         function monitorTick() {
             const tripulacion = document.getElementById('tripulacion');
             document.getElementById('rolCabina')?.classList.toggle('hidden', tripulacion?.value !== 'DOBLE');
+            ['coConductorWrap', 'coLicenciaWrap'].forEach(id =>
+                document.getElementById(id)?.classList.toggle('hidden', tripulacion?.value !== 'DOBLE'));
             gestionarWakeLock();
             gestionarGps();
             evaluarLimitesConduccion();
@@ -1554,7 +1556,8 @@
                         row("HORA LLEGADA (ESTIMADA/REAL):", fmtFechaHora(document.getElementById('horaLlegada').value) || "En ruta", 106, 89);
             y += 8;
 
-            const coCond = document.getElementById('coConductor').value;
+            const esDoble = document.getElementById('tripulacion')?.value === 'DOBLE';
+            const coCond = esDoble ? document.getElementById('coConductor').value : "";
             if (coCond && coCond.trim()) {
                 row("CO-CONDUCTOR:", coCond, 14, 92);
                 row("LIC. CO-COND:", document.getElementById('coLicencia').value, 108, 87);
@@ -1783,8 +1786,8 @@
                 puntosIntermedios: document.getElementById('puntosIntermedios')?.value || "",
                 horaSalida: document.getElementById('horaSalida')?.value || "",
                 horaLlegada: document.getElementById('horaLlegada')?.value || "",
-                coConductor: document.getElementById('coConductor')?.value || "",
-                coLicencia: document.getElementById('coLicencia')?.value || "",
+                coConductor: document.getElementById('tripulacion')?.value === 'DOBLE' ? (document.getElementById('coConductor')?.value || "") : "",
+                coLicencia: document.getElementById('tripulacion')?.value === 'DOBLE' ? (document.getElementById('coLicencia')?.value || "") : "",
                 shiftStartHour: getShiftStartHour(logs),
                 shiftStartTime: getShiftStartTime(logs),
                 logs: structuredClone(logs),
