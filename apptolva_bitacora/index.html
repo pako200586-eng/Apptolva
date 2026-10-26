@@ -178,7 +178,7 @@
             </button>
 
             <!-- Botón Reset -->
-            <button onclick="borrarDatosLocales()" class="menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">                
+            <button type="button" onclick="borrarDatosLocales()" class="menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">
                 <i class="fas fa-trash mr-2"></i> Iniciar Check List Nuevo (Borrar Guardado)            
             </button>        
         </div>
@@ -211,8 +211,8 @@
             <div class="bg-slate-50 p-3 rounded mb-4 border border-slate-200">
                 <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Modalidad de Revisión</label>
                 <div class="flex bg-slate-200 p-1 rounded-lg mb-3">
-                    <button onclick="setModalidad('full')" id="btn-mod-full" class="flex-1 py-2 px-3 text-xs font-black rounded shadow bg-orange-600 text-white transition-all">FULL (Tracto+Dolly+2 Tolvas)</button>
-                    <button onclick="setModalidad('sencillo')" id="btn-mod-sencillo" class="flex-1 py-2 px-3 text-xs font-black rounded text-gray-500 transition-all">SENCILLO (Tracto+Tolva)</button>
+                    <button type="button" onclick="setModalidad('full')" id="btn-mod-full" class="flex-1 py-2 px-3 text-xs font-black rounded shadow bg-orange-600 text-white transition-all">FULL (Tracto+Dolly+2 Tolvas)</button>
+                    <button type="button" onclick="setModalidad('sencillo')" id="btn-mod-sencillo" class="flex-1 py-2 px-3 text-xs font-black rounded text-gray-500 transition-all">SENCILLO (Tracto+Tolva)</button>
                 </div>
                 <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Identificación de Equipo</label>
                 <div class="grid grid-cols-2 gap-2 mb-2">
@@ -240,10 +240,10 @@
             </div>
 
             <div class="flex bg-slate-200 p-1 rounded-lg mb-4 sticky top-[70px] z-40 shadow-sm pdf-hide overflow-x-auto">
-                <button onclick="setRevTab('tracto')" id="rt-tracto" class="flex-1 py-3 px-2 text-[10px] font-black rounded shadow bg-white text-orange-700 whitespace-nowrap">TRACTO</button>
-                <button onclick="setRevTab('tolva1')" id="rt-tolva1" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">1ra. TOLVA</button>
-                <button onclick="setRevTab('dolly')" id="rt-dolly" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">DOLLY</button>
-                <button onclick="setRevTab('tolva2')" id="rt-tolva2" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">2da. TOLVA</button>
+                <button type="button" onclick="setRevTab('tracto')" id="rt-tracto" class="flex-1 py-3 px-2 text-[10px] font-black rounded shadow bg-white text-orange-700 whitespace-nowrap">TRACTO</button>
+                <button type="button" onclick="setRevTab('tolva1')" id="rt-tolva1" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">1ra. TOLVA</button>
+                <button type="button" onclick="setRevTab('dolly')" id="rt-dolly" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">DOLLY</button>
+                <button type="button" onclick="setRevTab('tolva2')" id="rt-tolva2" class="flex-1 py-3 px-2 text-[10px] font-black rounded text-gray-500 whitespace-nowrap">2da. TOLVA</button>
             </div>
 
             <div id="revListContainer" class="space-y-6 mb-6"></div>
@@ -339,14 +339,17 @@
             </div>
         </div>
         
-        <div class="mt-4">
-            <button onclick="procesarFinal()" id="btnFinal" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-4 rounded-xl shadow-xl hover:scale-[1.02] transition-transform flex flex-col justify-center items-center">
+        <div class="mt-4 space-y-2">
+            <button type="button" onclick="procesarFinal()" id="btnFinal" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-4 rounded-xl shadow-xl hover:scale-[1.02] transition-transform flex flex-col justify-center items-center">
                 <div class="flex items-center gap-3 text-xl">
                     <i class="fas fa-file-pdf"></i>
                     <span>+</span>
                     <i class="fas fa-cloud-arrow-up"></i>
                 </div>
                 <span class="text-sm mt-1">GENERAR Y ENVIAR REPORTE</span>
+            </button>
+            <button type="button" onclick="borrarDatosLocales()" class="w-full bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 font-bold py-2.5 rounded-xl border border-gray-200 text-xs flex items-center justify-center gap-2 transition">
+                <i class="fas fa-trash-alt"></i> Limpiar Todo el Formulario
             </button>
             <p id="statusMsg" class="text-center text-xs font-bold text-gray-400 mt-2 hidden">Contactando a la nube para asignar folio...</p>
         </div>
@@ -361,7 +364,7 @@
                     <h3 class="font-bold text-gray-800 text-sm" id="modalSigTitle">Firma Digital</h3>
                     <p class="text-[11px] text-gray-500">Firme claramente dentro del recuadro con su dedo o lápiz táctil.</p>
                 </div>
-                <button onclick="cerrarModalFirma()" class="text-gray-400 hover:text-gray-600 p-1">
+                <button type="button" onclick="cerrarModalFirma()" class="text-gray-400 hover:text-gray-600 p-1">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
@@ -375,14 +378,14 @@
             </div>
 
             <div class="p-3 bg-white border-t border-gray-200 flex justify-between items-center gap-2">
-                <button onclick="limpiarTrazoModal()" class="px-3 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1 active:scale-95 transition">
+                <button type="button" onclick="limpiarTrazoModal()" class="px-3 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1 active:scale-95 transition">
                     <i class="fas fa-eraser"></i> Limpiar
                 </button>
                 <div class="flex items-center gap-2">
-                    <button onclick="cerrarModalFirma()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                    <button type="button" onclick="cerrarModalFirma()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">
                         Cancelar
                     </button>
-                    <button onclick="guardarFirmaModal()" class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-1.5 active:scale-95 transition">
+                    <button type="button" onclick="guardarFirmaModal()" class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-1.5 active:scale-95 transition">
                         <i class="fas fa-check"></i> Aceptar y Guardar
                     </button>
                 </div>
@@ -395,14 +398,14 @@
         <div class="flex flex-col h-[75vh] bg-white rounded-xl shadow border border-gray-300 overflow-hidden">
             <div class="bg-gray-100 p-3 border-b flex items-center justify-between">
                 <span class="font-bold text-sm text-gray-700"><i class="fas fa-robot text-orange-600 mr-2"></i>Soporte Técnico</span>
-                <button onclick="clearChat()" class="text-xs text-red-500 font-bold">BORRAR</button>
+                <button type="button" onclick="clearChat()" class="text-xs text-red-500 font-bold">BORRAR</button>
             </div>
             <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 text-sm">
                 <div class="bg-orange-600 text-white p-3 rounded-lg rounded-tl-none self-start max-w-[90%] shadow text-xs">Soy el Asistente. Pregúntame sobre coples, presiones o fallas de descarga.</div>
             </div>
             <div class="p-3 bg-white border-t flex gap-2">
                 <input type="text" id="aiInput" class="flex-1 p-3 bg-gray-100 border rounded-full text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="Escribe tu duda...">
-                <button onclick="sendAI()" class="bg-orange-600 text-white w-10 h-10 rounded-full shadow flex items-center justify-center active:scale-90"><i class="fas fa-paper-plane"></i></button>
+                <button type="button" onclick="sendAI()" class="bg-orange-600 text-white w-10 h-10 rounded-full shadow flex items-center justify-center active:scale-90"><i class="fas fa-paper-plane"></i></button>
             </div>
         </div>
     </main>
@@ -411,6 +414,9 @@
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
         const FIRESTORE_PENDING_REPORT_ID_KEY = 'apptolva_pending_firestore_report_id';
         const FIRESTORE_PENDING_REPORT_DRAFT_KEY = 'apptolva_pending_firestore_report_draft';
+
+        // Candado global para evitar que pagehide o visibilitychange re-escriban el borrador al limpiar
+        let ignorarAutoGuardado = false;
 
         // Respaldo en memoria: en iOS setItem puede lanzar QuotaExceededError y la firma se perdía.
         const _sigMem = {};
@@ -423,9 +429,13 @@
 
         // Pide a iOS/Safari no purgar el almacenamiento de la PWA.
         if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-        // iOS suspende la app sin avisar: guardar al ocultarse.
-        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoGuardar(); });
-        window.addEventListener('pagehide', () => autoGuardar());
+        // iOS suspende la app sin avisar: guardar al ocultarse únicamente si no se está limpiando.
+        document.addEventListener('visibilitychange', () => {
+            if (!ignorarAutoGuardado && document.visibilityState === 'hidden') autoGuardar();
+        });
+        window.addEventListener('pagehide', () => {
+            if (!ignorarAutoGuardado) autoGuardar();
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             try {
@@ -440,8 +450,9 @@
             } catch(e) { console.warn("Init error: ", e); }
         });
 
-        // --- SISTEMA DE AUTO-GUARDADO ---
+        // --- SISTEMA DE AUTO-GUARDADO Y LIMPIEZA REAL ---
         function autoGuardar() {
+            if (ignorarAutoGuardado) return;
             try {
                 revResults = filtrarResultadosChecklist(revResults);
                 const data = {
@@ -462,12 +473,54 @@
             } catch(e) { console.error("AutoSave error"); }
         }
 
+        function limpiarEstadoChecklistPorCompleto() {
+            ignorarAutoGuardado = true;
+
+            // 1. Vaciar objetos de resultados y observaciones en memoria
+            revResults = {};
+            obsData = { tracto: "", tolva1: "", dolly: "", tolva2: "" };
+
+            // 2. Limpiar todos los inputs del DOM y desbloquear el autocompletado de operador
+            document.querySelectorAll('.save-me, textarea, #revFolio').forEach(el => {
+                el.value = '';
+                el.removeAttribute('value');
+                if (el.id === 'revOperador') {
+                    el.readOnly = false;
+                    el.style.backgroundColor = '';
+                    el.style.borderColor = '';
+                }
+            });
+
+            const inputNum = document.getElementById('revEmpleado');
+            if (inputNum) {
+                inputNum.dispatchEvent(new Event('change'));
+            }
+
+            // 3. Eliminar firmas tanto de memoria (_sigMem) como de localStorage
+            delSig('apptolva_sig_op');
+            delSig('apptolva_sig_op2');
+            delSig('apptolva_sig_sup');
+
+            // 4. Purgar claves de borrador en localStorage
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
+            localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
+
+            // 5. Ocultar aviso de borrador pendiente y restaurar pestaña/modalidad por defecto
+            const notice = document.getElementById('draft-notice');
+            if (notice) notice.classList.add('hidden');
+
+            setModalidad('full', true);
+            setRevTab('tracto');
+            actualizarFirmasUI();
+        }
+
         function cargarDatosGuardados() {
             try {
                 const saved = localStorage.getItem(STORAGE_KEY);
                 if (saved) {
                     const data = JSON.parse(saved);
-                    for (const [id, value] of Object.entries(data.inputs)) {
+                    for (const [id, value] of Object.entries(data.inputs || {})) {
                         const el = document.getElementById(id);
                         if (el) el.value = value;
                     }
@@ -475,24 +528,22 @@
                     if (data.obs) obsData = data.obs;
                     if (data.modalidad) {
                         modalidadActual = data.modalidad;
-                        setModalidad(modalidadActual);
+                        setModalidad(modalidadActual, true);
                     }
                     const notice = document.getElementById('draft-notice');
                     if(notice) notice.classList.remove('hidden');
                 }
+                renderRevList();
                 actualizarLabelOp();
             } catch(e) { console.error("LoadSave error"); }
         }
 
         function borrarDatosLocales() {
-            if(confirm("¿Seguro que quieres borrar todos los datos guardados y empezar de cero?")) {
-                localStorage.removeItem(STORAGE_KEY);
-                localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
-                localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
-                localStorage.removeItem('apptolva_sig_op');
-                localStorage.removeItem('apptolva_sig_op2');
-                localStorage.removeItem('apptolva_sig_sup');
-                location.reload();
+            if(confirm("¿Seguro que quieres borrar todos los datos guardados y empezar un Check List desde cero?")) {
+                limpiarEstadoChecklistPorCompleto();
+                setTimeout(() => { ignorarAutoGuardado = false; }, 300);
+                nav('rev');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         }
 
@@ -612,7 +663,7 @@
         let obsData = { tracto: "", tolva1: "", dolly: "", tolva2: "" };
         let modalidadActual = 'full';
 
-        function setModalidad(modo) {
+        function setModalidad(modo, omitirGuardado = false) {
             modalidadActual = modo;
             const btnFull = document.getElementById('btn-mod-full');
             const btnSencillo = document.getElementById('btn-mod-sencillo');
@@ -643,7 +694,7 @@
                     setRevTab('tracto');
                 }
             }
-            autoGuardar();
+            if (!omitirGuardado) autoGuardar();
         }
 
         function nav(id) {
@@ -655,7 +706,10 @@
             const prog = document.getElementById('progContainer');
             if(prog) prog.style.display = id === 'guia' ? 'block' : 'none';
             if(id === 'guia') renderGuide();
-            if(id === 'rev') actualizarFirmasUI();
+            if(id === 'rev') {
+                renderRevList();
+                actualizarFirmasUI();
+            }
         }
 
         function renderGuide() {
@@ -698,6 +752,7 @@
         
         function renderRevList() {
             const c = document.getElementById('revListContainer');
+            if (!c) return;
             c.innerHTML = '';
             
             let label = "";
@@ -711,7 +766,7 @@
             c.innerHTML += `
                 <div class="flex justify-between items-center mb-4 bg-orange-50 p-2 rounded border border-orange-100">
                     <span class="text-xs font-bold text-orange-800">¿Todo en orden?</span>
-                    <button onclick="markAllOk()" class="bg-green-600 text-white text-[10px] font-bold py-2 px-4 rounded shadow hover:bg-green-700 active:scale-95 transition">
+                    <button type="button" onclick="markAllOk()" class="bg-green-600 text-white text-[10px] font-bold py-2 px-4 rounded shadow hover:bg-green-700 active:scale-95 transition">
                         <i class="fas fa-check-double mr-1"></i> MARCAR TODO BIEN
                     </button>
                 </div>
@@ -727,8 +782,8 @@
                         <div class="flex justify-between items-center">
                             <span class="text-xs font-bold w-1/2">${item}</span>
                             <div class="flex gap-1">
-                                <button onclick="setR('${k}','OK',this)" class="check-btn flex-1 rounded border border-gray-300 ${v==='OK'?'active-good':''}">BIEN</button>
-                                <button onclick="setR('${k}','MAL',this)" class="check-btn flex-1 rounded border border-gray-300 ${v==='MAL'?'active-bad':''}">MAL</button>
+                                <button type="button" onclick="setR('${k}','OK',this)" class="check-btn flex-1 rounded border border-gray-300 ${v==='OK'?'active-good':''}">BIEN</button>
+                                <button type="button" onclick="setR('${k}','MAL',this)" class="check-btn flex-1 rounded border border-gray-300 ${v==='MAL'?'active-bad':''}">MAL</button>
                             </div>
                         </div>`;
                     });
@@ -1361,26 +1416,23 @@
                         localStorage.setItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY, localStorage.getItem(STORAGE_KEY) || "");
                     }
                     const resFirestore = await window.guardarReporteEnFirestore(reportePayload, reporteId);
+
+                    // Limpieza inmediata en memoria, DOM y localStorage sin recargar ni perder sesión
+                    limpiarEstadoChecklistPorCompleto();
+                    restaurarBoton(btn, originalText, msg);
+                    setTimeout(() => { ignorarAutoGuardado = false; }, 300);
+
                     if (resFirestore.status === 'pending') {
-                        msg.innerText = '📴 Reporte guardado localmente. Se sincronizará al volver la conexión.';
-                        btn.disabled = true;
-                        btn.textContent = 'Reporte pendiente de sincronización';
-                        alert("📴 El reporte quedó guardado en el dispositivo y se sincronizará automáticamente con Firebase al recuperar conexión.");
+                        alert("📴 El reporte (Folio: " + folio + ") quedó guardado en el dispositivo y se sincronizará automáticamente con Firebase al recuperar conexión.\n\nEl formulario ya quedó limpio para una nueva revisión.");
+                        nav('menu');
                         return;
                     }
                 } else {
                     throw new Error('El módulo de guardado en Firebase no está inicializado.');
                 }
 
-                // Limpieza de datos locales tras guardar con éxito
-                localStorage.removeItem(STORAGE_KEY);
-                localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
-                localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
-                localStorage.removeItem('apptolva_sig_op');
-                localStorage.removeItem('apptolva_sig_op2');
-                localStorage.removeItem('apptolva_sig_sup');
-                alert("✅ REPORTE GUARDADO EN FIREBASE\n\nFolio: " + folio + "\n\nEl reporte está disponible en el panel. El PDF se descargó en tu dispositivo.");
-                location.reload();
+                alert("✅ REPORTE GUARDADO EN FIREBASE\n\nFolio: " + folio + "\n\nEl reporte está disponible en el panel y el formulario ya quedó limpio para un nuevo Check List.");
+                nav('menu');
 
             } catch (error) {
                 console.error(error);
@@ -1409,16 +1461,10 @@
 
         window.addEventListener('firestore-report-synced', (event) => {
             const { id } = event.detail || {};
-            if (!id || localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY) !== id) return;
-
-            localStorage.removeItem(STORAGE_KEY);
+            if (!id) return;
             localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
             localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
-            localStorage.removeItem('apptolva_sig_op');
-            localStorage.removeItem('apptolva_sig_op2');
-            localStorage.removeItem('apptolva_sig_sup');
-            alert("✅ REPORTE SINCRONIZADO CON FIREBASE\n\nYa está disponible en el panel de supervisión.");
-            location.reload();
+            console.log("✅ Reporte pendiente sincronizado con Firebase:", id);
         });
 
         // --- ASISTENTE IA ---
