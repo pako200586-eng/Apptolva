@@ -449,6 +449,12 @@
             return new Date(getShiftStartTime(logList)).getHours();
         }
 
+        // El DESCANSO "Inicio" se crea al abrir un periodo nuevo; no es actividad del turno y no se grafica ni se imprime.
+        function getLogsVisibles(list) {
+            const base = list || logs;
+            return base.length > 0 && base[0].status === 1 && base[0].place === "Inicio" ? base.slice(1) : base;
+        }
+
         // Límites NOM-087: 4.7 (máximo 14 h de conducción en 24 h) y 4.1 (5 h continuas, con pausa acumulada de 30 min).
         const LIMITE_24H_MIN = 14 * 60;
         const LIMITE_CONTINUO_MIN = 5 * 60;
@@ -1151,9 +1157,10 @@
                 ctx.beginPath(); ctx.moveTo(p, p + (i * rowH) + rowH); ctx.lineTo(w, p + (i * rowH) + rowH); ctx.strokeStyle = "#eee"; ctx.stroke();
             }
 
-            const shiftStartH = getShiftStartHour(logs);
+            const visibles = getLogsVisibles();
+            const shiftStartH = getShiftStartHour(visibles);
 
-            for (let i = 0; i <= 24; i++) { 
+            for (let i = 0; i <= 24; i++) {
                 let x = p + ((w - p) / 24) * i; 
                 ctx.beginPath(); ctx.moveTo(x, p); ctx.lineTo(x, h - p); ctx.strokeStyle = "#e5e7eb"; ctx.stroke(); 
             }
@@ -1169,10 +1176,10 @@
                 }
             }
 
-            if (logs.length === 0) return;
+            if (visibles.length === 0) return;
             ctx.lineWidth = 3; ctx.strokeStyle = '#F28B00'; ctx.lineJoin = 'miter'; ctx.beginPath();
 
-            logs.forEach((l, i) => {
+            visibles.forEach((l, i) => {
                 let ds = new Date(l.startTime); let de = l.endTime ? new Date(l.endTime) : new Date();
                 let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
                 let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
@@ -1454,11 +1461,17 @@
             }
             if (!window.jspdf) { alert("⚠️ Error: Librería PDF no disponible."); return; }
 
+            const logsPDF = getLogsVisibles();
+            if (logsPDF.length === 0) {
+                alert("⚠️ Aún no has iniciado turno. Cambia a una actividad (Auxiliar, Conduciendo, etc.) para poder generar la bitácora.");
+                return;
+            }
+
             const permisoEl = document.getElementById('permisoSCT');
             let faltante = null;
             if (!permisoEl.value.trim()) faltante = [permisoEl, "Captura el No. de Permiso SCT antes de generar el PDF."];
-                        if (faltante) {
-                            alert("⚠️ " + faltante[1]);
+            if (faltante) {
+                alert("⚠️ " + faltante[1]);
                 faltante[0].scrollIntoView({ behavior: "smooth", block: "center" });
                 faltante[0].focus();
                 return;
@@ -1482,16 +1495,16 @@
                 return v && !isNaN(d) ? `${fmtFecha(d)} ${fmtHora(d)}` : "";
             };
 
-            const shiftStartH = getShiftStartHour(logs);
-            const shiftStartMs = getShiftStartTime(logs);
+            const shiftStartH = getShiftStartHour(logsPDF);
+            const shiftStartMs = getShiftStartTime(logsPDF);
             const DAY_MS = 24 * 60 * 60 * 1000;
             const gridOriginMs = new Date(shiftStartMs).setMinutes(0, 0, 0);
             const limit24 = gridOriginMs + DAY_MS;
 
             const nowMs = Date.now();
-            const logsD1 = logs.filter(l => l.startTime < limit24);
-            const logsD2 = logs.filter(l => (l.endTime || nowMs) > limit24);
-            const tableLogs = logs.filter(l => minuteMs(l.endTime || nowMs) - minuteMs(l.startTime) >= 60000);
+            const logsD1 = logsPDF.filter(l => l.startTime < limit24);
+            const logsD2 = logsPDF.filter(l => (l.endTime || nowMs) > limit24);
+            const tableLogs = logsPDF.filter(l => minuteMs(l.endTime || nowMs) - minuteMs(l.startTime) >= 60000);
 
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
             try {
@@ -1788,8 +1801,8 @@
                 horaLlegada: document.getElementById('horaLlegada')?.value || "",
                 coConductor: document.getElementById('tripulacion')?.value === 'DOBLE' ? (document.getElementById('coConductor')?.value || "") : "",
                 coLicencia: document.getElementById('tripulacion')?.value === 'DOBLE' ? (document.getElementById('coLicencia')?.value || "") : "",
-                shiftStartHour: getShiftStartHour(logs),
-                shiftStartTime: getShiftStartTime(logs),
+                shiftStartHour: getShiftStartHour(getLogsVisibles()),
+                shiftStartTime: getShiftStartTime(getLogsVisibles()),
                 logs: structuredClone(logs),
                 gpsEvidenceVersion: 1,
                 signatureOp,

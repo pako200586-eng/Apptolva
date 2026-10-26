@@ -189,7 +189,10 @@
             const azulOficial = [0, 51, 153];
 
             const folio = data.folio || "SF";
-            const logs = Array.isArray(data.logs) ? data.logs : [];
+            const logsRaw = Array.isArray(data.logs) ? data.logs : [];
+            // El DESCANSO "Inicio" de un periodo recién abierto no es actividad del turno.
+            const hayPlaceholder = logsRaw.length > 0 && logsRaw[0].status === 1 && logsRaw[0].place === "Inicio";
+            const logs = hayPlaceholder ? logsRaw.slice(1) : logsRaw;
             const fecha = data.fecha || new Date().toLocaleDateString();
 
             const pad2 = n => String(n).padStart(2, "0");
@@ -205,8 +208,8 @@
 
             // Cálculo dinámico de corte
             const shiftCalc = getShiftStartFromLogs(logs);
-            const shiftStartH = data.shiftStartHour !== undefined ? data.shiftStartHour : shiftCalc.startHour;
-            const shiftStartMs = data.shiftStartTime !== undefined ? data.shiftStartTime : shiftCalc.startMs;
+            const shiftStartH = (!hayPlaceholder && data.shiftStartHour !== undefined) ? data.shiftStartHour : shiftCalc.startHour;
+            const shiftStartMs = (!hayPlaceholder && data.shiftStartTime !== undefined) ? data.shiftStartTime : shiftCalc.startMs;
             const DAY_MS = 24 * 60 * 60 * 1000;
             const gridOriginMs = new Date(shiftStartMs).setMinutes(0, 0, 0);
             const limit24 = gridOriginMs + DAY_MS;
