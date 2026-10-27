@@ -1,4 +1,4 @@
-﻿const CACHE_VERSION = "v85"; // Incremento de versión para forzar actualización
+﻿const CACHE_VERSION = "v87"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -448,6 +448,24 @@ self.addEventListener("message", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  const ACCIONES_APP = ["iniciar_pausa", "voy_volante", "soy_copiloto"];
+  if (ACCIONES_APP.includes(event.action)) {
+    const ts = (event.notification.data && event.notification.data.ts) || Date.now();
+    event.waitUntil(
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+        const cliente = clientList.find((c) => c.url.includes("bitacora_master.html"));
+        if (cliente) {
+          cliente.postMessage({ type: "ACCION_NOTIFICACION", accion: event.action, ts });
+          return cliente.focus();
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(`./bitacora_master.html?accionBitacora=${event.action}&ts=${ts}`);
+        }
+      })
+    );
+    return;
+  }
 
   if (event.action === "abrir_bitacora" || !event.action) {
     const bitacoraUrl = "./bitacora_master.html";

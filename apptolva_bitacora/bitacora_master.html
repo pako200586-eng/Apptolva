@@ -67,13 +67,19 @@
                 <div class="hidden sm:block text-xs font-bold tracking-wide">NOM-087 · Bitácora Digital</div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
+                <select id="tripulacion" class="bg-black/20 text-white rounded-full px-1.5 py-1 text-[10px] font-bold border-0 outline-none max-w-[64px]" title="Tripulación de la unidad">
+                    <option value="INDIVIDUAL" class="text-gray-800">1 op.</option><option value="DOBLE" class="text-gray-800">2 ops.</option>
+                </select>
+                <select id="rolCabina" class="hidden bg-black/20 text-white rounded-full px-1.5 py-1 text-[10px] font-bold border-0 outline-none max-w-[64px]" title="Mi rol en cabina">
+                    <option value="VOLANTE" class="text-gray-800">Volante</option><option value="COPILOTO" class="text-gray-800">Copil.</option>
+                </select>
                 <div id="cloudSyncIndicator" class="bg-black/20 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5" title="Estado de la conexión y sincronización">
                     <i class="fas fa-cloud text-gray-300" id="cloudIcon"></i>
                     <span id="cloudText" class="hidden xs:inline">Local</span>
                 </div>
                 <div class="bg-black/20 px-2 py-1 rounded-full text-[10px] font-mono" id="clockDisplay">00:00</div>
-                <button onclick="generarPDFSeguro()" class="bg-white text-orange-600 px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center gap-1 active:scale-95 transition border border-orange-200">
+                                <button onclick="generarPDFSeguro()" class="bg-white text-orange-600 px-2.5 py-1.5 rounded-lg font-bold text-xs shadow flex items-center gap-1 active:scale-95 transition border border-orange-200">
                     <i class="fas fa-file-contract"></i> PDF
                 </button>
                 <button onclick="generarQRSeguro()" id="qrBtn" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow flex items-center justify-center active:scale-95 transition border border-gray-600" title="Exhibir QR oficial">
@@ -145,7 +151,18 @@
                     <span id="licenseExpBadge" class="hidden mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full"></span>
                 </div>
 
-                <div class="col-span-2"><label class="text-xs font-bold text-gray-500 block mb-1">No. Serie Vehicular (VIN)</label><input type="text" id="vin" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300 font-mono text-xs" placeholder="1FUJA6CG57LW86529" maxlength="17"></div>
+                <div class="col-span-2"><label class="text-xs font-bold text-gray-500 block mb-1">No. Serie Vehicular (VIN)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="vin" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300 font-mono text-xs" placeholder="1FUJA6CG57LW86529" maxlength="17">
+                        <button type="button" onclick="abrirEscanerVIN()" class="bg-orange-500 text-white px-3 rounded-lg shadow active:scale-95 transition" title="Escanear VIN con la cámara"><i class="fas fa-camera"></i></button>
+                    </div>
+                </div>
+                <div id="vinScanModal" class="hidden fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
+                    <p class="text-white text-sm font-bold mb-2">Apunta al código de barras o QR del VIN (parabrisas / puerta)</p>
+                    <video id="vinScanVideo" class="w-full max-w-md rounded-lg bg-black" playsinline muted></video>
+                    <p id="vinScanMsg" class="text-orange-300 text-xs mt-2 text-center">Buscando código...</p>
+                    <button type="button" onclick="cerrarEscanerVIN()" class="mt-4 bg-white text-gray-800 px-6 py-2 rounded-lg font-bold text-sm">Cancelar</button>
+                </div>
 
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Tipo de Carga</label>
                     <select id="tipoCarga" class="bachoco-input w-full rounded-lg p-2 bg-white border border-gray-300">
@@ -178,8 +195,8 @@
                     </div>
                 </div>
 
-                <div class="col-span-2"><label class="text-xs text-gray-400 block mb-1">Co-conductor (si aplica relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre co-conductor (opcional)"></div>
-                <div><label class="text-xs text-gray-400 block mb-1">Licencia Co-conductor</label><input type="text" id="coLicencia" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="(opcional)"></div>
+                <div id="coConductorWrap" class="col-span-2 hidden"><label class="text-xs text-gray-400 block mb-1">Co-conductor (relevo)</label><input type="text" id="coConductor" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="Nombre co-conductor"></div>
+                <div id="coLicenciaWrap" class="hidden"><label class="text-xs text-gray-400 block mb-1">Licencia Co-conductor</label><input type="text" id="coLicencia" class="bachoco-input w-full rounded-lg p-2 uppercase border border-gray-300" placeholder="Licencia"></div>
             </div>
         </div>
 
@@ -421,15 +438,21 @@
             if (ultimoDescansoIndex !== -1 && ultimoDescansoIndex < logList.length - 1) {
                 return logList[ultimoDescansoIndex + 1].startTime;
             }
-            // Descanso de 8 h que aún es el último registro: la nueva jornada empieza al terminarlo.
+            // Descanso de 8 h que aún es el último registro: se ancla al inicio del descanso para que la gráfica no se desplace mientras sigue corriendo.
             if (ultimoDescansoIndex !== -1) {
-                return logList[ultimoDescansoIndex].endTime || Date.now();
+                return logList[ultimoDescansoIndex].startTime;
             }
             return logList[0].startTime;
         }
 
         function getShiftStartHour(logList) {
             return new Date(getShiftStartTime(logList)).getHours();
+        }
+
+        // El DESCANSO "Inicio" se crea al abrir un periodo nuevo; no es actividad del turno y no se grafica ni se imprime.
+        function getLogsVisibles(list) {
+            const base = list || logs;
+            return base.length > 0 && base[0].status === 1 && base[0].place === "Inicio" ? base.slice(1) : base;
         }
 
         // Límites NOM-087: 4.7 (máximo 14 h de conducción en 24 h) y 4.1 (5 h continuas, con pausa acumulada de 30 min).
@@ -477,7 +500,8 @@
             'unitId', 'brandModel', 'plates', 'mode', 'folio', 
             'origin', 'destination', 'puntosIntermedios', 'horaSalida', 'horaLlegada',
             'permisoSCT', 'tipoPermiso', 'vin', 'tipoCarga', 
-            'kmInicio', 'kmFin', 'coConductor', 'coLicencia'
+            'kmInicio', 'kmFin', 'coConductor', 'coLicencia',
+            'tripulacion', 'rolCabina'
         ];
         
         ids.forEach(id => {
@@ -721,6 +745,7 @@
 
         window.changeStatus = async (st) => {
             if (currentStatus === st) return;
+            if (typeof solicitarPermisoNotificaciones === "function") solicitarPermisoNotificaciones();
             const now = Date.now();
             if (currentStatus === 5 && st !== 5 && excepcionSinJustificar()) {
                 alert("⚠️ NOM-087 8.2.1 IX: debes justificar el caso de excepción antes de salir de este estado.");
@@ -849,6 +874,17 @@
             if (turnoEnProceso) return;
             if (!getSelectedCatalogOperator()) {
                 alert("⚠️ Selecciona al operador del catálogo oficial antes de finalizar el turno.");
+                return;
+            }
+            const kmFinEl = document.getElementById('kmFin');
+            const kmIniVal = parseFloat(document.getElementById('kmInicio').value);
+            const kmFinVal = parseFloat(kmFinEl.value);
+            const errorKm = (kmFinEl.value.trim() === "" || isNaN(kmFinVal)) ? "Captura el Km Fin antes de finalizar el turno."
+                : (!isNaN(kmIniVal) && kmFinVal < kmIniVal) ? "El Km Fin no puede ser menor al Km Inicio." : null;
+            if (errorKm) {
+                alert("⚠️ " + errorKm);
+                kmFinEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                kmFinEl.focus();
                 return;
             }
             if (!confirm("⚠️ ¿FINALIZAR VIAJE / TERMINAR TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nLa bitácora se respaldará en la nube y se iniciará un periodo en ceros.")) return;
@@ -1121,9 +1157,10 @@
                 ctx.beginPath(); ctx.moveTo(p, p + (i * rowH) + rowH); ctx.lineTo(w, p + (i * rowH) + rowH); ctx.strokeStyle = "#eee"; ctx.stroke();
             }
 
-            const shiftStartH = getShiftStartHour(logs);
+            const visibles = getLogsVisibles();
+            const shiftStartH = getShiftStartHour(visibles);
 
-            for (let i = 0; i <= 24; i++) { 
+            for (let i = 0; i <= 24; i++) {
                 let x = p + ((w - p) / 24) * i; 
                 ctx.beginPath(); ctx.moveTo(x, p); ctx.lineTo(x, h - p); ctx.strokeStyle = "#e5e7eb"; ctx.stroke(); 
             }
@@ -1139,10 +1176,10 @@
                 }
             }
 
-            if (logs.length === 0) return;
+            if (visibles.length === 0) return;
             ctx.lineWidth = 3; ctx.strokeStyle = '#F28B00'; ctx.lineJoin = 'miter'; ctx.beginPath();
 
-            logs.forEach((l, i) => {
+            visibles.forEach((l, i) => {
                 let ds = new Date(l.startTime); let de = l.endTime ? new Date(l.endTime) : new Date();
                 let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
                 let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
@@ -1164,6 +1201,258 @@
             ctx.stroke();
         }
 
+        // ===== Alertas NOM-087, Wake Lock y sugerencia de movimiento por GPS =====
+        // Todo se calcula con marcas de tiempo absolutas; nada depende de contadores que el SO pueda congelar.
+        const MONITOR = {
+            VEL_RUTA_KMH: 25, CONFIRMA_MOV_MS: 2 * 60000,
+            VEL_DETENIDO_KMH: 3, CONFIRMA_DETENIDO_MS: 5 * 60000,
+            PRECISION_MAX_M: 50, MUESTRA_VIGENCIA_MS: 60000,
+            ENFRIAMIENTO_MS: 10 * 60000, ACCION_VIGENCIA_MS: 15 * 60000
+        };
+        let wakeLock = null, wakeLockPendiente = false;
+        let alerta270 = false, alerta300 = false;
+        let gpsWatchId = null, ultimaPos = null, ultimaVel = null;
+        let movDesde = null, detenidoDesde = null, ultimaSugerenciaMs = 0;
+
+        window.solicitarPermisoNotificaciones = function() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => {});
+            }
+        };
+
+        async function notificarApp(titulo, cuerpo, tag, acciones) {
+            if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                await reg.showNotification(titulo, {
+                    body: cuerpo,
+                    icon: './icon-192x192.png',
+                    badge: './favicon-32x32.png',
+                    tag,
+                    renotify: true,
+                    requireInteraction: true,
+                    vibrate: [500, 200, 500, 200, 800],
+                    actions: acciones || [],
+                    data: { ts: Date.now() }
+                });
+            } catch (e) { /* sin notificación: queda el aviso en pantalla */ }
+        }
+
+        function mostrarSugerencia(mensaje, botones) {
+            document.getElementById('bannerSugerencia')?.remove();
+            const el = document.createElement('div');
+            el.id = 'bannerSugerencia';
+            el.className = 'fixed bottom-4 left-3 right-3 z-[90] bg-white border-l-4 border-orange-500 rounded-lg shadow-xl p-3 text-sm';
+            const p = document.createElement('p');
+            p.className = 'font-bold text-gray-800 mb-2';
+            p.textContent = mensaje;
+            const fila = document.createElement('div');
+            fila.className = 'flex gap-2 flex-wrap';
+            [...botones, { texto: 'Ahora no', accion: null }].forEach((b, i, arr) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = b.texto;
+                btn.className = i === arr.length - 1
+                    ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 text-gray-700'
+                    : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 text-white';
+                btn.onclick = () => { el.remove(); if (b.accion) b.accion(); };
+                fila.appendChild(btn);
+            });
+            el.append(p, fila);
+            document.body.appendChild(el);
+        }
+
+        function marcarCopiloto() {
+            const rol = document.getElementById('rolCabina');
+            if (!rol) return;
+            rol.value = 'COPILOTO';
+            rol.dispatchEvent(new Event('input'));
+        }
+
+        async function gestionarWakeLock() {
+            const necesita = currentStatus === 3 && document.visibilityState === 'visible';
+            if (necesita && !wakeLock && !wakeLockPendiente && 'wakeLock' in navigator) {
+                wakeLockPendiente = true;
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
+                } catch (e) { /* batería baja o no permitido */ }
+                wakeLockPendiente = false;
+            } else if (!necesita && wakeLock) {
+                wakeLock.release().catch(() => {});
+                wakeLock = null;
+            }
+        }
+
+        function evaluarLimitesConduccion() {
+            if (currentStatus !== 3) { alerta270 = alerta300 = false; return; }
+            const { continuousDrive } = calcularLimitesConduccion(Date.now());
+            if (continuousDrive < 270) { alerta270 = alerta300 = false; return; }
+            if (continuousDrive >= 300 && !alerta300) {
+                alerta300 = alerta270 = true;
+                notificarApp('🚨 Límite NOM-087: 5 horas de manejo continuo',
+                    'Detente y registra una pausa de 30 minutos ahora.', 'limite-5h',
+                    [{ action: 'iniciar_pausa', title: '⏸️ Iniciar pausa' }]);
+            } else if (!alerta270) {
+                alerta270 = true;
+                notificarApp('⚠️ 4 h 30 min de manejo continuo',
+                    'Te quedan menos de 30 minutos para la pausa obligatoria. Busca un paradero seguro.', 'limite-4h30',
+                    [{ action: 'iniciar_pausa', title: '⏸️ Iniciar pausa' }]);
+            }
+        }
+
+        function distanciaMetros(a, b) {
+            const R = 6371000, rad = x => x * Math.PI / 180;
+            const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+            const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(h));
+        }
+
+        function alRecibirPosicion(pos) {
+            const c = pos.coords;
+            const actual = { lat: c.latitude, lng: c.longitude, t: pos.timestamp };
+            let kmh = (typeof c.speed === 'number' && c.speed >= 0) ? c.speed * 3.6 : null;
+            // Muchos teléfonos no reportan speed: se calcula con distancia y tiempo entre muestras.
+            if (kmh === null && ultimaPos && actual.t > ultimaPos.t) {
+                kmh = (distanciaMetros(ultimaPos, actual) / ((actual.t - ultimaPos.t) / 1000)) * 3.6;
+            }
+            ultimaPos = actual;
+            ultimaVel = (kmh !== null && c.accuracy <= MONITOR.PRECISION_MAX_M) ? { kmh, ms: Date.now() } : null;
+            evaluarMovimiento();
+        }
+
+        function evaluarMovimiento() {
+            const ahora = Date.now();
+            const copiloto = document.getElementById('tripulacion')?.value === 'DOBLE'
+                && document.getElementById('rolCabina')?.value === 'COPILOTO';
+            if (copiloto || !ultimaVel || ahora - ultimaVel.ms > MONITOR.MUESTRA_VIGENCIA_MS) {
+                movDesde = detenidoDesde = null;
+                return;
+            }
+            const kmh = ultimaVel.kmh;
+            const enfriado = ahora - ultimaSugerenciaMs > MONITOR.ENFRIAMIENTO_MS;
+
+            if (currentStatus !== 3) {
+                detenidoDesde = null;
+                if (kmh < MONITOR.VEL_RUTA_KMH) { movDesde = null; return; }
+                if (!movDesde) movDesde = ahora;
+                if (ahora - movDesde < MONITOR.CONFIRMA_MOV_MS || !enfriado) return;
+                movDesde = null;
+                ultimaSugerenciaMs = ahora;
+                const doble = document.getElementById('tripulacion')?.value === 'DOBLE';
+                const msg = `Movimiento en ruta detectado (${Math.round(kmh)} km/h). Tu bitácora sigue en otro estado.`;
+                const botones = [{ texto: doble ? 'Voy al volante' : 'Registrar CONDUCIENDO', accion: () => window.changeStatus(3) }];
+                const acciones = [{ action: 'voy_volante', title: '🟢 Registrar CONDUCIENDO' }];
+                if (doble) {
+                    botones.push({ texto: 'Soy copiloto', accion: marcarCopiloto });
+                    acciones.push({ action: 'soy_copiloto', title: '💺 Soy copiloto' });
+                }
+                mostrarSugerencia(msg, botones);
+                notificarApp('🚛 Movimiento detectado', msg + (doble ? ' ¿Vas al volante?' : ''), 'mov-detectado', acciones);
+            } else {
+                movDesde = null;
+                if (kmh >= MONITOR.VEL_DETENIDO_KMH) { detenidoDesde = null; return; }
+                if (!detenidoDesde) detenidoDesde = ahora;
+                if (ahora - detenidoDesde < MONITOR.CONFIRMA_DETENIDO_MS || !enfriado) return;
+                detenidoDesde = null;
+                ultimaSugerenciaMs = ahora;
+                const msg = 'La unidad lleva más de 5 minutos detenida. ¿Registrar una pausa?';
+                mostrarSugerencia(msg, [{ texto: 'Registrar PAUSA', accion: () => window.changeStatus(2) }]);
+                notificarApp('⏸️ Unidad detenida', msg, 'unidad-detenida', [{ action: 'iniciar_pausa', title: '⏸️ Registrar pausa' }]);
+            }
+        }
+
+        function gestionarGps() {
+            const quiere = document.visibilityState === 'visible' && logs.length > 0 && 'geolocation' in navigator;
+            if (quiere && gpsWatchId === null) {
+                gpsWatchId = navigator.geolocation.watchPosition(alRecibirPosicion, () => {},
+                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+            } else if (!quiere && gpsWatchId !== null) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null; ultimaPos = ultimaVel = null; movDesde = detenidoDesde = null;
+            }
+        }
+
+        function monitorTick() {
+            const tripulacion = document.getElementById('tripulacion');
+            document.getElementById('rolCabina')?.classList.toggle('hidden', tripulacion?.value !== 'DOBLE');
+            ['coConductorWrap', 'coLicenciaWrap'].forEach(id =>
+                document.getElementById(id)?.classList.toggle('hidden', tripulacion?.value !== 'DOBLE'));
+            gestionarWakeLock();
+            gestionarGps();
+            evaluarLimitesConduccion();
+            evaluarMovimiento();
+        }
+
+        function ejecutarAccionNotificacion(accion, ts) {
+            if (!ts || Date.now() - Number(ts) > MONITOR.ACCION_VIGENCIA_MS) return;
+            if (accion === 'iniciar_pausa') window.changeStatus(2);
+            else if (accion === 'voy_volante') window.changeStatus(3);
+            else if (accion === 'soy_copiloto') marcarCopiloto();
+            monitorTick();
+        }
+
+        setInterval(monitorTick, 15000);
+        document.addEventListener('visibilitychange', monitorTick);
+        ['tripulacion', 'rolCabina'].forEach(id =>
+            document.getElementById(id)?.addEventListener('input', monitorTick));
+        navigator.serviceWorker?.addEventListener('message', (e) => {
+            if (e.data?.type === 'ACCION_NOTIFICACION') ejecutarAccionNotificacion(e.data.accion, e.data.ts);
+        });
+        (function accionPorUrl() {
+            const q = new URLSearchParams(location.search);
+            const accion = q.get('accionBitacora');
+            if (!accion) return;
+            history.replaceState(null, '', location.pathname);
+            ejecutarAccionNotificacion(accion, q.get('ts'));
+        })();
+        monitorTick();
+
+        let vinStream = null, vinScanActivo = false;
+        window.cerrarEscanerVIN = function() {
+            vinScanActivo = false;
+            if (vinStream) { vinStream.getTracks().forEach(t => t.stop()); vinStream = null; }
+            document.getElementById('vinScanModal').classList.add('hidden');
+        };
+        window.abrirEscanerVIN = async function() {
+            if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
+                alert("⚠️ Tu navegador no soporta el escáner. Usa Chrome en Android o captura el VIN manualmente.");
+                return;
+            }
+            const modal = document.getElementById('vinScanModal');
+            const video = document.getElementById('vinScanVideo');
+            const msg = document.getElementById('vinScanMsg');
+            msg.textContent = "Buscando código...";
+            try {
+                vinStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+            } catch (e) {
+                alert("⚠️ No se pudo acceder a la cámara. Revisa los permisos.");
+                return;
+            }
+            modal.classList.remove('hidden');
+            video.srcObject = vinStream;
+            await video.play().catch(() => {});
+            const detector = new BarcodeDetector({ formats: ['code_39', 'code_128', 'data_matrix', 'qr_code'] });
+            vinScanActivo = true;
+            const buscar = async () => {
+                if (!vinScanActivo) return;
+                try {
+                    const codes = await detector.detect(video);
+                    for (const c of codes) {
+                        const m = String(c.rawValue).toUpperCase().replace(/[^A-Z0-9]/g, '').match(/[A-HJ-NPR-Z0-9]{17}/);
+                        if (m) {
+                            document.getElementById('vin').value = m[0];
+                            cerrarEscanerVIN();
+                            return;
+                        }
+                        msg.textContent = "Código leído, pero no contiene un VIN válido. Intenta con otro.";
+                    }
+                } catch (e) { /* frame no listo */ }
+                setTimeout(buscar, 250);
+            };
+            buscar();
+        };
+
         window.generarPDFSeguro = async function() {
             const selectedOperator = getSelectedCatalogOperator();
             if (!selectedOperator) {
@@ -1171,6 +1460,22 @@
                 return;
             }
             if (!window.jspdf) { alert("⚠️ Error: Librería PDF no disponible."); return; }
+
+            const logsPDF = getLogsVisibles();
+            if (logsPDF.length === 0) {
+                alert("⚠️ Aún no has iniciado turno. Cambia a una actividad (Auxiliar, Conduciendo, etc.) para poder generar la bitácora.");
+                return;
+            }
+
+            const permisoEl = document.getElementById('permisoSCT');
+            let faltante = null;
+            if (!permisoEl.value.trim()) faltante = [permisoEl, "Captura el No. de Permiso SCT antes de generar el PDF."];
+            if (faltante) {
+                alert("⚠️ " + faltante[1]);
+                faltante[0].scrollIntoView({ behavior: "smooth", block: "center" });
+                faltante[0].focus();
+                return;
+            }
             
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -1178,12 +1483,28 @@
             const azulOficial = [0, 51, 153];
             const folio = document.getElementById('folio').value || "S/F";
 
-            const shiftStartH = getShiftStartHour(logs);
-            const shiftStartMs = getShiftStartTime(logs);
-            const limit24 = shiftStartMs + (24 * 60 * 60 * 1000);
-            
-            const logsD1 = logs.filter(l => l.startTime < limit24);
-            const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
+            const pad2 = n => String(n).padStart(2, "0");
+            const minuteMs = t => Math.floor(t / 60000) * 60000;
+            const fmtHora = d => {
+                const h = d.getHours();
+                return `${pad2(h % 12 || 12)}:${pad2(d.getMinutes())} ${h < 12 ? "a.m." : "p.m."}`;
+            };
+            const fmtFecha = d => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+            const fmtFechaHora = v => {
+                const d = new Date(v);
+                return v && !isNaN(d) ? `${fmtFecha(d)} ${fmtHora(d)}` : "";
+            };
+
+            const shiftStartH = getShiftStartHour(logsPDF);
+            const shiftStartMs = getShiftStartTime(logsPDF);
+            const DAY_MS = 24 * 60 * 60 * 1000;
+            const gridOriginMs = new Date(shiftStartMs).setMinutes(0, 0, 0);
+            const limit24 = gridOriginMs + DAY_MS;
+
+            const nowMs = Date.now();
+            const logsD1 = logsPDF.filter(l => l.startTime < limit24);
+            const logsD2 = logsPDF.filter(l => (l.endTime || nowMs) > limit24);
+            const tableLogs = logsPDF.filter(l => minuteMs(l.endTime || nowMs) - minuteMs(l.startTime) >= 60000);
 
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
             try {
@@ -1218,16 +1539,16 @@
             doc.setFont("helvetica", "normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
             y += 5;
             
-            row("FOLIO:", folio, 14, 35);
-            row("FECHA EMISIÓN:", new Date().toLocaleDateString(), 51, 35);
-            row("PERMISO SCT:", document.getElementById('permisoSCT').value, 88, 45);
-            row("TIPO PERMISO:", document.getElementById('tipoPermiso').value, 135, 60);
+            row("FOLIO:", folio, 14, 30);
+            row("FECHA EMISIÓN:", fmtFecha(new Date()), 46, 46);
+            row("PERMISO SCT:", document.getElementById('permisoSCT').value, 94, 45);
+            row("TIPO PERMISO:", document.getElementById('tipoPermiso').value, 141, 54);
             y += 8;
-            row("UNIDAD:", document.getElementById('unitId').value, 14, 32);
-            row("MARCA/MOD:", document.getElementById('brandModel').value, 48, 38);
-            row("PLACAS:", document.getElementById('plates').value, 88, 32);
-            row("CONFIG:", document.getElementById('mode').value, 122, 25);
-            row("VIN:", document.getElementById('vin').value, 149, 46);
+            row("UNIDAD:", document.getElementById('unitId').value, 14, 28);
+            row("MARCA/MOD:", document.getElementById('brandModel').value, 44, 52);
+            row("PLACAS:", document.getElementById('plates').value, 98, 32);
+            row("CONFIG:", document.getElementById('mode').value, 132, 25);
+            row("VIN:", document.getElementById('vin').value, 159, 36);
             y += 8;
             row("OPERADOR:", `${selectedOperator.nombre} (No. ${selectedOperator.numero})`, 14, 181);
             y += 8;
@@ -1244,11 +1565,12 @@
             const puntos = document.getElementById('puntosIntermedios').value;
             row("PUNTOS INTERMEDIOS / RUTA:", puntos || "Directo por carretera federal", 14, 181);
             y += 8;
-            row("HORA SALIDA:", document.getElementById('horaSalida').value || "No registrada", 14, 90);
-            row("HORA LLEGADA (ESTIMADA/REAL):", document.getElementById('horaLlegada').value || "En ruta", 106, 89);
+            row("HORA SALIDA:",             fmtFechaHora(document.getElementById('horaSalida').value) || "No registrada", 14, 90);
+                        row("HORA LLEGADA (ESTIMADA/REAL):", fmtFechaHora(document.getElementById('horaLlegada').value) || "En ruta", 106, 89);
             y += 8;
 
-            const coCond = document.getElementById('coConductor').value;
+            const esDoble = document.getElementById('tripulacion')?.value === 'DOBLE';
+            const coCond = esDoble ? document.getElementById('coConductor').value : "";
             if (coCond && coCond.trim()) {
                 row("CO-CONDUCTOR:", coCond, 14, 92);
                 row("LIC. CO-COND:", document.getElementById('coLicencia').value, 108, 87);
@@ -1260,6 +1582,7 @@
                 doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
                 doc.setTextColor(0); doc.setFont("helvetica", "bold"); doc.text(label, 105, startY + 3.5, { align: "center" });
                 
+                const winStart = gridOriginMs + (isDay2 ? DAY_MS : 0); const winEnd = winStart + DAY_MS;
                 const gx = 20; const gy = startY + 8; const gw = 175; const gh = 28; const rowH = gh / 5;
                 const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
                 
@@ -1291,27 +1614,21 @@
 
                         let ds = new Date(l.startTime); 
                         let de = l.endTime ? new Date(l.endTime) : new Date();
-                        let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
-                        let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
+                        if (de.getTime() <= winStart || ds.getTime() >= winEnd) return;
+                        let h1 = (Math.max(ds.getTime(), winStart) - winStart) / 3600000;
+                        let h2 = (Math.min(de.getTime(), winEnd) - winStart) / 3600000;
                         let x1 = gx + (gw / 24) * h1;
                         let x2 = gx + (gw / 24) * h2;
-                        const cruza = (de > ds) && (x2 < x1);
                         let yLine = gy + (rIdx * rowH) + (rowH / 2);
-
-                        if (cruza) {
-                            if (!isDay2) doc.line(x1, yLine, gx + gw, yLine);
-                            else doc.line(gx, yLine, x2, yLine);
-                        } else {
-                            doc.line(x1, yLine, x2, yLine);
-                        }
+                        doc.line(x1, yLine, x2, yLine);
                         
                         if (i > 0) {
                             let prev = dayLogs[i - 1];
                             const prevR = mapSt[getActivityStatus(prev)];
                             if (prevR !== undefined) {
                                 let prevY = gy + (prevR * rowH) + (rowH / 2);
-                                let prevEnd = new Date(prev.endTime);
-                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStartH + 24) % 24;
+                                const prevEndMs = Math.min(Math.max(prev.endTime || nowMs, winStart), winEnd);
+                                let hPrevEnd = (prevEndMs - winStart) / 3600000;
                                 let xPrevEnd = gx + (gw / 24) * hPrevEnd;
                                 if (Math.abs(x1 - xPrevEnd) < 2) doc.line(x1, prevY, x1, yLine);
                             }
@@ -1337,7 +1654,7 @@
             y += 5;
 
             doc.setFont("helvetica", "normal");
-            logs.forEach((l, idx) => {
+            tableLogs.forEach((l, idx) => {
                 if (y > 250) {
                     doc.addPage();
                     y = 20;
@@ -1353,13 +1670,13 @@
                 const stName = ["", "DESCANSO", "PAUSA", "CONDUCIENDO", "AUXILIAR", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
-                const dur = Math.floor((e - s) / 60000);
+                const dur = Math.round((minuteMs(e.getTime()) - minuteMs(s.getTime())) / 60000);
                 const durStr = `${Math.floor(dur / 60)}h ${dur % 60}m`;
                 
                 if (idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
                 
-                doc.text(s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 16, y + 3);
-                doc.text(e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 42, y + 3);
+                doc.text(fmtHora(s), 16, y + 3);
+                doc.text(fmtHora(e), 42, y + 3);
                 doc.text(stName, 66, y + 3);
                 doc.text(durStr, 96, y + 3);
                 doc.text(formatGps(l.gps).substring(0, 26), 121, y + 3);
@@ -1418,8 +1735,8 @@
                 "4.6 DESCANSO EN RUTAS DE HASTA 14 HORAS: Si la ruta implica hasta 14 horas de conducción, el conductor debe tener un descanso mínimo de 8 horas continuas, sin perjuicio de las pausas de 4.1 y 4.2.",
                 "4.7 TIEMPO MÁXIMO DE CONDUCCIÓN EN 24 HORAS: El tiempo de conducción no excederá de 14 horas en 24 horas.",
                 "REGISTRO DE RUTA: El conductor debe asentar la ruta, escalas intermedias y horas de salida y llegada para validación de la autoridad federal.",
-                "4.6 CO-CONDUCTOR: En relevo, cada conductor llevará su propia bitácora individual. El tiempo de copiloto no sustituye el descanso de 8 horas.",
-                "4.7 EXCEPCIONES: La conducción solo se prolongará por fuerza mayor justificada y anotada textualmente en la bitácora.",
+                "CO-CONDUCTOR: En relevo, cada conductor llevará su propia bitácora individual. El tiempo de copiloto no sustituye el descanso de 8 horas.",
+                "EXCEPCIONES: La conducción solo se prolongará por fuerza mayor justificada y anotada textualmente en la bitácora.",
                 "4.8 PORTABILIDAD DE LA BITÁCORA: Deberá portarse en la unidad física o digitalmente para inspección de la Guardia Nacional / SCT en todo momento."
             ];
             rules.forEach(r => {
@@ -1482,10 +1799,10 @@
                 puntosIntermedios: document.getElementById('puntosIntermedios')?.value || "",
                 horaSalida: document.getElementById('horaSalida')?.value || "",
                 horaLlegada: document.getElementById('horaLlegada')?.value || "",
-                coConductor: document.getElementById('coConductor')?.value || "",
-                coLicencia: document.getElementById('coLicencia')?.value || "",
-                shiftStartHour: getShiftStartHour(logs),
-                shiftStartTime: getShiftStartTime(logs),
+                coConductor: document.getElementById('tripulacion')?.value === 'DOBLE' ? (document.getElementById('coConductor')?.value || "") : "",
+                coLicencia: document.getElementById('tripulacion')?.value === 'DOBLE' ? (document.getElementById('coLicencia')?.value || "") : "",
+                shiftStartHour: getShiftStartHour(getLogsVisibles()),
+                shiftStartTime: getShiftStartTime(getLogsVisibles()),
                 logs: structuredClone(logs),
                 gpsEvidenceVersion: 1,
                 signatureOp,

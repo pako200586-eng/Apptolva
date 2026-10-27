@@ -189,17 +189,35 @@
             const azulOficial = [0, 51, 153];
 
             const folio = data.folio || "SF";
-            const logs = Array.isArray(data.logs) ? data.logs : [];
+            const logsRaw = Array.isArray(data.logs) ? data.logs : [];
+            // El DESCANSO "Inicio" de un periodo recién abierto no es actividad del turno.
+            const hayPlaceholder = logsRaw.length > 0 && logsRaw[0].status === 1 && logsRaw[0].place === "Inicio";
+            const logs = hayPlaceholder ? logsRaw.slice(1) : logsRaw;
             const fecha = data.fecha || new Date().toLocaleDateString();
+
+            const pad2 = n => String(n).padStart(2, "0");
+            const minuteMs = t => Math.floor(t / 60000) * 60000;
+            const fmtHora = d => {
+                const h = d.getHours();
+                return `${pad2(h % 12 || 12)}:${pad2(d.getMinutes())} ${h < 12 ? "a.m." : "p.m."}`;
+            };
+            const fmtFechaHora = v => {
+                const d = new Date(v);
+                return v && !isNaN(d) ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${fmtHora(d)}` : "";
+            };
 
             // Cálculo dinámico de corte
             const shiftCalc = getShiftStartFromLogs(logs);
-            const shiftStartH = data.shiftStartHour !== undefined ? data.shiftStartHour : shiftCalc.startHour;
-            const shiftStartMs = data.shiftStartTime !== undefined ? data.shiftStartTime : shiftCalc.startMs;
-            const limit24 = shiftStartMs + (24 * 60 * 60 * 1000);
+            const shiftStartH = (!hayPlaceholder && data.shiftStartHour !== undefined) ? data.shiftStartHour : shiftCalc.startHour;
+            const shiftStartMs = (!hayPlaceholder && data.shiftStartTime !== undefined) ? data.shiftStartTime : shiftCalc.startMs;
+            const DAY_MS = 24 * 60 * 60 * 1000;
+            const gridOriginMs = new Date(shiftStartMs).setMinutes(0, 0, 0);
+            const limit24 = gridOriginMs + DAY_MS;
 
+            const nowMs = Date.now();
             const logsD1 = logs.filter(l => l.startTime < limit24);
-            const logsD2 = logs.filter(l => l.startTime >= limit24 || (l.endTime && l.endTime > limit24));
+            const logsD2 = logs.filter(l => (l.endTime || nowMs) > limit24);
+            const tableLogs = logs.filter(l => minuteMs(l.endTime || nowMs) - minuteMs(l.startTime) >= 60000);
 
             // Encabezado
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
@@ -222,16 +240,16 @@
             doc.setFont("helvetica", "normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
             y += 5;
             
-            row("FOLIO:", folio, 14, 35);
-            row("FECHA EMISIÓN:", fecha, 51, 35);
-            row("PERMISO SCT:", data.permisoSCT || "", 88, 45);
-            row("TIPO PERMISO:", data.tipoPermiso || "", 135, 60);
+            row("FOLIO:", folio, 14, 30);
+            row("FECHA EMISIÓN:", fecha, 46, 46);
+            row("PERMISO SCT:", data.permisoSCT || "", 94, 45);
+            row("TIPO PERMISO:", data.tipoPermiso || "", 141, 54);
             y += 8;
-            row("UNIDAD:", data.unitId || "", 14, 32);
-            row("MARCA/MOD:", data.brandModel || "", 48, 38);
-            row("PLACAS:", data.plates || "", 88, 32);
-            row("CONFIG:", data.mode || "", 122, 25);
-            row("VIN:", data.vin || "", 149, 46);
+            row("UNIDAD:", data.unitId || "", 14, 28);
+            row("MARCA/MOD:", data.brandModel || "", 44, 52);
+            row("PLACAS:", data.plates || "", 98, 32);
+            row("CONFIG:", data.mode || "", 132, 25);
+            row("VIN:", data.vin || "", 159, 36);
             y += 8;
             row("OPERADOR:", (data.driverName || "") + (data.employeeNumber ? ` (No. ${data.employeeNumber})` : ""), 14, 181);
             y += 8;
@@ -248,8 +266,8 @@
             const puntos = data.puntosIntermedios || data.puntos_intermedios || "Directo por carretera federal";
             row("PUNTOS INTERMEDIOS / RUTA:", puntos, 14, 181);
             y += 8;
-            row("HORA SALIDA:", data.horaSalida || data.hora_salida || "No registrada", 14, 90);
-            row("HORA LLEGADA (ESTIMADA/REAL):", data.horaLlegada || data.hora_llegada || "En ruta", 106, 89);
+            row("HORA SALIDA:", fmtFechaHora(data.horaSalida || data.hora_salida) || "No registrada", 14, 90);
+                        row("HORA LLEGADA (ESTIMADA/REAL):", fmtFechaHora(data.horaLlegada || data.hora_llegada) || "En ruta", 106, 89);
             y += 8;
 
             const coCond = data.coConductor;
@@ -264,6 +282,7 @@
                 doc.setFillColor(230); doc.rect(14, startY, 181, 5, 'F');
                 doc.setTextColor(0); doc.setFont("helvetica", "bold"); doc.text(label, 105, startY + 3.5, { align: "center" });
                 
+                const winStart = gridOriginMs + (isDay2 ? DAY_MS : 0); const winEnd = winStart + DAY_MS;
                 const gx = 20; const gy = startY + 8; const gw = 175; const gh = 28; const rowH = gh / 5;
                 const statusLabels = ["CONDUCIENDO", "PAUSA", "AUXILIAR", "EXCEPCIÓN", "DESCANSO"];
                 
@@ -295,8 +314,9 @@
 
                         let ds = new Date(l.startTime); 
                         let de = l.endTime ? new Date(l.endTime) : new Date();
-                        let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
-                        let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
+                        if (de.getTime() <= winStart || ds.getTime() >= winEnd) return;
+                        let h1 = (Math.max(ds.getTime(), winStart) - winStart) / 3600000;
+                        let h2 = (Math.min(de.getTime(), winEnd) - winStart) / 3600000;
                         let x1 = gx + (gw / 24) * h1;
                         let x2 = gx + (gw / 24) * h2;
                         const cruza = (de > ds) && (x2 < x1);
@@ -314,8 +334,8 @@
                             const prevR = mapSt[getActivityStatus(prev)];
                             if (prevR !== undefined) {
                                 let prevY = gy + (prevR * rowH) + (rowH / 2);
-                                let prevEnd = new Date(prev.endTime);
-                                let hPrevEnd = (prevEnd.getHours() + prevEnd.getMinutes() / 60 - shiftStartH + 24) % 24;
+                                const prevEndMs = Math.min(Math.max(prev.endTime || nowMs, winStart), winEnd);
+                                let hPrevEnd = (prevEndMs - winStart) / 3600000;
                                 let xPrevEnd = gx + (gw / 24) * hPrevEnd;
                                 if (Math.abs(x1 - xPrevEnd) < 2) doc.line(x1, prevY, x1, yLine);
                             }
@@ -342,7 +362,7 @@
             y += 5;
 
             doc.setFont("helvetica", "normal");
-            logs.forEach((l, idx) => {
+            tableLogs.forEach((l, idx) => {
                 if (y > 250) {
                     doc.addPage();
                     y = 20;
@@ -358,13 +378,13 @@
                 const stName = ["", "DESCANSO", "PAUSA", "CONDUCIENDO", "AUXILIAR", "EXCEPCIÓN"][getActivityStatus(l)] || "OTRO";
                 const s = new Date(l.startTime);
                 const e = l.endTime ? new Date(l.endTime) : new Date();
-                const dur = Math.floor((e - s) / 60000);
+                const dur = Math.round((minuteMs(e.getTime()) - minuteMs(s.getTime())) / 60000);
                 const durStr = `${Math.floor(dur / 60)}h ${dur % 60}m`;
                 
                 if (idx % 2 === 0) { doc.setFillColor(250); doc.rect(14, y, 181, 4, 'F'); }
                 
-                doc.text(s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 16, y + 3);
-                doc.text(e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 42, y + 3);
+                doc.text(fmtHora(s), 16, y + 3);
+                doc.text(fmtHora(e), 42, y + 3);
                 doc.text(stName, 66, y + 3);
                 doc.text(durStr, 96, y + 3);
                 doc.text(formatGps(l.gps).substring(0, 26), 121, y + 3);
