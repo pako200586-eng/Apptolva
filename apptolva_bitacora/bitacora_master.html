@@ -400,6 +400,11 @@
         const GPS_PRECISION_MINIMA_M = 100;
         const LICENSE_EXP_WARNING_DAYS = 15;
         const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
+        const CUATRO_HORAS_AUX_MS = 4 * 60 * 60 * 1000;
+        let ignorarFlushLogs = false;
+
+        // Normaliza cualquier timestamp al minuto exacto (:00s) para eliminar el desfase de -1 min entre UI y PDF
+        const truncarMinutoMs = (t) => Math.floor(Number(t || Date.now()) / 60000) * 60000;
 
         // Respaldo en memoria: en iOS setItem puede lanzar QuotaExceededError y la firma se perdía.
         const _sigMem = {};
@@ -412,8 +417,11 @@
 
         // Pide a iOS/Safari no purgar el almacenamiento de la PWA.
         if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-        // iOS suspende la app sin avisar: guardar al ocultarse.
-        const flushLogs = () => { try { localStorage.setItem('nom087_logs', JSON.stringify(logs)); } catch (e) {} };
+        // iOS suspende la app sin avisar: guardar al ocultarse salvo cuando se esté limpiando el turno.
+        const flushLogs = () => {
+            if (ignorarFlushLogs) return;
+            try { localStorage.setItem('nom087_logs', JSON.stringify(logs)); } catch (e) {}
+        };
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushLogs(); });
         window.addEventListener('pagehide', flushLogs);
 
@@ -455,6 +463,17 @@
             return base.length > 0 && base[0].status === 1 && base[0].place === "Inicio" ? base.slice(1) : base;
         }
 
+        // Ancla del viaje de 48h para el PDF: siempre toma el primer registro real para no borrar el Día 1 tras un descanso de 8h
+        function getTripOriginTime(logList) {
+            const vis = getLogsVisibles(logList);
+            if (vis.length > 0) return vis[0].startTime;
+            return (logList && logList.length > 0) ? logList[0].startTime : Date.now();
+        }
+
+        function getTripOriginHour(logList) {
+            return new Date(getTripOriginTime(logList)).getHours();
+        }
+
         // Límites NOM-087: 4.7 (máximo 14 h de conducción en 24 h) y 4.1 (5 h continuas, con pausa acumulada de 30 min).
         const LIMITE_24H_MIN = 14 * 60;
         const LIMITE_CONTINUO_MIN = 5 * 60;
@@ -469,25 +488,27 @@
             let driveMins = 0;
             logs.forEach(l => {
                 if (l.status === 3) {
-                    const start = l.startTime;
-                    const end = l.endTime || now;
+                    const start = truncarMinutoMs(l.startTime);
+                    const end = truncarMinutoMs(l.endTime || now);
                     if (end > shiftStart && start < limite24h) {
-                        const s = Math.max(start, shiftStart);
-                        const e = Math.min(end, limite24h, now);
-                        if (e > s) driveMins += Math.floor((e - s) / 60000);
+                        const s = Math.max(start, truncarMinutoMs(shiftStart));
+                        const e = Math.min(end, truncarMinutoMs(limite24h), truncarMinutoMs(now));
+                        if (e > s) driveMins += Math.round((e - s) / 60000);
                     }
                 }
             });
 
-            // Las pausas se suman hacia atrás hasta completar 30 min; solo el manejo posterior cuenta como continuo.
+            // Cláusula 4.1 y 4.2: Las pausas cuentan desde el último bloque de manejo dentro de la ventana de 5.5 h.
             let continuousDrive = 0;
             let pausaAcumulada = 0;
             for (let i = logs.length - 1; i >= 0; i--) {
-                const end = logs[i].endTime || now;
-                const dur = Math.floor((end - logs[i].startTime) / 60000);
+                const start = truncarMinutoMs(logs[i].startTime);
+                const end = truncarMinutoMs(logs[i].endTime || now);
+                const dur = Math.max(0, Math.round((end - start) / 60000));
                 if (logs[i].status === 3) {
                     continuousDrive += dur;
                 } else if (logs[i].status === 1 || logs[i].status === 2) {
+                    // Un descanso de 30 min continuos o acumulado tras iniciar manejo corta la racha continua
                     pausaAcumulada += dur;
                     if (pausaAcumulada >= 30) break;
                 }
@@ -519,9 +540,64 @@
                     localStorage.setItem('nombreOperadorActual', e.target.value.trim());
                     actualizarNombreOperadorUI();
                 }
+                if (id === 'licenseExp') actualizarSemaforoLicencia();
                 sincronizarSilenciosoDebounced();
             });
         });
+
+        // Prellenado inteligente desde el Checklist (index.html) si los campos de la bitácora están vacíos
+        (function sincronizarDesdeChecklist() {
+            try {
+                const draftRaw = localStorage.getItem('bachoco_tolva_draft_v9');
+                if (!draftRaw) return;
+                const draft = JSON.parse(draftRaw);
+                const inp = draft.inputs || {};
+                const mapa = [
+                    ['unitId', inp.revUnidad],
+                    ['employeeNumber', inp.revEmpleado],
+                    ['driverName', inp.revOperador],
+                    ['origin', inp.revOrigen],
+                    ['destination', inp.revDestino],
+                    ['kmInicio', inp.revKm]
+                ];
+                mapa.forEach(([idDest, valorChecklist]) => {
+                    const el = document.getElementById(idDest);
+                    if (el && !el.value.trim() && valorChecklist && String(valorChecklist).trim()) {
+                        el.value = String(valorChecklist).trim();
+                        localStorage.setItem('nom087_' + idDest, el.value);
+                    }
+                });
+            } catch (e) {}
+        })();
+
+        // Semáforo de vigencia de Licencia Federal (activa #licenseExpBadge con LICENSE_EXP_WARNING_DAYS)
+        function actualizarSemaforoLicencia() {
+            const expInput = document.getElementById('licenseExp');
+            const badge = document.getElementById('licenseExpBadge');
+            if (!expInput || !badge) return;
+            const val = expInput.value;
+            if (!val) {
+                badge.className = "hidden mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full";
+                return;
+            }
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            const fechaExp = new Date(val + "T00:00:00");
+            const diasRestantes = Math.ceil((fechaExp - hoy) / (1000 * 60 * 60 * 24));
+
+            badge.classList.remove('hidden');
+            if (diasRestantes < 0) {
+                badge.className = "mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-300";
+                badge.textContent = `⛔ LICENCIA VENCIDA (${Math.abs(diasRestantes)}d)`;
+            } else if (diasRestantes <= LICENSE_EXP_WARNING_DAYS) {
+                badge.className = "mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300";
+                badge.textContent = `⚠️ Vence en ${diasRestantes} día(s)`;
+            } else {
+                badge.className = "mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200";
+                badge.textContent = `✅ Vigente (${diasRestantes}d)`;
+            }
+        }
+        actualizarSemaforoLicencia();
 
         const driverNameInput = document.getElementById('driverName');
         const employeeNumberInput = document.getElementById('employeeNumber');
@@ -787,6 +863,21 @@
         function setCloudStatus(estado) {
             const icon = document.getElementById('cloudIcon');
             const text = document.getElementById('cloudText');
+            const offlineBanner = document.getElementById('offlineSyncStatus');
+            const offlineText = document.getElementById('offlineSyncText');
+            const pendientes = typeof leerCierresPendientes === 'function' ? leerCierresPendientes().length : 0;
+
+            if (offlineBanner && offlineText) {
+                if (estado === "offline" || !navigator.onLine || pendientes > 0) {
+                    offlineBanner.classList.remove('hidden');
+                    offlineText.textContent = pendientes > 0
+                        ? `Modo sin red: ${pendientes} cierre(s) de bitácora guardado(s) en el teléfono. Se sincronizarán al recuperar cobertura.`
+                        : "Sin cobertura celular: la bitácora se está guardando localmente en el dispositivo.";
+                } else {
+                    offlineBanner.classList.add('hidden');
+                }
+            }
+
             if (!icon || !text) return;
             if (estado === "syncing") {
                 icon.className = "fas fa-spinner fa-spin text-amber-300";
@@ -849,8 +940,9 @@
             });
         }
 
-        // Reinicia el periodo sin recargar la página: el turno anterior ya quedó en la cola local.
+        // Reinicia el periodo sin recargar la página y protege contra re-escritura accidental en pagehide
         function iniciarNuevoPeriodo() {
+            ignorarFlushLogs = true;
             logs = [{ status: 1, startTime: Date.now(), endTime: null, place: "Inicio", observation: "", gps: null }];
             currentStatus = 1;
             localStorage.removeItem('nom087_logs');
@@ -867,13 +959,21 @@
             guardarLocal();
             actualizarFirmasUI();
             window.generarFolioFirebase?.();
+            setTimeout(() => { ignorarFlushLogs = false; }, 300);
         }
 
-        // Cierre optimista: la UI y el log se cierran de inmediato; la nube se actualiza después.
-        window.terminarTurno48h = function() {
+        // Cierre blindado: valida Permiso SCT, Km Fin y Firma del Conductor, descarga el PDF y limpia para nuevo turno.
+        window.terminarTurno48h = async function() {
             if (turnoEnProceso) return;
             if (!getSelectedCatalogOperator()) {
                 alert("⚠️ Selecciona al operador del catálogo oficial antes de finalizar el turno.");
+                return;
+            }
+            const permisoEl = document.getElementById('permisoSCT');
+            if (!permisoEl.value.trim()) {
+                alert("⚠️ Captura el No. de Permiso SCT antes de finalizar el turno.");
+                permisoEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                permisoEl.focus();
                 return;
             }
             const kmFinEl = document.getElementById('kmFin');
@@ -887,15 +987,52 @@
                 kmFinEl.focus();
                 return;
             }
-            if (!confirm("⚠️ ¿FINALIZAR VIAJE / TERMINAR TURNO?\n\nAsegúrate de haber generado tu PDF oficial.\nLa bitácora se respaldará en la nube y se iniciará un periodo en ceros.")) return;
+            if (!getSig('nom087_signatureOp')) {
+                alert("⚠️ Falta la Firma del Conductor. Presiona 'Capturar Firma' en la sección inferior antes de cerrar el turno.");
+                document.getElementById('cardSigOp')?.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+            }
+            if (!confirm("⚠️ ¿FINALIZAR VIAJE / TERMINAR TURNO?\n\nSe descargará automáticamente tu PDF oficial firmado, se respaldará en Firebase y la bitácora quedará limpia en ceros.")) return;
 
             turnoEnProceso = true;
             const ultimo = logs[logs.length - 1];
             const endTimeOriginal = ultimo ? ultimo.endTime : null;
+            const llegadaEl = document.getElementById('horaLlegada');
+            const llegadaOriginal = llegadaEl?.value || "";
+            const restaurarCierre = () => {
+                if (ultimo) ultimo.endTime = endTimeOriginal;
+                if (llegadaEl && llegadaEl.value !== llegadaOriginal) {
+                    llegadaEl.value = llegadaOriginal;
+                    if (llegadaOriginal) localStorage.setItem('nom087_horaLlegada', llegadaOriginal);
+                    else localStorage.removeItem('nom087_horaLlegada');
+                }
+            };
             try {
                 const corteMs = Date.now();
                 const horaCorte = new Date(corteMs).toISOString();
                 if (ultimo && !ultimo.endTime) ultimo.endTime = corteMs;
+
+                // Si no se capturó Hora de Llegada, sellar automáticamente con la hora de cierre
+                if (llegadaEl && !llegadaEl.value) {
+                    const dLocal = new Date(corteMs - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                    llegadaEl.value = dLocal;
+                    localStorage.setItem('nom087_horaLlegada', dLocal);
+                }
+
+                // Descargar el PDF oficial antes de limpiar los datos de la pantalla
+                let pdfGenerado;
+                try {
+                    pdfGenerado = await window.generarPDFSeguro();
+                } catch (error) {
+                    restaurarCierre();
+                    console.error("No se pudo generar el PDF de cierre de turno.", error);
+                    alert("⚠️ No se pudo generar el PDF. La bitácora se conservó; intenta descargarlo nuevamente antes de cerrar.");
+                    return;
+                }
+                if (!pdfGenerado) {
+                    restaurarCierre();
+                    return;
+                }
 
                 const cierre = {
                     id: crypto.randomUUID(),
@@ -909,13 +1046,14 @@
                 };
 
                 if (!guardarCierresPendientes([...leerCierresPendientes(), cierre])) {
-                    if (ultimo) ultimo.endTime = endTimeOriginal;
-                    alert("⚠️ La memoria del dispositivo está llena. Genera el PDF y libera espacio antes de finalizar el turno.");
+                    restaurarCierre();
+                    alert("⚠️ La memoria del dispositivo está llena. Libera espacio antes de finalizar el turno.");
                     return;
                 }
 
                 iniciarNuevoPeriodo();
                 sincronizarCierresPendientes();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             } finally {
                 turnoEnProceso = false;
             }
@@ -1088,7 +1226,7 @@
 
                 let dur = "";
                 if (l.endTime || now) {
-                    const d = Math.floor(((l.endTime || now) - l.startTime) / 60000);
+                    const d = Math.max(0, Math.round((truncarMinutoMs(l.endTime || now) - truncarMinutoMs(l.startTime)) / 60000));
                     dur = `${Math.floor(d / 60)}h ${d % 60}m`;
                 }
 
@@ -1158,7 +1296,10 @@
             }
 
             const visibles = getLogsVisibles();
-            const shiftStartH = getShiftStartHour(visibles);
+            const DAY_MS = 24 * 60 * 60 * 1000;
+            const originMs = visibles.length ? new Date(getTripOriginTime(visibles)).setMinutes(0, 0, 0) : Date.now();
+            const ahoraMs = Date.now();
+            const winStart = ahoraMs - originMs >= DAY_MS ? originMs + DAY_MS : originMs;
 
             for (let i = 0; i <= 24; i++) {
                 let x = p + ((w - p) / 24) * i; 
@@ -1169,7 +1310,7 @@
             if (axisContainer) {
                 axisContainer.innerHTML = '';
                 for (let i = 0; i <= 4; i++) {
-                    const hour = (shiftStartH + i * 6) % 24;
+                    const hour = new Date(winStart + i * 6 * 60 * 60 * 1000).getHours();
                     const span = document.createElement('span');
                     span.textContent = (hour < 10 ? '0' : '') + hour + ':00';
                     axisContainer.appendChild(span);
@@ -1177,26 +1318,27 @@
             }
 
             if (visibles.length === 0) return;
+
+            // Mostrar el bloque activo de 24h (Día 1 o Día 2) sin encimar las 48h en el mismo lienzo
+            const winEnd = winStart + DAY_MS;
+
+            const logsVentana = visibles.filter(l => (l.endTime || ahoraMs) > winStart && l.startTime < winEnd);
+            if (logsVentana.length === 0) return;
+
             ctx.lineWidth = 3; ctx.strokeStyle = '#F28B00'; ctx.lineJoin = 'miter'; ctx.beginPath();
 
-            visibles.forEach((l, i) => {
-                let ds = new Date(l.startTime); let de = l.endTime ? new Date(l.endTime) : new Date();
-                let h1 = (ds.getHours() + ds.getMinutes() / 60 - shiftStartH + 24) % 24;
-                let h2 = (de.getHours() + de.getMinutes() / 60 - shiftStartH + 24) % 24;
-                let x1 = p + ((w - p) / 24) * h1;
-                let x2 = p + ((w - p) / 24) * h2;
-                let y = p + ((l.status - 1) * rowH) + (rowH / 2);
+            logsVentana.forEach((l, i) => {
+                const sClamp = Math.max(l.startTime, winStart);
+                const eClamp = Math.min(l.endTime || ahoraMs, winEnd);
+                const h1 = (sClamp - winStart) / 3600000;
+                const h2 = (eClamp - winStart) / 3600000;
+                const x1 = p + ((w - p) / 24) * h1;
+                const x2 = p + ((w - p) / 24) * h2;
+                const y = p + ((l.status - 1) * rowH) + (rowH / 2);
 
                 if (i === 0) ctx.moveTo(x1, y);
                 else ctx.lineTo(x1, y);
-
-                if (h2 >= h1) {
-                    ctx.lineTo(x2, y);
-                } else {
-                    ctx.lineTo(w, y);
-                    ctx.moveTo(p, y);
-                    ctx.lineTo(x2, y);
-                }
+                ctx.lineTo(x2, y);
             });
             ctx.stroke();
         }
@@ -1284,7 +1426,24 @@
             }
         }
 
+        let alertaAuxiliar4h = false;
+        function evaluarExcesoAuxiliar() {
+            if (currentStatus !== 4 || logs.length === 0) { alertaAuxiliar4h = false; return; }
+            const ultimo = logs[logs.length - 1];
+            const tiempoAuxMs = Date.now() - ultimo.startTime;
+            if (tiempoAuxMs >= CUATRO_HORAS_AUX_MS && !alertaAuxiliar4h) {
+                alertaAuxiliar4h = true;
+                const horasAux = Math.floor(tiempoAuxMs / 3600000);
+                const msg = `Llevas más de ${horasAux} horas continuas en AUXILIAR. Si estás descansando o en espera prolongada, cambia a DESCANSO para que cuente en tus 8 horas reglamentarias (NOM-087 4.6).`;
+                mostrarSugerencia(msg, [{ texto: 'Pasar a DESCANSO', accion: () => window.changeStatus(1) }]);
+                notificarApp('🛌 ¿Sigues en Auxiliar o en Descanso?', msg, 'alerta-auxiliar-largo', [
+                    { action: 'iniciar_descanso', title: '🏠 Pasar a DESCANSO' }
+                ]);
+            }
+        }
+
         function evaluarLimitesConduccion() {
+            evaluarExcesoAuxiliar();
             if (currentStatus !== 3) { alerta270 = alerta300 = false; return; }
             const { continuousDrive } = calcularLimitesConduccion(Date.now());
             if (continuousDrive < 270) { alerta270 = alerta300 = false; return; }
@@ -1387,6 +1546,7 @@
         function ejecutarAccionNotificacion(accion, ts) {
             if (!ts || Date.now() - Number(ts) > MONITOR.ACCION_VIGENCIA_MS) return;
             if (accion === 'iniciar_pausa') window.changeStatus(2);
+            else if (accion === 'iniciar_descanso') window.changeStatus(1);
             else if (accion === 'voy_volante') window.changeStatus(3);
             else if (accion === 'soy_copiloto') marcarCopiloto();
             monitorTick();
@@ -1457,14 +1617,14 @@
             const selectedOperator = getSelectedCatalogOperator();
             if (!selectedOperator) {
                 alert("⚠️ Selecciona al operador del catálogo oficial antes de generar el PDF.");
-                return;
+                return false;
             }
-            if (!window.jspdf) { alert("⚠️ Error: Librería PDF no disponible."); return; }
+            if (!window.jspdf) { alert("⚠️ Error: Librería PDF no disponible."); return false; }
 
             const logsPDF = getLogsVisibles();
             if (logsPDF.length === 0) {
                 alert("⚠️ Aún no has iniciado turno. Cambia a una actividad (Auxiliar, Conduciendo, etc.) para poder generar la bitácora.");
-                return;
+                return false;
             }
 
             const permisoEl = document.getElementById('permisoSCT');
@@ -1474,7 +1634,7 @@
                 alert("⚠️ " + faltante[1]);
                 faltante[0].scrollIntoView({ behavior: "smooth", block: "center" });
                 faltante[0].focus();
-                return;
+                return false;
             }
             
             const { jsPDF } = window.jspdf;
@@ -1495,16 +1655,18 @@
                 return v && !isNaN(d) ? `${fmtFecha(d)} ${fmtHora(d)}` : "";
             };
 
-            const shiftStartH = getShiftStartHour(logsPDF);
-            const shiftStartMs = getShiftStartTime(logsPDF);
+            const shiftStartH = getTripOriginHour(logsPDF);
+            const shiftStartMs = getTripOriginTime(logsPDF);
             const DAY_MS = 24 * 60 * 60 * 1000;
             const gridOriginMs = new Date(shiftStartMs).setMinutes(0, 0, 0);
             const limit24 = gridOriginMs + DAY_MS;
+            const limit48 = gridOriginMs + DAY_MS * 2;
 
             const nowMs = Date.now();
-            const logsD1 = logsPDF.filter(l => l.startTime < limit24);
-            const logsD2 = logsPDF.filter(l => (l.endTime || nowMs) > limit24);
+            // Filtrar primero registros reales (>= 1 minuto) para que las gráficas D1/D2 y la tabla coincidan al 100% sin picos fantasma de 0h 0m
             const tableLogs = logsPDF.filter(l => minuteMs(l.endTime || nowMs) - minuteMs(l.startTime) >= 60000);
+            const logsD1 = tableLogs.filter(l => (l.endTime || nowMs) > gridOriginMs && l.startTime < limit24);
+            const logsD2 = tableLogs.filter(l => (l.endTime || nowMs) > limit24 && l.startTime < limit48);
 
             doc.setFillColor(...naranja); doc.rect(0, 0, 210, 22, 'F');
             try {
@@ -1746,6 +1908,7 @@
             });
 
             doc.save(`Bitacora_${folio.replace(/[\\/]/g, '-')}.pdf`);
+            return true;
         };
 
         function buildFullOfflineQrData(payload) {
