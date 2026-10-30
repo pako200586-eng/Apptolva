@@ -53,6 +53,24 @@ test('selects production for other hosts', () => {
   assert.equal(configFor('apptolva.example.com').projectId, 'apptolva-production');
 });
 
+test('build context forces staging for branch deploys and production only for production context', () => {
+  const configForContext = (contextoBuild, hostname) => {
+    const context = {
+      __APPTOLVA_BUILD_CONTEXT__: contextoBuild,
+      __APPTOLVA_FIREBASE_CONFIGS__: {
+        staging: { projectId: 'apptolva-staging' },
+        production: { projectId: 'apptolva-production' }
+      }
+    };
+    vm.runInNewContext(runtimeSource, context);
+    return context.getAppFirebaseConfig(hostname).projectId;
+  };
+  assert.equal(configForContext('branch-deploy', 'rama--apptolva.netlify.app'), 'apptolva-staging');
+  assert.equal(configForContext('deploy-preview', 'cualquier.netlify.app'), 'apptolva-staging');
+  assert.equal(configForContext('production', 'apptolva.example.com'), 'apptolva-production');
+  assert.equal(configForContext('production', 'localhost'), 'apptolva-staging');
+});
+
 test('reports a missing config instead of falling back to another project', () => {
   const context = { __APPTOLVA_FIREBASE_CONFIGS__: { production: { projectId: 'prod' } } };
   vm.runInNewContext(runtimeSource, context);

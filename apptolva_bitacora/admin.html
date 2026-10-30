@@ -1045,13 +1045,16 @@
         const avisoFecha = conFechaInferida
           ? `\n${conFechaInferida} OT(s) no tienen fecha de cierre y usarán la fecha de realización o, si falta, la última actualización.`
           : '';
-        if (!confirm(`Se revisarán ${ordenes.length} OT(s) cerradas, incluidas las ya procesadas, para incorporar reportes que hayan sincronizado después de su cierre. Solo se vincularán coincidencias exactas por equipo, sistema y falla y con fecha anterior o igual al cierre. El proceso puede tardar, consumir lecturas de Firestore y se puede reanudar si se interrumpe.${avisoFecha}\n\n¿Continuar?`)) return;
+        if (!confirm(`Se revisarán ${ordenes.length} OT(s) cerradas, incluidas las ya procesadas, para incorporar reportes que hayan sincronizado después de su cierre. Solo se vincularán coincidencias exactas por equipo, sistema y falla y con fecha anterior o igual al cierre. Esta acción está limitada en frecuencia y solo la puede ejecutar el responsable autorizado. El proceso puede tardar, consumir lecturas de Firestore y se puede reanudar si se interrumpe.${avisoFecha}\n\n¿Continuar?`)) return;
+
+        const { run_id: runId } = await solicitarCierreBackend({ action: 'retroactive-start' });
 
         for (let indice = 0; indice < ordenes.length; indice += 1) {
           const orden = ordenes[indice];
           showToast(`Depuración ${indice + 1}/${ordenes.length}: OT-${orden.folio_ot || ''}`);
           let resultado = await solicitarCierreBackend({
             action: 'retroactive-close',
+            run_id: runId,
             ot_id: orden.id,
             cerrada_at: orden.cerrada_at
           });
@@ -1063,6 +1066,7 @@
           }
         }
 
+        await solicitarCierreBackend({ action: 'retroactive-finish', run_id: runId });
         showToast(`Depuración completada: ${ordenes.length} OT(s) procesadas.`);
         await Promise.all([cargarOrdenes(true), cargarFallas(), cargarDashboard(true)]);
       } catch (error) {

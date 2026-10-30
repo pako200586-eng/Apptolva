@@ -16,7 +16,9 @@ We will acknowledge your report within 48 hours and work to address confirmed vu
 
 ## Security Best Practices for Contributors
 
-- The Netlify `cerrar-fallas-repetidas` function requires `FIREBASE_SERVICE_ACCOUNT_JSON`, containing the Firebase service-account JSON with Firestore access. Configure it as a Netlify environment variable; never commit the JSON or place it in the PWA.
+- The Netlify `cerrar-fallas-repetidas` function requires `FIREBASE_SERVICE_ACCOUNT_JSON`, containing the Firebase service-account JSON with Firestore access. Configure it as a Netlify environment variable; never commit the JSON or place it in the PWA. Use the staging service account for Branch deploys and Deploy Previews and the production one only for the Production context; the function rejects ID tokens from another Firebase project.
+- The retroactive bulk cleanup ("Depurar fallas repetidas") only runs for the emails listed in `DEPURACION_MASIVA_EMAILS` (comma-separated; empty means nobody) and at most once every `DEPURACION_INTERVALO_DIAS` days (default 30). The last run is tracked in `control_depuracion/retroactiva`.
+- Netlify's `CONTEXT` is embedded at build time: any context other than `production` makes the PWA use the staging Firebase project.
 - Firebase web configuration (including its API key) is public client configuration, not an authorization secret. Provide the staging and production JSON objects through the `FIREBASE_STAGING_CONFIG_JSON` and `FIREBASE_PRODUCTION_CONFIG_JSON` Netlify build environment variables; never commit them to source.
 - Each value must be the Web App config JSON from its corresponding Firebase project, with `apiKey`, `authDomain`, `projectId`, `messagingSenderId`, and `appId`; `storageBucket` and `measurementId` are optional.
 - **Never commit service-account credentials or other server secrets** directly in source code.

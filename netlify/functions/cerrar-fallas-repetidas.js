@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldPath, getFirestore } from 'firebase-admin/firestore';
@@ -11,8 +11,61 @@ const COLECCION_ORDENES = 'ordenes_trabajo';
 const COLECCION_EVENTOS = 'ot_seguimiento';
 const COLECCION_COBERTURAS = 'falla_ot_cobertura';
 const COLECCION_CIERRES = 'cierres_masivos_ot';
+const COLECCION_CONTROL = 'control_depuracion';
+const DOCUMENTO_DEPURACION = 'retroactiva';
 const ESTATUS_CERRADOS = new Set(['TERMINADA', 'CERRADA']);
 const TAMANO_PAGINA = 200;
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+function correosDepuracion() {
+  return new Set(String(process.env.DEPURACION_MASIVA_EMAILS || '')
+    .split(',')
+    .map((correo) => correo.trim().toLowerCase())
+    .filter(Boolean));
+}
+
+function intervaloDepuracionMs() {
+  const dias = Number(process.env.DEPURACION_INTERVALO_DIAS || 30);
+  return (Number.isFinite(dias) && dias >= 0 ? dias : 30) * DIA_MS;
+}
+
+function exigirResponsableDepuracion(usuario) {
+  return correosDepuracion().has(usuario.correo)
+    ? null
+    : respuesta(403, { error: 'La depuración masiva está reservada al responsable autorizado.' });
+}
+
+async function iniciarDepuracion(db, usuario) {
+  const referencia = db.collection(COLECCION_CONTROL).doc(DOCUMENTO_DEPURACION);
+  return db.runTransaction(async (transaction) => {
+    const actual = (await transaction.get(referencia)).data();
+    const ahora = Date.now();
+    const iniciada = actual?.iniciada_at ? Date.parse(actual.iniciada_at) : NaN;
+    if (actual?.estado === 'en_curso' && actual.usuario === usuario.correo && ahora - iniciada < DIA_MS) {
+      return { run_id: actual.run_id, reanudada: true };
+    }
+    if (Number.isFinite(iniciada) && ahora - iniciada < intervaloDepuracionMs()) {
+      const disponible = new Date(iniciada + intervaloDepuracionMs()).toISOString();
+      return { limitada: true, disponible_desde: disponible, ultima: actual.iniciada_at };
+    }
+    const runId = randomUUID();
+    transaction.set(referencia, {
+      run_id: runId,
+      estado: 'en_curso',
+      usuario: usuario.correo,
+      iniciada_at: new Date(ahora).toISOString()
+    });
+    return { run_id: runId, reanudada: false };
+  });
+}
+
+async function corridaVigente(db, runId, usuario) {
+  const referencia = db.collection(COLECCION_CONTROL).doc(DOCUMENTO_DEPURACION);
+  const actual = (await referencia.get()).data();
+  const vigente = Boolean(runId) && actual?.run_id === runId && actual.estado === 'en_curso'
+    && actual.usuario === usuario.correo && Date.now() - Date.parse(actual.iniciada_at) < DIA_MS;
+  return vigente ? referencia : null;
+}
 
 function respuesta(status, data) {
   return new Response(JSON.stringify(data), {
@@ -405,6 +458,29 @@ export default async function handler(request) {
       return respuesta(200, await procesarPagina(db, jobId));
     }
 
+    if (String(body.action || '').startsWith('retroactive-')) {
+      const denegado = exigirResponsableDepuracion(usuario);
+      if (denegado) return denegado;
+    }
+
+    if (body.action === 'retroactive-start') {
+      const inicio = await iniciarDepuracion(db, usuario);
+      if (inicio.limitada) {
+        return respuesta(429, {
+          error: `La depuración masiva ya se ejecutó el ${inicio.ultima}. Podrás repetirla a partir del ${inicio.disponible_desde}.`,
+          disponible_desde: inicio.disponible_desde
+        });
+      }
+      return respuesta(200, inicio);
+    }
+
+    if (body.action === 'retroactive-finish') {
+      const referencia = await corridaVigente(db, String(body.run_id || ''), usuario);
+      if (!referencia) return respuesta(409, { error: 'La depuración no está en curso.' });
+      await referencia.update({ estado: 'completada', finalizada_at: new Date().toISOString() });
+      return respuesta(200, { done: true });
+    }
+
     if (body.action === 'retroactive-list') {
       const snapshot = await db.collection(COLECCION_ORDENES)
         .where('estatus', 'in', [...ESTATUS_CERRADOS])
@@ -428,6 +504,9 @@ export default async function handler(request) {
     }
 
     if (body.action === 'retroactive-close') {
+      if (!await corridaVigente(db, String(body.run_id || ''), usuario)) {
+        return respuesta(409, { error: 'Inicia la depuración masiva antes de procesar OTs.' });
+      }
       const otId = String(body.ot_id || '').trim();
       if (!otId) return respuesta(400, { error: 'Falta el identificador de la OT.' });
       const fechaSolicitada = fechaLegacy({ fecha_realizacion: body.cerrada_at });
@@ -446,6 +525,9 @@ export default async function handler(request) {
     return respuesta(400, { error: 'Acción no reconocida.' });
   } catch (error) {
     console.error('Error en cierre masivo de fallas:', error);
+    if (error.code === 'auth/argument-error' && /aud/.test(String(error.message))) {
+      return respuesta(409, { error: 'La sesión pertenece a otro proyecto de Firebase; el ambiente del panel y de la función no coinciden.' });
+    }
     if (error.code === 'auth/argument-error' || error.code === 'auth/id-token-expired' || error.code === 'auth/invalid-id-token') {
       return respuesta(401, { error: 'La sesión expiró. Inicia sesión nuevamente.' });
     }

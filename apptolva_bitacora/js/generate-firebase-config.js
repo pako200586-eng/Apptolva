@@ -36,8 +36,9 @@ if (configs.staging.projectId === configs.production.projectId) {
 }
 
 const serialized = JSON.stringify(configs).replaceAll("<", "\\u003c");
+const buildContext = JSON.stringify(String(process.env.CONTEXT || "").toLowerCase());
 await writeFile(
   outputPath,
-  `globalThis.__APPTOLVA_FIREBASE_CONFIGS__ = Object.freeze(${serialized});\n`,
+  `globalThis.__APPTOLVA_FIREBASE_CONFIGS__ = Object.freeze(${serialized});\nglobalThis.__APPTOLVA_BUILD_CONTEXT__ = ${buildContext};\n`,
   { encoding: "utf8" }
 );

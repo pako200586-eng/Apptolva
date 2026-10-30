@@ -139,6 +139,7 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     }
     await adminDb.collection('ordenes_trabajo').doc(otId).delete();
     if (jobId) await adminDb.collection('cierres_masivos_ot').doc(jobId).delete();
+    await adminDb.collection('control_depuracion').doc('retroactiva').delete();
     const eventos = await adminDb.collection('ot_seguimiento').where('ot_id', '==', otId).get();
     await Promise.all(eventos.docs.map((evento) => evento.ref.delete()));
     await adminDb.collection('usuarios').doc(emailAdmin).delete();
@@ -191,6 +192,8 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
 
   const sinSesion = await ejecutar({ action: 'retroactive-list' }, '');
   assert.equal(sinSesion.status, 403);
+  process.env.DEPURACION_MASIVA_EMAILS = emailAdmin;
+  process.env.DEPURACION_INTERVALO_DIAS = '30';
 
   const cierreResponse = await ejecutar({ action: 'close', ot_id: otId, estatus: 'TERMINADA' });
   assert.equal(cierreResponse.status, 200);
@@ -220,13 +223,38 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
   assert.equal(listaResponse.status, 200);
   const lista = await listaResponse.json();
   assert.ok(lista.ordenes.some((orden) => orden.id === otId));
+  const sinInicio = await ejecutar({
+    action: 'retroactive-close',
+    run_id: 'inexistente',
+    ot_id: otId,
+    cerrada_at: cierre.cerrada_at
+  });
+  assert.equal(sinInicio.status, 409);
+
+  process.env.DEPURACION_MASIVA_EMAILS = 'otra-persona@example.test';
+  assert.equal((await ejecutar({ action: 'retroactive-list' })).status, 403);
+  assert.equal((await ejecutar({ action: 'retroactive-start' })).status, 403);
+  process.env.DEPURACION_MASIVA_EMAILS = emailAdmin;
+
+  const inicioResponse = await ejecutar({ action: 'retroactive-start' });
+  assert.equal(inicioResponse.status, 200);
+  const { run_id: runId } = await inicioResponse.json();
+  assert.ok(runId);
+  const reanudada = await (await ejecutar({ action: 'retroactive-start' })).json();
+  assert.equal(reanudada.run_id, runId);
+
   const retroactivoResponse = await ejecutar({
     action: 'retroactive-close',
+    run_id: runId,
     ot_id: otId,
     cerrada_at: cierre.cerrada_at
   });
   assert.equal(retroactivoResponse.status, 200);
   assert.equal((await retroactivoResponse.json()).done, true);
+  assert.equal((await ejecutar({ action: 'retroactive-finish', run_id: runId })).status, 200);
+  const repetida = await ejecutar({ action: 'retroactive-start' });
+  assert.equal(repetida.status, 429);
+  assert.ok((await repetida.json()).disponible_desde);
   assert.equal((await adminDb.collection('falla_ot_cobertura')
     .doc(idCobertura(reportesIds.sincronizadoTarde, firmaTracto)).get()).get('ot_id'), otId);
 
