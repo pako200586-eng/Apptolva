@@ -1610,7 +1610,15 @@
                     if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
                     unsubscribe();
                     observersByReportId.delete(id);
-                    window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
+                    setDoc(reportRef, { synced_at: new Date().toISOString() }, { merge: true })
+                        .then(() => {
+                            window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
+                        })
+                        .catch((error) => {
+                            window.dispatchEvent(new CustomEvent("firestore-report-sync-error", {
+                                detail: { id, message: error.message }
+                            }));
+                        });
                 }, (error) => {
                     unsubscribe();
                     observersByReportId.delete(id);
@@ -1650,7 +1658,8 @@
                     license: reportePayload.license || "",
                     priority: reportePayload.priority || "baja",
                     payload: reportePayload,
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    synced_at: new Date().toISOString()
                 };
 
                 const payloadBytes = new Blob([JSON.stringify(data)]).size;

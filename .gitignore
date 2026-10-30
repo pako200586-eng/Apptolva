@@ -3,3 +3,6 @@ apptolva_bitacora/js/firebase-sdk.js
 node_modules/
 node_modules/
 node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

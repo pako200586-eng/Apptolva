@@ -43,6 +43,9 @@
         <button id="refreshBtn" class="rounded-md bg-white px-4 py-2 text-sm font-black text-[#7c2d12] shadow-sm hover:bg-orange-50">
           <i class="fas fa-sync-alt mr-2"></i>Actualizar
         </button>
+        <button id="depurarFallasBtn" class="btn-accion-admin hidden rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
+          Depurar fallas repetidas
+        </button>
         <button id="logoutBtn" class="hidden rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
           <i class="fas fa-right-from-bracket mr-2"></i>Cerrar sesión
         </button>
@@ -156,8 +159,17 @@
           <div id="emptyState" class="hidden px-4 py-10 text-center text-sm font-bold text-slate-500">No hay reportes para los filtros seleccionados.</div>
           <div class="flex flex-wrap items-center gap-3 border-t border-orange-100 px-4 py-3 text-xs font-bold text-slate-600">
             <span id="ventanaInfo"></span>
-            <button id="verMasFilas" class="hidden rounded-md border border-[#294936] px-3 py-2 text-[#294936]">Mostrar más</button>
-            <button id="cargarMasAntiguos" class="rounded-md border border-slate-500 px-3 py-2 text-slate-700">Cargar 30 días más antiguos</button>
+            <label class="flex items-center gap-2">Filas por página
+              <select id="tamanoPagina" class="rounded border border-slate-300 px-2 py-1 text-slate-700">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <button id="paginaAnterior" class="rounded-md border border-slate-300 px-3 py-2 text-slate-700">Anterior</button>
+            <span id="paginaInfo"></span>
+            <button id="paginaSiguiente" class="rounded-md border border-slate-300 px-3 py-2 text-slate-700">Siguiente</button>
+            <button id="cargarMasAntiguos" class="rounded-md border border-slate-500 px-3 py-2 text-slate-700">Cargar histórico</button>
           </div>
         </section>
 
@@ -165,7 +177,7 @@
         <section id="vista-fallas" class="panel-card overflow-hidden rounded-lg hidden">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
             <h2 class="font-black text-[#7c2d12]">Fallas Pendientes de Asignación</h2>
-            <p class="text-xs font-bold text-slate-500">Una tarjeta por unidad · al generar la OT, la tarjeta pasa a Órdenes de Trabajo</p>
+            <p class="text-xs font-bold text-slate-500">Una tarjeta por falla · folios repetidos se vinculan a una OT</p>
           </div>
           <div id="fallas-cards" class="grid gap-4 p-4 sm:grid-cols-2">
             <p class="col-span-full py-6 text-center font-bold text-slate-500">
@@ -335,6 +347,16 @@
       </div>
       <form id="segForm" class="space-y-3 p-4">
         <p id="segResumen" class="rounded-md bg-slate-50 p-3 text-sm text-slate-700"></p>
+        <label class="block text-xs font-bold uppercase text-slate-600">Estatus de OT
+          <select name="estatus" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal normal-case">
+            <option value="NUEVA">NUEVA</option>
+            <option value="ASIGNADA">ASIGNADA</option>
+            <option value="EN PROCESO">EN PROCESO</option>
+            <option value="PENDIENTE REFACCION">PENDIENTE REFACCIÓN</option>
+            <option value="TERMINADA">TERMINADA</option>
+            <option value="CERRADA">CERRADA</option>
+          </select>
+        </label>
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="text-xs font-bold uppercase text-slate-600">Electromecánico asignado
             <input name="electromecanico" maxlength="200" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal normal-case">
@@ -390,6 +412,7 @@
       updateDoc,
       runTransaction
     } from "./js/firebase-sdk.js";
+    import { crearFirmaFalla, crearFirmasFalla, idCoberturaFalla, separarSistemasFalla } from "./js/firmaFalla.js";
 
     const firebaseConfig = {
       apiKey: "__FIREBASE_API_KEY__",
@@ -405,16 +428,21 @@
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
 
-    const state = { user: null, role: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '', windowDays: 30, visibleRows: 50, hitLimit: false };
+    const state = { user: null, role: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '', windowDays: 30, pageSize: 50, page: 1, historyCursor: null, historyLoaded: false, historyExhausted: false, hitLimit: false, syncWatermark: null };
     const VENTANA_PASO_DIAS = 30;
-    const FILAS_POR_PAGINA = 50;
-    const LIMITE_SEGURIDAD_LECTURAS = 1500;
+    const LIMITE_PAGINA_REPORTES = 250;
+    const LIMITE_VENTANA_REPORTES = 1500;
+    const INTERVALO_SINCRONIZACION_REPORTES = 3 * 60 * 1000;
+    let sincronizacionReportesActiva = false;
+    let temporizadorSincronizacion = null;
     const $ = (id) => document.getElementById(id);
     const COLECCIONES_AUDITORIA_FIRESTORE = [
       'bitacora_reports',
       'ordenes_trabajo',
       'ot_seguimiento',
-      'ot_por_reporte'
+      'ot_por_reporte',
+      'falla_ot_cobertura',
+      'cierres_masivos_ot'
     ];
     let ultimoInventarioFirestore = null;
 
@@ -492,7 +520,7 @@
         return;
       }
       const confirmar = window.confirm(
-        'Esta auditoría leerá todos los documentos de bitacora_reports, ordenes_trabajo, ot_seguimiento y ot_por_reporte. Firestore puede cobrar estas lecturas; el costo depende del volumen. Solo calculará conteos y tamaño JSON aproximado: no exportará datos ni modificará o eliminará registros. ¿Continuar?'
+        'Esta auditoría leerá todos los documentos de bitacora_reports, ordenes_trabajo, ot_seguimiento, ot_por_reporte, falla_ot_cobertura y cierres_masivos_ot. Firestore puede cobrar estas lecturas; el costo depende del volumen. Solo calculará conteos y tamaño JSON aproximado: no exportará datos ni modificará o eliminará registros. ¿Continuar?'
       );
       if (!confirmar) return;
 
@@ -530,7 +558,7 @@
         showToast('El respaldo necesita conexión.');
         return;
       }
-      if (!window.confirm('El respaldo leerá TODOS los documentos de bitacora_reports, ordenes_trabajo, ot_seguimiento y ot_por_reporte (unas 2,400 lecturas, ~35 MB) y descargará un archivo JSON. No modifica ni elimina nada. ¿Continuar?')) return;
+      if (!window.confirm('El respaldo leerá TODOS los documentos de reportes, Órdenes de Trabajo, seguimientos, relaciones OT-reporte, coberturas de fallas y procesos de cierre, y descargará un archivo JSON. Firestore puede cobrar estas lecturas; no modifica ni elimina registros. ¿Continuar?')) return;
 
       const boton = $('backupFirestoreBtn');
       boton.disabled = true;
@@ -636,6 +664,31 @@
       setTimeout(() => $('toast').classList.remove('show'), 2800);
     }
 
+    async function solicitarCierreBackend(body) {
+      if (!state.user) throw new Error('Inicia sesión para administrar las Órdenes de Trabajo.');
+      const token = await state.user.getIdToken();
+      const response = await fetch('/.netlify/functions/cerrar-fallas-repetidas', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      const resultado = await response.json();
+      if (!response.ok) throw new Error(resultado.error || 'No se pudo procesar la operación.');
+      return resultado;
+    }
+
+    async function completarCierreBackend(resultado, etiqueta = 'Procesando cierre masivo') {
+      let actual = resultado;
+      while (!actual.done) {
+        showToast(`${etiqueta}: ${actual.reportes_revisados || 0} reportes revisados`);
+        actual = await solicitarCierreBackend({ action: 'continue', job_id: actual.jobId });
+      }
+      return actual;
+    }
+
     function escapeHtml(value) {
       return String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -722,7 +775,7 @@
       const signature = state.reports.map((report) => `${report.id}:${report.syncStatus}`).join('|');
       if (!(options.silent && signature === state.tableSignature)) {
         state.tableSignature = signature;
-        state.visibleRows = FILAS_POR_PAGINA;
+        if (!options.loadOlder) state.page = 1;
         renderTablaReportes();
         renderResumen();
         renderDashboard();
@@ -730,13 +783,19 @@
     }
 
     function renderTablaReportes() {
-      const visibles = state.reports.slice(0, state.visibleRows);
+      const totalPaginas = Math.max(1, Math.ceil(state.reports.length / state.pageSize));
+      state.page = Math.min(state.page, totalPaginas);
+      const inicio = (state.page - 1) * state.pageSize;
+      const visibles = state.reports.slice(inicio, inicio + state.pageSize);
       $('tabla-datos').innerHTML = visibles.map(reportRowHtml).join('');
       $('emptyState').classList.toggle('hidden', state.reports.length > 0);
-      $('verMasFilas').classList.toggle('hidden', state.reports.length <= state.visibleRows);
-      $('verMasFilas').textContent = `Mostrar ${Math.min(FILAS_POR_PAGINA, state.reports.length - state.visibleRows)} más`;
-      $('ventanaInfo').textContent = `Mostrando ${visibles.length} de ${state.reports.length} · últimos ${state.windowDays} días`
-        + (state.hitLimit ? ` · se alcanzó el límite de ${LIMITE_SEGURIDAD_LECTURAS} lecturas` : '');
+      $('paginaAnterior').disabled = state.page <= 1;
+      $('paginaSiguiente').disabled = state.page >= totalPaginas;
+      $('paginaInfo').textContent = `Página ${state.page} de ${totalPaginas}`;
+      $('cargarMasAntiguos').disabled = state.historyExhausted;
+      $('ventanaInfo').textContent = `Mostrando ${visibles.length} de ${state.reports.length} reportes · últimos ${state.windowDays} días${state.historyLoaded ? ' + histórico' : ''}`
+        + (state.hitLimit ? ` · límite de ${LIMITE_VENTANA_REPORTES} reportes alcanzado` : '')
+        + (state.historyExhausted ? ' · histórico completo' : '');
     }
 
     // Normaliza fechas ISO, timestamps de Firestore o formato local DD/MM/YYYY ("14/10/2026")
@@ -759,6 +818,31 @@
       return Number.isNaN(parsed.getTime()) ? new Date(0).toISOString() : parsed.toISOString();
     }
 
+    function convertirSnapshotReporte(docSnap) {
+      const d = docSnap.data();
+      const p = (d.payload && typeof d.payload === 'object') ? d.payload : d;
+      const folio = String(d.folio || p.folio || '').trim();
+      const rawType = String(d.report_type || d.reportType || p.reportType || '').toLowerCase().trim();
+      const esBitacora = rawType === 'bitacora'
+        || /^(?:FB\d+|OFF-\d+)/i.test(folio)
+        || Array.isArray(p.logs)
+        || d.gpsEvidenceVersion !== undefined;
+
+      return {
+        id: docSnap.id,
+        folio,
+        type: esBitacora ? 'bitacora' : (rawType || 'checklist'),
+        unitId: d.unit_id || d.unitId || p.unitId || '',
+        driverName: d.driver_name || d.driverName || p.driverName || '',
+        employeeNumber: d.employee_number || d.employeeNumber || p.employeeNumber || p.numeroEmpleado || '',
+        license: d.license || p.license || '',
+        priority: d.priority || 'baja',
+        syncStatus: d.sync_status || 'sincronizado',
+        createdAt: normalizarFechaReporte(d, p),
+        payload: p
+      };
+    }
+
     function resumenReportes(lista) {
       const hoy = new Date();
       const esHoy = (valor) => {
@@ -775,7 +859,7 @@
       };
     }
 
-    // CARGA DIRECTA DESDE FIREBASE FIRESTORE (Incluye checklists y bitácoras con o sin created_at)
+    // Carga el periodo reciente en lotes y conserva un cursor para consultar el histórico.
     async function cargarDatos(params = filtrosAplicados(), options = {}) {
       if (!state.user) throw new Error('Inicia sesión para consultar los reportes');
       if (!options.silent) {
@@ -784,49 +868,61 @@
       }
 
       try {
+        if (!state.syncWatermark) state.syncWatermark = new Date().toISOString();
         const reportsCol = collection(db, 'bitacora_reports');
-        const desdeIso = new Date(Date.now() - state.windowDays * 86400000).toISOString();
-        const q = fsQuery(
-          reportsCol,
-          fsWhere('created_at', '>=', desdeIso),
-          fsOrderBy('created_at', 'desc'),
-          fsLimit(LIMITE_SEGURIDAD_LECTURAS)
-        );
-        const snapshot = await getDocs(q);
+        const constraints = [];
+        let fechaCorte = null;
+        if (!options.loadOlder) {
+          fechaCorte = new Date(Date.now() - state.windowDays * 86400000).toISOString();
+          constraints.push(fsWhere('created_at', '>=', fechaCorte));
+        }
+        constraints.push(fsOrderBy('created_at', 'desc'));
+        if (options.loadOlder && state.historyCursor) {
+          constraints.push(fsStartAfter(state.historyCursor));
+        }
+        constraints.push(fsLimit(LIMITE_PAGINA_REPORTES));
+        const q = fsQuery(reportsCol, ...constraints);
+        let snapshot = await getDocs(q);
+        const documentos = [...snapshot.docs];
+        if (!options.loadOlder) {
+          while (snapshot.size === LIMITE_PAGINA_REPORTES
+            && documentos.length < LIMITE_VENTANA_REPORTES) {
+            const cursor = snapshot.docs[snapshot.docs.length - 1];
+            const siguiente = await getDocs(fsQuery(
+              reportsCol,
+              fsWhere('created_at', '>=', fechaCorte),
+              fsOrderBy('created_at', 'desc'),
+              fsStartAfter(cursor),
+              fsLimit(Math.min(LIMITE_PAGINA_REPORTES, LIMITE_VENTANA_REPORTES - documentos.length))
+            ));
+            snapshot = siguiente;
+            documentos.push(...siguiente.docs);
+          }
+        }
 
-        state.hitLimit = snapshot.size >= LIMITE_SEGURIDAD_LECTURAS;
-        const rawReports = [];
-        snapshot.forEach((docSnap) => {
-          const d = docSnap.data();
-          const p = (d.payload && typeof d.payload === 'object') ? d.payload : d;
-          const folio = String(d.folio || p.folio || '').trim();
+        if (!options.loadOlder) {
+          state.hitLimit = documentos.length >= LIMITE_VENTANA_REPORTES
+            && snapshot.size === LIMITE_PAGINA_REPORTES;
+        }
+        if (!options.loadOlder) {
+          state.historyCursor = null;
+          state.historyLoaded = false;
+          state.historyExhausted = false;
+        }
+        if (options.loadOlder && snapshot.size) state.historyLoaded = true;
+        if (documentos.length) state.historyCursor = documentos[documentos.length - 1];
+        state.historyExhausted = options.loadOlder && snapshot.size < LIMITE_PAGINA_REPORTES;
+        const rawReports = documentos.map(convertirSnapshotReporte);
 
-          const rawType = String(d.report_type || d.reportType || p.reportType || '').toLowerCase().trim();
-          const esBitacora = rawType === 'bitacora'
-            || /^(?:FB\d+|OFF-\d+)/i.test(folio)
-            || Array.isArray(p.logs)
-            || d.gpsEvidenceVersion !== undefined;
-
-          rawReports.push({
-            id: docSnap.id,
-            folio,
-            type: esBitacora ? 'bitacora' : (rawType || 'checklist'),
-            unitId: d.unit_id || d.unitId || p.unitId || '',
-            driverName: d.driver_name || d.driverName || p.driverName || '',
-            employeeNumber: d.employee_number || d.employeeNumber || p.employeeNumber || p.numeroEmpleado || '',
-            license: d.license || p.license || '',
-            priority: d.priority || 'baja',
-            syncStatus: d.sync_status || 'sincronizado',
-            createdAt: normalizarFechaReporte(d, p),
-            payload: p
-          });
-        });
-
-        rawReports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        state.allReports = rawReports;
-        const filteredReports = rawReports.filter((rep) =>
+        const reportesBase = options.loadOlder ? (state.allReports || []) : [];
+        const reportesPorId = new Map([...reportesBase, ...rawReports].map((reporte) => [reporte.id, reporte]));
+        const reportesCompletos = [...reportesPorId.values()]
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        state.allReports = reportesCompletos;
+        const filteredReports = reportesCompletos.filter((rep) =>
           coincideFiltroGlobal(rep, { unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type' })
         );
+        if (options.loadOlder) state.page = Math.max(1, Math.ceil(filteredReports.length / state.pageSize));
 
         const summary = resumenReportes(filteredReports);
 
@@ -838,9 +934,74 @@
         }, options);
 
       } catch (error) {
+        if (!state.allReports?.length) state.syncWatermark = null;
         console.error('Error al consultar Firestore:', error);
         $('tabla-datos').innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error al consultar Firestore: ${escapeHtml(error.message)}</td></tr>`;
         showToast(error.message);
+      }
+    }
+
+    async function sincronizarReportesNuevos() {
+      if (!state.user || sincronizacionReportesActiva) return;
+      sincronizacionReportesActiva = true;
+      try {
+        if (!state.syncWatermark) {
+          await cargarDatos(filtrosAplicados(), { silent: true });
+          return;
+        }
+
+        const inicioSincronizacion = Date.now();
+        const fechaCursor = new Date(Date.parse(state.syncWatermark) - 60000).toISOString();
+        const documentos = [];
+        let snapshot;
+        let cursor = null;
+        do {
+          const constraints = [
+            fsWhere('synced_at', '>', fechaCursor),
+            fsOrderBy('synced_at', 'asc')
+          ];
+          if (cursor) constraints.push(fsStartAfter(cursor));
+          constraints.push(fsLimit(LIMITE_PAGINA_REPORTES));
+          snapshot = await getDocs(fsQuery(collection(db, 'bitacora_reports'), ...constraints));
+          documentos.push(...snapshot.docs);
+          cursor = snapshot.docs[snapshot.docs.length - 1] || cursor;
+        } while (snapshot.size === LIMITE_PAGINA_REPORTES);
+        state.syncWatermark = new Date(inicioSincronizacion - 60000).toISOString();
+
+        const idsExistentes = new Set(state.allReports.map((reporte) => String(reporte.id)));
+        const corteVentana = Date.now() - state.windowDays * 86400000;
+        const reportesNuevos = documentos
+          .map(convertirSnapshotReporte)
+          .filter((reporte) => !idsExistentes.has(String(reporte.id))
+            && (state.historyLoaded || new Date(reporte.createdAt).getTime() >= corteVentana));
+        if (!reportesNuevos.length) {
+          $('syncState').textContent = `Firebase Firestore · ${formatDate(new Date().toISOString())}`;
+          return;
+        }
+
+        const reportesPorId = new Map(state.allReports.map((reporte) => [String(reporte.id), reporte]));
+        reportesNuevos.forEach((reporte) => reportesPorId.set(String(reporte.id), reporte));
+        let reportes = [...reportesPorId.values()]
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        if (!state.historyLoaded && reportes.length > LIMITE_VENTANA_REPORTES) {
+          reportes = reportes.slice(0, LIMITE_VENTANA_REPORTES);
+          state.hitLimit = true;
+        }
+        state.allReports = reportes;
+        const filteredReports = reportes.filter((reporte) =>
+          coincideFiltroGlobal(reporte, { unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type' })
+        );
+        render({
+          summary: resumenReportes(filteredReports),
+          reports: filteredReports,
+          generatedAt: new Date().toISOString(),
+          filtered: Boolean(state.appliedFilters.from || state.appliedFilters.to || state.appliedFilters.unit
+            || state.appliedFilters.operator || (state.appliedFilters.type && state.appliedFilters.type !== 'todos'))
+        }, { silent: true });
+
+        if (!$('vista-fallas').classList.contains('hidden')) await cargarFallas();
+      } finally {
+        sincronizacionReportesActiva = false;
       }
     }
 
@@ -871,13 +1032,71 @@
 
     $('logoutBtn').addEventListener('click', () => signOut(auth));
 
+    $('depurarFallasBtn').addEventListener('click', async () => {
+      if (state.role !== 'admin') {
+        showToast('Solo un administrador puede depurar cierres históricos.');
+        return;
+      }
+
+      const boton = $('depurarFallasBtn');
+      boton.disabled = true;
+      try {
+        const { ordenes } = await solicitarCierreBackend({ action: 'retroactive-list' });
+        if (!ordenes.length) {
+          showToast('No hay OTs cerradas pendientes de depuración.');
+          return;
+        }
+
+        const conFechaInferida = ordenes.filter((orden) => orden.fecha_inferida).length;
+        const avisoFecha = conFechaInferida
+          ? `\n${conFechaInferida} OT(s) no tienen fecha de cierre y usarán la fecha de realización o, si falta, la última actualización.`
+          : '';
+        if (!confirm(`Se revisarán ${ordenes.length} OT(s) cerradas, incluidas las ya procesadas, para incorporar reportes que hayan sincronizado después de su cierre. Solo se vincularán coincidencias exactas por equipo, sistema y falla y con fecha anterior o igual al cierre. El proceso puede tardar, consumir lecturas de Firestore y se puede reanudar si se interrumpe.${avisoFecha}\n\n¿Continuar?`)) return;
+
+        for (let indice = 0; indice < ordenes.length; indice += 1) {
+          const orden = ordenes[indice];
+          showToast(`Depuración ${indice + 1}/${ordenes.length}: OT-${orden.folio_ot || ''}`);
+          let resultado = await solicitarCierreBackend({
+            action: 'retroactive-close',
+            ot_id: orden.id,
+            cerrada_at: orden.cerrada_at
+          });
+          while (!resultado.done) {
+            resultado = await solicitarCierreBackend({
+              action: 'continue',
+              job_id: resultado.jobId
+            });
+          }
+        }
+
+        showToast(`Depuración completada: ${ordenes.length} OT(s) procesadas.`);
+        await Promise.all([cargarOrdenes(true), cargarFallas(), cargarDashboard(true)]);
+      } catch (error) {
+        console.error('Error al depurar cierres históricos:', error);
+        showToast(error.message || 'No se pudo completar la depuración.');
+      } finally {
+        boton.disabled = false;
+      }
+    });
+
     $('refreshBtn').addEventListener('click', () => {
       Promise.all([cargarDatos(), cargarDashboard(true), cargarOrdenes(true)])
         .catch((error) => showToast(error.message));
     });
 
-    $('verMasFilas').addEventListener('click', () => {
-      state.visibleRows += FILAS_POR_PAGINA;
+    $('paginaAnterior').addEventListener('click', () => {
+      state.page = Math.max(1, state.page - 1);
+      renderTablaReportes();
+    });
+
+    $('paginaSiguiente').addEventListener('click', () => {
+      state.page += 1;
+      renderTablaReportes();
+    });
+
+    $('tamanoPagina').addEventListener('change', (event) => {
+      state.pageSize = Number(event.target.value);
+      state.page = 1;
       renderTablaReportes();
     });
 
@@ -886,12 +1105,15 @@
         showToast('Solo un administrador puede cargar reportes más antiguos.');
         return;
       }
-      state.windowDays += VENTANA_PASO_DIAS;
-      state.tableSignature = '';
+      if (state.historyExhausted) return;
+      $('cargarMasAntiguos').disabled = true;
       try {
-        await Promise.all([cargarDatos(), cargarDashboard(true)]);
+        await cargarDatos(filtrosAplicados(), { loadOlder: true });
+        await cargarDashboard(true);
       } catch (error) {
         showToast(error.message);
+      } finally {
+        $('cargarMasAntiguos').disabled = state.historyExhausted;
       }
     });
 
@@ -996,9 +1218,11 @@
       fallas.forEach((f) => {
         const key = f.componenteKey || 'tracto';
         if (resultado[key]) {
-          resultado[key].push({
-            categoria: f.categoria || f.sistema || 'GENERAL',
-            item: f.itemReportado || f.descripcion || f.itemOficial
+          separarSistemasFalla(f.categoria || f.sistema || 'GENERAL').forEach((categoria) => {
+            resultado[key].push({
+              categoria,
+              item: f.itemReportado || f.descripcion || f.itemOficial
+            });
           });
         }
       });
@@ -1113,6 +1337,7 @@
       }
       if (currentAuthStateVersion !== authStateVersion) return;
 
+      if (state.user?.uid !== authenticatedUser?.uid) state.syncWatermark = null;
       state.user = authenticatedUser;
       state.role = userRole;
       const loginPanel = $('loginPanel');
@@ -1133,9 +1358,14 @@
       }
 
       if (!authenticatedUser) {
+        if (temporizadorSincronizacion) {
+          clearInterval(temporizadorSincronizacion);
+          temporizadorSincronizacion = null;
+        }
         state.reports = [];
         state.allReports = [];
         state.lastTotal = 0;
+        state.syncWatermark = null;
         dashState.ordenes = null;
         aplicarPermisosDeInterfaz();
         if (user) {
@@ -1152,6 +1382,15 @@
       try {
         await cargarDatos();
         cargarDashboard().catch(() => {});
+        if (currentAuthStateVersion !== authStateVersion) return;
+        if (temporizadorSincronizacion) clearInterval(temporizadorSincronizacion);
+        temporizadorSincronizacion = setInterval(() => {
+          if (document.visibilityState !== 'visible') return;
+          sincronizarReportesNuevos().catch((error) => {
+            console.error('Error al sincronizar nuevos reportes:', error);
+            showToast(error.message || 'No se pudieron sincronizar nuevos reportes.');
+          });
+        }, INTERVALO_SINCRONIZACION_REPORTES);
       } catch (error) {
         showToast(error.message);
       }
@@ -1394,6 +1633,207 @@
       }
     }
 
+    async function obtenerCoberturas(reportes) {
+      const ids = [...new Set(reportes.map((reporte) => String(reporte.id)))];
+      const coberturas = new Map();
+      for (let inicio = 0; inicio < ids.length; inicio += 30) {
+        const lote = ids.slice(inicio, inicio + 30);
+        const snapshot = await getDocs(fsQuery(
+          collection(db, 'falla_ot_cobertura'),
+          fsWhere('report_id', 'in', lote)
+        ));
+        snapshot.forEach((documento) => {
+          const cobertura = documento.data();
+          coberturas.set(`${cobertura.report_id}|${cobertura.falla_key}`, cobertura);
+        });
+      }
+      return coberturas;
+    }
+
+    function fallasFirmablesDeReporte(reporte) {
+      const economicos = numerosEconomicos(reporte);
+      return obtenerFallasReporte(reporte).fallas.flatMap((falla) => {
+        const key = falla.componenteKey || componenteKey(falla.componente);
+        const sistemaOriginal = falla.sistema || falla.categoria || 'GENERAL';
+        const item = falla.itemReportado || falla.descripcion || falla.itemOficial || 'Falla de inspección';
+        const unidad = String(economicos[key] || '').trim();
+        return separarSistemasFalla(sistemaOriginal).map((sistema) => {
+          const firma = crearFirmaFalla({
+          unidad,
+          componente: key,
+          sistema,
+          item
+          });
+          return firma ? {
+            firma,
+            unidad,
+            componenteKey: key,
+            componente: falla.componente || COMPONENTES.find((componente) => componente.key === key)?.nombre || key,
+            sistema,
+            categoria: sistema,
+            itemReportado: item,
+            itemOficial: falla.itemOficial || item,
+            descripcion: falla.descripcion || item
+          } : null;
+        }).filter(Boolean);
+      }).flat();
+    }
+
+    function firmasDeOrden(orden) {
+      const payload = orden.payload && typeof orden.payload === 'object' ? orden.payload : {};
+      const firmasGuardadas = payload.cobertura_falla_keys;
+      if (Array.isArray(firmasGuardadas) && firmasGuardadas.length) return firmasGuardadas;
+      const fallas = Array.isArray(payload.fallas) ? payload.fallas : [];
+      return [...new Set(fallas.flatMap((falla) => {
+        if (!falla || typeof falla !== 'object') return [];
+        const key = falla.componenteKey || componenteKey(falla.componente);
+        const firmas = crearFirmasFalla({
+          unidad: falla.economico_componente || payload[key] || (key === 'tracto' ? payload.unitId || orden.unidad : ''),
+          componente: key,
+          sistema: falla.sistema || falla.categoria,
+          item: falla.itemReportado || falla.item || falla.descripcion || falla.itemOficial
+        });
+        return firmas;
+      }).filter(Boolean))];
+    }
+
+    async function crearOTDesdeGrupo(grupo) {
+      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      if (grupo.reportes.length > 400) {
+        throw new Error('El grupo supera el límite seguro de una sola OT. Carga una ventana menor y vuelve a intentarlo.');
+      }
+
+      const fechaActual = new Date().toISOString();
+      const otId = crypto.randomUUID().replace(/-/g, '');
+      const segId = crypto.randomUUID().replace(/-/g, '');
+      const reportesGrupo = grupo.reportes.map((item) => item.reporte);
+      const idsCobertura = await Promise.all(reportesGrupo.map((reporte) => idCoberturaFalla(reporte.id, grupo.firma)));
+      const refCoberturas = idsCobertura.map((id) => doc(db, 'falla_ot_cobertura', id));
+      const refContador = doc(db, 'sistema', 'contadores');
+      const refOT = doc(db, 'ordenes_trabajo', otId);
+      const refSeguimiento = doc(db, 'ot_seguimiento', segId);
+      const representante = reportesGrupo[0];
+      const fallasOT = [{
+        componente: grupo.componente,
+        componenteKey: grupo.componenteKey,
+        sistema: grupo.sistema,
+        categoria: grupo.sistema,
+        itemReportado: grupo.item,
+        itemOficial: grupo.item,
+        descripcion: grupo.item,
+        economico_componente: grupo.unidad
+      }];
+
+      const creada = await runTransaction(db, async (transaction) => {
+        const existentes = await Promise.all(refCoberturas.map((ref) => transaction.get(ref)));
+        const yaAsignada = existentes.find((snapshot) => snapshot.exists());
+        if (yaAsignada) return false;
+
+        const contador = await transaction.get(refContador);
+        const maxFolioLocal = (dashState.ordenes || []).reduce((max, orden) => {
+          const folio = Number.parseInt(orden.folio_ot, 10);
+          return Number.isFinite(folio) ? Math.max(max, folio) : max;
+        }, 164);
+        const folioGuardado = Number(contador.data()?.folio_ot_actual) || 164;
+        const nuevoFolio = Math.max(maxFolioLocal, folioGuardado) + 1;
+        const datosOT = {
+          id: otId,
+          folio_ot: nuevoFolio,
+          reporte_id: representante.id,
+          reporte_ids: reportesGrupo.map((reporte) => String(reporte.id)),
+          folios_checklist: reportesGrupo.map((reporte) => reporte.folio || reporte.payload?.folio || reporte.id),
+          folio_checklist: representante.folio || representante.payload?.folio || '',
+          reporte_folio: representante.folio || representante.payload?.folio || '',
+          unidad: representante.unitId || 'N/A',
+          unidad_componente: grupo.unidad,
+          operador: representante.driverName || 'No especificado',
+          componente: grupo.componente,
+          sistema: grupo.sistema,
+          descripcion_falla: `${grupo.componente} | ${grupo.sistema}: ${grupo.item}`,
+          estatus: 'NUEVA',
+          fecha_apertura: fechaActual,
+          updated_at: fechaActual,
+          recurrencia: reportesGrupo.length,
+          cobertura_por_falla: true,
+          electromecanico: '',
+          proveedor_externo: '',
+          supervisor_mantenimiento: '',
+          fecha_realizacion: null,
+          kilometraje: representante.payload?.km || '',
+          comentarios_ejecutor: '',
+          payload: {
+            ...representante.payload,
+            report_ids: reportesGrupo.map((reporte) => String(reporte.id)),
+            cobertura_falla_keys: [grupo.firma],
+            fallas: fallasOT
+          }
+        };
+
+        transaction.set(refContador, { folio_ot: nuevoFolio }, { merge: true });
+        transaction.set(refOT, datosOT);
+        transaction.set(refSeguimiento, {
+          id: segId,
+          ot_id: otId,
+          accion: 'CREACIÓN',
+          usuario: state.user?.email || 'Supervisor (panel)',
+          comentario: `OT generada para ${reportesGrupo.length} incidencia(s) de la falla ${grupo.sistema}: ${grupo.item}.`,
+          fecha: fechaActual
+        });
+        refCoberturas.forEach((ref, index) => {
+          const reporte = reportesGrupo[index];
+          transaction.set(ref, {
+            reporte_id: String(reporte.id),
+            folio: reporte.folio || reporte.payload?.folio || String(reporte.id),
+            ot_id: otId,
+            falla_key: grupo.firma,
+            unidad: grupo.unidad,
+            componente: grupo.componente,
+            estado: 'EN_PROCESO',
+            atendido_en_bloque: false,
+            created_at: reporte.createdAt || fechaActual,
+            updated_at: fechaActual
+          });
+        });
+        return datosOT;
+      });
+
+      if (!creada) {
+        await cargarFallas();
+        showToast('Una incidencia del grupo ya fue asignada a otra OT; se actualizó la lista.');
+        return;
+      }
+
+      dashState.ordenes = [creada, ...(dashState.ordenes || [])];
+      renderDashboard();
+      await generarPDFOT(creada);
+      await Promise.all([cargarFallas(), cargarOrdenes(true)]);
+      mostrarVistaOrdenes();
+    }
+
+    function tarjetaFallaGrupoHtml(grupo) {
+      const folios = grupo.reportes
+        .map(({ reporte }) => String(reporte.folio || reporte.payload?.folio || reporte.id))
+        .slice(0, 10);
+      const adicionales = grupo.reportes.length - folios.length;
+      return `
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <p class="text-xs font-black text-slate-400">${grupo.reportes.length} checklist${grupo.reportes.length === 1 ? '' : 's'} · ${escapeHtml(folios.join(', '))}${adicionales > 0 ? ` y ${adicionales} más` : ''}</p>
+            <h3 class="text-lg font-black text-[#7c2d12]">Unidad ${escapeHtml(grupo.reportes[0].reporte.unitId || 'N/A')}</h3>
+            <p class="text-xs font-bold text-slate-600">${escapeHtml(grupo.componente)} · Económico ${escapeHtml(grupo.unidad)}</p>
+            <p class="text-xs font-bold text-slate-500">${grupo.reportes.length} incidencia(s) registrada(s)</p>
+          </div>
+          <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>
+        </div>
+        <div class="rounded-md bg-red-50 p-3 text-sm">
+          <strong class="text-slate-700">${escapeHtml(grupo.sistema)}</strong>
+          <p>${escapeHtml(grupo.item)}</p>
+        </div>
+        <button class="btn-generar-ot btn-accion-admin w-full rounded-md bg-[#294936] px-3 py-2 text-sm font-black text-white shadow hover:bg-[#203b2b] disabled:cursor-wait disabled:opacity-60 ${state.role === 'admin' ? '' : 'hidden'}">
+          GENERAR OT${grupo.reportes.length > 1 ? ` PARA ${grupo.reportes.length} FOLIOS` : ''}
+        </button>`;
+    }
+
     // CARGA DE FALLAS DESDE FIRESTORE
     async function cargarFallas() {
       const contenedor = $('fallas-cards');
@@ -1402,43 +1842,67 @@
 
       try {
         await obtenerOrdenes();
+        const checklists = state.reports.filter((reporte) => reporte.type === 'checklist');
+        const coberturas = await obtenerCoberturas(checklists);
+        const idsOTLegadas = new Set((dashState.ordenes || [])
+          .filter((orden) => !orden.cobertura_por_falla && orden.reporte_id)
+          .map((orden) => String(orden.reporte_id)));
+        const firmasEnOTAbierta = new Set((dashState.ordenes || [])
+          .filter((orden) => !ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)))
+          .flatMap((orden) => firmasDeOrden(orden)));
+        const grupos = new Map();
 
-        const otReporteIds = new Set((dashState.ordenes || []).map((o) => String(o.reporte_id || '')).filter(Boolean));
-
-        const reportesFiltrados = state.reports.filter((reporte) => {
-          if (reporte.type !== 'checklist') return false;
-          if (otReporteIds.has(String(reporte.id))) return false;
-          const { fallas } = obtenerFallasReporte(reporte);
-          return fallas.length > 0;
+        checklists.forEach((reporte) => {
+          if (idsOTLegadas.has(String(reporte.id))) return;
+          fallasFirmablesDeReporte(reporte).forEach((falla) => {
+            const cobertura = coberturas.get(`${reporte.id}|${falla.firma}`);
+            if (cobertura || firmasEnOTAbierta.has(falla.firma)) return;
+            let grupo = grupos.get(falla.firma);
+            if (!grupo) {
+              grupo = {
+                firma: falla.firma,
+                unidad: falla.unidad,
+                componenteKey: falla.componenteKey,
+                componente: falla.componente,
+                sistema: falla.sistema,
+                item: falla.itemReportado,
+                reportes: []
+              };
+              grupos.set(falla.firma, grupo);
+            }
+            if (!grupo.reportes.some((item) => String(item.reporte.id) === String(reporte.id))) {
+              grupo.reportes.push({ reporte, falla });
+            }
+          });
         });
 
+        const lista = [...grupos.values()].sort((a, b) =>
+          b.reportes.length - a.reportes.length
+          || new Date(b.reportes[0].reporte.createdAt) - new Date(a.reportes[0].reporte.createdAt)
+        );
         contenedor.innerHTML = '';
-
-        reportesFiltrados.forEach((reporte) => {
-          const { fallas, observaciones } = obtenerFallasReporte(reporte);
-
-          if (!fallas.length) return;
-
+        lista.forEach((grupo) => {
           const tarjeta = document.createElement('article');
           tarjeta.className = 'flex flex-col gap-3 rounded-lg border border-orange-100 bg-white p-4 shadow-sm';
-          tarjeta.innerHTML = tarjetaFallaHtml(reporte, fallas, observaciones);
-
+          tarjeta.innerHTML = tarjetaFallaGrupoHtml(grupo);
           const boton = tarjeta.querySelector('.btn-generar-ot');
           boton.addEventListener('click', async () => {
             if (boton.disabled) return;
             boton.disabled = true;
             try {
-              await crearOTDesdeReporte(reporte, fallas, observaciones);
+              await crearOTDesdeGrupo(grupo);
+            } catch (error) {
+              console.error('Error al crear OT para fallas agrupadas:', error);
+              showToast(error.message || 'No se pudo guardar la OT.');
             } finally {
               boton.disabled = false;
             }
           });
-
           contenedor.appendChild(tarjeta);
         });
 
         if (!contenedor.children.length) {
-          contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500">No hay fallas pendientes de atención. Las fallas con OT generada se consultan en Órdenes de Trabajo.</p>';
+          contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500">No hay fallas pendientes de atención. Las fallas con OT asignada se consultan en Órdenes de Trabajo.</p>';
         }
       } catch (error) {
         contenedor.innerHTML = `<p class="col-span-full py-6 text-center font-bold text-red-700">Error: ${escapeHtml(error.message)}</p>`;
@@ -1536,24 +2000,34 @@
               const estatusAnterior = orden.estatus;
 
               try {
-                await updateDoc(doc(db, 'ordenes_trabajo', otId), {
-                  estatus: nuevoEstatus,
-                  updated_at: new Date().toISOString()
-                });
-
-                const segId = crypto.randomUUID().replace(/-/g, '');
-                await setDoc(doc(db, 'ot_seguimiento', segId), {
-                  id: segId,
-                  ot_id: otId,
-                  accion: 'CAMBIO_ESTATUS',
-                  usuario: 'Supervisor (panel)',
-                  comentario: `Estatus actualizado a ${nuevoEstatus}`,
-                  fecha: new Date().toISOString()
-                });
-
+                if (ESTATUS_REALIZADA.has(sinAcentos(nuevoEstatus))) {
+                  let resultado = await solicitarCierreBackend({
+                    action: 'close',
+                    ot_id: otId,
+                    estatus: nuevoEstatus
+                  });
+                  resultado = await completarCierreBackend(resultado, `Cerrando OT-${orden.folio_ot || ''}`);
+                  orden.cerrada_at = resultado.cerrada_at;
+                  showToast(`OT-${orden.folio_ot || ''} cerrada · ${resultado.incidencias_vinculadas || 0} falla(s) atendida(s)`);
+                } else {
+                  await updateDoc(doc(db, 'ordenes_trabajo', otId), {
+                    estatus: nuevoEstatus,
+                    updated_at: new Date().toISOString()
+                  });
+                  const segId = crypto.randomUUID().replace(/-/g, '');
+                  await setDoc(doc(db, 'ot_seguimiento', segId), {
+                    id: segId,
+                    ot_id: otId,
+                    accion: 'CAMBIO_ESTATUS',
+                    usuario: state.user?.email || 'Supervisor (panel)',
+                    comentario: `Estatus actualizado a ${nuevoEstatus}`,
+                    fecha: new Date().toISOString()
+                  });
+                  showToast(`Estatus actualizado a ${nuevoEstatus} en Firebase`);
+                }
                 orden.estatus = nuevoEstatus;
                 renderDashboard();
-                showToast(`Estatus actualizado a ${nuevoEstatus} en Firebase`);
+                await cargarFallas();
               } catch (error) {
                 console.error('Error al cambiar estatus:', error);
                 event.target.value = estatusAnterior || 'NUEVA';
@@ -1608,10 +2082,11 @@
       const esAdmin = state.role === 'admin';
       $('segTitulo').textContent = `Seguimiento de OT-${orden?.folio_ot ?? ''}`;
       $('segResumen').innerHTML = `<strong>Unidad:</strong> ${escapeHtml(orden?.unidad || 'N/A')} · <strong>Componente:</strong> ${escapeHtml(orden?.componente || '')} · <strong>Sistema:</strong> ${escapeHtml(orden?.sistema || '')}<br>${escapeHtml(orden?.descripcion_falla || '').replace(/\n/g, '<br>')}`;
+      form.elements.estatus.value = orden?.estatus || 'NUEVA';
       CAMPOS_SEGUIMIENTO.forEach((campo) => {
         form.elements[campo].value = orden?.[campo] || '';
       });
-      form.querySelectorAll('input, textarea').forEach((element) => {
+      form.querySelectorAll('input, textarea, select').forEach((element) => {
         element.disabled = !esAdmin;
       });
       form.querySelectorAll('button[type="submit"]').forEach((button) => {
@@ -1641,6 +2116,8 @@
       botones.forEach((boton) => { boton.disabled = true; });
 
       try {
+        const estatusAnterior = ordenEnSeguimiento.estatus || 'NUEVA';
+        const nuevoEstatus = form.elements.estatus.value;
         const datosActualizados = { updated_at: new Date().toISOString() };
         CAMPOS_SEGUIMIENTO.forEach((campo) => {
           datosActualizados[campo] = form.elements[campo].value.trim() || null;
@@ -1659,12 +2136,41 @@
         });
 
         Object.assign(ordenEnSeguimiento, datosActualizados);
+        if (nuevoEstatus !== estatusAnterior) {
+          if (ESTATUS_REALIZADA.has(sinAcentos(nuevoEstatus))) {
+            let resultado = await solicitarCierreBackend({
+              action: 'close',
+              ot_id: ordenEnSeguimiento.id,
+              estatus: nuevoEstatus
+            });
+            resultado = await completarCierreBackend(
+              resultado,
+              `Cerrando OT-${ordenEnSeguimiento.folio_ot || ''}`
+            );
+            ordenEnSeguimiento.cerrada_at = resultado.cerrada_at;
+          } else {
+            await updateDoc(doc(db, 'ordenes_trabajo', ordenEnSeguimiento.id), {
+              estatus: nuevoEstatus,
+              updated_at: new Date().toISOString()
+            });
+            const cambioId = crypto.randomUUID().replace(/-/g, '');
+            await setDoc(doc(db, 'ot_seguimiento', cambioId), {
+              id: cambioId,
+              ot_id: ordenEnSeguimiento.id,
+              accion: 'CAMBIO_ESTATUS',
+              usuario: state.user?.email || 'Supervisor (panel)',
+              comentario: `Estatus actualizado a ${nuevoEstatus}`,
+              fecha: new Date().toISOString()
+            });
+          }
+          ordenEnSeguimiento.estatus = nuevoEstatus;
+        }
         showToast(`OT-${ordenEnSeguimiento?.folio_ot ?? ''} actualizada en Firebase`);
 
         renderDashboard();
         if (generarPdf) await generarPDFOT(ordenEnSeguimiento);
         cerrarSeguimiento();
-        cargarOrdenes();
+        await Promise.all([cargarOrdenes(true), cargarFallas()]);
       } catch (error) {
         showToast(error.message);
       } finally {
@@ -1842,16 +2348,25 @@
 
       const ordenesList = dashState.ordenes || [];
       const otPorReporte = new Map();
-      const reparacionesCerradas = new Set();
-      const reparacionesEnCurso = new Set();
+      const fallasEnOT = [];
       let fallasNuevas = 0;
 
       ordenesList.forEach((orden) => {
-        if (orden.reporte_id) otPorReporte.set(String(orden.reporte_id), orden);
-        const unidad = String(orden.unidad || '').toUpperCase().trim();
-        const categoria = categoriaKey(orden.sistema || orden.categoria || '');
-        if (ESTATUS_REALIZADA.has(sinAcentos(orden.estatus))) reparacionesCerradas.add(`${unidad}|${categoria}`);
-        else reparacionesEnCurso.add(`${unidad}|${categoria}`);
+        const idsReporte = [
+          orden.reporte_id,
+          ...(Array.isArray(orden.reporte_ids) ? orden.reporte_ids : []),
+          ...(Array.isArray(orden.payload?.report_ids) ? orden.payload.report_ids : [])
+        ].filter(Boolean);
+        idsReporte.forEach((id) => {
+          if (!otPorReporte.has(String(id))) otPorReporte.set(String(id), orden);
+        });
+        const estatusCerrado = ESTATUS_REALIZADA.has(sinAcentos(orden.estatus));
+        const fechaCierre = new Date(
+          orden.cerrada_at || orden.fecha_realizacion || orden.updated_at || orden.fecha_apertura || ''
+        ).getTime();
+        firmasDeOrden(orden).forEach((firma) => {
+          fallasEnOT.push({ firma, estatusCerrado, fechaCierre });
+        });
       });
 
       checklists.forEach((report) => {
@@ -1862,25 +2377,37 @@
         const registroDia = porDia.get(claveDia) || { value: 0, checklists: 0, realizadas: 0 };
         registroDia.checklists += 1;
 
+        const fechaReporte = new Date(report.createdAt).getTime();
         const otAsociada = otPorReporte.get(String(report.id));
-        const tieneOTTerminadaDirecta = Boolean(
-          otAsociada && ESTATUS_REALIZADA.has(sinAcentos(otAsociada.estatus))
-        );
+        const esOTLegadaDirecta = Boolean(otAsociada && !otAsociada.cobertura_por_falla);
 
         COMPONENTES.forEach(({ key }) => {
           const numUnidad = numeros[key];
-          fallas[key].forEach(({ categoria }) => {
+          fallas[key].forEach(({ categoria, item }) => {
             const cat = categoriaKey(categoria);
             const id = `${key}|${cat}`;
             const celda = celdas.get(id) || { componente: key, categoria: cat, label: String(categoria).toUpperCase(), reportadas: 0, realizadas: 0 };
             celda.reportadas += 1;
 
-            const claveReparacion = `${String(numUnidad).toUpperCase().trim()}|${cat}`;
-            const estaRealizada = tieneOTTerminadaDirecta || reparacionesCerradas.has(claveReparacion);
+            const firma = crearFirmaFalla({
+              unidad: numUnidad,
+              componente: key,
+              sistema: categoria,
+              item
+            });
+            const otCoincidente = fallasEnOT.find((cobertura) =>
+              cobertura.firma === firma
+              && (!cobertura.estatusCerrado
+                || (Number.isFinite(cobertura.fechaCierre) && fechaReporte <= cobertura.fechaCierre))
+            );
+            const estaRealizada = Boolean(
+              otCoincidente?.estatusCerrado || (esOTLegadaDirecta && ESTATUS_REALIZADA.has(sinAcentos(otAsociada.estatus)))
+            );
+            const estaAsignada = Boolean(otCoincidente || esOTLegadaDirecta);
             if (estaRealizada) {
               celda.realizadas += 1;
               registroDia.realizadas = (registroDia.realizadas || 0) + 1;
-            } else if (!otAsociada && !reparacionesEnCurso.has(claveReparacion)) {
+            } else if (!estaAsignada) {
               fallasNuevas += 1;
             }
 

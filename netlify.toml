@@ -4,6 +4,7 @@
   functions = "netlify/functions"
 
 [build.environment]
+  NODE_VERSION = "22"
   # The Firebase SDK and esbuild are build-time dependencies used to create the
   # locally cached browser bundle.
   NPM_FLAGS = "--include=dev"

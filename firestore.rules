@@ -192,6 +192,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /falla_ot_cobertura/{coverageId} {
+      allow read: if isPanelUser();
+      allow write: if isAdmin();
+    }
+
+    match /cierres_masivos_ot/{jobId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /evaluaciones_operador_master/{evaluationId} {
       allow get, list: if isEvaluationAdmin();
       allow create: if isEvaluationUser() && validEvaluation(evaluationId);
