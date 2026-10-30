@@ -17,7 +17,9 @@ We will acknowledge your report within 48 hours and work to address confirmed vu
 ## Security Best Practices for Contributors
 
 - The Netlify `cerrar-fallas-repetidas` function requires `FIREBASE_SERVICE_ACCOUNT_JSON`, containing the Firebase service-account JSON with Firestore access. Configure it as a Netlify environment variable; never commit the JSON or place it in the PWA.
-- **Never commit API keys or secrets** directly in source code.
-- Use the placeholder system (`__GOOGLE_AI_API_KEY__`, `__FIREBASE_API_KEY__`) and inject secrets via environment variables at build time.
+- Firebase web configuration (including its API key) is public client configuration, not an authorization secret. Provide the staging and production JSON objects through the `FIREBASE_STAGING_CONFIG_JSON` and `FIREBASE_PRODUCTION_CONFIG_JSON` Netlify build environment variables; never commit them to source.
+- Each value must be the Web App config JSON from its corresponding Firebase project, with `apiKey`, `authDomain`, `projectId`, `messagingSenderId`, and `appId`; `storageBucket` and `measurementId` are optional.
+- **Never commit service-account credentials or other server secrets** directly in source code.
+- The app selects staging for localhost, Netlify deploy previews, and hostnames containing `staging`; other hostnames use production. Configure both JSON objects in every Netlify deploy context that builds this site.
 - Store secrets in [GitHub repository secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions), never in source files.
 - Keep dependencies up to date (Dependabot is enabled for this repository).

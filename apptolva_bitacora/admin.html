@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./js/firebase-config.js"></script>
+  <script src="./js/firebase-config-runtime.js"></script>
   <meta name="theme-color" content="#7c2d12">
   <title>Panel Administrativo | AppTolva</title>
   <script src="./js/tailwindcss.js"></script>
@@ -393,7 +395,7 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "./js/firebase-sdk.js";
+    import { getFirebaseConfig, initializeApp } from "./js/firebase-sdk.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "./js/firebase-sdk.js";
     import {
       getFirestore,
@@ -414,15 +416,7 @@
     } from "./js/firebase-sdk.js";
     import { crearFirmaFalla, crearFirmasFalla, idCoberturaFalla, separarSistemasFalla } from "./js/firmaFalla.js";
 
-    const firebaseConfig = {
-      apiKey: "__FIREBASE_API_KEY__",
-      authDomain: "gen-lang-client-0015118308.firebaseapp.com",
-      projectId: "gen-lang-client-0015118308",
-      storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
-      messagingSenderId: "228375512926",
-      appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
-      measurementId: "G-SK8TYXT3JD"
-    };
+    const firebaseConfig = getFirebaseConfig();
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);

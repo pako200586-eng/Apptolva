@@ -8,9 +8,8 @@
   # The Firebase SDK and esbuild are build-time dependencies used to create the
   # locally cached browser bundle.
   NPM_FLAGS = "--include=dev"
-  # La API key web de Firebase es pública por diseño (va en el HTML); se omite del escaneo
-  # de secretos para que el build no falle al inyectarla. El resto de variables sí se escanea.
-  SECRETS_SCAN_OMIT_KEYS = "FIREBASE_API_KEY"
+  # Las configuraciones Firebase web son públicas por diseño y se embeben en el bundle.
+  SECRETS_SCAN_OMIT_KEYS = "FIREBASE_STAGING_CONFIG_JSON,FIREBASE_PRODUCTION_CONFIG_JSON"
 
 [[redirects]]
   from = "/api/*"

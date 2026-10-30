@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./js/firebase-config.js"></script>
+  <script src="./js/firebase-config-runtime.js"></script>
   <title>Migrador a Firebase | AppTolva</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -48,14 +50,7 @@
     import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, writeBatch, doc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyB-zX1PF3_Ei567UgYoYozOCttCN75PwO4",
-      authDomain: "gen-lang-client-0015118308.firebaseapp.com",
-      projectId: "gen-lang-client-0015118308",
-      storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
-      messagingSenderId: "228375512926",
-      appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf"
-    };
+    const firebaseConfig = window.getAppFirebaseConfig();
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
