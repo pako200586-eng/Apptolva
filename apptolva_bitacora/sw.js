@@ -1,4 +1,4 @@
-﻿const CACHE_VERSION = "v87"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v91"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -30,11 +30,14 @@ const OFFLINE_URLS = [
   "./js/signature_pad.min.js",
   "./js/jspdf.min.js",
   "./js/firebase-sdk.js",
+  "./js/firebase-config.js",
+  "./js/firebase-config-runtime.js",
   "./js/qrcode.min.js",
   "./js/confetti.min.js",
   "./js/catalogoOperadores.js",
   "./js/catalogoBachoco.js",
   "./js/normalizadorFallas.js",
+  "./js/firmaFalla.js",
   "./js/procesadorInspeccion.js",
   "./js/generarPDF_OT.js",
   "./img/ot/logo.jpg",

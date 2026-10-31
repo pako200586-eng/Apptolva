@@ -29,7 +29,7 @@ netlify.toml         # Netlify deployment configuration
 - **Frontend**: Vanilla HTML, CSS, and JavaScript (no framework)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) (loaded from local `js/tailwindcss.js`)
 - **Backend/Database**: [Firebase Firestore](https://firebase.google.com/docs/firestore) (Realtime Database is not currently used in this repo)
-- **Deployment**: [Netlify](https://netlify.com/) — build command runs `build.sh` which substitutes the `FIREBASE_API_KEY` environment variable into the HTML files
+- **Deployment**: [Netlify](https://netlify.com/) — build command runs `build.sh`, which generates the public Firebase environment configuration from Netlify variables
 - **PWA**: Includes `manifest.json` and `sw.js` service worker for offline-capable mobile use
 - **Libraries**:
   - `jspdf.min.js` — PDF generation
@@ -39,7 +39,7 @@ netlify.toml         # Netlify deployment configuration
 
 ## Key Conventions
 
-- The Firebase API key is **never hard-coded** in source files. Use the placeholder `__FIREBASE_API_KEY__` in HTML files; the `build.sh` script replaces it at deploy time via the `FIREBASE_API_KEY` Netlify environment variable.
+- Firebase web configuration is generated at build time from `FIREBASE_STAGING_CONFIG_JSON` and `FIREBASE_PRODUCTION_CONFIG_JSON`; do not commit either configuration to source. The browser selects staging for localhost, Netlify deploy previews, and hostnames containing `staging`, and production for other hosts.
 - All app logic lives in plain HTML files using `<script>` tags — there is no bundler or transpiler.
 - Tailwind CSS is used for all styling; avoid adding separate custom CSS unless necessary.
 - The app is designed for mobile-first usage by field workers, so UI changes should prioritize mobile usability.
@@ -47,7 +47,7 @@ netlify.toml         # Netlify deployment configuration
 
 ## Development & Deployment
 
-- **Local development**: Run a simple local static server (for example, `npx serve apptolva_bitacora`) and open the app via `http://localhost/...`. Avoid opening `index.html` directly via `file://`, since service workers and some browsers' module/CORS restrictions will prevent the app from working correctly. Set `FIREBASE_API_KEY` manually for local testing.
-- **Deployment**: Netlify automatically runs `cd apptolva_bitacora && bash build.sh` on push to the main branch. The `FIREBASE_API_KEY` secret must be configured in the Netlify environment.
+- **Local development**: Set both Firebase JSON configuration variables, run `cd apptolva_bitacora && bash build.sh`, then run a static server (for example, `npx serve apptolva_bitacora`) and open the app via `http://localhost/...`. Avoid opening `index.html` directly via `file://`.
+- **Deployment**: Netlify runs `cd apptolva_bitacora && bash build.sh`; both Firebase web configuration variables must be available in each deploy context.
 - **Security scanning**: CodeQL runs on every push/pull request via `.github/workflows/codeql.yml`.
-- There are no automated tests currently in this repository.
+- Run `npm test` for unit tests and `npm run test:emulator` for Firebase Emulator integration tests.

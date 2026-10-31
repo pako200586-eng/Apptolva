@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="./js/firebase-config.js"></script>
+    <script src="./js/firebase-config-runtime.js"></script>
     <meta name="theme-color" content="#ea580c">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="AppTolva">
@@ -1527,7 +1529,7 @@
 
     <!-- FIREBASE -->
     <script type="module">
-        import { initializeApp } from "./js/firebase-sdk.js";
+        import { getFirebaseConfig, initializeApp } from "./js/firebase-sdk.js";
         import {
             doc,
             initializeFirestore,
@@ -1539,15 +1541,7 @@
         } from "./js/firebase-sdk.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
        
-        const firebaseConfig = {
-            apiKey: "AIzaSyB-zX1PF3_Ei567UgYoYozOCttCN75PwO4",
-            authDomain: "gen-lang-client-0015118308.firebaseapp.com",
-            projectId: "gen-lang-client-0015118308",
-            storageBucket: "gen-lang-client-0015118308.firebasestorage.app",
-            messagingSenderId: "228375512926",
-            appId: "1:228375512926:web:201c4c4b4dec7ae7fdb1cf",
-            measurementId: "G-SK8TYXT3JD"
-        };
+        const firebaseConfig = getFirebaseConfig();
 
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
             console.warn("Firebase: API key no configurada.");
@@ -1610,7 +1604,15 @@
                     if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
                     unsubscribe();
                     observersByReportId.delete(id);
-                    window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
+                    setDoc(reportRef, { synced_at: new Date().toISOString() }, { merge: true })
+                        .then(() => {
+                            window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
+                        })
+                        .catch((error) => {
+                            window.dispatchEvent(new CustomEvent("firestore-report-sync-error", {
+                                detail: { id, message: error.message }
+                            }));
+                        });
                 }, (error) => {
                     unsubscribe();
                     observersByReportId.delete(id);
@@ -1650,7 +1652,8 @@
                     license: reportePayload.license || "",
                     priority: reportePayload.priority || "baja",
                     payload: reportePayload,
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    synced_at: new Date().toISOString()
                 };
 
                 const payloadBytes = new Blob([JSON.stringify(data)]).size;

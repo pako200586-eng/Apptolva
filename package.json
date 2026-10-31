@@ -2,7 +2,13 @@
   "name": "appsflotapropiachapo",
   "private": true,
   "type": "module",
-  "dependencies": {},
+  "scripts": {
+    "test": "node --test tests/firmaFalla.test.js tests/firebase-config.test.js",
+    "test:emulator": "firebase emulators:exec --project demo-apptolva --only auth,firestore \"node --test tests/firebase-emulator.integration.js\""
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  },
   "devDependencies": {
     "esbuild": "^0.28.2",
     "firebase": "^11.2.0"
