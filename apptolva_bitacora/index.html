@@ -28,6 +28,7 @@
     <script src="./js/confetti.min.js"></script>
     <script src="./js/signature_pad.min.js"></script>
     <script src="./js/jspdf.min.js"></script>
+    <script src="./js/checklistPdf.js"></script>
     <link rel="stylesheet" href="./css/fontawesome.min.css">
     
     <style>
@@ -1101,21 +1102,11 @@
                 revResults = filtrarResultadosChecklist(revResults);
 
                 // --- GENERACIÓN DEL PDF OFICIAL ---
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
                 const km = document.getElementById('revKm').value || '-';
                 const origen = document.getElementById('revOrigen').value || '-';
                 const destino = document.getElementById('revDestino').value || '-';
                 const fecha = new Date().toLocaleDateString('es-MX');
                 const hora = new Date().toLocaleTimeString('es-MX');
-
-                const pageW = 210;
-                const margin = 14;
-                const contentW = pageW - margin * 2;
-                const NUM_COLS = 3;
-                const COL_GAP = 4;
-                const colW = (contentW - COL_GAP * (NUM_COLS - 1)) / NUM_COLS;
 
                 let logoUrl = null;
                 try {
@@ -1142,198 +1133,36 @@
                 ];
                 const secciones = modalidadActual === 'sencillo' ? seccionesSencillo : seccionesFull;
 
-                secciones.forEach((sec, pageIndex) => {
-                    if (pageIndex > 0) doc.addPage();
-                    let y = 13;
+                const checklistData = secciones.map((sec) => ({
+                    id: sec.id,
+                    titulo: sec.titulo,
+                    observacion: obsData[sec.id] || '',
+                    categorias: (revData[sec.id] || []).map((cat) => ({
+                        cat: cat.cat,
+                        items: cat.i.map((item) => ({ item, estado: revResults[sec.id + '-' + item] || '' }))
+                    }))
+                }));
 
-                    doc.setFillColor(234, 88, 12);
-                    doc.rect(margin, y, contentW, 12, 'F');
-                    if (logoUrl) {
-                        doc.setFillColor(255, 255, 255);
-                        doc.rect(margin + 1, y + 1, 40, 10, 'F');
-                        try { doc.addImage(logoUrl, 'JPEG', margin + 2, y + 1.4, 36.9, 10 - 0.8, undefined, 'FAST'); } catch (e) {}
-                    } else {
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(13);
-                        doc.text('BACHOCO', margin + 3, y + 8);
-                    }
-                    doc.setTextColor(255, 255, 255);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(7.5);
-                    doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 5, {align: 'right'});
-                    doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 10, {align: 'right'});
-
-                    y += 16;
-                    doc.setFillColor(248, 250, 252);
-                    doc.setDrawColor(226, 232, 240);
-                    doc.setLineWidth(0.3);
-                    doc.rect(margin, y, contentW, 31, 'FD');
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(9);
-                    const half = contentW / 2;
-                    const empleadoTexto = numeroEmpleado ? '   |   No. EMP: ' + numeroEmpleado : '';
-                    doc.text('OPERADOR: ' + opNombre + empleadoTexto, pageW / 2, y + 6, {align: 'center'});
-                    doc.setDrawColor(226, 232, 240);
-                    doc.line(margin + 3, y + 9, margin + contentW - 3, y + 9);
-                    doc.setFontSize(8);
-                    doc.text('UNIDAD: ' + u, margin + 3, y + 14.5);
-                    doc.text('KM: ' + km, margin + half + 3, y + 14.5);
-                    doc.text('TOLVA 1: ' + t1, margin + 3, y + 20);
-                    doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 20);
-                    doc.text('DOLLY: ' + dolly, margin + 3, y + 25.5);
-                    doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + half + 3, y + 25.5);
-
-                    y += 35;
-                    doc.setFillColor(51, 65, 85);
-                    doc.rect(margin, y, contentW, 8, 'F');
-                    doc.setTextColor(255, 255, 255);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(11);
-                    doc.text(sec.titulo, margin + 3, y + 5.5);
-
-                    y += 12;
-
-                    const COL_HEIGHT = 164;
-                    const CAT_BOX_H = 6;
-                    const CAT_INCREMENT = 9.5;
-                    const ITEM_INCREMENT = 5.6;
-                    const ITEM_LINE_HEIGHT = 3.1;
-                    const MIN_OBS_H = 12;
-                    const OBS_TOP_PADDING = 8;
-                    const OBS_LINE_HEIGHT = 4;
-
-                    const COL_START_Y = y;
-                    const COL_BOTTOM = COL_START_Y + COL_HEIGHT;
-                    const OBS_Y = COL_BOTTOM + 3;
-                    const MAX_OBS_H = 18;
-                    const SIG_Y = OBS_Y + MAX_OBS_H + 2;
-                    const colXStart = [
-                        margin,
-                        margin + colW + COL_GAP,
-                        margin + (colW + COL_GAP) * 2
-                    ];
-
-                    let col = 0;
-
-                    if (revData[sec.id]) {
-                        revData[sec.id].forEach(cat => {
-                            if (col < NUM_COLS - 1 && y + CAT_INCREMENT + ITEM_INCREMENT > COL_BOTTOM) {
-                                col++;
-                                y = COL_START_Y;
-                            }
-                            const cx = colXStart[col];
-
-                            doc.setFillColor(241, 245, 249);
-                            doc.setDrawColor(234, 88, 12);
-                            doc.setLineWidth(0.4);
-                            doc.rect(cx, y, colW, CAT_BOX_H, 'FD');
-                            doc.setFillColor(234, 88, 12);
-                            doc.rect(cx, y, 1.5, CAT_BOX_H, 'F');
-                            doc.setTextColor(51, 65, 85);
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(7);
-                            doc.text(cat.cat, cx + 5, y + 4.1);
-
-                            y += CAT_INCREMENT;
-
-                            cat.i.forEach(item => {
-                                doc.setFont('helvetica', 'normal');
-                                doc.setFontSize(6.5);
-                                const itemLines = doc.splitTextToSize(item, colW - 17);
-                                const itemHeight = Math.max(ITEM_INCREMENT, 2.5 + itemLines.length * ITEM_LINE_HEIGHT);
-
-                                if (col < NUM_COLS - 1 && y + itemHeight > COL_BOTTOM) {
-                                    col++;
-                                    y = COL_START_Y;
-                                }
-                                const cxItem = colXStart[col];
-                                const cxRight = cxItem + colW;
-
-                                doc.setFillColor(255, 255, 255);
-                                doc.setDrawColor(238, 238, 238);
-                                doc.setLineWidth(0.15);
-                                doc.rect(cxItem, y - 3, colW, itemHeight - 0.5, 'FD');
-
-                                doc.setTextColor(50, 50, 50);
-                                doc.text(itemLines, cxItem + 3, y + 0.2);
-
-                                const k = sec.id + '-' + item;
-                                const v = revResults[k];
-                                if (v === 'OK') {
-                                    doc.setTextColor(22, 163, 74);
-                                    doc.setFont('helvetica', 'bold');
-                                    doc.text('OK', cxRight - 2, y + 0.5, {align: 'right'});
-                                } else if (v === 'MAL') {
-                                    doc.setFillColor(220, 38, 38);
-                                    doc.roundedRect(cxRight - 11, y - 2.5, 9, 5, 1, 1, 'F');
-                                    doc.setTextColor(255, 255, 255);
-                                    doc.setFont('helvetica', 'bold');
-                                    doc.text('MAL', cxRight - 6.5, y + 0.5, {align: 'center'});
-                                } else {
-                                    doc.setTextColor(180, 180, 180);
-                                    doc.setFont('helvetica', 'normal');
-                                    doc.text('-', cxRight - 2, y + 0.5, {align: 'right'});
-                                }
-
-                                y += itemHeight;
-                            });
-
-                            y += 2;
-                        });
-                    }
-
-                    // Observaciones
-                    const obsTexto = obsData[sec.id] || 'Sin observaciones';
-                    const obsLines = doc.splitTextToSize(obsTexto, contentW - 10);
-                    const obsH = Math.min(MAX_OBS_H, Math.max(MIN_OBS_H, OBS_TOP_PADDING + obsLines.length * OBS_LINE_HEIGHT));
-                    doc.setFillColor(255, 247, 237);
-                    doc.setDrawColor(253, 186, 116);
-                    doc.setLineWidth(0.3);
-                    doc.rect(margin, OBS_Y, contentW, obsH, 'FD');
-                    doc.setTextColor(154, 52, 18);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(7.5);
-                    doc.text('NOTAS ' + sec.titulo + ':', margin + 3, OBS_Y + 5);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(obsLines, margin + 3, OBS_Y + 10);
-
-                    // --- FIRMAS EN PDF (SIN FONDOS VERDES NI ERRORES) ---
-                    {
-                        const sigW = (contentW - 8) / 3;
-                        const sigBoxes = [
-                            {img: firmaOpImg, nombre: opNombre, cargo: 'FIRMA OPERADOR', x: margin},
-                            {img: firmaOp2Img, nombre: nombreOp2 || 'N/A', cargo: 'FIRMA OPERADOR 2', x: margin + sigW + 4},
-                            {img: firmaSupImg, nombre: nombreSup || 'N/A', cargo: 'FIRMA SUPERVISOR', x: margin + (sigW + 4) * 2}
-                        ];
-                        sigBoxes.forEach(sig => {
-                            const esFirmaValida = typeof sig.img === 'string' &&
-                                                  (sig.img.startsWith('data:image/png') || sig.img.startsWith('data:image/jpeg')) &&
-                                                  sig.img.length > 200;
-
-                            if (esFirmaValida) {
-                                try {
-                                    const formato = sig.img.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
-                                    doc.addImage(sig.img, formato, sig.x, SIG_Y, sigW, 18, undefined, 'FAST');
-                                } catch(e) {
-                                    console.warn('Error al estampar firma ' + sig.cargo + ':', e);
-                                }
-                            }
-                            doc.setDrawColor(100, 100, 100);
-                            doc.setLineWidth(0.5);
-                            doc.line(sig.x, SIG_Y + 20, sig.x + sigW, SIG_Y + 20);
-                            doc.setTextColor(0, 0, 0);
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(7.5);
-                            doc.text(sig.nombre, sig.x + sigW / 2, SIG_Y + 25, {align: 'center'});
-                            doc.setTextColor(100, 100, 100);
-                            doc.setFont('helvetica', 'normal');
-                            doc.setFontSize(7);
-                            doc.text(sig.cargo, sig.x + sigW / 2, SIG_Y + 29, {align: 'center'});
-                        });
-                    }
-                });
+                const doc = window.generarPdfChecklist({
+                    folio,
+                    unitId: u,
+                    driverName: opNombre,
+                    employeeNumber: numeroEmpleado,
+                    fecha,
+                    hora,
+                    km,
+                    origen,
+                    destino,
+                    tolva1: t1,
+                    tolva2: t2,
+                    dolly,
+                    operador2: nombreOp2,
+                    supervisor: nombreSup,
+                    firmaOp: firmaOpImg,
+                    firmaOp2: firmaOp2Img,
+                    firmaSup: firmaSupImg,
+                    checklistData
+                }, { logoUrl });
 
                 doc.save('REPORTE_' + u + '_' + opNombre + '.pdf');
 
@@ -1370,16 +1199,6 @@
                         });
                     });
                 });
-
-                const checklistData = secciones.map((sec) => ({
-                    id: sec.id,
-                    titulo: sec.titulo,
-                    observacion: obsData[sec.id] || '',
-                    categorias: (revData[sec.id] || []).map((cat) => ({
-                        cat: cat.cat,
-                        items: cat.i.map((item) => ({ item, estado: revResults[sec.id + '-' + item] || '' }))
-                    }))
-                }));
 
                 const reportePayload = {
                     folio: folio,
