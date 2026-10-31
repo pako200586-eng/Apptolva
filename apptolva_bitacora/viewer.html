@@ -13,6 +13,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
     <script src="./js/jspdf.min.js"></script>
+    <script src="./js/checklistPdf.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -480,106 +481,7 @@
         async function generarPDFChecklist(data) {
             if (!window.jspdf) { showError("Librería PDF no disponible."); return null; }
             const logoUrl = await cargarLogoBachoco();
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-            const folio = data.folio || 'S/F';
-            const u = data.unitId || '-';
-            const opNombre = data.driverName || '-';
-            const numeroEmpleado = data.employeeNumber || '';
-            const t1 = data.tolva1 || 'S/N';
-            const t2 = data.tolva2 || 'S/N';
-            const dolly = data.dolly || 'S/N';
-            const km = data.km || '-';
-            const origen = data.origen || '-';
-            const destino = data.destino || '-';
-            const fecha = data.fecha || new Date().toLocaleDateString('es-MX');
-            const hora = data.hora || new Date().toLocaleTimeString('es-MX');
-            const secciones = Array.isArray(data.checklistData) ? data.checklistData : [];
-
-            const pageW = 210, margin = 14, contentW = pageW - margin * 2;
-            const NUM_COLS = 3, COL_GAP = 4, colW = (contentW - COL_GAP * (NUM_COLS - 1)) / NUM_COLS;
-
-            secciones.forEach((sec, pageIndex) => {
-                if (pageIndex > 0) doc.addPage();
-                let y = 13;
-                doc.setFillColor(234, 88, 12); doc.rect(margin, y, contentW, 12, 'F');
-                if (logoUrl) {
-                    doc.setFillColor(255, 255, 255); doc.rect(margin + 1, y + 1, 40, 10, 'F');
-                    try { doc.addImage(logoUrl, 'JPEG', margin + 2, y + 1.4, 36.9, 9.2, undefined, 'FAST'); } catch (e) {}
-                } else {
-                    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-                    doc.text('BACHOCO', margin + 3, y + 8);
-                }
-                doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-                doc.text('FECHA: ' + fecha + '   HORA: ' + hora, pageW - margin - 2, y + 5, { align: 'right' });
-                doc.text('FOLIO: ' + folio, pageW - margin - 2, y + 10, { align: 'right' });
-
-                y += 16;
-                doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.3);
-                doc.rect(margin, y, contentW, 31, 'FD');
-                doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-                const half = contentW / 2;
-                doc.text('OPERADOR: ' + opNombre + (numeroEmpleado ? '   |   No. EMP: ' + numeroEmpleado : ''), pageW / 2, y + 6, { align: 'center' });
-                doc.line(margin + 3, y + 9, margin + contentW - 3, y + 9);
-                doc.setFontSize(8);
-                doc.text('UNIDAD: ' + u, margin + 3, y + 14.5);
-                doc.text('KM: ' + km, margin + half + 3, y + 14.5);
-                doc.text('TOLVA 1: ' + t1, margin + 3, y + 20);
-                doc.text('TOLVA 2: ' + t2, margin + half + 3, y + 20);
-                doc.text('DOLLY: ' + dolly, margin + 3, y + 25.5);
-                doc.text('ORIGEN: ' + origen + '   DESTINO: ' + destino, margin + half + 3, y + 25.5);
-                y += 35;
-
-                doc.setFillColor(51, 65, 85); doc.rect(margin, y, contentW, 8, 'F');
-                doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-                doc.text(sec.titulo || '', margin + 3, y + 5.5);
-                y += 12;
-
-                const COL_HEIGHT = 190;
-                const COL_START_Y = y;
-                const colXStart = [margin, margin + colW + COL_GAP, margin + (colW + COL_GAP) * 2];
-                let col = 0;
-
-                (sec.categorias || []).forEach(cat => {
-                    if (col < NUM_COLS - 1 && y + 15 > COL_START_Y + COL_HEIGHT) { col++; y = COL_START_Y; }
-                    const cx = colXStart[col];
-                    doc.setFillColor(241, 245, 249); doc.setDrawColor(234, 88, 12); doc.setLineWidth(0.4);
-                    doc.rect(cx, y, colW, 6, 'FD');
-                    doc.setFillColor(234, 88, 12); doc.rect(cx, y, 1.5, 6, 'F');
-                    doc.setTextColor(51, 65, 85); doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
-                    doc.text(cat.cat || '', cx + 5, y + 4.1);
-                    y += 9.5;
-
-                    (cat.items || []).forEach(entry => {
-                        const itemText = entry.item || '';
-                        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
-                        const itemLines = doc.splitTextToSize(itemText, colW - 17);
-                        const itemHeight = Math.max(5.6, 2.5 + itemLines.length * 3.1);
-
-                        if (col < NUM_COLS - 1 && y + itemHeight > COL_START_Y + COL_HEIGHT) { col++; y = COL_START_Y; }
-                        const cxItem = colXStart[col];
-                        const cxRight = cxItem + colW;
-
-                        doc.setFillColor(255, 255, 255); doc.setDrawColor(238, 238, 238); doc.setLineWidth(0.15);
-                        doc.rect(cxItem, y - 3, colW, itemHeight - 0.5, 'FD');
-                        doc.setTextColor(50, 50, 50);
-                        doc.text(itemLines, cxItem + 3, y + 0.2);
-
-                        const v = entry.estado;
-                        if (v === 'OK') {
-                            doc.setTextColor(22, 163, 74); doc.setFont('helvetica', 'bold');
-                            doc.text('OK', cxRight - 2, y + 0.5, { align: 'right' });
-                        } else if (v === 'MAL') {
-                            doc.setFillColor(220, 38, 38); doc.roundedRect(cxRight - 11, y - 2.5, 9, 5, 1, 1, 'F');
-                            doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
-                            doc.text('MAL', cxRight - 6.5, y + 0.5, { align: 'center' });
-                        }
-                        y += itemHeight;
-                    });
-                    y += 2;
-                });
-            });
-
+            const doc = window.generarPdfChecklist(data, { logoUrl });
             doc._docTipo = 'checklist';
             return doc;
         }
