@@ -3,10 +3,12 @@
   publish = "apptolva_bitacora"
   functions = "netlify/functions"
 
+[functions]
+  # Empaqueta jose/jwks-rsa dentro de la función para evitar ERR_REQUIRE_ESM.
+  node_bundler = "esbuild"
+
 [build.environment]
   NODE_VERSION = "22"
-  # Las funciones deben ejecutarse en Node 22: firebase-admin carga jose (ESM) con require().
-  AWS_LAMBDA_JS_RUNTIME = "nodejs22.x"
   # The Firebase SDK and esbuild are build-time dependencies used to create the
   # locally cached browser bundle.
   NPM_FLAGS = "--include=dev"
