@@ -179,7 +179,7 @@
         <section id="vista-fallas" class="panel-card overflow-hidden rounded-lg hidden">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
             <h2 class="font-black text-[#7c2d12]">Fallas Pendientes de Asignación</h2>
-            <p class="text-xs font-bold text-slate-500">Una tarjeta por falla · folios repetidos se vinculan a una OT</p>
+            <p class="text-xs font-bold text-slate-500">Una tarjeta por unidad · elige qué fallas reparar</p>
           </div>
           <div id="fallas-cards" class="grid gap-4 p-4 sm:grid-cols-2">
             <p class="col-span-full py-6 text-center font-bold text-slate-500">
@@ -1699,32 +1699,63 @@
       }).filter(Boolean))];
     }
 
-    async function crearOTDesdeGrupo(grupo) {
+    async function descartarFalla(grupo, motivo) {
       if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
-      if (grupo.reportes.length > 400) {
-        throw new Error('El grupo supera el límite seguro de una sola OT. Carga una ventana menor y vuelve a intentarlo.');
+      const fechaActual = new Date().toISOString();
+      for (let inicio = 0; inicio < grupo.reportes.length; inicio += 400) {
+        const lote = grupo.reportes.slice(inicio, inicio + 400);
+        const ids = await Promise.all(lote.map(({ reporte }) => idCoberturaFalla(reporte.id, grupo.firma)));
+        await runTransaction(db, async (transaction) => {
+          lote.forEach(({ reporte }, indice) => {
+            transaction.set(doc(db, 'falla_ot_cobertura', ids[indice]), {
+              reporte_id: String(reporte.id),
+              folio: reporte.folio || reporte.payload?.folio || String(reporte.id),
+              ot_id: '',
+              falla_key: grupo.firma,
+              unidad: grupo.unidad,
+              componente: grupo.componente,
+              estado: 'DESCARTADA',
+              motivo_descarte: motivo,
+              descartada_por: state.user?.email || 'Supervisor (panel)',
+              atendido_en_bloque: false,
+              created_at: reporte.createdAt || fechaActual,
+              updated_at: fechaActual
+            });
+          });
+        });
+      }
+    }
+
+    async function crearOTDesdeFallas(grupos) {
+      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      if (!grupos.length) throw new Error('Selecciona al menos una falla.');
+      const pares = grupos.flatMap((grupo) => grupo.reportes.map((item) => ({ grupo, reporte: item.reporte })));
+      if (pares.length > 400) {
+        throw new Error('La selección supera el límite seguro de una sola OT. Genera la OT por partes.');
       }
 
       const fechaActual = new Date().toISOString();
       const otId = crypto.randomUUID().replace(/-/g, '');
       const segId = crypto.randomUUID().replace(/-/g, '');
-      const reportesGrupo = grupo.reportes.map((item) => item.reporte);
-      const idsCobertura = await Promise.all(reportesGrupo.map((reporte) => idCoberturaFalla(reporte.id, grupo.firma)));
+      const reportesGrupo = [...new Map(pares.map(({ reporte }) => [String(reporte.id), reporte])).values()]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const idsCobertura = await Promise.all(pares.map(({ grupo, reporte }) => idCoberturaFalla(reporte.id, grupo.firma)));
       const refCoberturas = idsCobertura.map((id) => doc(db, 'falla_ot_cobertura', id));
       const refContador = doc(db, 'sistema', 'contadores');
       const refOT = doc(db, 'ordenes_trabajo', otId);
       const refSeguimiento = doc(db, 'ot_seguimiento', segId);
       const representante = reportesGrupo[0];
-      const fallasOT = [{
+      const nombres = (valores) => [...new Set(valores)].join(' / ');
+      const fallasOT = grupos.map((grupo) => ({
         componente: grupo.componente,
         componenteKey: grupo.componenteKey,
         sistema: grupo.sistema,
         categoria: grupo.sistema,
         itemReportado: grupo.item,
         itemOficial: grupo.item,
-        descripcion: grupo.item,
+        descripcion: grupo.descripcion || grupo.item,
         economico_componente: grupo.unidad
-      }];
+      }));
 
       const creada = await runTransaction(db, async (transaction) => {
         const existentes = await Promise.all(refCoberturas.map((ref) => transaction.get(ref)));
@@ -1747,11 +1778,11 @@
           folio_checklist: representante.folio || representante.payload?.folio || '',
           reporte_folio: representante.folio || representante.payload?.folio || '',
           unidad: representante.unitId || 'N/A',
-          unidad_componente: grupo.unidad,
+          unidad_componente: nombres(grupos.map((grupo) => grupo.unidad)),
           operador: representante.driverName || 'No especificado',
-          componente: grupo.componente,
-          sistema: grupo.sistema,
-          descripcion_falla: `${grupo.componente} | ${grupo.sistema}: ${grupo.item}`,
+          componente: nombres(grupos.map((grupo) => grupo.componente)),
+          sistema: nombres(grupos.map((grupo) => grupo.sistema)),
+          descripcion_falla: grupos.map((grupo) => `${grupo.componente} | ${grupo.sistema}: ${grupo.item}`).join(' ; '),
           estatus: 'NUEVA',
           fecha_apertura: fechaActual,
           updated_at: fechaActual,
@@ -1766,7 +1797,7 @@
           payload: {
             ...representante.payload,
             report_ids: reportesGrupo.map((reporte) => String(reporte.id)),
-            cobertura_falla_keys: [grupo.firma],
+            cobertura_falla_keys: grupos.map((grupo) => grupo.firma),
             fallas: fallasOT
           }
         };
@@ -1778,11 +1809,11 @@
           ot_id: otId,
           accion: 'CREACIÓN',
           usuario: state.user?.email || 'Supervisor (panel)',
-          comentario: `OT generada para ${reportesGrupo.length} incidencia(s) de la falla ${grupo.sistema}: ${grupo.item}.`,
+          comentario: `OT generada para ${pares.length} incidencia(s) en ${grupos.length} falla(s): ${grupos.map((grupo) => `${grupo.sistema}: ${grupo.item}`).join(' ; ')}.`,
           fecha: fechaActual
         });
         refCoberturas.forEach((ref, index) => {
-          const reporte = reportesGrupo[index];
+          const { grupo, reporte } = pares[index];
           transaction.set(ref, {
             reporte_id: String(reporte.id),
             folio: reporte.folio || reporte.payload?.folio || String(reporte.id),
@@ -1812,28 +1843,102 @@
       mostrarVistaOrdenes();
     }
 
-    function tarjetaFallaGrupoHtml(grupo) {
-      const folios = grupo.reportes
-        .map(({ reporte }) => String(reporte.folio || reporte.payload?.folio || reporte.id))
-        .slice(0, 10);
-      const adicionales = grupo.reportes.length - folios.length;
+    const ORDEN_COMPONENTES = { tracto: 0, tolva1: 1, dolly: 2, tolva2: 3 };
+
+    function notasDeGrupo(grupo) {
+      const vistas = new Map();
+      grupo.reportes.forEach(({ reporte, falla }) => {
+        const detalle = String(falla.descripcion || '').trim();
+        if (!detalle || detalle === String(falla.itemReportado || '').trim() || vistas.has(detalle)) return;
+        vistas.set(detalle, String(reporte.folio || reporte.payload?.folio || reporte.id));
+      });
+      return [...vistas];
+    }
+
+    function tarjetaUnidadHtml(unidad) {
+      const reciente = unidad.reciente;
+      const eco = numerosEconomicos(reciente);
+      const fecha = reciente.createdAt ? new Date(reciente.createdAt).toLocaleDateString('es-MX') : 'Sin fecha';
+      const folios = unidad.reportes.map((reporte) => String(reporte.folio || reporte.payload?.folio || reporte.id));
+      const mostrados = folios.slice(0, 6);
+      const adicionales = folios.length - mostrados.length;
+      const esAdmin = state.role === 'admin';
+
+      const filas = unidad.grupos.map((grupo, indice) => {
+        const notas = notasDeGrupo(grupo);
+        return `
+        <li class="flex items-start gap-2 text-sm">
+          <input type="checkbox" class="chk-falla mt-1 h-4 w-4 accent-[#294936]" data-indice="${indice}" checked ${esAdmin ? '' : 'disabled'}>
+          <div class="min-w-0 flex-1">
+            <strong class="text-slate-700">${escapeHtml(grupo.componente)} · ${escapeHtml(grupo.sistema)}</strong>: ${escapeHtml(grupo.item)}
+            ${grupo.reportes.length > 1 ? `<span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">× ${grupo.reportes.length} folios</span>` : ''}
+            ${notas.slice(0, 3).map(([texto, folio]) => `<p class="mt-0.5 text-xs italic text-slate-600">${escapeHtml(texto)} <span class="not-italic text-slate-400">(${escapeHtml(folio)})</span></p>`).join('')}
+            ${notas.length > 3 ? `<p class="text-[10px] text-slate-400">y ${notas.length - 3} nota(s) más en otros folios</p>` : ''}
+            ${esAdmin ? `<button type="button" class="btn-descartar mt-1 text-[10px] font-black uppercase text-slate-400 underline hover:text-red-700" data-indice="${indice}">Descartar con motivo</button>` : ''}
+          </div>
+        </li>`;
+      }).join('');
+
       return `
         <div class="flex items-start justify-between gap-2">
           <div>
-            <p class="text-xs font-black text-slate-400">${grupo.reportes.length} checklist${grupo.reportes.length === 1 ? '' : 's'} · ${escapeHtml(folios.join(', '))}${adicionales > 0 ? ` y ${adicionales} más` : ''}</p>
-            <h3 class="text-lg font-black text-[#7c2d12]">Unidad ${escapeHtml(grupo.reportes[0].reporte.unitId || 'N/A')}</h3>
-            <p class="text-xs font-bold text-slate-600">${escapeHtml(grupo.componente)} · Económico ${escapeHtml(grupo.unidad)}</p>
-            <p class="text-xs font-bold text-slate-500">${grupo.reportes.length} incidencia(s) registrada(s)</p>
+            <p class="text-xs font-black text-slate-400">${unidad.reportes.length} checklist${unidad.reportes.length === 1 ? '' : 's'} · ${escapeHtml(mostrados.join(', '))}${adicionales > 0 ? ` y ${adicionales} más` : ''}</p>
+            <h3 class="text-lg font-black text-[#7c2d12]">Unidad ${escapeHtml(unidad.unitId)}</h3>
+            <p class="text-xs font-bold text-slate-600">Tolva 1: ${escapeHtml(eco.tolva1)} · Dolly: ${escapeHtml(eco.dolly)} · Tolva 2: ${escapeHtml(eco.tolva2)}</p>
+            <p class="text-xs font-bold text-slate-500">Último operador: ${escapeHtml(reciente.driverName || 'N/A')} · ${escapeHtml(fecha)}</p>
           </div>
           <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>
         </div>
-        <div class="rounded-md bg-red-50 p-3 text-sm">
-          <strong class="text-slate-700">${escapeHtml(grupo.sistema)}</strong>
-          <p>${escapeHtml(grupo.item)}</p>
-        </div>
-        <button class="btn-generar-ot btn-accion-admin w-full rounded-md bg-[#294936] px-3 py-2 text-sm font-black text-white shadow hover:bg-[#203b2b] disabled:cursor-wait disabled:opacity-60 ${state.role === 'admin' ? '' : 'hidden'}">
-          GENERAR OT${grupo.reportes.length > 1 ? ` PARA ${grupo.reportes.length} FOLIOS` : ''}
-        </button>`;
+        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Fallas pendientes (${unidad.grupos.length})</p>
+        <ul class="space-y-2">${filas}</ul>
+        <button class="btn-generar-ot btn-accion-admin w-full rounded-md bg-[#294936] px-3 py-2 text-sm font-black text-white shadow hover:bg-[#203b2b] disabled:cursor-wait disabled:opacity-60 ${esAdmin ? '' : 'hidden'}"></button>`;
+    }
+
+    function enlazarTarjetaUnidad(tarjeta, unidad) {
+      const boton = tarjeta.querySelector('.btn-generar-ot');
+      const casillas = [...tarjeta.querySelectorAll('.chk-falla')];
+      const seleccionadas = () => casillas.filter((c) => c.checked).map((c) => unidad.grupos[Number(c.dataset.indice)]);
+      const actualizar = () => {
+        const grupos = seleccionadas();
+        const folios = new Set(grupos.flatMap((grupo) => grupo.reportes.map((item) => String(item.reporte.id))));
+        boton.disabled = !grupos.length;
+        boton.textContent = grupos.length
+          ? `GENERAR OT (${grupos.length} FALLA${grupos.length === 1 ? '' : 'S'} · ${folios.size} FOLIO${folios.size === 1 ? '' : 'S'})`
+          : 'SELECCIONA AL MENOS UNA FALLA';
+      };
+      casillas.forEach((casilla) => casilla.addEventListener('change', actualizar));
+      actualizar();
+
+      boton.addEventListener('click', async () => {
+        const grupos = seleccionadas();
+        if (boton.disabled || !grupos.length) return;
+        boton.disabled = true;
+        try {
+          await crearOTDesdeFallas(grupos);
+        } catch (error) {
+          console.error('Error al crear OT para fallas seleccionadas:', error);
+          showToast(error.message || 'No se pudo guardar la OT.');
+          actualizar();
+        }
+      });
+
+      tarjeta.querySelectorAll('.btn-descartar').forEach((enlace) => {
+        enlace.addEventListener('click', async () => {
+          const grupo = unidad.grupos[Number(enlace.dataset.indice)];
+          const motivo = (window.prompt(`Motivo para descartar "${grupo.componente} · ${grupo.sistema}: ${grupo.item}" (${grupo.reportes.length} folio(s)):`) || '').trim();
+          if (!motivo) return;
+          enlace.disabled = true;
+          try {
+            await descartarFalla(grupo, motivo);
+            showToast('Falla descartada y registrada con su motivo.');
+            await cargarFallas();
+          } catch (error) {
+            console.error('Error al descartar falla:', error);
+            showToast(error.message || 'No se pudo descartar la falla.');
+            enlace.disabled = false;
+          }
+        });
+      });
     }
 
     // CARGA DE FALLAS DESDE FIRESTORE
@@ -1878,28 +1983,40 @@
           });
         });
 
-        const lista = [...grupos.values()].sort((a, b) =>
-          b.reportes.length - a.reportes.length
-          || new Date(b.reportes[0].reporte.createdAt) - new Date(a.reportes[0].reporte.createdAt)
+        const unidades = new Map();
+        grupos.forEach((grupo) => {
+          grupo.reportes.sort((a, b) => new Date(b.reporte.createdAt) - new Date(a.reporte.createdAt));
+          grupo.descripcion = grupo.reportes[0].falla.descripcion || grupo.item;
+          const unitId = String(grupo.reportes[0].reporte.unitId || grupo.reportes[0].reporte.payload?.unitId || 'N/A');
+          let unidad = unidades.get(unitId);
+          if (!unidad) {
+            unidad = { unitId, grupos: [], reportes: [], reciente: null };
+            unidades.set(unitId, unidad);
+          }
+          unidad.grupos.push(grupo);
+          grupo.reportes.forEach(({ reporte }) => {
+            if (!unidad.reportes.some((r) => String(r.id) === String(reporte.id))) unidad.reportes.push(reporte);
+          });
+        });
+        unidades.forEach((unidad) => {
+          unidad.reportes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          unidad.reciente = unidad.reportes[0];
+          unidad.grupos.sort((a, b) =>
+            (ORDEN_COMPONENTES[a.componenteKey] ?? 9) - (ORDEN_COMPONENTES[b.componenteKey] ?? 9)
+            || String(a.sistema).localeCompare(String(b.sistema), 'es')
+          );
+        });
+
+        const lista = [...unidades.values()].sort((a, b) =>
+          b.grupos.length - a.grupos.length
+          || new Date(b.reciente.createdAt) - new Date(a.reciente.createdAt)
         );
         contenedor.innerHTML = '';
-        lista.forEach((grupo) => {
+        lista.forEach((unidad) => {
           const tarjeta = document.createElement('article');
           tarjeta.className = 'flex flex-col gap-3 rounded-lg border border-orange-100 bg-white p-4 shadow-sm';
-          tarjeta.innerHTML = tarjetaFallaGrupoHtml(grupo);
-          const boton = tarjeta.querySelector('.btn-generar-ot');
-          boton.addEventListener('click', async () => {
-            if (boton.disabled) return;
-            boton.disabled = true;
-            try {
-              await crearOTDesdeGrupo(grupo);
-            } catch (error) {
-              console.error('Error al crear OT para fallas agrupadas:', error);
-              showToast(error.message || 'No se pudo guardar la OT.');
-            } finally {
-              boton.disabled = false;
-            }
-          });
+          tarjeta.innerHTML = tarjetaUnidadHtml(unidad);
+          enlazarTarjetaUnidad(tarjeta, unidad);
           contenedor.appendChild(tarjeta);
         });
 
