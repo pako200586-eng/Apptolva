@@ -7,7 +7,7 @@
     "test:emulator": "firebase emulators:exec --project demo-apptolva --only auth,firestore \"node --test tests/firebase-emulator.integration.js\""
   },
   "dependencies": {
-    "firebase-admin": "^14.5.0"
+    "firebase-admin": "^13.10.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
