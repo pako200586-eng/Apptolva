@@ -179,7 +179,11 @@
         <section id="vista-fallas" class="panel-card overflow-hidden rounded-lg hidden">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
             <h2 class="font-black text-[#7c2d12]">Fallas Pendientes de Asignación</h2>
-            <p class="text-xs font-bold text-slate-500">Una tarjeta por unidad · elige qué fallas reparar</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="btn-fallas-pendientes" type="button" class="rounded-md bg-[#294936] px-3 py-1 text-xs font-black text-white">Pendientes</button>
+              <button id="btn-fallas-descartadas" type="button" class="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-black text-slate-600">Descartadas</button>
+              <p class="text-xs font-bold text-slate-500">Una tarjeta por unidad · elige qué fallas reparar</p>
+            </div>
           </div>
           <div id="fallas-cards" class="grid gap-4 p-4 sm:grid-cols-2">
             <p class="col-span-full py-6 text-center font-bold text-slate-500">
@@ -1699,28 +1703,62 @@
       }).filter(Boolean))];
     }
 
-    async function descartarFalla(grupo, motivo) {
+    async function descartarFalla(grupos, motivo) {
       if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
       const fechaActual = new Date().toISOString();
-      for (let inicio = 0; inicio < grupo.reportes.length; inicio += 400) {
-        const lote = grupo.reportes.slice(inicio, inicio + 400);
-        const ids = await Promise.all(lote.map(({ reporte }) => idCoberturaFalla(reporte.id, grupo.firma)));
+      const pares = grupos.flatMap((grupo) => grupo.reportes.map(({ reporte }) => ({ grupo, reporte })));
+      for (let inicio = 0; inicio < pares.length; inicio += 400) {
+        const lote = pares.slice(inicio, inicio + 400);
+        const ids = await Promise.all(lote.map(({ grupo, reporte }) => idCoberturaFalla(reporte.id, grupo.firma)));
         await runTransaction(db, async (transaction) => {
-          lote.forEach(({ reporte }, indice) => {
+          lote.forEach(({ grupo, reporte }, indice) => {
             transaction.set(doc(db, 'falla_ot_cobertura', ids[indice]), {
               reporte_id: String(reporte.id),
               folio: reporte.folio || reporte.payload?.folio || String(reporte.id),
               ot_id: '',
               falla_key: grupo.firma,
               unidad: grupo.unidad,
+              unit_id: String(reporte.unitId || reporte.payload?.unitId || ''),
               componente: grupo.componente,
+              sistema: grupo.sistema,
+              item: grupo.item,
               estado: 'DESCARTADA',
               motivo_descarte: motivo,
               descartada_por: state.user?.email || 'Supervisor (panel)',
+              descartada_en: fechaActual,
               atendido_en_bloque: false,
               created_at: reporte.createdAt || fechaActual,
               updated_at: fechaActual
             });
+          });
+        });
+      }
+    }
+
+    async function cargarDescartadas() {
+      const snapshot = await getDocs(fsQuery(collection(db, 'falla_ot_cobertura'), fsWhere('estado', '==', 'DESCARTADA')));
+      const registros = [];
+      snapshot.forEach((documento) => registros.push({ id: documento.id, ...documento.data() }));
+      const grupos = new Map();
+      registros.forEach((registro) => {
+        const clave = `${registro.falla_key}|${registro.motivo_descarte}|${registro.descartada_por}`;
+        const grupo = grupos.get(clave) || { ...registro, ids: [], folios: [] };
+        grupo.ids.push(registro.id);
+        grupo.folios.push(registro.folio || registro.reporte_id);
+        grupos.set(clave, grupo);
+      });
+      return [...grupos.values()].sort((a, b) => String(b.descartada_en || '').localeCompare(String(a.descartada_en || '')));
+    }
+
+    async function restaurarDescartada(ids) {
+      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      for (let inicio = 0; inicio < ids.length; inicio += 400) {
+        const lote = ids.slice(inicio, inicio + 400);
+        await runTransaction(db, async (transaction) => {
+          const refs = lote.map((id) => doc(db, 'falla_ot_cobertura', id));
+          const snaps = await Promise.all(refs.map((ref) => transaction.get(ref)));
+          snaps.forEach((snap, indice) => {
+            if (snap.exists() && snap.data().estado === 'DESCARTADA') transaction.delete(refs[indice]);
           });
         });
       }
@@ -1844,15 +1882,32 @@
     }
 
     const ORDEN_COMPONENTES = { tracto: 0, tolva1: 1, dolly: 2, tolva2: 3 };
+    const normalizarSistema = (texto) => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-    function notasDeGrupo(grupo) {
-      const vistas = new Map();
-      grupo.reportes.forEach(({ reporte, falla }) => {
-        const detalle = String(falla.descripcion || '').trim();
-        if (!detalle || detalle === String(falla.itemReportado || '').trim() || vistas.has(detalle)) return;
-        vistas.set(detalle, String(reporte.folio || reporte.payload?.folio || reporte.id));
-      });
-      return [...vistas];
+    function notaDeFalla(falla) {
+      const item = String(falla.itemReportado || '').trim();
+      const detalle = String(falla.descripcion || '').trim();
+      if (!detalle || detalle === item) return '';
+      if (item && detalle.startsWith(item)) return detalle.slice(item.length).trim().replace(/^\(|\)$/g, '');
+      if (/^Reportado en nota:/i.test(detalle)) return '';
+      return detalle;
+    }
+
+    // Solo orientativo en pantalla: no modifica firmas ni cobertura de fallas.
+    const SUGERENCIAS_GENERAL = [
+      ['QUINTA RUEDA / TREN MOTRIZ', /quinta|kinta|muelas|clutch|clach|embrague/],
+      ['ELÉCTRICO', /plaf?lo?n?era|plafon|intermitente|luz|foco|corto|lampara|calavera/],
+      ['CARROCERÍA', /facia|parrilla|lodera|salpicadera|espejo|retrovisor|chisguet|limpiaparabrisas|hule|puerta|defensa|golpe/],
+      ['SISTEMA HIDRÁULICO', /manguera|hidraul|fuga de aceite/],
+      ['ACCESORIOS / ENGRASE', /engras|ajustador|tornillo|compartimento|lavado/],
+      ['LLANTAS / SUSPENSIÓN', /llanta|balata|resorte|amortiguador/]
+    ];
+
+    function sugerenciaGeneral(fila) {
+      if (!/^general/.test(normalizarSistema(fila.sistema))) return '';
+      const texto = normalizarSistema(fila.grupos.map((grupo) => [grupo.item, ...grupo.reportes.map(({ falla }) => notaDeFalla(falla))].join(' ')).join(' '));
+      const coincidencia = SUGERENCIAS_GENERAL.find(([, patron]) => patron.test(texto));
+      return coincidencia ? coincidencia[0] : '';
     }
 
     function tarjetaUnidadHtml(unidad) {
@@ -1864,17 +1919,34 @@
       const adicionales = folios.length - mostrados.length;
       const esAdmin = state.role === 'admin';
 
-      const filas = unidad.grupos.map((grupo, indice) => {
-        const notas = notasDeGrupo(grupo);
+      const filas = unidad.filas.map((fila, indice) => {
+        const items = fila.grupos.map((grupo) => {
+          const notas = new Map();
+          grupo.reportes.forEach(({ reporte, falla }) => {
+            const nota = notaDeFalla(falla);
+            if (nota && !notas.has(nota)) notas.set(nota, String(reporte.folio || reporte.payload?.folio || reporte.id));
+          });
+          const lista = [...notas];
+          return `
+            <li class="text-xs text-slate-700">
+              • ${escapeHtml(grupo.item)}
+              ${grupo.reportes.length > 1 ? `<span class="ml-1 rounded bg-orange-100 px-1 py-0.5 text-[9px] font-black text-orange-700">×${grupo.reportes.length}</span>` : ''}
+              ${lista.slice(0, 2).map(([texto, folio]) => `<p class="ml-3 text-[11px] italic text-slate-500">${escapeHtml(texto)} <span class="not-italic text-slate-400">(${escapeHtml(folio)})</span></p>`).join('')}
+              ${lista.length > 2 ? `<p class="ml-3 text-[10px] text-slate-400">y ${lista.length - 2} nota(s) más</p>` : ''}
+            </li>`;
+        }).join('');
         return `
-        <li class="flex items-start gap-2 text-sm">
-          <input type="checkbox" class="chk-falla mt-1 h-4 w-4 accent-[#294936]" data-indice="${indice}" checked ${esAdmin ? '' : 'disabled'}>
-          <div class="min-w-0 flex-1">
-            <strong class="text-slate-700">${escapeHtml(grupo.componente)} · ${escapeHtml(grupo.sistema)}</strong>: ${escapeHtml(grupo.item)}
-            ${grupo.reportes.length > 1 ? `<span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">× ${grupo.reportes.length} folios</span>` : ''}
-            ${notas.slice(0, 3).map(([texto, folio]) => `<p class="mt-0.5 text-xs italic text-slate-600">${escapeHtml(texto)} <span class="not-italic text-slate-400">(${escapeHtml(folio)})</span></p>`).join('')}
-            ${notas.length > 3 ? `<p class="text-[10px] text-slate-400">y ${notas.length - 3} nota(s) más en otros folios</p>` : ''}
-            ${esAdmin ? `<button type="button" class="btn-descartar mt-1 text-[10px] font-black uppercase text-slate-400 underline hover:text-red-700" data-indice="${indice}">Descartar con motivo</button>` : ''}
+        <li class="rounded-md border border-slate-100 bg-slate-50 p-2">
+          <div class="flex items-start gap-2">
+            <input type="checkbox" class="chk-falla mt-0.5 h-4 w-4 accent-[#294936]" data-indice="${indice}" checked ${esAdmin ? '' : 'disabled'}>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-black text-slate-700">${escapeHtml(fila.componente)} · ${escapeHtml(fila.sistema)}
+                <span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">${fila.folios.size} folio${fila.folios.size === 1 ? '' : 's'}</span>
+              </p>
+              ${sugerenciaGeneral(fila) ? `<p class="text-[10px] font-black uppercase text-sky-700">Probable: ${escapeHtml(sugerenciaGeneral(fila))}</p>` : ''}
+              <ul class="mt-1 space-y-0.5">${items}</ul>
+              ${esAdmin ? `<button type="button" class="btn-descartar mt-1 text-[10px] font-black uppercase text-slate-400 underline hover:text-red-700" data-indice="${indice}">Descartar con motivo</button>` : ''}
+            </div>
           </div>
         </li>`;
       }).join('');
@@ -1889,7 +1961,7 @@
           </div>
           <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>
         </div>
-        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Fallas pendientes (${unidad.grupos.length})</p>
+        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Sistemas con falla (${unidad.filas.length})</p>
         <ul class="space-y-2">${filas}</ul>
         <button class="btn-generar-ot btn-accion-admin w-full rounded-md bg-[#294936] px-3 py-2 text-sm font-black text-white shadow hover:bg-[#203b2b] disabled:cursor-wait disabled:opacity-60 ${esAdmin ? '' : 'hidden'}"></button>`;
     }
@@ -1897,13 +1969,14 @@
     function enlazarTarjetaUnidad(tarjeta, unidad) {
       const boton = tarjeta.querySelector('.btn-generar-ot');
       const casillas = [...tarjeta.querySelectorAll('.chk-falla')];
-      const seleccionadas = () => casillas.filter((c) => c.checked).map((c) => unidad.grupos[Number(c.dataset.indice)]);
+      const seleccionadas = () => casillas.filter((c) => c.checked).flatMap((c) => unidad.filas[Number(c.dataset.indice)].grupos);
       const actualizar = () => {
         const grupos = seleccionadas();
+        const sistemas = casillas.filter((c) => c.checked).length;
         const folios = new Set(grupos.flatMap((grupo) => grupo.reportes.map((item) => String(item.reporte.id))));
         boton.disabled = !grupos.length;
         boton.textContent = grupos.length
-          ? `GENERAR OT (${grupos.length} FALLA${grupos.length === 1 ? '' : 'S'} · ${folios.size} FOLIO${folios.size === 1 ? '' : 'S'})`
+          ? `GENERAR OT (${sistemas} SISTEMA${sistemas === 1 ? '' : 'S'} · ${folios.size} FOLIO${folios.size === 1 ? '' : 'S'})`
           : 'SELECCIONA AL MENOS UNA FALLA';
       };
       casillas.forEach((casilla) => casilla.addEventListener('change', actualizar));
@@ -1924,13 +1997,13 @@
 
       tarjeta.querySelectorAll('.btn-descartar').forEach((enlace) => {
         enlace.addEventListener('click', async () => {
-          const grupo = unidad.grupos[Number(enlace.dataset.indice)];
-          const motivo = (window.prompt(`Motivo para descartar "${grupo.componente} · ${grupo.sistema}: ${grupo.item}" (${grupo.reportes.length} folio(s)):`) || '').trim();
+          const fila = unidad.filas[Number(enlace.dataset.indice)];
+          const motivo = (window.prompt(`Motivo para descartar "${fila.componente} · ${fila.sistema}" (${fila.folios.size} folio(s)). Podrás consultarlo y restaurarlo en la pestaña "Descartadas":`) || '').trim();
           if (!motivo) return;
           enlace.disabled = true;
           try {
-            await descartarFalla(grupo, motivo);
-            showToast('Falla descartada y registrada con su motivo.');
+            await descartarFalla(fila.grupos, motivo);
+            showToast('Falla descartada. Consúltala en la pestaña "Descartadas".');
             await cargarFallas();
           } catch (error) {
             console.error('Error al descartar falla:', error);
@@ -1941,7 +2014,48 @@
       });
     }
 
+    async function mostrarDescartadas() {
+      const contenedor = $('fallas-cards');
+      contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando fallas descartadas...</p>';
+      try {
+        const descartadas = await cargarDescartadas();
+        if (!descartadas.length) {
+          contenedor.innerHTML = '<p class="col-span-full py-6 text-center font-bold text-slate-500">No hay fallas descartadas.</p>';
+          return;
+        }
+        contenedor.innerHTML = '';
+        descartadas.forEach((grupo) => {
+          const fecha = grupo.descartada_en ? new Date(grupo.descartada_en).toLocaleString('es-MX') : '';
+          const tarjeta = document.createElement('article');
+          tarjeta.className = 'flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm';
+          tarjeta.innerHTML = `
+            <p class="text-xs font-black text-slate-400">${grupo.folios.length} folio(s) · ${escapeHtml(grupo.folios.slice(0, 6).join(', '))}${grupo.folios.length > 6 ? ' …' : ''}</p>
+            <h3 class="text-base font-black text-[#7c2d12]">${escapeHtml(grupo.unit_id ? `Unidad ${grupo.unit_id} · ` : '')}${escapeHtml(grupo.componente || '')} (${escapeHtml(grupo.unidad || '')})</h3>
+            <p class="text-sm text-slate-700"><strong>${escapeHtml(grupo.sistema || '')}</strong>${grupo.item ? `: ${escapeHtml(grupo.item)}` : ''}</p>
+            <p class="rounded-md bg-slate-50 p-2 text-xs text-slate-600"><strong>Motivo:</strong> ${escapeHtml(grupo.motivo_descarte || 'Sin motivo')}<br><span class="text-slate-400">${escapeHtml(grupo.descartada_por || '')} · ${escapeHtml(fecha)}</span></p>
+            <button type="button" class="btn-restaurar btn-accion-admin rounded-md border border-[#294936] px-3 py-1.5 text-xs font-black text-[#294936] hover:bg-slate-50 ${state.role === 'admin' ? '' : 'hidden'}">RESTAURAR A PENDIENTES</button>`;
+          tarjeta.querySelector('.btn-restaurar').addEventListener('click', async (evento) => {
+            evento.currentTarget.disabled = true;
+            try {
+              await restaurarDescartada(grupo.ids);
+              showToast('Falla restaurada a pendientes.');
+              await mostrarDescartadas();
+            } catch (error) {
+              console.error('Error al restaurar falla:', error);
+              showToast(error.message || 'No se pudo restaurar la falla.');
+              evento.currentTarget.disabled = false;
+            }
+          });
+          contenedor.appendChild(tarjeta);
+        });
+      } catch (error) {
+        contenedor.innerHTML = `<p class="col-span-full py-6 text-center font-bold text-red-700">Error: ${escapeHtml(error.message)}</p>`;
+      }
+    }
+
     // CARGA DE FALLAS DESDE FIRESTORE
+    $('btn-fallas-pendientes')?.addEventListener('click', () => cargarFallas());
+    $('btn-fallas-descartadas')?.addEventListener('click', () => mostrarDescartadas());
     async function cargarFallas() {
       const contenedor = $('fallas-cards');
       if (!contenedor) return;
@@ -2004,11 +2118,21 @@
           unidad.grupos.sort((a, b) =>
             (ORDEN_COMPONENTES[a.componenteKey] ?? 9) - (ORDEN_COMPONENTES[b.componenteKey] ?? 9)
             || String(a.sistema).localeCompare(String(b.sistema), 'es')
+            || String(a.item).localeCompare(String(b.item), 'es')
           );
+          const filas = new Map();
+          unidad.grupos.forEach((grupo) => {
+            const clave = `${grupo.componenteKey}|${normalizarSistema(grupo.sistema)}`;
+            const fila = filas.get(clave) || { componente: grupo.componente, sistema: grupo.sistema, grupos: [], folios: new Set() };
+            fila.grupos.push(grupo);
+            grupo.reportes.forEach(({ reporte }) => fila.folios.add(String(reporte.id)));
+            filas.set(clave, fila);
+          });
+          unidad.filas = [...filas.values()];
         });
 
         const lista = [...unidades.values()].sort((a, b) =>
-          b.grupos.length - a.grupos.length
+          b.filas.length - a.filas.length
           || new Date(b.reciente.createdAt) - new Date(a.reciente.createdAt)
         );
         contenedor.innerHTML = '';
