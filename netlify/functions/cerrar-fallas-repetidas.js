@@ -32,7 +32,67 @@ function intervaloDepuracionMs() {
 function exigirResponsableDepuracion(usuario) {
   return correosDepuracion().has(usuario.correo)
     ? null
-    : respuesta(403, { error: 'La depuración masiva está reservada al responsable autorizado.' });
+    : respuesta(403, { error: 'Esta operación está reservada al responsable autorizado.' });
+}
+
+const COLECCIONES_RESPALDO = new Set([
+  'bitacora_reports',
+  'ordenes_trabajo',
+  'ot_seguimiento',
+  'ot_por_reporte',
+  'falla_ot_cobertura',
+  'cierres_masivos_ot'
+]);
+const LIMITE_BYTES_PAGINA = 3.5 * 1024 * 1024;
+
+function reemplazarTimestamps(_clave, valor) {
+  if (valor && typeof valor === 'object' && typeof valor.toDate === 'function' && 'seconds' in valor) {
+    return { seconds: valor.seconds, nanoseconds: valor.nanoseconds };
+  }
+  return valor;
+}
+
+function fechaDocumento(datos) {
+  const valor = datos.created_at || datos.fecha_apertura || datos.fecha || datos.updated_at;
+  if (!valor) return null;
+  const fecha = typeof valor.toDate === 'function' ? valor.toDate() : new Date(valor);
+  return Number.isNaN(fecha.getTime()) ? null : fecha.toISOString();
+}
+
+async function paginaFirestore(db, body) {
+  const coleccion = String(body.coleccion || '');
+  if (!COLECCIONES_RESPALDO.has(coleccion)) return respuesta(400, { error: 'Colección no permitida.' });
+  const respaldo = body.modo === 'backup';
+  let consulta = db.collection(coleccion).orderBy(FieldPath.documentId()).limit(respaldo ? 50 : 500);
+  if (body.cursor) consulta = consulta.startAfter(String(body.cursor));
+  const snapshot = await consulta.get();
+
+  const documentos = [];
+  const stats = { documentos: 0, bytesJson: 0, fechaMinima: null, fechaMaxima: null };
+  let bytesPagina = 0;
+  let incluidos = 0;
+  let ultimoId = body.cursor || '';
+  for (const documento of snapshot.docs) {
+    const datos = documento.data();
+    const json = JSON.stringify(respaldo ? { _id: documento.id, ...datos } : { id: documento.id, ...datos }, reemplazarTimestamps);
+    const bytes = Buffer.byteLength(json);
+    if (respaldo && incluidos > 0 && bytesPagina + bytes > LIMITE_BYTES_PAGINA) break;
+    bytesPagina += bytes;
+    incluidos += 1;
+    ultimoId = documento.id;
+    if (respaldo) {
+      documentos.push(json);
+    } else {
+      stats.documentos += 1;
+      stats.bytesJson += bytes;
+      const fecha = fechaDocumento(datos);
+      if (fecha && (!stats.fechaMinima || fecha < stats.fechaMinima)) stats.fechaMinima = fecha;
+      if (fecha && (!stats.fechaMaxima || fecha > stats.fechaMaxima)) stats.fechaMaxima = fecha;
+    }
+  }
+  const limite = respaldo ? 50 : 500;
+  const terminado = incluidos === snapshot.size && snapshot.size < limite;
+  return respuesta(200, { done: terminado, cursor: ultimoId, documentos, stats });
 }
 
 async function iniciarDepuracion(db, usuario) {
@@ -458,10 +518,16 @@ export default async function handler(request) {
       return respuesta(200, await procesarPagina(db, jobId));
     }
 
-    if (String(body.action || '').startsWith('retroactive-')) {
+    if (body.action === 'privileges') {
+      return respuesta(200, { sensibles: correosDepuracion().has(usuario.correo) });
+    }
+
+    if (String(body.action || '').startsWith('retroactive-') || String(body.action || '').startsWith('firestore-')) {
       const denegado = exigirResponsableDepuracion(usuario);
       if (denegado) return denegado;
     }
+
+    if (body.action === 'firestore-page') return await paginaFirestore(db, body);
 
     if (body.action === 'retroactive-start') {
       const inicio = await iniciarDepuracion(db, usuario);

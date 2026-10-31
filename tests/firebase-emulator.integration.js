@@ -234,7 +234,16 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
   process.env.DEPURACION_MASIVA_EMAILS = 'otra-persona@example.test';
   assert.equal((await ejecutar({ action: 'retroactive-list' })).status, 403);
   assert.equal((await ejecutar({ action: 'retroactive-start' })).status, 403);
+  assert.equal((await ejecutar({ action: 'firestore-page', modo: 'backup', coleccion: 'ordenes_trabajo' })).status, 403);
+  assert.equal((await (await ejecutar({ action: 'privileges' })).json()).sensibles, false);
   process.env.DEPURACION_MASIVA_EMAILS = emailAdmin;
+  assert.equal((await (await ejecutar({ action: 'privileges' })).json()).sensibles, true);
+  assert.equal((await ejecutar({ action: 'firestore-page', modo: 'backup', coleccion: 'usuarios' })).status, 400);
+  const respaldo = await (await ejecutar({ action: 'firestore-page', modo: 'backup', coleccion: 'ordenes_trabajo' })).json();
+  assert.equal(respaldo.done, true);
+  assert.ok(respaldo.documentos.some((json) => JSON.parse(json)._id === otId));
+  const auditoria = await (await ejecutar({ action: 'firestore-page', modo: 'audit', coleccion: 'ordenes_trabajo' })).json();
+  assert.ok(auditoria.stats.documentos >= 1 && auditoria.stats.bytesJson > 0);
 
   const inicioResponse = await ejecutar({ action: 'retroactive-start' });
   assert.equal(inicioResponse.status, 200);

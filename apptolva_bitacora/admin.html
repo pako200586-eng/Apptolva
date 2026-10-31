@@ -454,30 +454,19 @@
     }
 
     async function auditarColeccionFirestore(nombre, indiceColeccion) {
-      const tamanoPagina = 200;
       const stats = { coleccion: nombre, documentos: 0, bytesJson: 0, fechaMinima: null, fechaMaxima: null };
-      let cursor = null;
+      let cursor = '';
 
       while (true) {
-        const constraints = [fsOrderBy(fsDocumentId()), fsLimit(tamanoPagina)];
-        if (cursor) constraints.push(fsStartAfter(cursor));
-        const snapshot = await getDocsFromServer(fsQuery(collection(db, nombre), ...constraints));
-
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          const json = JSON.stringify({ id: docSnap.id, ...data });
-          stats.documentos += 1;
-          stats.bytesJson += new TextEncoder().encode(json).length;
-
-          const fecha = fechaAuditoria(
-            data.created_at || data.fecha_apertura || data.fecha || data.updated_at
-          );
-          if (fecha && (!stats.fechaMinima || fecha < stats.fechaMinima)) stats.fechaMinima = fecha;
-          if (fecha && (!stats.fechaMaxima || fecha > stats.fechaMaxima)) stats.fechaMaxima = fecha;
-        });
-
-        if (snapshot.empty || snapshot.size < tamanoPagina) break;
-        cursor = snapshot.docs[snapshot.docs.length - 1];
+        const pagina = await solicitarCierreBackend({ action: 'firestore-page', modo: 'audit', coleccion: nombre, cursor });
+        stats.documentos += pagina.stats.documentos;
+        stats.bytesJson += pagina.stats.bytesJson;
+        const minima = fechaAuditoria(pagina.stats.fechaMinima);
+        const maxima = fechaAuditoria(pagina.stats.fechaMaxima);
+        if (minima && (!stats.fechaMinima || minima < stats.fechaMinima)) stats.fechaMinima = minima;
+        if (maxima && (!stats.fechaMaxima || maxima > stats.fechaMaxima)) stats.fechaMaxima = maxima;
+        if (pagina.done) break;
+        cursor = pagina.cursor;
         $('firestoreAuditStatus').textContent =
           `Auditoría ${indiceColeccion + 1}/${COLECCIONES_AUDITORIA_FIRESTORE.length}: ${nombre} · ${stats.documentos} documentos leídos...`;
       }
@@ -562,20 +551,18 @@
         let total = 0;
         for (const [indice, nombre] of COLECCIONES_AUDITORIA_FIRESTORE.entries()) {
           partes.push(`${indice ? ',' : ''}${JSON.stringify(nombre)}:[`);
-          let cursor = null;
+          let cursor = '';
           let primero = true;
           while (true) {
-            const constraints = [fsOrderBy(fsDocumentId()), fsLimit(200)];
-            if (cursor) constraints.push(fsStartAfter(cursor));
-            const snapshot = await getDocsFromServer(fsQuery(collection(db, nombre), ...constraints));
-            snapshot.forEach((docSnap) => {
-              partes.push(`${primero ? '' : ','}${JSON.stringify({ _id: docSnap.id, ...docSnap.data() })}`);
+            const pagina = await solicitarCierreBackend({ action: 'firestore-page', modo: 'backup', coleccion: nombre, cursor });
+            pagina.documentos.forEach((json) => {
+              partes.push(`${primero ? '' : ','}${json}`);
               primero = false;
               total += 1;
             });
             $('firestoreAuditStatus').textContent = `Respaldo ${indice + 1}/${COLECCIONES_AUDITORIA_FIRESTORE.length}: ${nombre} · ${total} documentos...`;
-            if (snapshot.size < 200) break;
-            cursor = snapshot.docs[snapshot.docs.length - 1];
+            if (pagina.done) break;
+            cursor = pagina.cursor;
           }
           partes.push(']');
         }
@@ -694,17 +681,19 @@
 
     function aplicarPermisosDeInterfaz() {
       const esAdmin = state.role === 'admin';
+      const esResponsable = esAdmin && state.operacionesSensibles === true;
       document.querySelectorAll('.btn-accion-admin').forEach((element) => {
         element.classList.toggle('hidden', !esAdmin);
       });
+      $('depurarFallasBtn').classList.toggle('hidden', !esResponsable);
       document.querySelectorAll('#segForm input, #segForm textarea').forEach((element) => {
         element.disabled = !esAdmin;
       });
-      $('auditFirestoreBtn').classList.toggle('hidden', !esAdmin);
-      $('backupFirestoreBtn').classList.toggle('hidden', !esAdmin);
+      $('auditFirestoreBtn').classList.toggle('hidden', !esResponsable);
+      $('backupFirestoreBtn').classList.toggle('hidden', !esResponsable);
       $('cargarMasAntiguos').classList.toggle('hidden', !esAdmin);
       if (!esAdmin && state.windowDays > VENTANA_PASO_DIAS) state.windowDays = VENTANA_PASO_DIAS;
-      if (!esAdmin) {
+      if (!esResponsable) {
         $('firestoreAudit').classList.add('hidden');
         $('downloadFirestoreAudit').classList.add('hidden');
         ultimoInventarioFirestore = null;
@@ -1338,6 +1327,21 @@
       if (state.user?.uid !== authenticatedUser?.uid) state.syncWatermark = null;
       state.user = authenticatedUser;
       state.role = userRole;
+      state.operacionesSensibles = false;
+      if (authenticatedUser && userRole === 'admin') {
+        try {
+          const token = await authenticatedUser.getIdToken();
+          const respuestaPrivilegios = await fetch('/.netlify/functions/cerrar-fallas-repetidas', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'privileges' })
+          });
+          if (respuestaPrivilegios.ok) state.operacionesSensibles = (await respuestaPrivilegios.json()).sensibles === true;
+        } catch (error) {
+          console.warn('No se pudieron consultar los privilegios de operaciones sensibles:', error);
+        }
+        if (currentAuthStateVersion !== authStateVersion) return;
+      }
       const loginPanel = $('loginPanel');
       const dashboard = $('dashboard');
       const logoutBtn = $('logoutBtn');
