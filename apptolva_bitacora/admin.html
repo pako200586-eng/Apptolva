@@ -201,6 +201,11 @@
         <section id="vista-ordenes" class="panel-card overflow-hidden rounded-lg hidden">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
             <h2 class="font-black text-[#7c2d12]">Control de Órdenes de Trabajo</h2>
+            <div id="contenedor-filtro-ot" class="hidden items-center gap-2 rounded-md border border-[#7c2d12] bg-white px-3 py-1 text-xs font-bold text-[#7c2d12]">
+              <span>Filtro:</span>
+              <span id="texto-filtro-ot">ABIERTAS (En taller)</span>
+              <button id="limpiar-filtro-ot" type="button" class="rounded border border-[#7c2d12] px-2 py-0.5 text-[10px] font-black hover:bg-orange-50">Limpiar</button>
+            </div>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-orange-100 text-sm">
@@ -1251,8 +1256,18 @@
     });
 
     $('cardKpiUnidadesDetenidas').addEventListener('click', () => {
-      state.prefiltroEstatusOT = 'EN PROCESO';
+      state.prefiltroEstatusOT = 'ABIERTAS';
+      $('texto-filtro-ot').textContent = 'ABIERTAS (En taller)';
+      $('contenedor-filtro-ot').classList.remove('hidden');
+      $('contenedor-filtro-ot').classList.add('flex');
       $('btn-vista-ordenes').click();
+    });
+
+    $('limpiar-filtro-ot').addEventListener('click', async () => {
+      state.prefiltroEstatusOT = '';
+      $('contenedor-filtro-ot').classList.remove('flex');
+      $('contenedor-filtro-ot').classList.add('hidden');
+      await cargarOrdenes(true);
     });
 
     const COMPONENTES = [
@@ -2268,16 +2283,36 @@
 
         const prefiltroEstatus = String(state.prefiltroEstatusOT || '').trim();
         if (prefiltroEstatus) {
-          ordenesFiltradas = ordenesFiltradas.filter((orden) =>
-            sinAcentos(orden?.estatus || '') === sinAcentos(prefiltroEstatus)
-          );
+          const etiqueta = sinAcentos(prefiltroEstatus) === 'ABIERTAS'
+            ? 'ABIERTAS (En taller)'
+            : prefiltroEstatus;
+          $('texto-filtro-ot').textContent = etiqueta;
+          $('contenedor-filtro-ot').classList.remove('hidden');
+          $('contenedor-filtro-ot').classList.add('flex');
+        } else {
+          $('contenedor-filtro-ot').classList.remove('flex');
+          $('contenedor-filtro-ot').classList.add('hidden');
+        }
+
+        if (prefiltroEstatus) {
+          if (sinAcentos(prefiltroEstatus) === 'ABIERTAS') {
+            ordenesFiltradas = ordenesFiltradas.filter((orden) =>
+              !ESTATUS_REALIZADA.has(sinAcentos(orden?.estatus || ''))
+            );
+          } else {
+            ordenesFiltradas = ordenesFiltradas.filter((orden) =>
+              sinAcentos(orden?.estatus || '') === sinAcentos(prefiltroEstatus)
+            );
+          }
           state.prefiltroEstatusOT = '';
         }
 
         if (!ordenesFiltradas.length) {
-          const mensajeVacio = prefiltroEstatus
-            ? `No hay órdenes de trabajo con estatus ${escapeHtml(prefiltroEstatus)}.`
-            : 'No hay órdenes de trabajo registradas.';
+          const mensajeVacio = sinAcentos(prefiltroEstatus) === 'ABIERTAS'
+            ? 'No hay órdenes de trabajo abiertas en el taller.'
+            : (prefiltroEstatus
+              ? `No hay órdenes de trabajo con estatus ${escapeHtml(prefiltroEstatus)}.`
+              : 'No hay órdenes de trabajo registradas.');
           tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-slate-500">${mensajeVacio}</td></tr>`;
           return;
         }
