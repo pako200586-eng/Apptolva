@@ -73,7 +73,7 @@
     </section>
 
     <section id="dashboard" class="hidden space-y-5">
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Reportes</p><strong id="statTotal" class="text-3xl text-[#7c2d12]">0</strong></div>
         <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Checklist</p><strong id="statChecklist" class="text-3xl text-[#294936]">0</strong></div>
         <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Bitácoras</p><strong id="statBitacoras" class="text-3xl text-[#294936]">0</strong></div>
@@ -96,7 +96,7 @@
           <button id="applyFilters" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white">Filtrar</button>
         </div>
         <div class="mt-3 flex flex-wrap gap-2">
-          <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv mr-2"></i>Excel CSV (Resumen checklist)</button>
+          <button id="exportCsv" class="rounded-md border border-[#294936] px-3 py-2 text-sm font-bold text-[#294936]"><i class="fas fa-file-csv md:mr-2"></i><span class="hidden md:inline">Excel CSV (Resumen)</span><span class="inline md:hidden">CSV</span></button>
           <button id="exportPdf" class="rounded-md border border-[#7c2d12] px-3 py-2 text-sm font-bold text-[#7c2d12]"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
           <button id="auditFirestoreBtn" class="hidden rounded-md border border-slate-500 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Medir almacenamiento Firestore</button>
           <button id="backupFirestoreBtn" class="hidden rounded-md border border-slate-500 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"><i class="fas fa-download mr-2"></i>Respaldo Firestore (JSON)</button>
@@ -136,7 +136,7 @@
         </button>
       </div>
 
-      <div class="grid gap-5 lg:grid-cols-[1.6fr_.9fr]">
+      <div class="w-full space-y-5">
         <section id="vista-reportes" class="panel-card overflow-hidden rounded-lg block">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3">
             <h2 class="font-black text-[#7c2d12]">Checklist y bitácoras recibidas</h2>
@@ -149,14 +149,14 @@
             <table class="min-w-full divide-y divide-orange-100 text-sm">
               <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
                 <tr>
-                  <th class="px-4 py-3">Folio</th>
-                  <th class="px-4 py-3">Tipo</th>
-                  <th class="px-4 py-3">Unidad</th>
-                  <th class="px-4 py-3">Operador</th>
-                  <th class="px-4 py-3">No. Empleado</th>
-                  <th class="px-4 py-3">Estado</th>
-                  <th class="px-4 py-3">Fecha</th>
-                  <th class="px-4 py-3">PDF</th>
+                  <th class="px-2 py-3 md:px-4">Folio</th>
+                  <th class="hidden px-2 py-3 md:table-cell md:px-4">Tipo</th>
+                  <th class="px-2 py-3 md:px-4">Unidad</th>
+                  <th class="px-2 py-3 md:px-4">Operador</th>
+                  <th class="hidden px-2 py-3 md:table-cell md:px-4">No. Empleado</th>
+                  <th class="px-2 py-3 md:px-4">Estado</th>
+                  <th class="px-2 py-3 md:px-4">Fecha</th>
+                  <th class="px-2 py-3 md:px-4">PDF</th>
                 </tr>
               </thead>
               <tbody id="tabla-datos-checklist" class="divide-y divide-orange-50"></tbody>
@@ -727,14 +727,14 @@
     function reportRowHtml(report) {
       return `
         <tr class="hover:bg-orange-50/70">
-          <td class="px-4 py-3 font-black text-[#7c2d12]">${escapeHtml(report.folio)}</td>
-          <td class="px-4 py-3 capitalize">${escapeHtml(report.type)}</td>
-          <td class="px-4 py-3">${escapeHtml(report.unitId)}</td>
-          <td class="px-4 py-3">${escapeHtml(report.driverName)}</td>
-          <td class="px-4 py-3">${escapeHtml(report.employeeNumber || report.payload?.employeeNumber || '')}</td>
-          <td class="px-4 py-3"><span class="status-dot bg-green-600"></span> ${escapeHtml(report.syncStatus)}</td>
-          <td class="px-4 py-3 whitespace-nowrap">${formatDate(report.createdAt)}</td>
-          <td class="px-4 py-3">
+          <td class="px-2 py-3 font-black text-[#7c2d12] md:px-4">${escapeHtml(report.folio)}</td>
+          <td class="hidden px-2 py-3 capitalize md:table-cell md:px-4">${escapeHtml(report.type)}</td>
+          <td class="px-2 py-3 md:px-4">${escapeHtml(report.unitId)}</td>
+          <td class="px-2 py-3 whitespace-nowrap md:px-4">${escapeHtml(report.driverName)}</td>
+          <td class="hidden px-2 py-3 md:table-cell md:px-4">${escapeHtml(report.employeeNumber || report.payload?.employeeNumber || '')}</td>
+          <td class="px-2 py-3 md:px-4"><span class="status-dot bg-green-600"></span> ${escapeHtml(report.syncStatus)}</td>
+          <td class="px-2 py-3 whitespace-nowrap md:px-4">${formatDate(report.createdAt)}</td>
+          <td class="px-2 py-3 md:px-4">
             <a href="./viewer.html?id=${encodeURIComponent(report.id)}" target="_blank" rel="noopener"
                class="inline-flex items-center gap-1 rounded-md bg-[#7c2d12] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#5f220e]">
               <i class="fas fa-file-pdf"></i> Ver PDF
