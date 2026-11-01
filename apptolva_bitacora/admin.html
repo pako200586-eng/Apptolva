@@ -426,6 +426,21 @@
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
 
+    async function enviarAlertaTelegram(mensaje) {
+      try {
+        const token = await state.user?.getIdToken();
+        if (!token) return;
+        const resp = await fetch('/.netlify/functions/telegram-alerta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ mensaje })
+        });
+        if (!resp.ok) console.warn('Telegram advertencia:', resp.status);
+      } catch (err) {
+        console.warn('No se pudo enviar notificación a Telegram:', err);
+      }
+    }
+
     const state = { user: null, role: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '', windowDays: 30, pageSize: 50, page: 1, historyCursor: null, historyLoaded: false, historyExhausted: false, hitLimit: false, syncWatermark: null };
     const VENTANA_PASO_DIAS = 30;
     const LIMITE_PAGINA_REPORTES = 250;
@@ -1573,6 +1588,15 @@
           dashState.ordenes.unshift(ordenCreada);
         }
         renderDashboard();
+        const resumenFallas = fallas.map((f) => `• <b>${escapeHtml(String(f.componente || ''))}</b>: ${escapeHtml(String(f.descripcion || f.itemOficial || ''))}`).join('\n');
+        enviarAlertaTelegram(`🚨 <b>NUEVA ORDEN DE TRABAJO GENERADA</b>\n\n` +
+          `📋 <b>Folio:</b> OT-${escapeHtml(String(ordenCreada.folio_ot))}\n` +
+          `🚛 <b>Unidad:</b> ${escapeHtml(String(ordenCreada.unidad))}\n` +
+          `👤 <b>Operador:</b> ${escapeHtml(String(ordenCreada.operador))}\n` +
+          `⚙️ <b>Componente:</b> ${escapeHtml(String(ordenCreada.componente))}\n` +
+          `🔧 <b>Sistema:</b> ${escapeHtml(String(ordenCreada.sistema))}\n\n` +
+          `⚠️ <b>Fallas detectadas (${fallas.length}):</b>\n${resumenFallas}\n\n` +
+          `⏱️ <i>Fecha: ${escapeHtml(formatDate(new Date()))}</i>`);
         await generarPDFOT(ordenCreada);
         cargarFallas();
         mostrarVistaOrdenes();
@@ -2252,6 +2276,15 @@
                   resultado = await completarCierreBackend(resultado, `Cerrando OT-${orden.folio_ot || ''}`);
                   orden.cerrada_at = resultado.cerrada_at;
                   showToast(`OT-${orden.folio_ot || ''} cerrada · ${resultado.incidencias_vinculadas || 0} falla(s) atendida(s)`);
+                  const tallerTexto = orden.proveedor_externo || orden.electromecanico || orden.supervisor_mantenimiento || 'Flota Propia (PA Chapo)';
+                  const totalCerrados = Array.isArray(orden.reportes_vinculados) ? orden.reportes_vinculados.length : (orden.recurrencia || 1);
+                  enviarAlertaTelegram(`✅ <b>OT CONCLUIDA / REPARACIÓN DE TALLER</b>\n\n` +
+                    `📋 <b>OT-${escapeHtml(String(orden.folio_ot))}</b> (${escapeHtml(String(nuevoEstatus))})\n` +
+                    `🚛 <b>Unidad:</b> ${escapeHtml(String(orden.unidad))}\n` +
+                    `🛠️ <b>Ejecutor / Taller:</b> ${escapeHtml(String(tallerTexto))}\n` +
+                    `⚙️ <b>Sistema atendido:</b> ${escapeHtml(String(orden.sistema || 'General'))}\n` +
+                    `📦 <b>Checklists atendidos en bloque:</b> ${totalCerrados}\n\n` +
+                    `⏱️ <i>Cierre asentado: ${escapeHtml(formatDate(new Date()))}</i>`);
                 } else {
                   await updateDoc(doc(db, 'ordenes_trabajo', otId), {
                     estatus: nuevoEstatus,
