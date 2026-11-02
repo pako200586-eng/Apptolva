@@ -70,9 +70,11 @@ export default async (req) => {
     );
   }
 
-  const gatewayKey = process.env.GEMINI_API_KEY;
+  const gatewayKey = (process.env.GEMINI_API_KEY || "").trim();
   const gatewayBase = process.env.GOOGLE_GEMINI_BASE_URL;
-  const directKey = process.env.GOOGLE_AI_API_KEY || process.env.AI_API_KEY || gatewayKey;
+  const directKey = (
+    process.env.GOOGLE_AI_API_KEY || process.env.AI_API_KEY || gatewayKey
+  ).trim();
 
   const useGateway = Boolean(gatewayKey && gatewayBase);
   const apiKey = useGateway ? gatewayKey : directKey;
@@ -91,11 +93,15 @@ export default async (req) => {
   };
 
   try {
-    const url = `${baseUrl}/models/${MODEL}:generateContent?key=${apiKey}`;
+    // La clave va en el header, no en la URL, para que no quede en logs ni trazas.
+    const url = `${baseUrl}/models/${MODEL}:generateContent`;
 
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify(payload),
     });
 
