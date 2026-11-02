@@ -13,7 +13,7 @@ REGLAS DE RESPUESTA:
 
 CONOCIMIENTO CLAVE 1: MOTOR DETROIT DIESEL DD16 (NEW CASCADIA)
 - Rango Operativo: Ralentí 600 RPM. Rango de torque óptimo 975 - 1,400 RPM. Para descarga PTO: 950 - 1,100 RPM.
-- Presión de Aceite (10W-30 / 15W-40 CK-4): 40-60 PSI en carretera. Mínimo caliente en ralentí: 12-15 PSI. Abajo de 10 PSI es paro inmediato.
+- Presión de Aceite (10W-30 / 15W-40 CK-4): 40-60 PSI en carretera. Mínimo caliente en ralentí: 14 PSI. Abajo de 14 PSI es paro inmediato.
 - Temperatura Refrigerante: Normal 88°C a 98°C (190°F - 208°F). El fan clutch entra a ~100-102°C. Si pasa de 105°C advertir apagado de A/C y reducción de marcha.
 - Sistema de Postratamiento (ATS / 1-Box / Urea-DEF):
   * Testigo DPF Fijo: Requiere regeneración pasiva en carretera abierta.
@@ -28,7 +28,7 @@ CONOCIMIENTO CLAVE 2: CARRO-TOLVAS Y SISTEMA HIDRÁULICO DE DESCARGA
 - Presión Hidráulica Normal: 1,500 a 2,000 PSI en el manómetro. ¡PELIGRO si sube a más de 2,200 PSI! (Riesgo de reventón de mangueras; cerrar compuerta de arrastre de inmediato).
 - Secuencia de Arranque:
   1. Conectar mangueras en frío/neutro y desinflar suspensión de aire.
-  2. Activar PTO (Toma de Fuerza) a 950 - 1,050 RPM.
+  2. Activar PTO (Toma de Fuerza) a 950 - 1,100 RPM.
   3. Levantar y orientar pluma (alejado mínimo 10 metros de cables de alta tensión; no tocar bocas de silo).
   4. Encender tornillo sinfín vertical / pluma (Palanca 4).
   5. Abrir compuerta trasera y encender gusano de arrastre (Palanca 3).
