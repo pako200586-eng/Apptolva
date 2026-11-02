@@ -575,16 +575,6 @@
         }
         setTimeout(showSlides, 500);
 
-        // --- CONFIGURACIÓN DE IA ---
-        const systemPrompt = `
-        Eres Asistente Experto en Tolvas Bachoco. Ayuda concisa y técnica en mecánica de tolvas de descarga.
-        - Presión Hidráulica Normal: 1500 a 2000 PSI (Más de 2500 PSI es peligroso).
-        - Secuencia Arranque: PTO -> 1000 RPM -> Sinfín (4) -> Arrastre (3).
-        - Secuencia Apagado: Inversa (3 -> 4 -> PTO).
-        - El Cople: Fusible mecánico. Si zumba y no gira, es el cople.
-        - Seguridad: 10m lejos de cables de alta tensión.
-        `;
-
         const guideSteps = [
             {t:"Llegada: Entregar docs y pasar Arco de Lavado.", img:"arco1.jpg"},
             {t:"Terreno firme, nivelado y unidad recta.", img:"suelo.jpg"},
@@ -1316,7 +1306,7 @@
             try {
                 const r = await fetch(`/.netlify/functions/gemini`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{parts: [{text: q}]}], systemInstruction: {parts: [{text: systemPrompt}]} })
+                    body: JSON.stringify({ mensaje: q })
                 });
 
                 const d = await r.json().catch(() => ({}));
