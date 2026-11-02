@@ -72,7 +72,7 @@ export default async (req) => {
 
   const gatewayKey = process.env.GEMINI_API_KEY;
   const gatewayBase = process.env.GOOGLE_GEMINI_BASE_URL;
-  const directKey = process.env.GOOGLE_AI_API_KEY || process.env.AI_API_KEY;
+  const directKey = process.env.GOOGLE_AI_API_KEY || process.env.AI_API_KEY || gatewayKey;
 
   const useGateway = Boolean(gatewayKey && gatewayBase);
   const apiKey = useGateway ? gatewayKey : directKey;
