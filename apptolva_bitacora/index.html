@@ -219,13 +219,18 @@
                 </div>
                 <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Identificación de Equipo</label>
                 <div class="grid grid-cols-2 gap-2 mb-2">
-                    <input type="text" id="revUnidad" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="NO. TRACTO">
-                    <input type="text" id="revDolly" class="p-2 border rounded text-xs font-bold uppercase save-me campo-full" placeholder="NO. DOLLY">
+                    <input type="text" id="revUnidad" list="listaEquiposTracto" inputmode="numeric" autocomplete="off" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="NO. TRACTO">
+                    <input type="text" id="revDolly" list="listaEquiposDolly" inputmode="numeric" autocomplete="off" class="p-2 border rounded text-xs font-bold uppercase save-me campo-full" placeholder="NO. DOLLY">
                 </div>
                 <div class="grid grid-cols-2 gap-2 mb-2" id="row-tolvas-full">
-                    <input type="text" id="revTolva1" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me" placeholder="NO. 1ra TOLVA">
-                    <input type="text" id="revTolva2" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me campo-full" placeholder="NO. 2da TOLVA">
+                    <input type="text" id="revTolva1" list="listaEquiposTolva" inputmode="numeric" autocomplete="off" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me" placeholder="NO. 1ra TOLVA">
+                    <input type="text" id="revTolva2" list="listaEquiposTolva" inputmode="numeric" autocomplete="off" class="p-2 border border-orange-200 bg-orange-50 rounded text-xs font-bold uppercase save-me campo-full" placeholder="NO. 2da TOLVA">
                 </div>
+                <datalist id="listaEquiposTracto"></datalist>
+                <datalist id="listaEquiposTolva"></datalist>
+                <datalist id="listaEquiposDolly"></datalist>
+                <input type="text" id="revEquipoMotivo" class="mb-1 w-full p-2 border border-dashed border-gray-300 rounded text-xs save-me" placeholder="Solo si un equipo NO está registrado: indica el motivo">
+                <p id="catalogoEquiposEstado" class="mb-2 text-[10px] font-bold text-gray-400"></p>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
                     <input type="text" id="revOperador" class="p-2 border rounded text-xs save-me" placeholder="Nombre Operador">
                     <input type="text" id="revEmpleado" class="p-2 border rounded text-xs font-bold uppercase save-me" placeholder="No. Empleado">
@@ -1035,7 +1040,7 @@
         // --- PROCESAMIENTO Y ENVÍO DEL REPORTE FINAL ---
         // ============================================================
         async function procesarFinal() {
-            const u = document.getElementById('revUnidad').value.trim();
+            let u = document.getElementById('revUnidad').value.trim();
             const opNombre = document.getElementById('revOperador').value.trim();
             const numeroEmpleado = document.getElementById('revEmpleado').value.trim();
 
@@ -1051,6 +1056,27 @@
             if (opNombre.trim().toUpperCase() !== operadorOficial.nombre.toUpperCase()) {
                 return alert("⚠️ El nombre del operador no coincide con el catálogo oficial.");
             }
+
+            if (typeof window.validarEquiposChecklist !== 'function') {
+                return alert("⚠️ El catálogo de equipos no está disponible. Recarga la app e inténtalo de nuevo.");
+            }
+            const validacionEquipos = window.validarEquiposChecklist({
+                modalidad: modalidadActual,
+                tracto: u,
+                tolva1: document.getElementById('revTolva1').value,
+                dolly: document.getElementById('revDolly').value,
+                tolva2: document.getElementById('revTolva2').value,
+                motivoExcepcion: document.getElementById('revEquipoMotivo').value
+            });
+            if (!validacionEquipos.ok) {
+                return alert("⚠️ Revisa la identificación de equipo:\n\n• " + validacionEquipos.errores.join("\n• "));
+            }
+            // Se escriben los números canónicos para que un mismo equipo siempre tenga la misma firma de falla.
+            const camposEquipo = { tracto: 'revUnidad', tolva1: 'revTolva1', dolly: 'revDolly', tolva2: 'revTolva2' };
+            Object.entries(validacionEquipos.valores).forEach(([componente, economico]) => {
+                document.getElementById(camposEquipo[componente]).value = economico;
+            });
+            u = validacionEquipos.valores.tracto;
 
             // Validar firma del operador obligatoria
             const firmaOpImg = getSig('apptolva_sig_op') || '';
@@ -1213,6 +1239,8 @@
                     tolva1: t1,
                     tolva2: t2,
                     dolly: dolly,
+                    equiposNoCatalogados: validacionEquipos.noCatalogados,
+                    catalogoEquipos: validacionEquipos.catalogo,
                     checklist: checklistArr,
                     checklistData: checklistData,
                     firmaOp: firmaOpImg,
@@ -1394,7 +1422,9 @@
     <script type="module">
         import { getFirebaseConfig, initializeApp } from "./js/firebase-sdk.js";
         import {
+            collection,
             doc,
+            getDocsFromServer,
             initializeFirestore,
             onSnapshot,
             persistentLocalCache,
@@ -1500,6 +1530,13 @@
                 });
             };
 
+            // Lectura directa del servidor: la caché de Firestore no debe confundirse con una sincronización real.
+            window.leerCatalogoEquiposCloud = async function() {
+                await esperarAuthListo();
+                const snapshot = await getDocsFromServer(collection(db, "catalogo_equipos"));
+                return snapshot.docs.map((documento) => documento.data());
+            };
+
             window.guardarReporteEnFirestore = async function(reportePayload, id) {
                 const user = await esperarAuthListo();
                 if (!id) throw new Error("Falta el identificador del reporte.");
@@ -1552,6 +1589,88 @@
                 return { id, url: `./viewer.html?id=${id}`, status: "synced" };
             };
         }
+    </script>
+
+    <!-- CATÁLOGO DE EQUIPOS: listas de captura, caché sincronizada y validación del checklist -->
+    <script type="module">
+        import { CATALOGO_SEMILLA, TIPOS_EQUIPO, activosPorTipo, validarCatalogo, validarTrenDeCarga } from "./js/catalogoEquipos.js";
+
+        const CLAVE_CACHE = "apptolva_catalogo_equipos_v1";
+        const DIAS_ANTES_DE_AVISAR = 7;
+        const LISTAS = [
+            { id: "listaEquiposTracto", tipo: TIPOS_EQUIPO.TRACTO },
+            { id: "listaEquiposTolva", tipo: TIPOS_EQUIPO.TOLVA },
+            { id: "listaEquiposDolly", tipo: TIPOS_EQUIPO.DOLLY }
+        ];
+
+        // Con un catálogo sincronizado válido se usa ese; la semilla incluida en la app solo cubre el arranque sin sincronizar.
+        function catalogoVigente() {
+            try {
+                const guardado = JSON.parse(localStorage.getItem(CLAVE_CACHE) || "null");
+                if (guardado && !validarCatalogo(guardado.equipos).length) {
+                    return { equipos: guardado.equipos, origen: "sincronizado", sincronizado_at: guardado.sincronizado_at };
+                }
+            } catch (e) { /* caché ilegible: se usa la semilla */ }
+            return { equipos: CATALOGO_SEMILLA, origen: "base", sincronizado_at: null };
+        }
+
+        function mostrarEstado(vigente) {
+            const etiqueta = document.getElementById("catalogoEquiposEstado");
+            if (!etiqueta) return;
+            if (vigente.origen === "base") {
+                etiqueta.textContent = "Catálogo de equipos: lista base de la app (aún sin sincronizar).";
+                return;
+            }
+            const fecha = new Date(vigente.sincronizado_at);
+            const dias = (Date.now() - fecha.getTime()) / 86400000;
+            const desactualizado = Number.isFinite(dias) && dias > DIAS_ANTES_DE_AVISAR;
+            etiqueta.textContent = `Catálogo de equipos sincronizado: ${fecha.toLocaleString("es-MX")}${desactualizado ? " · conéctate para actualizarlo" : ""}`;
+            etiqueta.classList.toggle("text-amber-600", desactualizado);
+            etiqueta.classList.toggle("text-gray-400", !desactualizado);
+        }
+
+        function poblarListas() {
+            const vigente = catalogoVigente();
+            LISTAS.forEach(({ id, tipo }) => {
+                const lista = document.getElementById(id);
+                if (!lista) return;
+                lista.replaceChildren(...activosPorTipo(vigente.equipos, tipo).map((equipo) => {
+                    const opcion = document.createElement("option");
+                    opcion.value = equipo.economico;
+                    return opcion;
+                }));
+            });
+            mostrarEstado(vigente);
+        }
+
+        window.validarEquiposChecklist = function(captura) {
+            const vigente = catalogoVigente();
+            return {
+                ...validarTrenDeCarga(vigente.equipos, captura),
+                catalogo: { origen: vigente.origen, sincronizado_at: vigente.sincronizado_at }
+            };
+        };
+
+        async function sincronizarCatalogo() {
+            if (typeof window.leerCatalogoEquiposCloud !== "function") return;
+            try {
+                const equipos = await window.leerCatalogoEquiposCloud();
+                // Un catálogo vacío (aún no cargado por admin) o inconsistente no reemplaza al vigente.
+                const errores = equipos.length ? validarCatalogo(equipos) : ["Catálogo vacío en Firestore."];
+                if (errores.length) {
+                    if (equipos.length) console.warn("Catálogo de equipos no sincronizado:", errores);
+                    return;
+                }
+                localStorage.setItem(CLAVE_CACHE, JSON.stringify({ sincronizado_at: new Date().toISOString(), equipos }));
+                poblarListas();
+            } catch (error) {
+                console.warn("No se pudo sincronizar el catálogo de equipos:", error);
+            }
+        }
+
+        poblarListas();
+        sincronizarCatalogo();
+        window.addEventListener("online", sincronizarCatalogo);
     </script>
 
     <!-- AUTOCOMPLETADO MAESTRO DE OPERADORES -->

@@ -9,7 +9,8 @@ import {
   connectAuthEmulator,
   createUserWithEmailAndPassword,
   getAuth,
-  getIdToken
+  getIdToken,
+  signInAnonymously
 } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
@@ -129,8 +130,13 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     `directo-${appId}`
   ];
   let jobId = '';
+  const economicoEquipo = String(Date.now()).slice(-9);
+  const idEquipoPrueba = `dolly_${economicoEquipo}`;
+  let uidAnonimo = '';
 
   t.after(async () => {
+    await adminDb.collection('catalogo_equipos').doc(idEquipoPrueba).delete();
+    if (uidAnonimo) await adminAuth.deleteUser(uidAnonimo);
     for (const id of Object.values(reportesIds)) {
       await adminDb.collection('bitacora_reports').doc(id).delete();
     }
@@ -282,4 +288,55 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     (error) => error.code === 'permission-denied'
   );
   await deleteDoc(directCoverage);
+
+  const equipoValido = {
+    id: idEquipoPrueba,
+    economico: economicoEquipo,
+    display: `T${economicoEquipo}`,
+    tipo: 'dolly',
+    estado: 'activo'
+  };
+  const referenciaEquipo = (db, id = idEquipoPrueba) => doc(db, 'catalogo_equipos', id);
+  const rechazadoPorReglas = (error) => error.code === 'permission-denied';
+
+  await setDoc(referenciaEquipo(clientDb), equipoValido);
+  await assert.rejects(
+    setDoc(referenciaEquipo(clientDb, `dolly_${economicoEquipo}9`), equipoValido),
+    rechazadoPorReglas,
+    'el id debe coincidir con tipo y económico'
+  );
+  await assert.rejects(
+    setDoc(referenciaEquipo(clientDb, 'dolly_AB'), { ...equipoValido, id: 'dolly_AB', economico: 'AB' }),
+    rechazadoPorReglas,
+    'el económico debe ser numérico'
+  );
+  await assert.rejects(
+    setDoc(referenciaEquipo(clientDb), { ...equipoValido, estado: 'perdido' }),
+    rechazadoPorReglas,
+    'el estado debe ser uno de los definidos'
+  );
+  await assert.rejects(
+    setDoc(referenciaEquipo(clientDb), { ...equipoValido, campo_extra: true }),
+    rechazadoPorReglas,
+    'no se admiten campos fuera del esquema'
+  );
+  await setDoc(referenciaEquipo(clientDb), { ...equipoValido, estado: 'taller' });
+  assert.equal((await getDoc(referenciaEquipo(clientDb))).get('estado'), 'taller');
+  await assert.rejects(deleteDoc(referenciaEquipo(clientDb)), rechazadoPorReglas, 'el catálogo nunca se borra');
+
+  assert.equal((await getDoc(referenciaEquipo(readerDb))).exists(), true);
+  await assert.rejects(
+    setDoc(referenciaEquipo(readerDb), { ...equipoValido, estado: 'activo' }),
+    rechazadoPorReglas,
+    'un usuario de solo lectura no modifica el catálogo'
+  );
+
+  const operador = await signInAnonymously(readerAuth);
+  uidAnonimo = operador.user.uid;
+  assert.equal((await getDoc(referenciaEquipo(readerDb))).get('tipo'), 'dolly');
+  await assert.rejects(
+    setDoc(referenciaEquipo(readerDb), { ...equipoValido, estado: 'activo' }),
+    rechazadoPorReglas,
+    'un operador anónimo lee pero no modifica el catálogo'
+  );
 });

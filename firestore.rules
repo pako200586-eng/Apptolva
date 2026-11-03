@@ -201,6 +201,29 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    function validEquipo(equipoId) {
+      let equipo = request.resource.data;
+      return equipo.keys().hasAll(['id', 'economico', 'tipo', 'estado'])
+        && equipo.keys().hasOnly(['id', 'economico', 'display', 'tipo', 'estado', 'notas', 'updated_at', 'updated_by'])
+        && equipo.id == equipoId
+        && equipo.tipo in ['tracto', 'tolva', 'dolly', 'utilitaria']
+        && equipo.estado in ['activo', 'inactivo', 'siniestrado', 'taller']
+        && equipo.economico is string
+        && equipo.economico.matches('^[0-9]+$')
+        && equipoId == equipo.tipo + '_' + equipo.economico
+        && (!equipo.keys().hasAny(['display']) || equipo.display is string)
+        && (!equipo.keys().hasAny(['notas']) || equipo.notas is string)
+        && (!equipo.keys().hasAny(['updated_at']) || equipo.updated_at is string)
+        && (!equipo.keys().hasAny(['updated_by']) || equipo.updated_by is string);
+    }
+
+    // Los operadores (anónimos) leen el catálogo para validar el checklist; solo admin lo modifica y nunca se borra.
+    match /catalogo_equipos/{equipoId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validEquipo(equipoId);
+      allow delete: if false;
+    }
+
     match /cierres_masivos_ot/{jobId} {
       allow read: if isAdmin();
       allow write: if false;

@@ -134,6 +134,9 @@
         <button id="btn-vista-dashboard" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           <i class="fas fa-chart-pie mr-1"></i>Dashboard
         </button>
+        <button id="btn-vista-catalogo" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
+          <i class="fas fa-truck mr-1"></i>Catálogo de Equipos
+        </button>
       </div>
 
       <div class="w-full space-y-5">
@@ -194,6 +197,53 @@
             <p class="col-span-full py-6 text-center font-bold text-slate-500">
               Haz clic en la pestaña para cargar las fallas pendientes.
             </p>
+          </div>
+        </section>
+
+        <!-- VISTA: CATÁLOGO DE EQUIPOS -->
+        <section id="vista-catalogo" class="panel-card overflow-hidden rounded-lg hidden">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3 bg-orange-50">
+            <h2 class="font-black text-[#7c2d12]">Catálogo de Equipos</h2>
+            <p id="catalogo-resumen" class="text-xs font-bold text-slate-500"></p>
+          </div>
+          <p class="border-b border-orange-100 px-4 py-2 text-xs text-slate-500">Los operadores validan sus checklists contra este catálogo en cuanto tenga equipos; mientras esté vacío usan la lista base de la app. Los equipos no se borran: se cambian de estado para conservar el historial.</p>
+          <div class="flex flex-wrap items-end gap-2 border-b border-orange-100 px-4 py-3">
+            <input id="catalogo-buscar" type="search" inputmode="numeric" placeholder="Buscar económico" class="rounded border border-slate-300 px-2 py-1 text-sm">
+            <select id="catalogo-filtro-tipo" class="rounded border border-slate-300 px-2 py-1 text-sm">
+              <option value="todos">Todos los tipos</option>
+              <option value="tracto">Tractos</option>
+              <option value="tolva">Tolvas</option>
+              <option value="dolly">Dollys</option>
+              <option value="utilitaria">Utilitarias</option>
+            </select>
+            <button id="btn-catalogo-cargar-base" type="button" class="btn-accion-admin hidden rounded-md border border-slate-500 px-3 py-1 text-xs font-black text-slate-700 hover:bg-slate-50">Cargar equipos base</button>
+          </div>
+          <div class="btn-accion-admin hidden">
+            <form id="form-alta-equipo" class="flex flex-wrap items-end gap-2 border-b border-orange-100 bg-slate-50 px-4 py-3">
+              <select id="alta-tipo" class="rounded border border-slate-300 px-2 py-1 text-sm">
+                <option value="tracto">Tracto</option>
+                <option value="tolva">Tolva</option>
+                <option value="dolly">Dolly</option>
+                <option value="utilitaria">Utilitaria</option>
+              </select>
+              <input id="alta-economico" type="text" inputmode="numeric" required placeholder="No. económico" class="rounded border border-slate-300 px-2 py-1 text-sm">
+              <input id="alta-notas" type="text" placeholder="Notas (opcional)" class="rounded border border-slate-300 px-2 py-1 text-sm">
+              <button type="submit" class="rounded-md bg-[#294936] px-3 py-1 text-xs font-black text-white">Dar de alta</button>
+            </form>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-orange-100 text-sm">
+              <thead class="bg-orange-50 text-left text-xs uppercase tracking-wide text-[#7c2d12]">
+                <tr>
+                  <th class="px-4 py-3">Económico</th>
+                  <th class="px-4 py-3">Tipo</th>
+                  <th class="px-4 py-3">Estado</th>
+                  <th class="px-4 py-3">Notas</th>
+                  <th class="px-4 py-3">Actualizado</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-catalogo-body" class="divide-y divide-orange-50"></tbody>
+            </table>
           </div>
         </section>
 
@@ -429,6 +479,7 @@
       runTransaction
     } from "./js/firebase-sdk.js";
     import { crearFirmaFalla, crearFirmasFalla, idCoberturaFalla, separarSistemasFalla } from "./js/firmaFalla.js";
+    import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, validarCatalogo } from "./js/catalogoEquipos.js";
 
     const firebaseConfig = getFirebaseConfig();
 
@@ -3047,7 +3098,176 @@
 
     $('paretoComponente').addEventListener('change', renderDashboard);
 
-    const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes', 'vista-dashboard'];
+    // ===== Catálogo de equipos =====
+    const catalogoState = { equipos: [] };
+    const ETIQUETA_TIPO_EQUIPO = { tracto: 'Tracto', tolva: 'Tolva', dolly: 'Dolly', utilitaria: 'Utilitaria' };
+
+    async function cargarCatalogoEquipos() {
+      const cuerpo = $('tabla-catalogo-body');
+      cuerpo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando catálogo...</td></tr>';
+      try {
+        const snapshot = await getDocs(collection(db, 'catalogo_equipos'));
+        catalogoState.equipos = snapshot.docs.map((documento) => documento.data());
+        renderCatalogoEquipos();
+      } catch (error) {
+        console.error('Error al cargar el catálogo de equipos:', error);
+        cuerpo.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-red-700">Error: ${escapeHtml(error.message)}</td></tr>`;
+      }
+    }
+
+    function renderCatalogoEquipos() {
+      const cuerpo = $('tabla-catalogo-body');
+      const tipo = $('catalogo-filtro-tipo').value;
+      const busqueda = normalizarEconomico($('catalogo-buscar').value);
+      const esAdmin = state.role === 'admin';
+      const filas = catalogoState.equipos
+        .filter((equipo) => (tipo === 'todos' || equipo.tipo === tipo) && equipo.economico.includes(busqueda))
+        .sort((a, b) => a.tipo.localeCompare(b.tipo) || Number(a.economico) - Number(b.economico));
+
+      const pendientes = equiposFaltantes(catalogoState.equipos).length;
+      const inactivos = catalogoState.equipos.filter((equipo) => equipo.estado !== ESTADOS_EQUIPO.ACTIVO).length;
+      $('catalogo-resumen').textContent = catalogoState.equipos.length
+        ? `${catalogoState.equipos.length} equipos · ${inactivos} no activos`
+        : 'Catálogo vacío: los operadores usan la lista base de la app.';
+      $('btn-catalogo-cargar-base').classList.toggle('hidden', !esAdmin || !pendientes);
+
+      if (!filas.length) {
+        cuerpo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500">Sin equipos para los filtros actuales.</td></tr>';
+        return;
+      }
+      cuerpo.innerHTML = filas.map((equipo) => {
+        const opciones = Object.values(ESTADOS_EQUIPO).map((estado) =>
+          `<option value="${estado}" ${estado === equipo.estado ? 'selected' : ''}>${estado}</option>`).join('');
+        const estado = esAdmin
+          ? `<select data-equipo-id="${escapeHtml(equipo.id)}" class="catalogo-estado rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold">${opciones}</select>`
+          : `<span class="font-bold">${escapeHtml(equipo.estado)}</span>`;
+        const actualizado = equipo.updated_at ? new Date(equipo.updated_at).toLocaleDateString('es-MX') : '';
+        return `<tr>
+          <td class="px-4 py-2 font-black text-slate-700">${escapeHtml(equipo.economico)}</td>
+          <td class="px-4 py-2">${escapeHtml(ETIQUETA_TIPO_EQUIPO[equipo.tipo] || equipo.tipo)}</td>
+          <td class="px-4 py-2">${estado}</td>
+          <td class="px-4 py-2 text-xs text-slate-500">${escapeHtml(equipo.notas || '')}</td>
+          <td class="px-4 py-2 text-xs text-slate-400">${escapeHtml(actualizado)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function altaEquipo(tipo, economicoCapturado, notas) {
+      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      // Un catálogo parcial reemplazaría la lista base en los dispositivos y bloquearía checklists válidos.
+      if (!catalogoState.equipos.length) throw new Error('Primero carga los equipos base para dar de alta nuevos equipos.');
+      const economico = normalizarEconomico(economicoCapturado);
+      if (!/^\d+$/.test(economico)) throw new Error('El número económico debe ser numérico.');
+      const id = idEquipo(tipo, economico);
+      const referencia = doc(db, 'catalogo_equipos', id);
+      const equipo = {
+        id,
+        economico,
+        display: `T${economico}`,
+        tipo,
+        estado: ESTADOS_EQUIPO.ACTIVO,
+        updated_at: new Date().toISOString(),
+        updated_by: state.user?.email || 'Supervisor (panel)'
+      };
+      if (notas) equipo.notas = notas;
+      await runTransaction(db, async (transaction) => {
+        if ((await transaction.get(referencia)).exists()) {
+          throw new Error(`El equipo ${ETIQUETA_TIPO_EQUIPO[tipo]} ${economico} ya está registrado.`);
+        }
+        transaction.set(referencia, equipo);
+      });
+    }
+
+    async function cambiarEstadoEquipo(id, estado) {
+      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      await updateDoc(doc(db, 'catalogo_equipos', id), {
+        estado,
+        updated_at: new Date().toISOString(),
+        updated_by: state.user?.email || 'Supervisor (panel)'
+      });
+    }
+
+    // Solo crea lo que falta: nunca pisa el estado de un equipo ya existente, aunque la lista local esté desactualizada.
+    async function cargarEquiposBase() {
+      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      const faltantes = equiposFaltantes(catalogoState.equipos);
+      if (!faltantes.length) return 0;
+      const fecha = new Date().toISOString();
+      const autor = state.user?.email || 'Supervisor (panel)';
+      let creados = 0;
+      for (let inicio = 0; inicio < faltantes.length; inicio += 200) {
+        const lote = faltantes.slice(inicio, inicio + 200);
+        creados += await runTransaction(db, async (transaction) => {
+          const referencias = lote.map((equipo) => doc(db, 'catalogo_equipos', equipo.id));
+          const existentes = await Promise.all(referencias.map((referencia) => transaction.get(referencia)));
+          let nuevos = 0;
+          existentes.forEach((existente, indice) => {
+            if (existente.exists()) return;
+            transaction.set(referencias[indice], { ...lote[indice], updated_at: fecha, updated_by: autor });
+            nuevos += 1;
+          });
+          return nuevos;
+        });
+      }
+      return creados;
+    }
+
+    $('catalogo-buscar').addEventListener('input', renderCatalogoEquipos);
+    $('catalogo-filtro-tipo').addEventListener('change', renderCatalogoEquipos);
+
+    $('form-alta-equipo').addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      const boton = evento.currentTarget.querySelector('button[type="submit"]');
+      boton.disabled = true;
+      try {
+        await altaEquipo($('alta-tipo').value, $('alta-economico').value, $('alta-notas').value.trim());
+        showToast('Equipo dado de alta.');
+        $('alta-economico').value = '';
+        $('alta-notas').value = '';
+        await cargarCatalogoEquipos();
+      } catch (error) {
+        showToast(error.message || 'No se pudo dar de alta el equipo.');
+      } finally {
+        boton.disabled = false;
+      }
+    });
+
+    $('tabla-catalogo-body').addEventListener('change', async (evento) => {
+      const selector = evento.target.closest('.catalogo-estado');
+      if (!selector) return;
+      selector.disabled = true;
+      try {
+        await cambiarEstadoEquipo(selector.dataset.equipoId, selector.value);
+        showToast('Estado actualizado.');
+        await cargarCatalogoEquipos();
+      } catch (error) {
+        showToast(error.message || 'No se pudo actualizar el estado.');
+        await cargarCatalogoEquipos();
+      }
+    });
+
+    $('btn-catalogo-cargar-base').addEventListener('click', async (evento) => {
+      const faltantes = equiposFaltantes(catalogoState.equipos).length;
+      const errores = validarCatalogo(catalogoState.equipos.concat(equiposFaltantes(catalogoState.equipos)));
+      if (errores.length) {
+        showToast(`El catálogo tiene inconsistencias: ${errores[0]}`);
+        return;
+      }
+      if (!window.confirm(`Se crearán ${faltantes} equipos base en el catálogo. Los equipos ya existentes no se modifican. ¿Continuar?`)) return;
+      const boton = evento.currentTarget;
+      boton.disabled = true;
+      try {
+        const creados = await cargarEquiposBase();
+        showToast(`${creados} equipos cargados.`);
+        await cargarCatalogoEquipos();
+      } catch (error) {
+        showToast(error.message || 'No se pudo cargar el catálogo base.');
+      } finally {
+        boton.disabled = false;
+      }
+    });
+
+    const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes', 'vista-dashboard', 'vista-catalogo'];
     
     vistasMantenimiento.forEach(id => {
       const btn = $(`btn-${id}`);
@@ -3081,6 +3301,10 @@
 
           if (id === 'vista-dashboard') {
             cargarDashboard(true);
+          }
+
+          if (id === 'vista-catalogo') {
+            cargarCatalogoEquipos();
           }
         });
       }
