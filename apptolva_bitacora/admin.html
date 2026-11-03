@@ -1772,11 +1772,11 @@
         const lote = ids.slice(inicio, inicio + 30);
         const snapshot = await getDocs(fsQuery(
           collection(db, 'falla_ot_cobertura'),
-          fsWhere('report_id', 'in', lote)
+          fsWhere('reporte_id', 'in', lote)
         ));
         snapshot.forEach((documento) => {
           const cobertura = documento.data();
-          coberturas.set(`${cobertura.report_id}|${cobertura.falla_key}`, cobertura);
+          coberturas.set(`${cobertura.reporte_id}|${cobertura.falla_key}`, cobertura);
         });
       }
       return coberturas;
