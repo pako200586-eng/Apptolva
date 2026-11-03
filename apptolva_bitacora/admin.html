@@ -1558,26 +1558,34 @@
         const reporteId = String(reporte.id || reporte.reporte_id || '').trim();
         if (!reporteId) throw new Error('Falta el identificador del reporte para generar la OT.');
 
+        // Solo bloquea si existe una OT activa (no TERMINADA/CERRADA) para el checklist
         if (Array.isArray(dashState.ordenes)) {
-          const existente = dashState.ordenes.find((o) => String(o.reporte_id) === reporteId);
-          if (existente) {
-            alert('Esta Orden de Trabajo ya fue creada anteriormente.');
+          const existenteActiva = dashState.ordenes.find((o) =>
+            !ESTATUS_REALIZADA.has(sinAcentos(o.estatus)) &&
+            (String(o.reporte_id) === reporteId ||
+            (Array.isArray(o.reportes_vinculados) && o.reportes_vinculados.includes(reporteId)))
+          );
+          if (existenteActiva) {
+            alert(`Esta incidencia ya cuenta con una OT activa en proceso (Folio: OT-${existenteActiva.folio_ot}, Estatus: ${existenteActiva.estatus}).`);
             mostrarVistaOrdenes();
-            abrirSeguimiento(existente);
+            abrirSeguimiento(existenteActiva);
             return;
           }
         }
+
         const existentes = await getDocs(fsQuery(
           collection(db, 'ordenes_trabajo'),
           fsWhere('reporte_id', '==', reporteId)
         ));
-        if (!existentes.empty) {
-          const existenteSnap = existentes.docs[0];
-          const existente = { id: existenteSnap.id, ...existenteSnap.data() };
-          if (Array.isArray(dashState.ordenes)) dashState.ordenes.unshift(existente);
-          alert('Esta Orden de Trabajo ya fue creada anteriormente.');
+        const existenteEnNube = existentes.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .find((o) => !ESTATUS_REALIZADA.has(sinAcentos(o.estatus)));
+
+        if (existenteEnNube) {
+          if (Array.isArray(dashState.ordenes)) dashState.ordenes.unshift(existenteEnNube);
+          alert(`Esta incidencia ya cuenta con una OT activa en proceso (Folio: OT-${existenteEnNube.folio_ot}, Estatus: ${existenteEnNube.estatus}).`);
           mostrarVistaOrdenes();
-          abrirSeguimiento(existente);
+          abrirSeguimiento(existenteEnNube);
           return;
         }
 
@@ -1608,7 +1616,11 @@
                 existente = { id: snapshotOT.id, ...snapshotOT.data() };
               }
             }
-            return { creada: false, orden: existente };
+            // Si la OT anterior ya está TERMINADA/CERRADA o fue eliminada, permite crear la nueva OT
+            const esCerrada = existente && ESTATUS_REALIZADA.has(sinAcentos(existente.estatus));
+            if (existente && !esCerrada) {
+              return { creada: false, orden: existente };
+            }
           }
 
           const snapContador = await transaction.get(refContador);
