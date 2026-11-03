@@ -1,4 +1,4 @@
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.8-flash";
 const MAX_BODY_CHARS = 8 * 1024;
 const MAX_MENSAJE_CHARS = 2000;
 
