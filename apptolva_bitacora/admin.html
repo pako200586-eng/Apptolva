@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -135,7 +135,7 @@
         <button id="btn-vista-dashboard" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           <i class="fas fa-chart-pie mr-1"></i>Dashboard
         </button>
-        <button id="btn-vista-catalogo" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
+        <button id="btn-vista-catalogo" class="hidden rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           <i class="fas fa-truck mr-1"></i>Catálogo de Equipos
         </button>
       </div>
@@ -772,6 +772,8 @@
       });
       $('auditFirestoreBtn').classList.toggle('hidden', !esResponsable);
       $('backupFirestoreBtn').classList.toggle('hidden', !esResponsable);
+      $('btn-vista-catalogo').classList.toggle('hidden', !esResponsable);
+      if (!esResponsable && !$('vista-catalogo').classList.contains('hidden')) $('btn-vista-reportes').click();
       $('cargarMasAntiguos').classList.toggle('hidden', !esAdmin);
       if (!esAdmin && state.windowDays > VENTANA_PASO_DIAS) state.windowDays = VENTANA_PASO_DIAS;
       if (!esResponsable) {
@@ -3108,6 +3110,7 @@
     const ETIQUETA_TIPO_EQUIPO = { tracto: 'Tracto', tolva: 'Tolva', dolly: 'Dolly', utilitaria: 'Utilitaria' };
 
     async function cargarCatalogoEquipos() {
+      if (state.operacionesSensibles !== true) return;
       const cuerpo = $('tabla-catalogo-body');
       cuerpo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando catálogo...</td></tr>';
       try {
@@ -3158,7 +3161,7 @@
     }
 
     async function altaEquipo(tipo, economicoCapturado, notas) {
-      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      if (state.role !== 'admin' || state.operacionesSensibles !== true) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
       // Un catálogo parcial reemplazaría la lista base en los dispositivos y bloquearía checklists válidos.
       if (!catalogoState.equipos.length) throw new Error('Primero carga los equipos base para dar de alta nuevos equipos.');
       const economico = normalizarEconomico(economicoCapturado);
@@ -3184,7 +3187,7 @@
     }
 
     async function cambiarEstadoEquipo(id, estado) {
-      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      if (state.role !== 'admin' || state.operacionesSensibles !== true) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
       await updateDoc(doc(db, 'catalogo_equipos', id), {
         estado,
         updated_at: new Date().toISOString(),
@@ -3194,7 +3197,7 @@
 
     // Solo crea lo que falta: nunca pisa el estado de un equipo ya existente, aunque la lista local esté desactualizada.
     async function cargarEquiposBase() {
-      if (state.role !== 'admin') throw new Error('Tu rol solo permite consultar el panel.');
+      if (state.role !== 'admin' || state.operacionesSensibles !== true) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
       const faltantes = equiposFaltantes(catalogoState.equipos);
       if (!faltantes.length) return 0;
       const fecha = new Date().toISOString();
