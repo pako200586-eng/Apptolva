@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v100"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v101"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -41,6 +41,7 @@ const OFFLINE_URLS = [
   "./js/normalizadorFallas.js",
   "./js/firmaFalla.js",
   "./js/procesadorInspeccion.js",
+  "./js/etiquetasOT.js",
   "./js/generarPDF_OT.js",
   "./img/ot/logo.jpg",
   "./img/logo-bachoco.jpg",

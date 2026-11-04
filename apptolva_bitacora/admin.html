@@ -11,6 +11,7 @@
   <script src="./js/jspdf.min.js"></script>
   <script src="./js/catalogoBachoco.js"></script>
   <script src="./js/normalizadorFallas.js"></script>
+  <script src="./js/etiquetasOT.js"></script>
   <script src="./js/generarPDF_OT.js"></script>
   <link rel="stylesheet" href="./css/fontawesome.min.css">
   <style>
@@ -1997,7 +1998,7 @@
           operador: representante.driverName || 'No especificado',
           componente: nombres(grupos.map((grupo) => grupo.componente)),
           sistema: nombres(grupos.map((grupo) => grupo.sistema)),
-          descripcion_falla: grupos.map((grupo) => `${grupo.componente} | ${grupo.sistema}: ${grupo.item}`).join(' ; '),
+          descripcion_falla: grupos.map((grupo) => `${window.etiquetasOT.etiquetaComponente(grupo.componente, representante.payload, grupo.unidad, grupo.componenteKey)} | ${grupo.sistema}: ${grupo.item}`).join(' ; '),
           estatus: 'NUEVA',
           fecha_apertura: fechaActual,
           updated_at: fechaActual,
@@ -2541,7 +2542,11 @@
       const form = $('segForm');
       const esAdmin = state.role === 'admin';
       $('segTitulo').textContent = `Seguimiento de OT-${orden?.folio_ot ?? ''}`;
-      $('segResumen').innerHTML = `<strong>Unidad:</strong> ${escapeHtml(orden?.unidad || 'N/A')} · <strong>Componente:</strong> ${escapeHtml(orden?.componente || '')} · <strong>Sistema:</strong> ${escapeHtml(orden?.sistema || '')}<br>${escapeHtml(orden?.descripcion_falla || '').replace(/\n/g, '<br>')}`;
+      const etiquetas = window.etiquetasOT;
+      const payloadOT = orden?.payload || {};
+      const componentesOT = etiquetas.encabezadoComponentes(payloadOT) || orden?.componente || '';
+      const descripcionOT = etiquetas.descripcionConEconomicos(orden?.descripcion_falla || '', payloadOT);
+      $('segResumen').innerHTML = `<strong>Unidad:</strong> ${escapeHtml(orden?.unidad || 'N/A')} · <strong>Componente:</strong> ${escapeHtml(componentesOT)} · <strong>Sistema:</strong> ${escapeHtml(orden?.sistema || '')}<br>${escapeHtml(descripcionOT).replace(/\n/g, '<br>')}`;
       form.elements.estatus.value = orden?.estatus || 'NUEVA';
       CAMPOS_SEGUIMIENTO.forEach((campo) => {
         form.elements[campo].value = orden?.[campo] || '';

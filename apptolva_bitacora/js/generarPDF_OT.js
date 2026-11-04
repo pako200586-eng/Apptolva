@@ -108,7 +108,10 @@
     const fallasLista = Array.isArray(payload.fallas) ? payload.fallas.filter((f) => f && typeof f === 'object') : [];
     const descripcion = fallasLista.length
       ? fallasLista.map((f) => {
-          const comp = texto(f.componente) || 'TRACTOCAMIÓN';
+          const etiquetaBase = texto(f.componente) || 'TRACTOCAMIÓN';
+          const comp = window.etiquetasOT
+            ? window.etiquetasOT.etiquetaComponente(etiquetaBase, payload, f.economico_componente, f.componenteKey)
+            : etiquetaBase;
           const sist = texto(f.sistema || f.categoria);
           const desc = texto(f.descripcion || f.falla) || 'Sin descripción';
           return `• ${comp}${sist ? ` | ${sist}` : ''}: ${desc}`;
@@ -116,6 +119,9 @@
       : (falla.includes('\n')
           ? falla.split('\n').map((linea) => `• ${linea.trim()}`).join('\n')
           : `${componente}${sistema ? ` | ${sistema}` : ''}: ${falla}`);
+    const descripcionFinal = window.etiquetasOT && !fallasLista.length
+      ? window.etiquetasOT.descripcionConEconomicos(descripcion, payload)
+      : descripcion;
 
     return {
       folioOT: ordenData.folio_ot ? `OT-${ordenData.folio_ot}` : (pick('folio') || 'S/F'),
@@ -131,7 +137,7 @@
       fechaRealizacion: formatearFechaCorta(pick('fecha_realizacion')),
       kilometraje: pick('kilometraje', 'km'),
       supervisor: pick('supervisor_mantenimiento') || SUPERVISOR_DEFAULT,
-      descripcion,
+      descripcion: descripcionFinal,
       comentariosEjecutor: pick('comentarios_ejecutor'),
       comentariosOperador: pick('comentarios_operador')
     };
