@@ -25,6 +25,11 @@ service cloud.firestore {
       return isPanelUser() && getUserRole() == 'admin';
     }
 
+    // El catálogo solo lo modifica el responsable autorizado (mismo criterio que las operaciones sensibles del panel).
+    function isCatalogOwner() {
+      return isAdmin() && request.auth.token.email.lower() == 'frank@apptolva.com';
+    }
+
     // Keep evaluation access independent from usuarios/{email}.rol (panel role).
     function isEmailPasswordUser() {
       return signedIn()
@@ -217,10 +222,10 @@ service cloud.firestore {
         && (!equipo.keys().hasAny(['updated_by']) || equipo.updated_by is string);
     }
 
-    // Los operadores (anónimos) leen el catálogo para validar el checklist; solo admin lo modifica y nunca se borra.
+    // Los operadores (anónimos) leen el catálogo para validar el checklist; solo el responsable lo modifica y nunca se borra.
     match /catalogo_equipos/{equipoId} {
       allow read: if signedIn();
-      allow create, update: if isAdmin() && validEquipo(equipoId);
+      allow create, update: if isCatalogOwner() && validEquipo(equipoId);
       allow delete: if false;
     }
 

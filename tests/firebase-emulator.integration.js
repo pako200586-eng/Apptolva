@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { cert, initializeApp as initializeAdminApp, deleteApp as deleteAdminApp } from 'firebase-admin/app';
@@ -73,13 +73,22 @@ const readerAuth = getAuth(readerApp);
 connectAuthEmulator(readerAuth, `http://${authEmulatorHost}`, { disableWarnings: true });
 const readerDb = getFirestore(readerApp);
 connectFirestoreEmulator(readerDb, firestoreAddress.hostname, firestoreAddress.port);
+const ownerApp = initializeClientApp({
+  apiKey: 'demo-api-key',
+  projectId: proyecto
+}, `apptolva-owner-${appId}`);
+const ownerAuth = getAuth(ownerApp);
+connectAuthEmulator(ownerAuth, `http://${authEmulatorHost}`, { disableWarnings: true });
+const ownerDb = getFirestore(ownerApp);
+connectFirestoreEmulator(ownerDb, firestoreAddress.hostname, firestoreAddress.port);
+const emailResponsable = 'frank@apptolva.com';
 setLogLevel('silent');
 
 test('cierre, reintento retroactivo y permisos funcionan con los emuladores', async (t) => {
   const adminUser = await createUserWithEmailAndPassword(clientAuth, emailAdmin, 'Emulator123!');
   const tokenAdmin = await getIdToken(adminUser.user);
   const lecturaUser = await createUserWithEmailAndPassword(readerAuth, emailLectura, 'Emulator123!');
-
+  const responsableUser = await createUserWithEmailAndPassword(ownerAuth, emailResponsable, 'Emulator123!');
   const otId = `ot-${appId}`;
   const reportesIds = {
     anterior: `reporte-anterior-${appId}`,
@@ -150,15 +159,19 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     await Promise.all(eventos.docs.map((evento) => evento.ref.delete()));
     await adminDb.collection('usuarios').doc(emailAdmin).delete();
     await adminDb.collection('usuarios').doc(emailLectura).delete();
+    await adminDb.collection('usuarios').doc(emailResponsable).delete();
     await adminAuth.deleteUser(adminUser.user.uid);
     await adminAuth.deleteUser(lecturaUser.user.uid);
+    await adminAuth.deleteUser(responsableUser.user.uid);
     await deleteClientApp(clientApp);
     await deleteClientApp(readerApp);
+    await deleteClientApp(ownerApp);
     await deleteAdminApp(adminApp);
   });
 
   await adminDb.collection('usuarios').doc(emailAdmin).set({ rol: 'admin' });
   await adminDb.collection('usuarios').doc(emailLectura).set({ rol: 'lectura' });
+  await adminDb.collection('usuarios').doc(emailResponsable).set({ rol: 'admin' });
   await adminDb.collection('ordenes_trabajo').doc(otId).set({
     id: otId,
     folio_ot: 90001,
@@ -299,30 +312,35 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
   const referenciaEquipo = (db, id = idEquipoPrueba) => doc(db, 'catalogo_equipos', id);
   const rechazadoPorReglas = (error) => error.code === 'permission-denied';
 
-  await setDoc(referenciaEquipo(clientDb), equipoValido);
   await assert.rejects(
-    setDoc(referenciaEquipo(clientDb, `dolly_${economicoEquipo}9`), equipoValido),
+    setDoc(referenciaEquipo(clientDb), equipoValido),
+    rechazadoPorReglas,
+    'un admin que no es el responsable no modifica el catálogo'
+  );
+  await setDoc(referenciaEquipo(ownerDb), equipoValido);
+  await assert.rejects(
+    setDoc(referenciaEquipo(ownerDb, `dolly_${economicoEquipo}9`), equipoValido),
     rechazadoPorReglas,
     'el id debe coincidir con tipo y económico'
   );
   await assert.rejects(
-    setDoc(referenciaEquipo(clientDb, 'dolly_AB'), { ...equipoValido, id: 'dolly_AB', economico: 'AB' }),
+    setDoc(referenciaEquipo(ownerDb, 'dolly_AB'), { ...equipoValido, id: 'dolly_AB', economico: 'AB' }),
     rechazadoPorReglas,
     'el económico debe ser numérico'
   );
   await assert.rejects(
-    setDoc(referenciaEquipo(clientDb), { ...equipoValido, estado: 'perdido' }),
+    setDoc(referenciaEquipo(ownerDb), { ...equipoValido, estado: 'perdido' }),
     rechazadoPorReglas,
     'el estado debe ser uno de los definidos'
   );
   await assert.rejects(
-    setDoc(referenciaEquipo(clientDb), { ...equipoValido, campo_extra: true }),
+    setDoc(referenciaEquipo(ownerDb), { ...equipoValido, campo_extra: true }),
     rechazadoPorReglas,
     'no se admiten campos fuera del esquema'
   );
-  await setDoc(referenciaEquipo(clientDb), { ...equipoValido, estado: 'taller' });
-  assert.equal((await getDoc(referenciaEquipo(clientDb))).get('estado'), 'taller');
-  await assert.rejects(deleteDoc(referenciaEquipo(clientDb)), rechazadoPorReglas, 'el catálogo nunca se borra');
+  await setDoc(referenciaEquipo(ownerDb), { ...equipoValido, estado: 'taller' });
+  assert.equal((await getDoc(referenciaEquipo(ownerDb))).get('estado'), 'taller');
+  await assert.rejects(deleteDoc(referenciaEquipo(ownerDb)), rechazadoPorReglas, 'el catálogo nunca se borra');
 
   assert.equal((await getDoc(referenciaEquipo(readerDb))).exists(), true);
   await assert.rejects(
