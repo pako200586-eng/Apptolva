@@ -1,0 +1,31 @@
+name: Cron Push NOM-087 (Staging)
+
+on:
+  schedule:
+    # GitHub Actions no garantiza ejecuciones cada minuto; 5 min es el intervalo práctico.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: cron-nom087-staging
+  cancel-in-progress: false
+
+jobs:
+  ping_netlify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Disparar push-nom087 en staging
+        env:
+          PUSH_URL: ${{ vars.STAGING_PUSH_NOM087_URL }}
+          PUSH_CRON_SECRET: ${{ secrets.PUSH_CRON_SECRET }}
+        run: |
+          if [ -z "$PUSH_URL" ] || [ -z "$PUSH_CRON_SECRET" ]; then
+            echo "Falta la variable STAGING_PUSH_NOM087_URL o el secreto PUSH_CRON_SECRET"
+            exit 1
+          fi
+          curl --silent --show-error --fail-with-body \
+            --request POST "$PUSH_URL" \
+            --header "Authorization: Bearer $PUSH_CRON_SECRET" \
+            --header "Content-Type: application/json" \
+            --data '{}'

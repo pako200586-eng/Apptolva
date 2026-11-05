@@ -20,6 +20,7 @@ export {
 } from "firebase/auth";
 export {
   collection,
+  deleteDoc,
   documentId,
   doc,
   getDoc,

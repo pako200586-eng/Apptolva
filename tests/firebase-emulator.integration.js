@@ -145,7 +145,10 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
 
   t.after(async () => {
     await adminDb.collection('catalogo_equipos').doc(idEquipoPrueba).delete();
-    if (uidAnonimo) await adminAuth.deleteUser(uidAnonimo);
+    if (uidAnonimo) {
+      await adminDb.collection('alertas_nom087').doc(uidAnonimo).delete();
+      await adminAuth.deleteUser(uidAnonimo);
+    }
     for (const id of Object.values(reportesIds)) {
       await adminDb.collection('bitacora_reports').doc(id).delete();
     }
@@ -357,4 +360,44 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     rechazadoPorReglas,
     'un operador anónimo lee pero no modifica el catálogo'
   );
+
+  const alertaPush = {
+    owner_uid: uidAnonimo,
+    unit_id: 'TR-101',
+    driver_name: 'Operador de prueba',
+    subscription: { endpoint: 'https://push.example.test/abc', keys: { p256dh: 'p', auth: 'a' } },
+    fire_at_270: Date.now() + 60000,
+    fire_at_300: Date.now() + 1860000,
+    sent_270: false,
+    sent_300: false,
+    updated_at: Date.now()
+  };
+  const referenciaAlerta = (db, id = uidAnonimo) => doc(db, 'alertas_nom087', id);
+  await setDoc(referenciaAlerta(readerDb), alertaPush);
+  assert.equal((await getDoc(referenciaAlerta(readerDb))).get('unit_id'), 'TR-101');
+  await assert.rejects(
+    setDoc(referenciaAlerta(readerDb, `otro-${appId}`), alertaPush),
+    rechazadoPorReglas,
+    'el operador solo escribe su propio documento de alerta'
+  );
+  await assert.rejects(
+    setDoc(referenciaAlerta(readerDb), { ...alertaPush, sent_270: true }),
+    rechazadoPorReglas,
+    'solo el servidor marca los avisos como enviados'
+  );
+  await assert.rejects(
+    setDoc(referenciaAlerta(readerDb), {
+      ...alertaPush,
+      subscription: { ...alertaPush.subscription, endpoint: 'http://inseguro.example.test' }
+    }),
+    rechazadoPorReglas,
+    'el endpoint push debe ser https'
+  );
+  await assert.rejects(
+    getDoc(referenciaAlerta(clientDb)),
+    rechazadoPorReglas,
+    'ni un administrador lee suscripciones push'
+  );
+  await deleteDoc(referenciaAlerta(readerDb));
+  assert.equal((await getDoc(referenciaAlerta(readerDb))).exists(), false);
 });

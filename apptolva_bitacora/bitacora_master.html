@@ -1444,7 +1444,66 @@
             }
         }
 
+        // El SW no lee localStorage: la página refleja aquí el estado real para validar los Web Push sin red.
+        let estadoSwFirma = '';
+        function reflejarEstadoParaSW(copiloto) {
+            const conduciendo = currentStatus === 3 && !copiloto;
+            let fireAt270 = null, fireAt300 = null;
+            if (conduciendo) {
+                const { continuousDrive } = calcularLimitesConduccion(Date.now());
+                const base = truncarMinutoMs(Date.now());
+                fireAt270 = base + (270 - continuousDrive) * 60000;
+                fireAt300 = base + (300 - continuousDrive) * 60000;
+            }
+            const firma = `${conduciendo}|${fireAt270}|${fireAt300}`;
+            if (firma === estadoSwFirma || !('indexedDB' in window)) return;
+            estadoSwFirma = firma;
+            const abrir = indexedDB.open('apptolva_estado', 1);
+            abrir.onupgradeneeded = () => abrir.result.createObjectStore('operacion');
+            abrir.onsuccess = () => {
+                const db = abrir.result;
+                const tx = db.transaction('operacion', 'readwrite');
+                tx.objectStore('operacion').put({
+                    estado: conduciendo ? 'CONDUCIENDO' : 'NO_CONDUCIENDO',
+                    fireAt270, fireAt300, ts: Date.now()
+                }, 'estado_actual');
+                tx.oncomplete = tx.onerror = tx.onabort = () => db.close();
+            };
+            abrir.onerror = () => { estadoSwFirma = ''; };
+        }
+
+        let pushFirma, pushEnCurso = false;
+        async function sincronizarAlertasPush() {
+            const copiloto = document.getElementById('tripulacion')?.value === 'DOBLE'
+                && document.getElementById('rolCabina')?.value === 'COPILOTO';
+            reflejarEstadoParaSW(copiloto);
+            if (typeof window.registrarAlertasPush !== 'function' || pushEnCurso) return;
+            pushEnCurso = true;
+            try {
+                if (currentStatus !== 3 || copiloto) {
+                    // pushFirma indefinida = primera evaluación tras recargar: limpia avisos huérfanos de otra sesión.
+                    if (pushFirma !== 'off' && await window.cancelarAlertasPush()) pushFirma = 'off';
+                    return;
+                }
+                const { continuousDrive } = calcularLimitesConduccion(Date.now());
+                const base = truncarMinutoMs(Date.now());
+                const fireAt270 = base + (270 - continuousDrive) * 60000;
+                const fireAt300 = base + (300 - continuousDrive) * 60000;
+                const firma = `${fireAt270}|${fireAt300}`;
+                if (firma === pushFirma) return;
+                const ok = await window.registrarAlertasPush({
+                    fireAt270, fireAt300,
+                    unitId: document.getElementById('unitId')?.value,
+                    driverName: document.getElementById('driverName')?.value
+                });
+                if (ok) pushFirma = firma;
+            } finally {
+                pushEnCurso = false;
+            }
+        }
+
         function evaluarLimitesConduccion() {
+            sincronizarAlertasPush();
             evaluarExcesoAuxiliar();
             if (currentStatus !== 3) { alerta270 = alerta300 = false; return; }
             const { continuousDrive } = calcularLimitesConduccion(Date.now());
@@ -2077,6 +2136,7 @@
     <script type="module">
         import { getFirebaseConfig, initializeApp } from "./js/firebase-sdk.js";
         import {
+            deleteDoc,
             doc,
             initializeFirestore,
             persistentLocalCache,
@@ -2238,6 +2298,61 @@
                     url: new URL(`./viewer.html?id=${reportId}`, window.location.href).href,
                     status: "synced"
                 };
+            };
+
+            // Web Push NOM-087: el servidor avisa a las 4 h 30 min y 5 h aunque la app esté cerrada.
+            const docAlertaPush = () => doc(db, "alertas_nom087", auth.currentUser.uid);
+            const claveVapidABytes = (b64) => {
+                const bin = atob(b64.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(b64.length / 4) * 4, "="));
+                return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+            };
+            const obtenerSuscripcionPush = async () => {
+                if (!("PushManager" in window) || !("serviceWorker" in navigator)) return null;
+                if (!("Notification" in window) || Notification.permission !== "granted") return null;
+                const reg = await navigator.serviceWorker.ready;
+                const existente = await reg.pushManager.getSubscription();
+                if (existente) return existente;
+                const resp = await fetch("/api/push-nom087-clave");
+                if (!resp.ok) return null;
+                const { publicKey } = await resp.json();
+                return reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: claveVapidABytes(publicKey)
+                });
+            };
+
+            window.registrarAlertasPush = async function({ fireAt270, fireAt300, unitId, driverName }) {
+                try {
+                    if (!auth.currentUser?.uid || !navigator.onLine) return false;
+                    const suscripcion = await obtenerSuscripcionPush();
+                    if (!suscripcion) return false;
+                    // Sin await: offline, Firestore encola la escritura y confirma al recuperar red.
+                    setDoc(docAlertaPush(), {
+                        owner_uid: auth.currentUser.uid,
+                        unit_id: String(unitId || "").slice(0, 60),
+                        driver_name: String(driverName || "").slice(0, 120),
+                        subscription: JSON.parse(JSON.stringify(suscripcion)),
+                        fire_at_270: fireAt270,
+                        fire_at_300: fireAt300,
+                        sent_270: false,
+                        sent_300: false,
+                        updated_at: Date.now()
+                    }).catch((e) => console.warn("No se pudo registrar la alerta push:", e?.code || e));
+                    return true;
+                } catch (e) {
+                    console.warn("Web Push no disponible:", e?.message || e);
+                    return false;
+                }
+            };
+
+            window.cancelarAlertasPush = async function() {
+                try {
+                    if (!auth.currentUser?.uid) return false;
+                    deleteDoc(docAlertaPush()).catch((e) => console.warn("No se pudo cancelar la alerta push:", e?.code || e));
+                    return true;
+                } catch (e) {
+                    return false;
+                }
             };
 
             onAuthStateChanged(auth, (user) => {

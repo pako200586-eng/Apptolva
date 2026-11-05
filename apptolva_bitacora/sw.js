@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v103"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v104"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -452,10 +452,72 @@ self.addEventListener("message", (event) => {
   }
 });
 
+// Avisos NOM-087 enviados por el servidor (Web Push) cuando la app está cerrada o el teléfono bloqueado.
+// Usan los mismos tags que la alerta local de bitacora_master.html para reemplazarla, no duplicarla.
+// Lee el estado que bitacora_master.html refleja en IndexedDB. Sin dato legible devuelve null (se avisa por seguridad).
+function leerEstadoLocal() {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === "undefined") return resolve(null);
+    const abrir = indexedDB.open("apptolva_estado", 1);
+    abrir.onupgradeneeded = () => abrir.result.createObjectStore("operacion");
+    abrir.onerror = () => resolve(null);
+    abrir.onsuccess = () => {
+      const db = abrir.result;
+      try {
+        const lectura = db.transaction("operacion", "readonly").objectStore("operacion").get("estado_actual");
+        lectura.onsuccess = () => { db.close(); resolve(lectura.result || null); };
+        lectura.onerror = () => { db.close(); resolve(null); };
+      } catch {
+        db.close();
+        resolve(null);
+      }
+    };
+  });
+}
+
+// El push puede estar desfasado (el operador cambió de estado sin red): manda la verdad local.
+function pushVigenteSegunEstadoLocal(estado, datos) {
+  if (!estado) return true;
+  if (estado.estado !== "CONDUCIENDO") return false;
+  if (typeof datos.fireAt !== "number") return true;
+  const local = datos.tag === "limite-5h" ? estado.fireAt300 : estado.fireAt270;
+  return typeof local !== "number" || Math.abs(local - datos.fireAt) <= 2 * 60 * 1000;
+}
+
+self.addEventListener("push", (event) => {
+  let datos = {};
+  try {
+    datos = event.data ? event.data.json() : {};
+  } catch {
+    datos = { body: event.data ? event.data.text() : "" };
+  }
+  const titulo = String(datos.title || "🚨 Alerta Bitácora NOM-087").slice(0, 120);
+  const tag = typeof datos.tag === "string" ? datos.tag.slice(0, 60) : "alerta-nom087";
+
+  event.waitUntil((async () => {
+    const estado = await leerEstadoLocal();
+    if (!pushVigenteSegunEstadoLocal(estado, datos)) {
+      console.log("Push NOM-087 silenciado: el estado local ya no es CONDUCIENDO o cambió el límite.");
+      return;
+    }
+    return self.registration.showNotification(titulo, {
+      body: String(datos.body || "Revisa tu estado de conducción en Apptolva.").slice(0, 300),
+      icon: "./icon-192x192.png",
+      badge: "./favicon-32x32.png",
+      tag,
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [500, 200, 500, 200, 800],
+      actions: [{ action: "iniciar_pausa", title: "⏸️ Iniciar pausa" }],
+      data: { ts: Date.now() }
+    });
+  })());
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const ACCIONES_APP = ["iniciar_pausa", "voy_volante", "soy_copiloto"];
+  const ACCIONES_APP = ["iniciar_pausa", "iniciar_descanso", "voy_volante", "soy_copiloto"];
   if (ACCIONES_APP.includes(event.action)) {
     const ts = (event.notification.data && event.notification.data.ts) || Date.now();
     event.waitUntil(

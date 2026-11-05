@@ -255,6 +255,41 @@ service cloud.firestore {
       allow create: if isEvaluationUser() && validDescargaEvaluation(evaluationId);
     }
 
+    function validAlertaPush(uid) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'owner_uid', 'unit_id', 'driver_name', 'subscription',
+          'fire_at_270', 'fire_at_300', 'sent_270', 'sent_300', 'updated_at'
+        ])
+        && d.owner_uid == uid
+        && d.unit_id is string && d.unit_id.size() <= 60
+        && d.driver_name is string && d.driver_name.size() <= 120
+        && d.subscription is map
+        && d.subscription.keys().hasOnly(['endpoint', 'expirationTime', 'keys'])
+        && d.subscription.endpoint is string
+        && d.subscription.endpoint.matches('https://.*')
+        && d.subscription.endpoint.size() <= 1000
+        && d.subscription.keys is map
+        && d.subscription.keys.keys().hasOnly(['p256dh', 'auth'])
+        && d.subscription.keys.p256dh is string
+        && d.subscription.keys.auth is string
+        && d.fire_at_270 is number
+        && d.fire_at_300 is number
+        && d.sent_270 == false
+        && d.sent_300 == false
+        && d.updated_at is number;
+    }
+
+    // Suscripción Web Push del operador en turno de manejo; el servidor (Admin SDK) envía y marca los avisos.
+    match /alertas_nom087/{uid} {
+      allow get: if isAnonymousOperator() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if isAnonymousOperator()
+        && request.auth.uid == uid
+        && validAlertaPush(uid);
+      allow delete: if isAnonymousOperator() && request.auth.uid == uid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
