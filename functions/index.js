@@ -6,7 +6,7 @@ const logger = require("firebase-functions/logger");
 initializeApp();
 
 exports.asignarFolioNOM087 = onDocumentCreated({
-  document: "bitacoras_nom087/{docId}",
+  document: "bitacora_reports/{docId}",
   region: "us-central1",
   retry: true,
   maxInstances: 10,
@@ -21,6 +21,7 @@ exports.asignarFolioNOM087 = onDocumentCreated({
       logger.warn("El registro ya no existe; no se asignó folio.", { id: registroRef.id });
       return null;
     }
+    if (registro.get("report_type") !== "bitacora") return null;
     if (registro.get("folio_definitivo")) return null;
 
     const contador = await transaction.get(contadorRef);
