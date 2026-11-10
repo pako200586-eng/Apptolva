@@ -121,11 +121,12 @@
                 </div>
 
                 <div class="col-span-2 md:col-span-1">
-                    <label class="text-xs font-bold text-orange-600 uppercase block mb-1">Folio</label>
+                    <label for="folio" class="text-xs font-bold text-orange-600 uppercase block mb-1">Folio</label>
                     <div class="relative">
                         <i class="fas fa-hashtag absolute left-3 top-2.5 text-orange-300"></i>
                         <input type="text" id="folio" class="bachoco-input w-full rounded-lg py-2 pl-8 pr-2 bg-gray-100 font-bold text-gray-600 uppercase border border-gray-300" placeholder="Asignando folio..." readonly aria-readonly="true">
                     </div>
+                    <p id="folioNubeEstado" role="status" class="mt-1 text-xs font-bold text-gray-600"></p>
                 </div>
 
                 <div><label class="text-xs font-bold text-gray-500 block mb-1">Económico</label><input type="text" id="unitId" class="bachoco-input w-full rounded-lg p-2 border border-gray-300" placeholder="14123"></div>
@@ -956,6 +957,7 @@
             });
             document.getElementById('folio').value = '';
             localStorage.removeItem('nom087_folio');
+            window.detenerObservacionFolio?.();
             delSig('nom087_signatureOp');
             delSig('nom087_signatureSup');
             guardarLocal();
@@ -2139,6 +2141,7 @@
             deleteDoc,
             doc,
             initializeFirestore,
+            onSnapshot,
             persistentLocalCache,
             persistentMultipleTabManager,
             runTransaction,
@@ -2146,6 +2149,7 @@
             setDoc
         } from "./js/firebase-sdk.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
+        import { crearObservadorFolio } from "./js/observadorFolio.js";
       
         const firebaseConfig = getFirebaseConfig();
 
@@ -2177,6 +2181,25 @@
                 localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
             });
             const auth = getAuth(app);
+            let uidObservado = null;
+            const estadoFolio = document.getElementById("folioNubeEstado");
+            const observadorFolio = crearObservadorFolio({
+                escuchar: onSnapshot,
+                mostrar: (estado, folio) => {
+                    if (estado === "asignado") {
+                        estadoFolio.textContent = `Folio de conciliación en nube: ${folio}`;
+                    } else if (estado === "error") {
+                        estadoFolio.textContent = "No se pudo consultar el folio de conciliación. Se reintentará al sincronizar.";
+                    } else {
+                        estadoFolio.textContent = "Folio de conciliación pendiente en la nube.";
+                    }
+                },
+                informarError: (error) => console.error("No se pudo consultar el folio de conciliación:", error)
+            });
+            window.detenerObservacionFolio = () => {
+                observadorFolio.detener();
+                estadoFolio.textContent = "";
+            };
 
             // Asigna el folio FB secuencial. Si ya existe un OFF- ya resuelto, reutiliza el mismo FB (idempotente).
             window.resolverFolioDefinitivo = async function(folioProvisional = "") {
@@ -2263,6 +2286,9 @@
 
                 const ahoraIso = new Date().toISOString();
                 const reportRef = doc(db, "bitacora_reports", reportId);
+                if (document.getElementById("folio").value.trim() === folioOriginal) {
+                    observadorFolio.observar(reportId, reportRef);
+                }
                 const serverCreatedKey = `nom087_server_created_${reportId}`;
                 const data = {
                     id: reportId,
@@ -2356,9 +2382,24 @@
             };
 
             onAuthStateChanged(auth, (user) => {
-                if (!user) signInAnonymously(auth).catch(console.error);
+                if (uidObservado !== (user?.uid || null)) {
+                    window.detenerObservacionFolio();
+                    uidObservado = user?.uid || null;
+                }
+                if (!user) {
+                    signInAnonymously(auth).catch(console.error);
+                }
                 window.generarFolioFirebase();
-                if (user) sincronizarCierresPendientes();
+                if (user) {
+                    sincronizarCierresPendientes();
+                    const actual = document.getElementById("folio").value.trim();
+                    const resuelto = localStorage.getItem('nom087_folio_map_' + actual) || actual;
+                    const key = encodeURIComponent(resuelto);
+                    const reportId = localStorage.getItem(`nom087_firestore_report_${key}`);
+                    if (reportId && localStorage.getItem(`nom087_firestore_owner_${key}`) === user.uid) {
+                        observadorFolio.observar(reportId, doc(db, "bitacora_reports", reportId));
+                    }
+                }
             });
         }
     </script>

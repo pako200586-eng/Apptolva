@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v105"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v106"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -33,6 +33,7 @@ const OFFLINE_URLS = [
   "./js/firebase-sdk.js",
   "./js/firebase-config.js",
   "./js/firebase-config-runtime.js",
+  "./js/observadorFolio.js",
   "./js/qrcode.min.js",
   "./js/confetti.min.js",
   "./js/catalogoOperadores.js",
