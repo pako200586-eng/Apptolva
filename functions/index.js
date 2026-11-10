@@ -7,6 +7,7 @@ initializeApp();
 
 exports.asignarFolioNOM087 = onDocumentCreated({
   document: "bitacoras_nom087/{docId}",
+  region: "us-central1",
   retry: true,
   maxInstances: 10,
 }, async (event) => {
