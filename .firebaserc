@@ -1,6 +1,7 @@
 {
   "projects": {
-    "staging": "apptolva-staging"
+    "staging": "apptolva-staging",
+    "default": "gen-lang-client-0015118308"
   },
   "targets": {},
   "etags": {}

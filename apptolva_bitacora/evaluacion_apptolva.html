@@ -1096,11 +1096,6 @@
   
 </style>
 
-<!-- SDKs de Firebase (Compat v10) para AppTolva -->
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
 </head>
 <body>
 <div id="adminAuthOverlay" class="admin-auth-overlay">
@@ -2683,14 +2678,19 @@
 <!-- ===================================================================
      LÓGICA JAVASCRIPT: SINCRONIZACIÓN BIDIRECCIONAL, CÁLCULO Y CONTROL
      =================================================================== -->
-<script>
-  const firebaseConfig = window.getAppFirebaseConfig();
+<script type="module">
+  import {
+    browserLocalPersistence, collection, doc, getAuth, getDoc, getFirebaseConfig,
+    initializeApp, initializeFirestore, onAuthStateChanged, onSnapshot, orderBy,
+    persistentLocalCache, persistentMultipleTabManager, query, setDoc,
+    setPersistence, signInAnonymously, signInWithEmailAndPassword, signOut
+  } from "./js/firebase-sdk.js";
 
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+  const app = initializeApp(getFirebaseConfig());
+  const auth = getAuth(app);
+  const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
   const ADMIN_PANEL_MODE = new URLSearchParams(window.location.search).get('panel') === 'admin';
   const adminAuthOverlay = document.getElementById('adminAuthOverlay');
   const adminAuthForm = document.getElementById('adminAuthForm');
@@ -2714,7 +2714,7 @@
     if (historySyncStarted) return;
     historySyncStarted = true;
 
-    db.collection("evaluaciones_conduccion").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+    onSnapshot(query(collection(db, "evaluaciones_conduccion"), orderBy("timestamp", "desc")), snapshot => {
       const listaConduccion = [];
       snapshot.forEach(doc => {
         const data = doc.data();
@@ -2731,7 +2731,7 @@
       showHistorySyncError("No se pudieron cargar las evaluaciones de conducción. Verifica los permisos de Firestore.");
     });
 
-    db.collection("evaluaciones_descarga").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+    onSnapshot(query(collection(db, "evaluaciones_descarga"), orderBy("timestamp", "desc")), snapshot => {
       const listaDescarga = [];
       snapshot.forEach(doc => {
         const data = doc.data();
@@ -2755,10 +2755,10 @@
     });
   }
 
-  auth.onAuthStateChanged(user => {
+  onAuthStateChanged(auth, user => {
     if (!ADMIN_PANEL_MODE) {
       if (!user) {
-        auth.signInAnonymously().catch(err => console.warn("Aviso Auth AppTolva:", err.message));
+        signInAnonymously(auth).catch(err => console.warn("Aviso Auth AppTolva:", err.message));
       } else {
         console.log("Sesión activa AppTolva (Firebase):", user.uid);
       }
@@ -2776,20 +2776,20 @@
       && user.providerData.some(provider => provider.providerId === 'password');
     if (!isPasswordUser) {
       showAdminAuthError("Inicia sesión con una cuenta de Evaluaciones autorizada.");
-      auth.signOut().catch(err => console.error("No se pudo cerrar la sesión no autorizada:", err));
+      signOut(auth).catch(err => console.error("No se pudo cerrar la sesión no autorizada:", err));
       return;
     }
 
-    db.collection("usuarios").doc(user.email.toLowerCase()).get().then(profile => {
+    getDoc(doc(db, "usuarios", user.email.toLowerCase())).then(profile => {
       if (stateVersion !== authVerificationVersion) return;
-      const role = profile.exists ? profile.data().rol_evaluaciones : null;
+      const role = profile.exists() ? profile.data().rol_evaluaciones : null;
       if (role === 'admin' || role === 'evaluador') {
         adminAuthError.textContent = "";
         adminAuthOverlay.hidden = true;
         startHistorySync();
       } else {
         showAdminAuthError("Acceso denegado. Se requiere el rol de administrador o evaluador.");
-        auth.signOut().catch(err => console.error("No se pudo cerrar la sesión sin permiso:", err));
+        signOut(auth).catch(err => console.error("No se pudo cerrar la sesión sin permiso:", err));
       }
     }).catch(err => {
       if (stateVersion !== authVerificationVersion) return;
@@ -2805,8 +2805,8 @@
     const email = document.getElementById('adminAuthEmail').value.trim().toLowerCase();
     const password = document.getElementById('adminAuthPassword').value;
     try {
-      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      await auth.signInWithEmailAndPassword(email, password);
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithEmailAndPassword(auth, email, password);
       document.getElementById('adminAuthPassword').value = "";
     } catch (err) {
       console.error("No se pudo iniciar sesión en el Mini Panel:", err);
@@ -2816,11 +2816,6 @@
     } finally {
       adminAuthButton.disabled = false;
     }
-  });
-
-  // Habilitar caché local offline para patios y carreteras
-  db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-    console.log("Caché offline de Firebase activa.");
   });
 
   // Definición de ítems por sección para sincronización y generación móvil
@@ -3726,7 +3721,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     try {
       let user = auth.currentUser;
       if (!user) {
-        const credential = await auth.signInAnonymously();
+        const credential = await signInAnonymously(auth);
         user = credential.user;
       }
       record.creadoPor = user.uid;
@@ -3737,7 +3732,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
         localStorage.setItem(STORAGE_KEY_EVALS, JSON.stringify(historico));
       }
 
-      await db.collection("evaluaciones_conduccion").doc(record.id).set(record);
+      await setDoc(doc(db, "evaluaciones_conduccion", record.id), record);
       console.log("Evaluación de conducción sincronizada con Firestore:", record.id);
     } catch (err) {
       console.warn("La evaluación permanece guardada localmente; no se pudo sincronizar con Firestore:", err);
@@ -4497,6 +4492,17 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
     }
   }
 
+  Object.assign(window, {
+    abrirModalFirma, cambiarPestana, cargarEvaluacion, cargarEvaluacionDescarga,
+    cerrarModalFirma, clearSigCanvas, configurarNube, eliminarEvaluacion,
+    exportarCSV, filtrarHistorial, guardarEnHistorial, guardarFirmaDesdeModal,
+    handleSigUpload, imprimirDesdeHistorial, imprimirEvaluacionDescarga,
+    imprimirFormatoOficial, limpiarModalCanvas, limpiarTodo, marcarGrupo,
+    nuevaEvaluacion, respaldarJSON, restaurarJSON, setAptoManual, syncFecha,
+    syncFromPaper, syncModalidad, syncSingleCheckGroup, syncToPaper,
+    toggleAccordion, toggleMobileCheck, toggleMobileItem, togglePaperCheck,
+    togglePaperCheckIndex, toggleTimer, triggerSigUpload
+  });
 </script>
 </body>
 </html>
