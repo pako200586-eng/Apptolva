@@ -480,7 +480,7 @@
       runTransaction
     } from "./js/firebase-sdk.js";
     import { crearFirmaFalla, crearFirmasFalla, idCoberturaFalla, separarSistemasFalla } from "./js/firmaFalla.js";
-    import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, validarCatalogo } from "./js/catalogoEquipos.js";
+    import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, puedeAdministrarCatalogo, validarCatalogo } from "./js/catalogoEquipos.js";
     import { validarEntrada } from "./js/controlSesion.js";
 
     const firebaseConfig = getFirebaseConfig();
@@ -764,6 +764,7 @@
     function aplicarPermisosDeInterfaz() {
       const esAdmin = state.role === 'admin';
       const esResponsable = esAdmin && state.operacionesSensibles === true;
+      const esResponsableCatalogo = puedeAdministrarCatalogo(state.role, state.user?.email);
       document.querySelectorAll('.btn-accion-admin').forEach((element) => {
         element.classList.toggle('hidden', !esAdmin);
       });
@@ -773,8 +774,8 @@
       });
       $('auditFirestoreBtn').classList.toggle('hidden', !esResponsable);
       $('backupFirestoreBtn').classList.toggle('hidden', !esResponsable);
-      $('btn-vista-catalogo').classList.toggle('hidden', !esResponsable);
-      if (!esResponsable && !$('vista-catalogo').classList.contains('hidden')) $('btn-vista-reportes').click();
+      $('btn-vista-catalogo').classList.toggle('hidden', !esResponsableCatalogo);
+      if (!esResponsableCatalogo && !$('vista-catalogo').classList.contains('hidden')) $('btn-vista-reportes').click();
       $('cargarMasAntiguos').classList.toggle('hidden', !esAdmin);
       if (!esAdmin && state.windowDays > VENTANA_PASO_DIAS) state.windowDays = VENTANA_PASO_DIAS;
       if (!esResponsable) {
@@ -1470,6 +1471,29 @@
     });
 
     let authStateVersion = 0;
+    async function consultarOperacionesSensibles(user, version) {
+      try {
+        const token = await user.getIdToken();
+        const respuesta = await fetch('/.netlify/functions/cerrar-fallas-repetidas', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'privileges' })
+        });
+        if (!respuesta.ok) throw new Error(`El servicio respondió ${respuesta.status}.`);
+        const privilegios = await respuesta.json();
+        if (version !== authStateVersion) return;
+        state.operacionesSensibles = privilegios.sensibles === true;
+        aplicarPermisosDeInterfaz();
+        if (!state.operacionesSensibles && puedeAdministrarCatalogo(state.role, state.user?.email)) {
+          showToast('Las operaciones sensibles no están habilitadas en Netlify.');
+        }
+      } catch (error) {
+        if (version !== authStateVersion) return;
+        console.error('No se pudieron consultar los privilegios de operaciones sensibles:', error);
+        showToast('No se pudieron comprobar las operaciones sensibles. Revisa la conexión y Netlify.');
+      }
+    }
+
     onAuthStateChanged(auth, async (user) => {
       const currentAuthStateVersion = ++authStateVersion;
       let authenticatedUser = null;
@@ -1498,18 +1522,7 @@
       state.role = userRole;
       state.operacionesSensibles = false;
       if (authenticatedUser && userRole === 'admin') {
-        try {
-          const token = await authenticatedUser.getIdToken();
-          const respuestaPrivilegios = await fetch('/.netlify/functions/cerrar-fallas-repetidas', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'privileges' })
-          });
-          if (respuestaPrivilegios.ok) state.operacionesSensibles = (await respuestaPrivilegios.json()).sensibles === true;
-        } catch (error) {
-          console.warn('No se pudieron consultar los privilegios de operaciones sensibles:', error);
-        }
-        if (currentAuthStateVersion !== authStateVersion) return;
+        consultarOperacionesSensibles(authenticatedUser, currentAuthStateVersion);
       }
       const loginPanel = $('loginPanel');
       const dashboard = $('dashboard');
@@ -3116,7 +3129,7 @@
     const ETIQUETA_TIPO_EQUIPO = { tracto: 'Tracto', tolva: 'Tolva', dolly: 'Dolly', utilitaria: 'Utilitaria' };
 
     async function cargarCatalogoEquipos() {
-      if (state.operacionesSensibles !== true) return;
+      if (!puedeAdministrarCatalogo(state.role, state.user?.email)) return;
       const cuerpo = $('tabla-catalogo-body');
       cuerpo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center font-bold text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando catálogo...</td></tr>';
       try {
@@ -3167,7 +3180,7 @@
     }
 
     async function altaEquipo(tipo, economicoCapturado, notas) {
-      if (state.role !== 'admin' || state.operacionesSensibles !== true) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
+      if (!puedeAdministrarCatalogo(state.role, state.user?.email)) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
       // Un catálogo parcial reemplazaría la lista base en los dispositivos y bloquearía checklists válidos.
       if (!catalogoState.equipos.length) throw new Error('Primero carga los equipos base para dar de alta nuevos equipos.');
       const economico = normalizarEconomico(economicoCapturado);
@@ -3193,7 +3206,7 @@
     }
 
     async function cambiarEstadoEquipo(id, estado) {
-      if (state.role !== 'admin' || state.operacionesSensibles !== true) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
+      if (!puedeAdministrarCatalogo(state.role, state.user?.email)) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
       await updateDoc(doc(db, 'catalogo_equipos', id), {
         estado,
         updated_at: new Date().toISOString(),
@@ -3203,7 +3216,7 @@
 
     // Solo crea lo que falta: nunca pisa el estado de un equipo ya existente, aunque la lista local esté desactualizada.
     async function cargarEquiposBase() {
-      if (state.role !== 'admin' || state.operacionesSensibles !== true) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
+      if (!puedeAdministrarCatalogo(state.role, state.user?.email)) throw new Error('Solo el responsable autorizado puede administrar el catálogo.');
       const faltantes = equiposFaltantes(catalogoState.equipos);
       if (!faltantes.length) return 0;
       const fecha = new Date().toISOString();

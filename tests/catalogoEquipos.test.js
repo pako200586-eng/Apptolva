@@ -7,6 +7,7 @@ import {
   activosPorTipo,
   equiposFaltantes,
   normalizarEconomico,
+  puedeAdministrarCatalogo,
   validarCatalogo,
   validarEquipo,
   validarTrenDeCarga
@@ -15,6 +16,14 @@ import { crearFirmaFalla } from '../apptolva_bitacora/js/firmaFalla.js';
 
 const contar = (tipo) => CATALOGO_SEMILLA.filter((equipo) => equipo.tipo === tipo).length;
 const tren = { modalidad: 'full', tracto: '13817', tolva1: '14109', dolly: '14148', tolva2: '14110' };
+
+test('solo el administrador responsable gestiona el catálogo, independientemente de Netlify', () => {
+  assert.equal(puedeAdministrarCatalogo('admin', 'FRANK@APPTOLVA.COM'), true);
+  assert.equal(puedeAdministrarCatalogo('admin', 'otro@example.test'), false);
+  assert.equal(puedeAdministrarCatalogo('master', 'frank@apptolva.com'), false);
+  assert.equal(puedeAdministrarCatalogo('operador', 'frank@apptolva.com'), false);
+  assert.equal(puedeAdministrarCatalogo('admin', null), false);
+});
 
 test('la semilla confirmada es consistente y no tiene duplicados', () => {
   assert.deepEqual(validarCatalogo(CATALOGO_SEMILLA), []);

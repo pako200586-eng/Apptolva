@@ -45,6 +45,11 @@ export const COMPONENTES_TREN = {
 
 const NUMERO_ECONOMICO = /^\d+$/;
 
+export function puedeAdministrarCatalogo(rol, correo) {
+  return rol === 'admin' && typeof correo === 'string' &&
+    correo.toLowerCase() === 'frank@apptolva.com';
+}
+
 // Acepta variantes comunes de captura ("T14148", " 14148 ") sin alterar el número.
 export function normalizarEconomico(valor) {
   return String(valor ?? '').trim().toUpperCase().replace(/\s+/g, '').replace(/^T(?=\d)/, '');
