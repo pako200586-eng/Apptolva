@@ -1094,10 +1094,11 @@
     font-size: 12px;
   }
   
+body.auth-pending { visibility: hidden; }
 </style>
 
 </head>
-<body>
+<body class="auth-pending">
 <div id="adminAuthOverlay" class="admin-auth-overlay">
   <form id="adminAuthForm" class="admin-auth-card">
     <h2 style="margin: 0; color: var(--slate-900);">Acceso al Mini Panel</h2>
@@ -2683,10 +2684,12 @@
     browserLocalPersistence, collection, doc, getAuth, getDoc, getFirebaseConfig,
     initializeApp, initializeFirestore, onAuthStateChanged, onSnapshot, orderBy,
     persistentLocalCache, persistentMultipleTabManager, query, setDoc,
-    setPersistence, signInAnonymously, signInWithEmailAndPassword, signOut
+    setPersistence, signInWithEmailAndPassword
   } from "./js/firebase-sdk.js";
+  import { leerPerfil, validarEntrada, validarEspacio } from "./js/controlSesion.js";
 
-  const app = initializeApp(getFirebaseConfig());
+  const firebaseConfig = getFirebaseConfig();
+  const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = initializeFirestore(app, {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
@@ -2757,14 +2760,25 @@
 
   onAuthStateChanged(auth, user => {
     if (!ADMIN_PANEL_MODE) {
-      if (!user) {
-        signInAnonymously(auth).catch(err => console.warn("Aviso Auth AppTolva:", err.message));
-      } else {
-        console.log("Sesión activa AppTolva (Firebase):", user.uid);
+      window.apptolvaEvaluacionActiva = false;
+      document.body.classList.add('auth-pending');
+      try {
+        if (!user || user.isAnonymous) throw new Error('Se requiere una cuenta de evaluador.');
+        validarEspacio(localStorage, firebaseConfig.projectId, user);
+        const profile = leerPerfil(localStorage, firebaseConfig.projectId, user.uid);
+        if (!profile || !['admin', 'evaluador'].includes(profile.rolEvaluaciones)) {
+          throw new Error('El perfil no tiene permiso de evaluación.');
+        }
+        window.apptolvaEvaluacionActiva = true;
+        document.body.classList.remove('auth-pending');
+      } catch (error) {
+        console.warn('Acceso a evaluación no disponible:', error);
+        window.location.replace('./index.html');
       }
       return;
     }
 
+    document.body.classList.remove('auth-pending');
     const stateVersion = ++authVerificationVersion;
     if (!user) {
       adminAuthOverlay.hidden = false;
@@ -2776,7 +2790,6 @@
       && user.providerData.some(provider => provider.providerId === 'password');
     if (!isPasswordUser) {
       showAdminAuthError("Inicia sesión con una cuenta de Evaluaciones autorizada.");
-      signOut(auth).catch(err => console.error("No se pudo cerrar la sesión no autorizada:", err));
       return;
     }
 
@@ -2789,7 +2802,6 @@
         startHistorySync();
       } else {
         showAdminAuthError("Acceso denegado. Se requiere el rol de administrador o evaluador.");
-        signOut(auth).catch(err => console.error("No se pudo cerrar la sesión sin permiso:", err));
       }
     }).catch(err => {
       if (stateVersion !== authVerificationVersion) return;
@@ -2805,6 +2817,10 @@
     const email = document.getElementById('adminAuthEmail').value.trim().toLowerCase();
     const password = document.getElementById('adminAuthPassword').value;
     try {
+      validarEntrada(localStorage, firebaseConfig.projectId, email);
+      if (auth.currentUser && auth.currentUser.email?.toLowerCase() !== email) {
+        throw new Error("Vuelve al menú y cierra la sesión actual antes de cambiar de cuenta.");
+      }
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       document.getElementById('adminAuthPassword').value = "";
@@ -3720,9 +3736,8 @@ document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
   async function sincronizarConduccionFirebase(record) {
     try {
       let user = auth.currentUser;
-      if (!user) {
-        const credential = await signInAnonymously(auth);
-        user = credential.user;
+      if (!user || (!ADMIN_PANEL_MODE && !window.apptolvaEvaluacionActiva)) {
+        throw new Error("La sesión de evaluación no está autorizada.");
       }
       record.creadoPor = user.uid;
       const historico = obtenerHistorial();

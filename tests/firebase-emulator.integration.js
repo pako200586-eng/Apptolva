@@ -14,15 +14,20 @@ import {
 } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
+  collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
+  query,
   setLogLevel,
-  setDoc
+  setDoc,
+  where
 } from 'firebase/firestore';
 import cerrarFallasHandler, { idCobertura } from '../netlify/functions/cerrar-fallas-repetidas.js';
 import { crearFirmaFalla } from '../apptolva_bitacora/js/firmaFalla.js';
+import { migrarCuenta } from '../migrar_operadores.js';
 
 const firestoreEmulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
 const authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
@@ -83,6 +88,92 @@ const ownerDb = getFirestore(ownerApp);
 connectFirestoreEmulator(ownerDb, firestoreAddress.hostname, firestoreAddress.port);
 const emailResponsable = 'frank@apptolva.com';
 setLogLevel('silent');
+
+test('migración crea el perfil por correo y es reanudable en Auth y Firestore', async (t) => {
+  const uid = `migration-${appId}`;
+  const email = `migration-${appId}@example.test`;
+  const operador = { numero: '221948', nombre: 'Prueba', email, rol: 'master' };
+  const credencial = { uid, password: 'Temporal-unica-para-emulador' };
+  const ctx = { auth: adminAuth, db: adminDb, operador, credencial, timestamp: () => new Date() };
+  t.after(async () => {
+    await adminDb.collection('usuarios').doc(email).delete();
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (error) {
+      if (error.code !== 'auth/user-not-found') throw error;
+    }
+  });
+  assert.equal(await migrarCuenta(ctx), 'creado');
+  const profile = await adminDb.collection('usuarios').doc(email).get();
+  assert.equal(profile.get('uid'), uid);
+  assert.equal(profile.get('rol_evaluaciones'), 'evaluador');
+  assert.equal(await migrarCuenta(ctx), 'existente');
+});
+
+test('operadores autenticados solo consultan y modifican sus propios reportes', async (t) => {
+  const apps = ['a', 'b', 'master'].map((suffix) => initializeClientApp({
+    apiKey: 'demo-api-key', projectId: proyecto
+  }, `route-${suffix}-${appId}`));
+  const clients = apps.map((app) => {
+    const auth = getAuth(app);
+    connectAuthEmulator(auth, `http://${authEmulatorHost}`, { disableWarnings: true });
+    const db = getFirestore(app);
+    connectFirestoreEmulator(db, firestoreAddress.hostname, firestoreAddress.port);
+    return { auth, db };
+  });
+  const emails = clients.map((_, i) => `route-${i}-${appId}@example.test`);
+  const users = [];
+  const id = `route-report-${appId}`;
+  const historicos = ['inside', 'outside', 'future'].map((suffix) => `${id}-${suffix}`);
+  t.after(async () => {
+    await adminDb.collection('bitacora_reports').doc(id).delete();
+    for (const historico of historicos) await adminDb.collection('bitacora_reports').doc(historico).delete();
+    for (const email of emails) await adminDb.collection('usuarios').doc(email).delete();
+    for (const user of users) await adminAuth.deleteUser(user.uid);
+    for (const app of apps) await deleteClientApp(app);
+  });
+  for (let i = 0; i < clients.length; i++) {
+    const { user } = await createUserWithEmailAndPassword(clients[i].auth, emails[i], 'Emulator123!');
+    users.push(user);
+    await adminDb.collection('usuarios').doc(emails[i]).set({
+      rol: i === 2 ? 'master' : 'operador',
+      ...(i === 2 ? { rol_evaluaciones: 'evaluador' } : {})
+    });
+  }
+  const reference = clients.map(({ db }) => doc(db, 'bitacora_reports', id));
+  const report = {
+    id, owner_uid: users[0].uid, report_type: 'checklist',
+    created_at: new Date().toISOString(), payload: {}
+  };
+  await setDoc(reference[0], report);
+  assert.equal((await getDoc(reference[0])).exists(), true);
+  await assert.rejects(getDoc(reference[1]), { code: 'permission-denied' });
+  await assert.rejects(setDoc(reference[1], { ...report, owner_uid: users[1].uid }));
+  await assert.rejects(setDoc(reference[0], { ...report, owner_uid: users[1].uid }));
+  await assert.rejects(setDoc(reference[0], { ...report, extra: true }));
+  await assert.rejects(setDoc(reference[0], { ...report, folio_definitivo: 'falso' }));
+  await setDoc(reference[0], { synced_at: new Date().toISOString() }, { merge: true });
+  const own = query(collection(clients[0].db, 'bitacora_reports'), where('owner_uid', '==', users[0].uid));
+  assert.equal((await getDocs(own)).size, 1);
+  const porId = (idBuscado) => query(collection(clients[0].db, 'bitacora_reports'),
+    where('owner_uid', '==', users[0].uid), where('id', '==', idBuscado));
+  assert.equal((await getDocs(porId(id))).size, 1);
+  assert.equal((await getDocs(porId(`${id}-inexistente`))).size, 0);
+  const ahora = Date.now();
+  for (const [i, offset] of [-47, -49, 1].entries()) {
+    await adminDb.collection('bitacora_reports').doc(historicos[i]).set({
+      ...report, id: historicos[i], created_at: new Date(ahora + offset * 3600000).toISOString()
+    });
+  }
+  const reciente = query(collection(clients[0].db, 'bitacora_reports'),
+    where('owner_uid', '==', users[0].uid),
+    where('created_at', '>=', new Date(ahora - 48 * 3600000).toISOString()),
+    where('created_at', '<=', new Date(ahora).toISOString()));
+  assert.deepEqual((await getDocs(reciente)).docs.map((d) => d.id).sort(), [id, historicos[0]].sort());
+  await assert.rejects(getDocs(collection(clients[1].db, 'bitacora_reports')), { code: 'permission-denied' });
+  assert.equal((await getDoc(reference[2])).exists(), true);
+  await assert.rejects(setDoc(reference[2], report));
+});
 
 test('cierre, reintento retroactivo y permisos funcionan con los emuladores', async (t) => {
   const adminUser = await createUserWithEmailAndPassword(clientAuth, emailAdmin, 'Emulator123!');

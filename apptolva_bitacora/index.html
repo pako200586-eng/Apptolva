@@ -88,10 +88,20 @@
             <h2 class="text-xl font-black text-slate-800 mb-1">APPTOLVA 🚛 PA CHAPO</h2>
             <p class="text-[10px] text-gray-500 mb-4 font-bold uppercase tracking-widest">FLOTA PROPIA</p>
             
-            <input type="password" id="passInput" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-2xl tracking-widest mb-4 font-bold outline-none focus:border-orange-500" placeholder="PIN" maxlength="4">
-            
-            <p id="errorMsg" class="hidden text-xs font-bold text-red-600 mb-3">PIN incorrecto. Inténtalo de nuevo.</p>
-            <button onclick="checkLogin()" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition uppercase">Entrar</button>
+            <form id="form-login" class="text-left">
+                <label for="login-email" class="block text-sm font-bold">Correo</label>
+                <input type="email" id="login-email" name="email" autocomplete="username" required class="w-full p-3 border-2 border-gray-300 rounded-lg mb-3">
+                <label for="login-password" class="block text-sm font-bold">Contraseña</label>
+                <input type="password" id="login-password" name="password" autocomplete="current-password" required class="w-full p-3 border-2 border-gray-300 rounded-lg mb-3">
+                <p id="errorMsg" role="alert" class="hidden text-xs font-bold text-red-600 mb-3"></p>
+                <button id="login-submit" type="submit" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition uppercase">Entrar</button>
+            </form>
+            <div id="legacy-login" class="hidden mt-4 border-t pt-4 text-left">
+                <p class="text-xs mb-2">Hay datos de una sesión anterior. Termina y sincroniza ese trabajo antes de cambiar de cuenta.</p>
+                <label for="legacy-pin" class="block text-xs font-bold">PIN anterior</label>
+                <input id="legacy-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="4" class="w-full p-2 border rounded mb-2">
+                <button type="button" id="legacy-submit" class="w-full bg-slate-700 text-white font-bold py-3 rounded-lg">Continuar sesión anterior</button>
+            </div>
             
             <div class="mt-6 pt-4 border-t border-gray-100 text-left">
                 <p class="text-[9px] text-gray-400 leading-tight">
@@ -168,17 +178,20 @@
                 <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
             </button>
 
-            <!-- 6. Evaluación -->
-            <button onclick="window.location.href='evaluaciones.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
-                <i class="fas fa-user-check text-3xl text-green-500 mb-2"></i>
-                <span class="font-bold text-gray-700 text-xs text-center">EVALUACIÓN</span>
-            </button>
-
-            <!-- 7. Panel Administrativo -->
-            <button onclick="window.location.href='admin.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-green-800 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02] col-span-2">
-                <i class="fas fa-user-shield text-3xl text-green-800 mb-2"></i>
-                <span class="font-bold text-gray-700 text-xs text-center">PANEL ADMINISTRATIVO</span>
-            </button>
+            <div id="modulos-oficina" class="contents"></div>
+            <section id="historial-propio" class="col-span-2 hidden rounded-xl bg-white p-4 shadow">
+                <h3 class="font-bold">Mis reportes de las últimas 48 horas</h3>
+                <p id="historial-estado" role="status" class="text-xs text-gray-600 mt-2"></p>
+                <ul id="historial-lista" class="mt-2 space-y-2"></ul>
+                <button id="historial-actualizar" type="button" class="mt-3 rounded bg-slate-700 p-3 text-white font-bold">Actualizar historial</button>
+            </section>
+            <section id="respaldos-reportes" class="col-span-2 hidden rounded-xl bg-white p-4 shadow">
+                <h3 class="font-bold">Reportes pendientes de confirmar</h3>
+                <p id="respaldos-estado" role="status" class="text-xs text-gray-600 mt-2"></p>
+                <ul id="respaldos-lista" class="mt-2 space-y-2"></ul>
+            </section>
+            <p id="estado-sesion" role="status" class="col-span-2 text-xs text-gray-600"></p>
+            <button id="cerrar-sesion" type="button" class="col-span-2 rounded bg-slate-700 p-3 text-white font-bold">Cerrar sesión</button>
 
             <!-- Botón Reset -->
             <button type="button" onclick="borrarDatosLocales()" class="menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">
@@ -444,17 +457,16 @@
         if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
         // iOS suspende la app sin avisar: guardar al ocultarse únicamente si no se está limpiando.
         document.addEventListener('visibilitychange', () => {
-            if (!ignorarAutoGuardado && document.visibilityState === 'hidden') autoGuardar();
+            if (window.apptolvaAccesoActivo && !ignorarAutoGuardado && document.visibilityState === 'hidden') autoGuardar();
         });
         window.addEventListener('pagehide', () => {
-            if (!ignorarAutoGuardado) autoGuardar();
+            if (window.apptolvaAccesoActivo && !ignorarAutoGuardado) autoGuardar();
         });
 
         document.addEventListener('DOMContentLoaded', function() {
             try {
                 initModalCanvasEvents();
                 actualizarFirmasUI();
-                cargarDatosGuardados();
                 
                 const inputs = document.querySelectorAll('.save-me, textarea');
                 inputs.forEach(input => {
@@ -557,20 +569,6 @@
                 setTimeout(() => { ignorarAutoGuardado = false; }, 300);
                 nav('rev');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        }
-
-        function checkLogin() {
-            try {
-                const pass = document.getElementById('passInput').value;
-                if(pass === '2020') {
-                    document.getElementById('login-overlay').style.display = 'none';
-                    nav('menu'); 
-                } else {
-                    document.getElementById('errorMsg').classList.remove('hidden');
-                }
-            } catch(e) {
-                alert("Error al iniciar: " + e.message);
             }
         }
 
@@ -1306,9 +1304,20 @@
         window.addEventListener('firestore-report-synced', (event) => {
             const { id } = event.detail || {};
             if (!id) return;
-            localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
-            localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
+            if (localStorage.getItem(FIRESTORE_PENDING_REPORT_ID_KEY) === id) {
+                localStorage.removeItem(FIRESTORE_PENDING_REPORT_ID_KEY);
+                localStorage.removeItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY);
+            }
             console.log("✅ Reporte pendiente sincronizado con Firebase:", id);
+        });
+
+        window.addEventListener('firestore-report-sync-error', (event) => {
+            const { id, message } = event.detail || {};
+            console.error('No se pudo sincronizar el reporte:', id, message);
+            const respaldado = id && localStorage.getItem('apptolva_pending_firestore_backup_' + id);
+            alert(respaldado
+                ? 'No se pudo confirmar la sincronización. El respaldo permanece en este dispositivo; consulta los reportes pendientes y contacta al administrador.'
+                : 'No se pudo actualizar el estado de sincronización. Conserva el PDF y contacta al administrador.');
         });
 
         // --- ASISTENTE IA ---
@@ -1424,15 +1433,22 @@
         import {
             collection,
             doc,
+            getDocFromServer,
+            getDocs,
             getDocsFromServer,
             initializeFirestore,
             onSnapshot,
+            orderBy,
             persistentLocalCache,
             persistentMultipleTabManager,
+            query,
             runTransaction,
-            setDoc
+            setDoc,
+            waitForPendingWrites,
+            where
         } from "./js/firebase-sdk.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "./js/firebase-sdk.js";
+        import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
        
         const firebaseConfig = getFirebaseConfig();
 
@@ -1445,56 +1461,300 @@
                 localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
             });
             const auth = getAuth(app);
-            let signInPromise = null;
+            const projectId = firebaseConfig.projectId;
+            const form = document.getElementById('form-login');
+            const errorElement = document.getElementById('errorMsg');
+            const estadoSesion = document.getElementById('estado-sesion');
+            const legacyKey = `apptolva_legacy_${projectId}`;
+            let usuarioActivo = null;
+            let versionAuth = 0;
+            let datosCargados = false;
 
-            function iniciarSesionAnonima() {
-                if (!signInPromise) {
-                    signInPromise = signInAnonymously(auth)
-                        .then((credential) => credential.user)
-                        .finally(() => { signInPromise = null; });
+            function mostrarError(message) {
+                errorElement.textContent = message;
+                errorElement.classList.remove('hidden');
+            }
+
+            async function esperarEscrituras() {
+                if (!auth.currentUser) return;
+                let timer;
+                try {
+                    await Promise.race([
+                        waitForPendingWrites(db),
+                        new Promise((_, reject) => {
+                            timer = setTimeout(() => reject(new Error('Hay escrituras sin confirmar o no hay conexión. Sincroniza antes de cambiar de sesión.')), 8000);
+                        })
+                    ]);
+                } finally {
+                    clearTimeout(timer);
                 }
-                return signInPromise;
             }
 
             function esperarAuthListo() {
-                if (auth.currentUser) return Promise.resolve(auth.currentUser);
-                return new Promise((resolve, reject) => {
-                    let detener = () => {};
-                    let timeout;
-                    let iniciado = false;
-                    let fin = false;
-                    const terminar = (cb, val) => {
-                        if (fin) return;
-                        fin = true;
-                        clearTimeout(timeout);
-                        detener();
-                        cb(val);
-                    };
-                    timeout = setTimeout(() => {
-                        terminar(reject, new Error("Tiempo de espera agotado en Firebase Auth."));
-                    }, 10000);
-                    detener = onAuthStateChanged(auth, (user) => {
-                        if (user) { terminar(resolve, user); return; }
-                        if (iniciado) return;
-                        iniciado = true;
-                        iniciarSesionAnonima().then((u) => terminar(resolve, u), (err) => terminar(reject, err));
-                    }, (err) => terminar(reject, err));
-                });
+                if (usuarioActivo && auth.currentUser?.uid === usuarioActivo.uid) return Promise.resolve(usuarioActivo);
+                return Promise.reject(new Error("Inicia sesión antes de guardar o sincronizar."));
             }
 
-            onAuthStateChanged(auth, (user) => {
-                if (!user) iniciarSesionAnonima().catch(console.error);
+            function botonOficina(texto, destino) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'menu-btn bg-slate-800 text-white p-4 rounded-xl shadow-md h-24 font-bold';
+                button.textContent = texto;
+                button.addEventListener('click', () => { window.location.href = destino; });
+                return button;
+            }
+
+            async function cargarHistorial() {
+                const status = document.getElementById('historial-estado');
+                const lista = document.getElementById('historial-lista');
+                const user = usuarioActivo;
+                if (!user || user.isAnonymous) return;
+                status.textContent = 'Cargando reportes…';
+                try {
+                    const { desde, hasta } = intervaloHistorial();
+                    const consulta = query(collection(db, 'bitacora_reports'),
+                        where('owner_uid', '==', user.uid), where('created_at', '>=', desde),
+                        where('created_at', '<=', hasta), orderBy('created_at', 'desc'));
+                    const snapshot = await getDocs(consulta);
+                    if (usuarioActivo?.uid !== user.uid) return;
+                    lista.replaceChildren();
+                    for (const report of snapshot.docs) {
+                        const data = report.data();
+                        const li = document.createElement('li');
+                        const link = document.createElement('a');
+                        link.className = 'block rounded border p-3 text-blue-700 underline';
+                        link.href = `./viewer.html?id=${encodeURIComponent(report.id)}`;
+                        link.textContent = `${data.report_type || 'Reporte'} · ${data.folio || 'Sin folio'} · ${data.created_at || ''}`;
+                        li.append(link);
+                        lista.append(li);
+                    }
+                    status.textContent = snapshot.empty ? 'No hay reportes en este intervalo.' :
+                        (snapshot.metadata.fromCache ? 'Mostrando datos disponibles en el dispositivo.' : `${snapshot.size} reporte(s).`);
+                } catch (error) {
+                    console.error('No se pudo cargar el historial:', error);
+                    status.textContent = 'No se pudo cargar el historial. Verifica la conexión y los permisos.';
+                }
+            }
+
+            function mostrarRespaldos() {
+                const section = document.getElementById('respaldos-reportes');
+                const list = document.getElementById('respaldos-lista');
+                const status = document.getElementById('respaldos-estado');
+                if (!usuarioActivo) return;
+                try {
+                    const reports = listarRespaldosReportes(localStorage, projectId, usuarioActivo.uid);
+                    list.replaceChildren();
+                    section.classList.toggle('hidden', reports.length === 0);
+                    status.textContent = 'Conservados en este dispositivo hasta que el servidor confirme su recepción.';
+                    for (const data of reports) {
+                        const item = document.createElement('li');
+                        const label = document.createElement('span');
+                        label.textContent = `${data.folio || data.id} `;
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'rounded bg-slate-700 p-3 text-white font-bold';
+                        button.textContent = 'Reintentar';
+                        button.addEventListener('click', async () => {
+                            button.disabled = true;
+                            try {
+                                const result = await escribirReporte(data, usuarioActivo);
+                                status.textContent = result.status === 'pending'
+                                    ? 'Guardado localmente; esperando confirmación del servidor.'
+                                    : 'Reporte confirmado por el servidor.';
+                            } catch (error) {
+                                console.error('No se pudo reintentar el reporte:', error);
+                                status.textContent = `No se pudo reintentar: ${error.message}`;
+                            } finally {
+                                button.disabled = false;
+                            }
+                        });
+                        item.append(label, button);
+                        list.append(item);
+                    }
+                } catch (error) {
+                    section.classList.remove('hidden');
+                    console.error(error);
+                    status.textContent = error.message;
+                }
+            }
+
+            function habilitarAcceso(user, profile, cached) {
+                const yaActivo = usuarioActivo?.uid === user.uid && window.apptolvaAccesoActivo;
+                usuarioActivo = user;
+                window.apptolvaAccesoActivo = true;
+                document.getElementById('login-overlay').style.display = 'none';
+                const office = document.getElementById('modulos-oficina');
+                office.replaceChildren();
+                if (profile && ['admin', 'master', 'lectura'].includes(profile.rol)) {
+                    office.append(botonOficina('Panel administrativo', './admin.html'));
+                }
+                if (profile && ['admin', 'evaluador'].includes(profile.rolEvaluaciones)) {
+                    office.append(botonOficina('Evaluaciones de conducción', './evaluaciones.html'));
+                }
+                document.getElementById('historial-propio').classList.toggle('hidden', user.isAnonymous);
+                estadoSesion.textContent = user.isAnonymous ? 'Sesión anterior: finaliza y sincroniza antes de cambiar de cuenta.' :
+                    `${profile.nombre}${cached ? ' · Perfil guardado: los cambios de permiso se comprobarán al recuperar conexión.' : ''}`;
+                if (!datosCargados) {
+                    cargarDatosGuardados();
+                    datosCargados = true;
+                }
+                if (!yaActivo) nav('menu');
+                const pending = localStorage.getItem('apptolva_pending_firestore_report_id');
+                if (pending) observarSincronizacionReporte(pending);
+                mostrarRespaldos();
+                if (!yaActivo) {
+                    if (!user.isAnonymous) cargarHistorial();
+                    window.dispatchEvent(new Event('apptolva-auth-ready'));
+                    if (new URLSearchParams(window.location.search).has('logout')) {
+                        history.replaceState(null, '', window.location.pathname);
+                        document.getElementById('cerrar-sesion').click();
+                    }
+                }
+            }
+
+            async function comprobarPerfil(user, version, cached) {
+                try {
+                    const snapshot = await getDocFromServer(doc(db, 'usuarios', user.email.toLowerCase()));
+                    if (version !== versionAuth) return;
+                    const profile = snapshot.exists() ? perfilValido(snapshot.data(), user.displayName || user.email) : null;
+                    if (!profile) {
+                        borrarPerfil(localStorage);
+                        usuarioActivo = null;
+                        window.apptolvaAccesoActivo = false;
+                        document.getElementById('login-overlay').style.display = 'flex';
+                        mostrarError('La cuenta no tiene un perfil de acceso válido.');
+                        return;
+                    }
+                    registrarEspacio(localStorage, projectId, user);
+                    guardarPerfil(localStorage, projectId, user.uid, profile);
+                    habilitarAcceso(user, profile, false);
+                } catch (error) {
+                    if (version !== versionAuth) return;
+                    console.error('No se pudo comprobar el perfil:', error);
+                    if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
+                        borrarPerfil(localStorage);
+                        usuarioActivo = null;
+                        window.apptolvaAccesoActivo = false;
+                        document.getElementById('login-overlay').style.display = 'flex';
+                        mostrarError('No se pudo autorizar la cuenta. Contacta al administrador.');
+                    } else if (cached) {
+                        estadoSesion.textContent = 'Perfil guardado: no se pudo comprobar el permiso con el servidor.';
+                    } else {
+                        mostrarError('No se pudo comprobar el perfil. Conéctate e inténtalo de nuevo.');
+                    }
+                }
+            }
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const email = document.getElementById('login-email').value.trim().toLowerCase();
+                const password = document.getElementById('login-password').value;
+                const button = document.getElementById('login-submit');
+                errorElement.classList.add('hidden');
+                button.disabled = true;
+                try {
+                    validarEntrada(localStorage, projectId, email);
+                    await esperarEscrituras();
+                    await signInWithEmailAndPassword(auth, email, password);
+                    document.getElementById('login-password').value = '';
+                } catch (error) {
+                    console.error('No se pudo iniciar sesión:', error);
+                    const message = error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials'
+                        ? 'Correo o contraseña incorrectos.' : (error.code === 'auth/network-request-failed'
+                            ? 'No se pudo conectar para iniciar sesión.' : error.message);
+                    mostrarError(message);
+                } finally {
+                    button.disabled = false;
+                }
             });
 
-            const pendingReportIdKey = "apptolva_pending_firestore_report_id";
+            document.getElementById('legacy-submit').addEventListener('click', () => {
+                if (!auth.currentUser?.isAnonymous || document.getElementById('legacy-pin').value !== '2020') {
+                    mostrarError('No se pudo recuperar la sesión anterior o el PIN es incorrecto.');
+                    return;
+                }
+                sessionStorage.setItem(legacyKey, auth.currentUser.uid);
+                habilitarAcceso(auth.currentUser, null, false);
+            });
+
+            document.getElementById('cerrar-sesion').addEventListener('click', async () => {
+                try {
+                    if (auth.currentUser?.isAnonymous && hayTrabajoAnterior(localStorage)) {
+                        throw new Error('La sesión anterior contiene trabajo local. No cierres la sesión hasta recuperarlo y sincronizarlo.');
+                    }
+                    await esperarEscrituras();
+                    sessionStorage.removeItem(legacyKey);
+                    borrarPerfil(localStorage);
+                    await signOut(auth);
+                    window.location.reload();
+                } catch (error) {
+                    console.error('No se pudo cerrar sesión:', error);
+                    estadoSesion.textContent = error.message;
+                }
+            });
+            document.getElementById('historial-actualizar').addEventListener('click', cargarHistorial);
+
+            onAuthStateChanged(auth, (user) => {
+                const version = ++versionAuth;
+                usuarioActivo = null;
+                window.apptolvaAccesoActivo = false;
+                document.getElementById('login-overlay').style.display = 'flex';
+                document.getElementById('legacy-login').classList.toggle('hidden', !(user?.isAnonymous && hayTrabajoAnterior(localStorage)));
+                if (!user) return;
+                if (user.isAnonymous) {
+                    if (sessionStorage.getItem(legacyKey) === user.uid) habilitarAcceso(user, null, false);
+                    return;
+                }
+                if (!user.email) {
+                    mostrarError('Esta cuenta no tiene correo de acceso.');
+                    return;
+                }
+                try {
+                    validarEntrada(localStorage, projectId, user.email.toLowerCase());
+                    const cached = leerPerfil(localStorage, projectId, user.uid);
+                    if (cached) {
+                        registrarEspacio(localStorage, projectId, user);
+                        habilitarAcceso(user, cached, true);
+                    }
+                    if (navigator.onLine || !cached) comprobarPerfil(user, version, cached);
+                } catch (error) {
+                    mostrarError(error.message);
+                }
+            });
+            window.addEventListener('online', () => {
+                if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                    comprobarPerfil(auth.currentUser, versionAuth, leerPerfil(localStorage, projectId, auth.currentUser.uid));
+                }
+            });
+
             const observersByReportId = new Map();
 
-            function observarSincronizacionReporte(id) {
-                if (observersByReportId.has(id)) return;
+            function consultaReporte(id, user) {
+                if (user.isAnonymous) return doc(db, 'bitacora_reports', id);
+                return query(collection(db, 'bitacora_reports'),
+                    where('owner_uid', '==', user.uid), where('id', '==', id));
+            }
+
+            function documentoObservado(snapshot, user, id) {
+                return user.isAnonymous ? snapshot : snapshot.docs.find((report) => report.id === id);
+            }
+
+            function observarSincronizacionReporte(id, onPending, onError) {
+                if (observersByReportId.has(id)) {
+                    if (onError) onError(new Error("Este reporte ya se está sincronizando."));
+                    return;
+                }
+                const user = usuarioActivo;
+                if (!user) return;
                 const reportRef = doc(db, "bitacora_reports", id);
-                const unsubscribe = onSnapshot(reportRef, { includeMetadataChanges: true }, (snapshot) => {
-                    if (!snapshot.exists()) return;
-                    if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache) return;
+                const unsubscribe = onSnapshot(consultaReporte(id, user), { includeMetadataChanges: true }, (snapshot) => {
+                    const report = documentoObservado(snapshot, user, id);
+                    if (!report || !report.exists()) return;
+                    if (snapshot.metadata.hasPendingWrites) {
+                        if (onPending) onPending();
+                        return;
+                    }
+                    if (snapshot.metadata.fromCache) return;
                     unsubscribe();
                     observersByReportId.delete(id);
                     setDoc(reportRef, { synced_at: new Date().toISOString() }, { merge: true })
@@ -1509,21 +1769,17 @@
                 }, (error) => {
                     unsubscribe();
                     observersByReportId.delete(id);
+                    if (onError) onError(error);
                     window.dispatchEvent(new CustomEvent("firestore-report-sync-error", { detail: { id, message: error.message } }));
                 });
                 observersByReportId.set(id, unsubscribe);
-            }
-
-            const pendingReportId = localStorage.getItem(pendingReportIdKey);
-            if (pendingReportId) {
-                esperarAuthListo().then(() => observarSincronizacionReporte(pendingReportId)).catch(console.error);
             }
 
             window.reservarFolioCloud = async function() {
                 return await runTransaction(db, async (transaction) => {
                     const ref = doc(db, "sistema", "contadores");
                     const snap = await transaction.get(ref);
-                    let sig = 1000;
+                    let sig = 1001;
                     if (snap.exists()) sig = (snap.data().folio_actual || 1000) + 1;
                     transaction.set(ref, { folio_actual: sig }, { merge: true });
                     return sig;
@@ -1540,8 +1796,8 @@
             window.guardarReporteEnFirestore = async function(reportePayload, id) {
                 const user = await esperarAuthListo();
                 if (!id) throw new Error("Falta el identificador del reporte.");
+                if (observersByReportId.has(id)) throw new Error("Este reporte ya se está sincronizando.");
 
-                const docRef = doc(db, "bitacora_reports", id);
                 const data = {
                     id: id,
                     owner_uid: user.uid,
@@ -1561,33 +1817,46 @@
                     throw new Error(`El reporte excede el tamaño permitido (${Math.round(payloadBytes / 1024)} KB).`);
                 }
 
-                let unsub = () => {};
+                guardarRespaldoReporte(localStorage, projectId, user.uid, data);
+                mostrarRespaldos();
+                return escribirReporte(data, user);
+            };
+
+            async function escribirReporte(data, user) {
+                if (!user || usuarioActivo?.uid !== user.uid || auth.currentUser?.uid !== user.uid || data.owner_uid !== user.uid) {
+                    throw new Error('El respaldo pertenece a otra sesión.');
+                }
+                const id = data.id;
+                if (observersByReportId.has(id)) throw new Error("Este reporte ya se está sincronizando.");
+                const docRef = doc(db, "bitacora_reports", id);
                 const writePendingLocally = new Promise((resolve, reject) => {
-                    unsub = onSnapshot(docRef, { includeMetadataChanges: true }, (snap) => {
-                        if (snap.exists() && snap.metadata.hasPendingWrites) {
-                            unsub();
-                            resolve();
-                        }
-                    }, (err) => { unsub(); reject(err); });
+                    observarSincronizacionReporte(id, resolve, reject);
                 });
 
                 const writePromise = setDoc(docRef, data);
-                let writeResult;
-                try {
-                    writeResult = await Promise.race([
-                        writePromise.then(() => "synced"),
-                        writePendingLocally.then(() => "pending")
-                    ]);
-                } finally {
-                    unsub();
-                }
+                writePromise.then(() => {
+                    borrarRespaldoReporte(localStorage, projectId, user.uid, data);
+                    mostrarRespaldos();
+                }, (error) => {
+                    const unsubscribe = observersByReportId.get(id);
+                    if (unsubscribe) {
+                        unsubscribe();
+                        observersByReportId.delete(id);
+                    }
+                    window.dispatchEvent(new CustomEvent("firestore-report-sync-error", {
+                        detail: { id, message: error.message }
+                    }));
+                }).catch((error) => console.error('No se pudo actualizar el respaldo confirmado:', error));
+                const writeResult = await Promise.race([
+                    writePromise.then(() => "synced"),
+                    writePendingLocally.then(() => "pending")
+                ]);
 
                 if (writeResult === "pending") {
-                    observarSincronizacionReporte(id);
                     return { id, url: `./viewer.html?id=${id}`, status: "pending" };
                 }
                 return { id, url: `./viewer.html?id=${id}`, status: "synced" };
-            };
+            }
         }
     </script>
 
@@ -1671,6 +1940,7 @@
         poblarListas();
         sincronizarCatalogo();
         window.addEventListener("online", sincronizarCatalogo);
+        window.addEventListener("apptolva-auth-ready", sincronizarCatalogo);
     </script>
 
     <!-- AUTOCOMPLETADO MAESTRO DE OPERADORES -->

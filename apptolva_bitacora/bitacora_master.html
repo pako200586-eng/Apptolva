@@ -38,6 +38,7 @@
     <style>
         :root { color-scheme: light; }
         body { user-select: none; -webkit-user-select: none; padding-bottom: 30px; background-color: #f3f4f6; }
+        body.auth-pending { visibility: hidden; }
         input, textarea, select {
             user-select: text;
             -webkit-user-select: text;
@@ -57,7 +58,7 @@
         .gps-pill { font-size: 10px; border-radius: 999px; padding: 2px 7px; display: inline-flex; align-items: center; gap: 4px; }
     </style>
 </head>
-<body class="font-sans text-gray-800">
+<body class="font-sans text-gray-800 auth-pending">
 
     <!-- Navbar con Estado de Sincronización Integrado -->
     <nav class="bg-gradient-to-r from-orange-600 to-[#F28B00] text-white p-2 shadow-lg sticky top-0 z-50">
@@ -93,6 +94,7 @@
 
     <div id="offlineSyncStatus" class="hidden sticky top-[48px] z-40 bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-[11px] font-bold text-amber-800">
         <i class="fas fa-cloud-upload-alt mr-1"></i><span id="offlineSyncText">Bitácora guardada en el dispositivo.</span>
+        <button id="reintentarCierres" type="button" class="ml-2 rounded bg-amber-800 px-3 py-2 text-white">Reintentar cierres</button>
     </div>
         
     <div class="container mx-auto p-4 max-w-4xl space-y-4">
@@ -422,7 +424,7 @@
         if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
         // iOS suspende la app sin avisar: guardar al ocultarse salvo cuando se esté limpiando el turno.
         const flushLogs = () => {
-            if (ignorarFlushLogs) return;
+            if (ignorarFlushLogs || !window.apptolvaRutaActiva) return;
             try { localStorage.setItem('nom087_logs', JSON.stringify(logs)); } catch (e) {}
         };
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushLogs(); });
@@ -549,7 +551,7 @@
         });
 
         // Prellenado inteligente desde el Checklist (index.html) si los campos de la bitácora están vacíos
-        (function sincronizarDesdeChecklist() {
+        function sincronizarDesdeChecklist() {
             try {
                 const draftRaw = localStorage.getItem('bachoco_tolva_draft_v9');
                 if (!draftRaw) return;
@@ -571,7 +573,7 @@
                     }
                 });
             } catch (e) {}
-        })();
+        }
 
         // Semáforo de vigencia de Licencia Federal (activa #licenseExpBadge con LICENSE_EXP_WARNING_DAYS)
         function actualizarSemaforoLicencia() {
@@ -871,9 +873,11 @@
             const pendientes = typeof leerCierresPendientes === 'function' ? leerCierresPendientes().length : 0;
 
             if (offlineBanner && offlineText) {
-                if (estado === "offline" || !navigator.onLine || pendientes > 0) {
+                if (estado === "offline" || estado === "error" || !navigator.onLine || pendientes > 0) {
                     offlineBanner.classList.remove('hidden');
-                    offlineText.textContent = pendientes > 0
+                    offlineText.textContent = estado === "error"
+                        ? "No se pudo confirmar el cierre. La copia permanece en el teléfono; reintenta o contacta al administrador."
+                        : pendientes > 0
                         ? `Modo sin red: ${pendientes} cierre(s) de bitácora guardado(s) en el teléfono. Se sincronizarán al recuperar cobertura.`
                         : "Sin cobertura celular: la bitácora se está guardando localmente en el dispositivo.";
                 } else {
@@ -939,9 +943,14 @@
                         guardarCierresPendientes(leerCierresPendientes().filter(c => c.id !== cierre.id));
                         setCloudStatus(leerCierresPendientes().length ? "offline" : "synced");
                     })
-                    .catch(() => setCloudStatus("offline"));
+                    .catch((error) => {
+                        console.error("No se pudo sincronizar el cierre de bitácora:", error);
+                        setCloudStatus("error");
+                    });
             });
         }
+
+        document.getElementById('reintentarCierres').addEventListener('click', sincronizarCierresPendientes);
 
         // Reinicia el periodo sin recargar la página y protege contra re-escritura accidental en pagehide
         function iniciarNuevoPeriodo() {
@@ -2148,8 +2157,9 @@
             serverTimestamp,
             setDoc
         } from "./js/firebase-sdk.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "./js/firebase-sdk.js";
+        import { getAuth, onAuthStateChanged } from "./js/firebase-sdk.js";
         import { crearObservadorFolio } from "./js/observadorFolio.js";
+        import { leerPerfil, validarEspacio } from "./js/controlSesion.js";
       
         const firebaseConfig = getFirebaseConfig();
 
@@ -2167,14 +2177,7 @@
         };
 
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("__")) {
-            window.generarFolioFirebase = function() {
-                const inputFolio = document.getElementById('folio');
-                if (!inputFolio || inputFolio.value.trim()) return;
-                const folio = nuevoFolioProvisional();
-                inputFolio.value = folio;
-                localStorage.setItem('nom087_folio', folio);
-            };
-            window.addEventListener('load', () => window.generarFolioFirebase());
+            window.location.replace('./index.html');
         } else {
             const app = initializeApp(firebaseConfig);
             const db = initializeFirestore(app, {
@@ -2182,6 +2185,7 @@
             });
             const auth = getAuth(app);
             let uidObservado = null;
+            let uidAutorizado = null;
             const estadoFolio = document.getElementById("folioNubeEstado");
             const observadorFolio = crearObservadorFolio({
                 escuchar: onSnapshot,
@@ -2208,7 +2212,7 @@
                 const folio = await runTransaction(db, async (transaction) => {
                     const counterRef = doc(db, "sistema", "contadores");
                     const sfDoc = await transaction.get(counterRef);
-                    let newSeq = 1000;
+                    let newSeq = 1001;
                     if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
                     transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
                     return `FB${newSeq}`;
@@ -2220,32 +2224,31 @@
             window.generarFolioFirebase = async function() {
                 const inputFolio = document.getElementById('folio');
                 if (!inputFolio) return;
-                const actual = inputFolio.value.trim();
+                let actual = inputFolio.value.trim();
                 if (actual && !esFolioProvisional(actual)) return actual;
 
-                if (!navigator.onLine) {
-                    if (actual) return actual;
-                    const offlineFolio = nuevoFolioProvisional();
-                    inputFolio.value = offlineFolio;
-                    localStorage.setItem('nom087_folio', offlineFolio);
-                    return offlineFolio;
+                if (!actual) {
+                    actual = nuevoFolioProvisional();
+                    inputFolio.value = actual;
+                    localStorage.setItem('nom087_folio', actual);
                 }
+                if (!navigator.onLine) return actual;
 
                 try {
                     const newFolio = await window.resolverFolioDefinitivo(actual);
+                    if (inputFolio.value.trim() !== actual) return inputFolio.value.trim();
                     inputFolio.value = newFolio;
                     localStorage.setItem('nom087_folio', newFolio);
                     return newFolio;
                 } catch(error) {
-                    if (actual) return actual;
-                    const offlineFolio = nuevoFolioProvisional();
-                    inputFolio.value = offlineFolio;
-                    localStorage.setItem('nom087_folio', offlineFolio);
-                    return offlineFolio;
+                    return actual;
                 }
             };
 
             window.guardarBitacoraEnFirestore = async function(payload) {
+                if (!uidAutorizado || auth.currentUser?.uid !== uidAutorizado) {
+                    throw new Error("La sesión de ruta no está autorizada.");
+                }
                 const employeeNumber = String(payload.employeeNumber || "").trim();
                 const operator = window.CATALOGO_OPERADORES?.[employeeNumber];
                 if (!operator) {
@@ -2349,7 +2352,7 @@
 
             window.registrarAlertasPush = async function({ fireAt270, fireAt300, unitId, driverName }) {
                 try {
-                    if (!auth.currentUser?.uid || !navigator.onLine) return false;
+                    if (!uidAutorizado || auth.currentUser?.uid !== uidAutorizado || !navigator.onLine) return false;
                     const suscripcion = await obtenerSuscripcionPush();
                     if (!suscripcion) return false;
                     // Sin await: offline, Firestore encola la escritura y confirma al recuperar red.
@@ -2373,7 +2376,7 @@
 
             window.cancelarAlertasPush = async function() {
                 try {
-                    if (!auth.currentUser?.uid) return false;
+                    if (!uidAutorizado || auth.currentUser?.uid !== uidAutorizado) return false;
                     deleteDoc(docAlertaPush()).catch((e) => console.warn("No se pudo cancelar la alerta push:", e?.code || e));
                     return true;
                 } catch (e) {
@@ -2382,13 +2385,37 @@
             };
 
             onAuthStateChanged(auth, (user) => {
+                uidAutorizado = null;
+                window.apptolvaRutaActiva = false;
+                document.body.classList.add('auth-pending');
                 if (uidObservado !== (user?.uid || null)) {
                     window.detenerObservacionFolio();
                     uidObservado = user?.uid || null;
                 }
                 if (!user) {
-                    signInAnonymously(auth).catch(console.error);
+                    window.location.replace('./index.html');
+                    return;
                 }
+                try {
+                    if (user.isAnonymous) {
+                        if (sessionStorage.getItem(`apptolva_legacy_${firebaseConfig.projectId}`) !== user.uid) {
+                            throw new Error('La sesión anterior debe recuperarse desde el menú.');
+                        }
+                    } else {
+                        validarEspacio(localStorage, firebaseConfig.projectId, user);
+                        if (!leerPerfil(localStorage, firebaseConfig.projectId, user.uid)) {
+                            throw new Error('El perfil no está disponible en este dispositivo.');
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Acceso a bitácora no disponible:', error);
+                    window.location.replace('./index.html');
+                    return;
+                }
+                uidAutorizado = user.uid;
+                window.apptolvaRutaActiva = true;
+                document.body.classList.remove('auth-pending');
+                sincronizarDesdeChecklist();
                 window.generarFolioFirebase();
                 if (user) {
                     sincronizarCierresPendientes();

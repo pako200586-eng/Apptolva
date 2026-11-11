@@ -505,6 +505,7 @@
             const firebaseConfig = getFirebaseConfig();
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
+            await auth.authStateReady();
             if (!auth.currentUser) await signInAnonymously(auth);
 
             const db = getFirestore(app);

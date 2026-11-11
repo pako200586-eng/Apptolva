@@ -699,17 +699,17 @@
             getAuth,
             onAuthStateChanged,
             signInWithEmailAndPassword,
-            signOut,
             setPersistence,
             browserLocalPersistence
         } from "./js/firebase-sdk.js";
         import { doc, getDoc, getFirestore, setDoc } from "./js/firebase-sdk.js";
+        import { validarEntrada } from "./js/controlSesion.js";
 
 
         const firebaseConfig = getFirebaseConfig();
         
 
-        const app = initializeApp(firebaseConfig, "apptolva-evaluaciones");
+        const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const loginForm = document.getElementById("evalLoginForm");
@@ -763,6 +763,10 @@
             accessError.classList.add("hidden");
             const email = emailInput.value.trim().toLowerCase();
             try {
+                validarEntrada(localStorage, firebaseConfig.projectId, email);
+                if (auth.currentUser && auth.currentUser.email?.toLowerCase() !== email) {
+                    throw new Error("Vuelve al menú y cierra la sesión actual antes de cambiar de cuenta.");
+                }
                 await setPersistence(auth, browserLocalPersistence);
                 await signInWithEmailAndPassword(auth, email, passwordInput.value);
                 passwordInput.value = "";
@@ -809,12 +813,6 @@
                 }
             } else if (user && !profileError) {
                 showAccessError("Acceso denegado. Este módulo es exclusivo para Másters y administradores autorizados.");
-                try {
-                    await signOut(auth);
-                } catch (error) {
-                    console.error("No se pudo cerrar la sesión sin permiso de evaluaciones:", error);
-                    showAccessError(`Acceso denegado y no se pudo cerrar la sesión: ${error.message}`);
-                }
             }
             if (profileError) {
                 showAccessError(`No se pudo comprobar el permiso: ${profileError.message}`);

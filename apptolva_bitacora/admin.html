@@ -461,7 +461,7 @@
 
   <script type="module">
     import { getFirebaseConfig, initializeApp } from "./js/firebase-sdk.js";
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "./js/firebase-sdk.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "./js/firebase-sdk.js";
     import {
       getFirestore,
       collection,
@@ -481,6 +481,7 @@
     } from "./js/firebase-sdk.js";
     import { crearFirmaFalla, crearFirmasFalla, idCoberturaFalla, separarSistemasFalla } from "./js/firmaFalla.js";
     import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, validarCatalogo } from "./js/catalogoEquipos.js";
+    import { validarEntrada } from "./js/controlSesion.js";
 
     const firebaseConfig = getFirebaseConfig();
 
@@ -1121,17 +1122,22 @@
       $('loginBtn').disabled = true;
       $('loginMsg').classList.add('hidden');
       try {
-        await signInWithEmailAndPassword(auth, $('adminEmail').value.trim(), $('adminPassword').value);
+        const email = $('adminEmail').value.trim().toLowerCase();
+        validarEntrada(localStorage, firebaseConfig.projectId, email);
+        if (auth.currentUser && auth.currentUser.email?.toLowerCase() !== email) {
+          throw new Error('Vuelve al menú y cierra la sesión actual antes de cambiar de cuenta.');
+        }
+        await signInWithEmailAndPassword(auth, email, $('adminPassword').value);
         $('adminPassword').value = '';
       } catch (error) {
-        $('loginMsg').textContent = loginErrorMessage(error);
+        $('loginMsg').textContent = error.code ? loginErrorMessage(error) : error.message;
         $('loginMsg').classList.remove('hidden');
       } finally {
         $('loginBtn').disabled = false;
       }
     });
 
-    $('logoutBtn').addEventListener('click', () => signOut(auth));
+    $('logoutBtn').addEventListener('click', () => { window.location.href = './index.html?logout=1'; });
 
     $('depurarFallasBtn').addEventListener('click', async () => {
       if (state.role !== 'admin') {
@@ -1475,9 +1481,9 @@
           const userSnapshot = await getDoc(doc(db, 'usuarios', email));
           if (userSnapshot.exists()) {
             const role = userSnapshot.data()?.rol;
-            if (role === 'admin' || role === 'lectura') {
+            if (role === 'admin' || role === 'lectura' || role === 'master') {
               authenticatedUser = user;
-              userRole = role;
+              userRole = role === 'master' ? 'lectura' : role;
             }
           }
         } catch (error) {

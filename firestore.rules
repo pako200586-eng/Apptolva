@@ -18,7 +18,7 @@ service cloud.firestore {
       return signedIn()
         && request.auth.token.firebase.sign_in_provider == 'password'
         && request.auth.token.email is string
-        && getUserRole() in ['admin', 'lectura'];
+        && getUserRole() in ['admin', 'lectura', 'master'];
     }
 
     function isAdmin() {
@@ -35,6 +35,15 @@ service cloud.firestore {
       return signedIn()
         && request.auth.token.firebase.sign_in_provider == 'password'
         && request.auth.token.email is string;
+    }
+
+    function isPasswordRouteUser() {
+      return isEmailPasswordUser()
+        && getUserRole() in ['operador', 'master', 'admin', 'lectura'];
+    }
+
+    function isRouteUser() {
+      return isAnonymousOperator() || isPasswordRouteUser();
     }
 
     function getEvaluationRole() {
@@ -133,7 +142,7 @@ service cloud.firestore {
       allow delete: if false;
 
       allow create: if isAdmin()
-        || (isAnonymousOperator()
+        || (isRouteUser()
           && (
             (request.resource.data.keys().hasOnly(['folio_bitacora'])
               && request.resource.data.folio_bitacora == 1001)
@@ -142,7 +151,7 @@ service cloud.firestore {
           ));
 
       allow update: if isAdmin()
-        || (isAnonymousOperator()
+        || (isRouteUser()
           && (
             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['folio_bitacora'])
               && request.resource.data.folio_bitacora is int
@@ -159,8 +168,11 @@ service cloud.firestore {
     }
 
     match /bitacora_reports/{reportId} {
-      allow get: if signedIn();
-      allow list: if isPanelUser();
+      // Los clientes anónimos conservan temporalmente los enlaces QR anteriores.
+      allow get: if isAnonymousOperator() || isPanelUser()
+        || (isPasswordRouteUser() && resource.data.owner_uid == request.auth.uid);
+      allow list: if isPanelUser()
+        || (isPasswordRouteUser() && resource.data.owner_uid == request.auth.uid);
       // Checklist: permite create aunque aún no envíe owner_uid (compatibilidad).
       // Bitácora: conserva la protección por owner_uid.
       allow create: if isAdmin()
@@ -168,15 +180,65 @@ service cloud.firestore {
           && (
             request.resource.data.get('report_type', '') == 'checklist'
             || request.resource.data.owner_uid == request.auth.uid
-          ));
+          ))
+        || (isPasswordRouteUser() && request.resource.data.owner_uid == request.auth.uid
+          && !request.resource.data.keys().hasAny(['folio_definitivo', 'fecha_recepcion_nube'])
+          && validPasswordReport(reportId));
 
-      allow update: if isAnonymousOperator()
+      allow update: if isRouteUser()
         && resource.data.owner_uid == request.auth.uid
-        && resource.data.turnoCerrado != true
+        && resource.data.get('turnoCerrado', false) != true
         && request.resource.data.owner_uid == resource.data.owner_uid
         && request.resource.data.created_at == resource.data.created_at
-        && request.resource.data.get('auditoria', []).size() >= resource.data.get('auditoria', []).size();
+        && request.resource.data.get('auditoria', []).size() >= resource.data.get('auditoria', []).size()
+        && (isAnonymousOperator() || (validPasswordReport(reportId)
+          && request.resource.data.get('folio_definitivo', null) == resource.data.get('folio_definitivo', null)
+          && request.resource.data.get('fecha_recepcion_nube', null) == resource.data.get('fecha_recepcion_nube', null)));
       allow delete: if false;
+    }
+
+    function optionalReportString(d, field, maxLength) {
+      return !(field in d) || (d[field] is string && d[field].size() <= maxLength);
+    }
+
+    function validPasswordReport(reportId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'owner_uid', 'report_type', 'created_at', 'payload'])
+        && d.keys().hasOnly([
+          'id', 'owner_uid', 'folio', 'folio_provisional', 'report_type', 'unit_id',
+          'driver_name', 'employee_number', 'license', 'empresa', 'puntos_intermedios',
+          'hora_salida', 'hora_llegada', 'shift_start_hour', 'priority', 'sync_status',
+          'payload', 'created_at', 'updated_at', 'synced_at', 'device_id', 'auditoria',
+          'turnoCerrado', 'server_created_at', 'server_updated_at', 'folio_definitivo',
+          'fecha_recepcion_nube'
+        ])
+        && d.id == reportId && d.id is string && d.id.size() <= 128
+        && d.owner_uid is string && d.owner_uid.size() <= 128
+        && d.report_type in ['checklist', 'bitacora']
+        && d.created_at is string && d.created_at.size() <= 40
+        && d.payload is map && d.payload.size() <= 100
+        && optionalReportString(d, 'folio', 128)
+        && optionalReportString(d, 'folio_provisional', 128)
+        && optionalReportString(d, 'unit_id', 100)
+        && optionalReportString(d, 'driver_name', 200)
+        && optionalReportString(d, 'employee_number', 40)
+        && optionalReportString(d, 'license', 100)
+        && optionalReportString(d, 'empresa', 200)
+        && optionalReportString(d, 'puntos_intermedios', 2000)
+        && optionalReportString(d, 'hora_salida', 40)
+        && optionalReportString(d, 'hora_llegada', 40)
+        && optionalReportString(d, 'priority', 40)
+        && optionalReportString(d, 'sync_status', 40)
+        && optionalReportString(d, 'updated_at', 40)
+        && optionalReportString(d, 'synced_at', 40)
+        && optionalReportString(d, 'device_id', 128)
+        && optionalReportString(d, 'folio_definitivo', 128)
+        && (!('shift_start_hour' in d) || d.shift_start_hour is number)
+        && (!('server_created_at' in d) || d.server_created_at is timestamp)
+        && (!('server_updated_at' in d) || d.server_updated_at is timestamp)
+        && (!('fecha_recepcion_nube' in d) || d.fecha_recepcion_nube is timestamp)
+        && (!('auditoria' in d) || (d.auditoria is list && d.auditoria.size() <= 1000))
+        && (!('turnoCerrado' in d) || d.turnoCerrado is bool);
     }
 
     match /usuarios/{email} {
@@ -282,12 +344,12 @@ service cloud.firestore {
 
     // Suscripción Web Push del operador en turno de manejo; el servidor (Admin SDK) envía y marca los avisos.
     match /alertas_nom087/{uid} {
-      allow get: if isAnonymousOperator() && request.auth.uid == uid;
+      allow get: if isRouteUser() && request.auth.uid == uid;
       allow list: if false;
-      allow create, update: if isAnonymousOperator()
+      allow create, update: if isRouteUser()
         && request.auth.uid == uid
         && validAlertaPush(uid);
-      allow delete: if isAnonymousOperator() && request.auth.uid == uid;
+      allow delete: if isRouteUser() && request.auth.uid == uid;
     }
 
     match /{document=**} {

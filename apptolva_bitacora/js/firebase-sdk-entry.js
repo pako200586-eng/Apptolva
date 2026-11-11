@@ -24,6 +24,7 @@ export {
   documentId,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   getDocsFromServer,
   getFirestore,
@@ -40,4 +41,5 @@ export {
   setDoc,
   updateDoc,
   where,
+  waitForPendingWrites,
 } from "firebase/firestore";
