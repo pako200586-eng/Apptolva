@@ -90,10 +90,13 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
   const lecturaUser = await createUserWithEmailAndPassword(readerAuth, emailLectura, 'Emulator123!');
   const responsableUser = await createUserWithEmailAndPassword(ownerAuth, emailResponsable, 'Emulator123!');
   const otId = `ot-${appId}`;
+  const otLegadaId = `ot-legada-${appId}`;
+  const otLegadaCoincidenteId = `ot-legada-coincidente-${appId}`;
   const reportesIds = {
     anterior: `reporte-anterior-${appId}`,
     posterior: `reporte-posterior-${appId}`,
     otroComponente: `reporte-componente-${appId}`,
+    legadoCoincidente: `reporte-legado-${appId}`,
     sincronizadoTarde: `reporte-tardio-${appId}`
   };
   const firmaTracto = crearFirmaFalla({
@@ -135,6 +138,7 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     idCobertura(reportesIds.anterior, firmaTracto),
     idCobertura(reportesIds.posterior, firmaTracto),
     idCobertura(reportesIds.otroComponente, firmaTolva),
+    idCobertura(reportesIds.legadoCoincidente, firmaTracto),
     idCobertura(reportesIds.sincronizadoTarde, firmaTracto),
     `directo-${appId}`
   ];
@@ -148,11 +152,14 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     if (uidAnonimo) await adminAuth.deleteUser(uidAnonimo);
     for (const id of Object.values(reportesIds)) {
       await adminDb.collection('bitacora_reports').doc(id).delete();
+      await adminDb.collection('ot_por_reporte').doc(id).delete();
     }
     for (const id of idsCobertura) {
       await adminDb.collection('falla_ot_cobertura').doc(id).delete();
     }
     await adminDb.collection('ordenes_trabajo').doc(otId).delete();
+    await adminDb.collection('ordenes_trabajo').doc(otLegadaId).delete();
+    await adminDb.collection('ordenes_trabajo').doc(otLegadaCoincidenteId).delete();
     if (jobId) await adminDb.collection('cierres_masivos_ot').doc(jobId).delete();
     await adminDb.collection('control_depuracion').doc('retroactiva').delete();
     const eventos = await adminDb.collection('ot_seguimiento').where('ot_id', '==', otId).get();
@@ -187,11 +194,28 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
       }]
     }
   });
+  await Promise.all([
+    adminDb.collection('ordenes_trabajo').doc(otLegadaId).set({
+      estatus: 'TERMINADA', payload: {
+        tolva1: 'TL-202',
+        fallas: [{ componente: '1ra TOLVA', sistema: 'MOTOR', itemReportado: 'Fuga de aceite' }]
+      }
+    }),
+    adminDb.collection('ordenes_trabajo').doc(otLegadaCoincidenteId).set({
+      estatus: 'TERMINADA', payload: {
+        unitId: 'TR-101',
+        fallas: [{ componente: 'TRACTOCAMIÓN', sistema: 'MOTOR', itemReportado: 'Fuga de aceite' }]
+      }
+    }),
+    adminDb.collection('ot_por_reporte').doc(reportesIds.anterior).set({ ot_id: otLegadaId }),
+    adminDb.collection('ot_por_reporte').doc(reportesIds.legadoCoincidente).set({ ot_id: otLegadaCoincidenteId })
+  ]);
 
   const reportesIniciales = [
     [reportesIds.anterior, construirReporte(reportesIds.anterior, antes)],
     [reportesIds.posterior, construirReporte(reportesIds.posterior, despues)],
-    [reportesIds.otroComponente, construirReporte(reportesIds.otroComponente, antes, 'tolva1')]
+    [reportesIds.otroComponente, construirReporte(reportesIds.otroComponente, antes, 'tolva1')],
+    [reportesIds.legadoCoincidente, construirReporte(reportesIds.legadoCoincidente, antes)]
   ];
   await Promise.all(reportesIniciales.map(([id, reporte]) =>
     adminDb.collection('bitacora_reports').doc(id).set(reporte)
@@ -234,6 +258,8 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     .doc(idCobertura(reportesIds.posterior, firmaTracto)).get()).exists, false);
   assert.equal((await adminDb.collection('falla_ot_cobertura')
     .doc(idCobertura(reportesIds.otroComponente, firmaTolva)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.legadoCoincidente, firmaTracto)).get()).exists, false);
 
   const lateReport = construirReporte(reportesIds.sincronizadoTarde, antes);
   lateReport.synced_at = new Date().toISOString();

@@ -38,6 +38,36 @@ export function crearFirmasFalla({ unidad, componente, sistema, item }) {
     .filter(Boolean))];
 }
 
+export function indiceOrdenesFalla(ordenes, firmasDeOrden, esCerrada) {
+  const abiertas = new Set();
+  const legadas = new Map();
+  ordenes.forEach((orden) => {
+    const firmas = firmasDeOrden(orden);
+    const cerrada = esCerrada(orden);
+    if (!cerrada) firmas.forEach((firma) => abiertas.add(firma));
+    if (orden.cobertura_por_falla || !orden.reporte_id) return;
+    const reporteId = String(orden.reporte_id);
+    if (!legadas.has(reporteId)) legadas.set(reporteId, new Map());
+    const estados = legadas.get(reporteId);
+    firmas.forEach((firma) => {
+      if (!estados.has(firma) || !cerrada) estados.set(firma, cerrada ? 'ATENDIDA' : 'ASIGNADA');
+    });
+  });
+  return { abiertas, legadas };
+}
+
+export function estadoFallaReporte(reporteId, firma, coberturas, indice) {
+  if (!firma) return 'PENDIENTE';
+  const cobertura = coberturas.get(`${reporteId}|${firma}`);
+  if (cobertura) {
+    if (cobertura.estado === 'DESCARTADA') return 'DESCARTADA';
+    return cobertura.estado === 'ATENDIDA' ? 'ATENDIDA' : 'ASIGNADA';
+  }
+  const legado = indice.legadas.get(String(reporteId))?.get(firma);
+  if (legado) return legado;
+  return indice.abiertas.has(firma) ? 'ASIGNADA' : 'PENDIENTE';
+}
+
 export async function idCoberturaFalla(reporteId, firma) {
   if (!globalThis.crypto?.subtle) throw new Error('El navegador no permite generar la huella de la falla.');
   const bytes = new TextEncoder().encode(firma);

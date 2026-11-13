@@ -82,6 +82,7 @@
         <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Operadores</p><strong id="statOperadores" class="text-3xl text-slate-800">0</strong></div>
         <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Unidades</p><strong id="statUnidades" class="text-3xl text-slate-800">0</strong></div>
       </div>
+      <p class="text-xs font-bold text-slate-500">Indicadores calculados con los filtros y reportes cargados; “Hoy” usa la fecha local del dispositivo.</p>
 
       <div class="panel-card rounded-lg p-4">
         <div class="grid gap-3 md:grid-cols-6">
@@ -479,7 +480,7 @@
       updateDoc,
       runTransaction
     } from "./js/firebase-sdk.js";
-    import { crearFirmaFalla, crearFirmasFalla, idCoberturaFalla, separarSistemasFalla } from "./js/firmaFalla.js";
+    import { crearFirmaFalla, crearFirmasFalla, estadoFallaReporte, idCoberturaFalla, indiceOrdenesFalla, separarSistemasFalla } from "./js/firmaFalla.js";
     import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, validarCatalogo } from "./js/catalogoEquipos.js";
 
     const firebaseConfig = getFirebaseConfig();
@@ -830,22 +831,19 @@
       $('statHoy').textContent = summary.hoy || 0;
       $('statOperadores').textContent = summary.operadores || 0;
       $('statUnidades').textContent = summary.unidades || 0;
-      $('syncState').textContent = `Firebase Firestore · ${formatDate(data.generatedAt)}`;
+      $('syncState').textContent = `Firebase ${firebaseConfig.projectId} · servidor · ${formatDate(data.generatedAt)}`;
 
       const total = Number(summary.total || 0);
       if (state.lastTotal && total > state.lastTotal) showToast(`${total - state.lastTotal} reporte(s) nuevo(s) en Firebase`);
       state.lastTotal = total;
       state.reports = data.reports || [];
       if (!data.filtered) state.allReports = state.reports;
+      dashState.coberturas = null;
 
-      const signature = state.reports.map((report) => `${report.id}:${report.syncStatus}`).join('|');
-      if (!(options.silent && signature === state.tableSignature)) {
-        state.tableSignature = signature;
-        if (!options.loadOlder) state.page = 1;
-        renderTablaReportes();
-        renderResumen();
-        renderDashboard();
-      }
+      if (!options.loadOlder && !options.silent) state.page = 1;
+      renderTablaReportes();
+      renderResumen();
+      renderDashboard();
     }
 
     function activarTabReportes(tab = 'checklist') {
@@ -981,13 +979,13 @@
         }
         constraints.push(fsLimit(LIMITE_PAGINA_REPORTES));
         const q = fsQuery(reportsCol, ...constraints);
-        let snapshot = await getDocs(q);
+        let snapshot = await getDocsFromServer(q);
         const documentos = [...snapshot.docs];
         if (!options.loadOlder) {
           while (snapshot.size === LIMITE_PAGINA_REPORTES
             && documentos.length < LIMITE_VENTANA_REPORTES) {
             const cursor = snapshot.docs[snapshot.docs.length - 1];
-            const siguiente = await getDocs(fsQuery(
+            const siguiente = await getDocsFromServer(fsQuery(
               reportsCol,
               fsWhere('created_at', '>=', fechaCorte),
               fsOrderBy('created_at', 'desc'),
@@ -1035,10 +1033,12 @@
       } catch (error) {
         if (!state.allReports?.length) state.syncWatermark = null;
         console.error('Error al consultar Firestore:', error);
+        $('syncState').textContent = `Firebase ${firebaseConfig.projectId} · error de consulta al servidor`;
         const filaError = `<tr><td colspan="8" class="px-4 py-6 text-center font-bold text-red-700">Error al consultar Firestore: ${escapeHtml(error.message)}</td></tr>`;
         $('tabla-datos-checklist').innerHTML = filaError;
         $('tabla-datos-bitacora').innerHTML = filaError;
         showToast(error.message);
+        throw error;
       }
     }
 
@@ -1063,25 +1063,25 @@
           ];
           if (cursor) constraints.push(fsStartAfter(cursor));
           constraints.push(fsLimit(LIMITE_PAGINA_REPORTES));
-          snapshot = await getDocs(fsQuery(collection(db, 'bitacora_reports'), ...constraints));
+          snapshot = await getDocsFromServer(fsQuery(collection(db, 'bitacora_reports'), ...constraints));
           documentos.push(...snapshot.docs);
           cursor = snapshot.docs[snapshot.docs.length - 1] || cursor;
         } while (snapshot.size === LIMITE_PAGINA_REPORTES);
         state.syncWatermark = new Date(inicioSincronizacion - 60000).toISOString();
 
-        const idsExistentes = new Set(state.allReports.map((reporte) => String(reporte.id)));
         const corteVentana = Date.now() - state.windowDays * 86400000;
-        const reportesNuevos = documentos
+        const reportesActualizados = documentos
           .map(convertirSnapshotReporte)
-          .filter((reporte) => !idsExistentes.has(String(reporte.id))
-            && (state.historyLoaded || new Date(reporte.createdAt).getTime() >= corteVentana));
-        if (!reportesNuevos.length) {
-          $('syncState').textContent = `Firebase Firestore · ${formatDate(new Date().toISOString())}`;
+          .filter((reporte) => state.historyLoaded || new Date(reporte.createdAt).getTime() >= corteVentana);
+        if (!reportesActualizados.length) {
+          $('statHoy').textContent = resumenReportes(state.reports).hoy;
+          $('syncState').textContent = `Firebase ${firebaseConfig.projectId} · servidor · ${formatDate(new Date().toISOString())}`;
+          renderDashboard();
           return;
         }
 
         const reportesPorId = new Map(state.allReports.map((reporte) => [String(reporte.id), reporte]));
-        reportesNuevos.forEach((reporte) => reportesPorId.set(String(reporte.id), reporte));
+        reportesActualizados.forEach((reporte) => reportesPorId.set(String(reporte.id), reporte));
         let reportes = [...reportesPorId.values()]
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         if (!state.historyLoaded && reportes.length > LIMITE_VENTANA_REPORTES) {
@@ -1101,6 +1101,10 @@
         }, { silent: true });
 
         if (!$('vista-fallas').classList.contains('hidden')) await cargarFallas();
+        if (!$('vista-dashboard').classList.contains('hidden')) await cargarDashboard(true);
+      } catch (error) {
+        $('syncState').textContent = `Firebase ${firebaseConfig.projectId} · error de sincronización`;
+        throw error;
       } finally {
         sincronizacionReportesActiva = false;
       }
@@ -1184,9 +1188,14 @@
       }
     });
 
-    $('refreshBtn').addEventListener('click', () => {
-      Promise.all([cargarDatos(), cargarDashboard(true), cargarOrdenes(true)])
-        .catch((error) => showToast(error.message));
+    $('refreshBtn').addEventListener('click', async () => {
+      try {
+        await cargarDatos();
+        await Promise.all([cargarDashboard(true), cargarOrdenes(true)]);
+        if (!$('vista-fallas').classList.contains('hidden')) await cargarFallas();
+      } catch (error) {
+        showToast(error.message);
+      }
     });
 
     $('paginaAnterior').addEventListener('click', () => {
@@ -1334,8 +1343,8 @@
     function componenteKey(nombre) {
       const texto = String(nombre || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       if (texto.includes('DOLLY')) return 'dolly';
-      if (/TOLVA\s*2|TOLVA2/.test(texto)) return 'tolva2';
-      if (/TOLVA\s*1|TOLVA1/.test(texto)) return 'tolva1';
+      if (/TOLVA\s*2|TOLVA2|2DA\s*TOLVA/.test(texto)) return 'tolva2';
+      if (/TOLVA\s*1|TOLVA1|1RA\s*TOLVA/.test(texto)) return 'tolva1';
       return 'tracto';
     }
 
@@ -1532,6 +1541,7 @@
         state.lastTotal = 0;
         state.syncWatermark = null;
         dashState.ordenes = null;
+        dashState.coberturas = null;
         aplicarPermisosDeInterfaz();
         if (user) {
           $('loginMsg').textContent = accessError
@@ -1801,7 +1811,7 @@
       if (Array.isArray(dashState.ordenes) && !forzar) return dashState.ordenes;
       if (!ordenesLoadPromise) {
         ordenesLoadPromise = (async () => {
-          const snapshot = await getDocs(fsQuery(
+          const snapshot = await getDocsFromServer(fsQuery(
             collection(db, 'ordenes_trabajo'),
             fsOrderBy('fecha_apertura', 'desc')
           ));
@@ -1824,7 +1834,7 @@
       const coberturas = new Map();
       for (let inicio = 0; inicio < ids.length; inicio += 30) {
         const lote = ids.slice(inicio, inicio + 30);
-        const snapshot = await getDocs(fsQuery(
+        const snapshot = await getDocsFromServer(fsQuery(
           collection(db, 'falla_ot_cobertura'),
           fsWhere('reporte_id', 'in', lote)
         ));
@@ -1867,9 +1877,11 @@
 
     function firmasDeOrden(orden) {
       const payload = orden.payload && typeof orden.payload === 'object' ? orden.payload : {};
-      const firmasGuardadas = payload.cobertura_falla_keys;
+      const firmasGuardadas = orden.cobertura_falla_keys || payload.cobertura_falla_keys;
       if (Array.isArray(firmasGuardadas) && firmasGuardadas.length) return firmasGuardadas;
-      const fallas = Array.isArray(payload.fallas) ? payload.fallas : [];
+      const fallas = Array.isArray(payload.fallas) && payload.fallas.some((falla) => falla && typeof falla === 'object')
+        ? payload.fallas
+        : obtenerFallasReporte({ payload }).fallas;
       return [...new Set(fallas.flatMap((falla) => {
         if (!falla || typeof falla !== 'object') return [];
         const key = falla.componenteKey || componenteKey(falla.componente);
@@ -1881,6 +1893,11 @@
         });
         return firmas;
       }).filter(Boolean))];
+    }
+
+    function indiceOrdenesPanel() {
+      return indiceOrdenesFalla(dashState.ordenes || [], firmasDeOrden,
+        (orden) => ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)));
     }
 
     async function descartarFalla(grupos, motivo) {
@@ -2245,19 +2262,13 @@
         await obtenerOrdenes();
         const checklists = state.reports.filter((reporte) => reporte.type === 'checklist');
         const coberturas = await obtenerCoberturas(checklists);
-        const idsOTLegadas = new Set((dashState.ordenes || [])
-          .filter((orden) => !orden.cobertura_por_falla && orden.reporte_id)
-          .map((orden) => String(orden.reporte_id)));
-        const firmasEnOTAbierta = new Set((dashState.ordenes || [])
-          .filter((orden) => !ESTATUS_REALIZADA.has(sinAcentos(orden.estatus)))
-          .flatMap((orden) => firmasDeOrden(orden)));
+        dashState.coberturas = coberturas;
+        const indice = indiceOrdenesPanel();
         const grupos = new Map();
 
         checklists.forEach((reporte) => {
-          if (idsOTLegadas.has(String(reporte.id))) return;
           fallasFirmablesDeReporte(reporte).forEach((falla) => {
-            const cobertura = coberturas.get(`${reporte.id}|${falla.firma}`);
-            if (cobertura || firmasEnOTAbierta.has(falla.firma)) return;
+            if (estadoFallaReporte(reporte.id, falla.firma, coberturas, indice) !== 'PENDIENTE') return;
             let grupo = grupos.get(falla.firma);
             if (!grupo) {
               grupo = {
@@ -2651,7 +2662,7 @@
     const COLOR_BARRA = '#1e5a96';
     const COLOR_MARCA = '#7c2d12';
     const ESTATUS_REALIZADA = new Set(['TERMINADA', 'CERRADA']);
-    const dashState = { ordenes: null };
+    const dashState = { ordenes: null, coberturas: null };
     let ordenesLoadPromise = null;
 
     const sinAcentos = (texto) => String(texto || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -2814,28 +2825,8 @@
       const porUnidad = new Map();
       const porDia = new Map();
 
-      const ordenesList = dashState.ordenes || [];
-      const otPorReporte = new Map();
-      const fallasEnOT = [];
+      const indice = indiceOrdenesPanel();
       let fallasNuevas = 0;
-
-      ordenesList.forEach((orden) => {
-        const idsReporte = [
-          orden.reporte_id,
-          ...(Array.isArray(orden.reporte_ids) ? orden.reporte_ids : []),
-          ...(Array.isArray(orden.payload?.report_ids) ? orden.payload.report_ids : [])
-        ].filter(Boolean);
-        idsReporte.forEach((id) => {
-          if (!otPorReporte.has(String(id))) otPorReporte.set(String(id), orden);
-        });
-        const estatusCerrado = ESTATUS_REALIZADA.has(sinAcentos(orden.estatus));
-        const fechaCierre = new Date(
-          orden.cerrada_at || orden.fecha_realizacion || orden.updated_at || orden.fecha_apertura || ''
-        ).getTime();
-        firmasDeOrden(orden).forEach((firma) => {
-          fallasEnOT.push({ firma, estatusCerrado, fechaCierre });
-        });
-      });
 
       checklists.forEach((report) => {
         const fallas = fallasPorComponente(report);
@@ -2844,10 +2835,6 @@
         const claveDia = Number.isNaN(dia.getTime()) ? 'Sin fecha' : `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
         const registroDia = porDia.get(claveDia) || { value: 0, checklists: 0, realizadas: 0 };
         registroDia.checklists += 1;
-
-        const fechaReporte = new Date(report.createdAt).getTime();
-        const otAsociada = otPorReporte.get(String(report.id));
-        const esOTLegadaDirecta = Boolean(otAsociada && !otAsociada.cobertura_por_falla);
 
         COMPONENTES.forEach(({ key }) => {
           const numUnidad = numeros[key];
@@ -2858,7 +2845,7 @@
               sistema: categoria,
               item
             });
-            const idFallaFisica = `${numUnidad}|${firma}`;
+            const idFallaFisica = firma || JSON.stringify([numUnidad, key, categoria, item]);
 
             if (!fallasUnicas.has(idFallaFisica)) {
               const cat = categoriaKey(categoria);
@@ -2866,8 +2853,7 @@
                 componente: key,
                 categoria: cat,
                 label: String(categoria).toUpperCase(),
-                asignada: false,
-                realizada: false
+                estados: new Set()
               });
 
               if (numUnidad !== 'S/N' && key === 'tracto') {
@@ -2877,17 +2863,7 @@
             }
 
             const fallaUnica = fallasUnicas.get(idFallaFisica);
-            const otCoincidente = fallasEnOT.find((cobertura) =>
-              cobertura.firma === firma
-              && (!cobertura.estatusCerrado
-                || (Number.isFinite(cobertura.fechaCierre) && fechaReporte <= cobertura.fechaCierre))
-            );
-            const estaRealizada = Boolean(
-              otCoincidente?.estatusCerrado || (esOTLegadaDirecta && ESTATUS_REALIZADA.has(sinAcentos(otAsociada.estatus)))
-            );
-            const estaAsignada = Boolean(otCoincidente || esOTLegadaDirecta);
-            fallaUnica.realizada = fallaUnica.realizada || estaRealizada;
-            fallaUnica.asignada = fallaUnica.asignada || estaAsignada;
+            fallaUnica.estados.add(estadoFallaReporte(report.id, firma, dashState.coberturas, indice));
           });
         });
         porDia.set(claveDia, registroDia);
@@ -2903,9 +2879,9 @@
           realizadas: 0
         };
         celda.reportadas += 1;
-        if (falla.realizada) {
+        if (falla.estados.has('ATENDIDA') && !falla.estados.has('PENDIENTE') && !falla.estados.has('ASIGNADA')) {
           celda.realizadas += 1;
-        } else if (!falla.asignada) {
+        } else if (falla.estados.has('PENDIENTE')) {
           fallasNuevas += 1;
         }
         celdas.set(id, celda);
@@ -3001,6 +2977,10 @@
 
     function renderDashboard() {
       if ($('vista-dashboard').classList.contains('hidden')) return;
+      if (!dashState.ordenes || !dashState.coberturas) {
+        $('dashEstado').textContent = 'Cargando órdenes y coberturas para calcular métricas...';
+        return;
+      }
       const { checklists, celdas, porUnidad, porDia, fallasNuevas } = calcularMetricas();
       const sumar = (lista, campo) => lista.reduce((s, x) => s + x[campo], 0);
       const reportadas = sumar(celdas, 'reportadas');
@@ -3094,11 +3074,18 @@
 
     async function cargarDashboard(forzar = false) {
       $('dashEstado').textContent = 'Cargando métricas de Firebase...';
-      renderDashboard();
       try {
         await obtenerOrdenes(forzar);
+        const reportes = state.reports;
+        const coberturas = await obtenerCoberturas(reportes.filter((report) => report.type === 'checklist'));
+        if (reportes !== state.reports) return;
+        dashState.coberturas = coberturas;
       } catch (error) {
+        dashState.coberturas = null;
+        $('dashEstado').textContent = `Error al cargar órdenes o coberturas: ${error.message}`;
+        console.error('Error al cargar métricas:', error);
         showToast(error.message);
+        return;
       }
       renderDashboard();
     }

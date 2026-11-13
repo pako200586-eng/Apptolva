@@ -104,6 +104,7 @@
   function extraerFallasChecklist(reporte) {
     const p = reporte?.payload || reporte || {};
     const fallasPorComp = { tracto: [], tolva1: [], dolly: [], tolva2: [] };
+    const esMal = (estado) => estado === false || String(estado ?? '').trim().toUpperCase() === 'MAL';
 
     const mapearCompKey = (texto) => {
       const t = normalizarTexto(texto);
@@ -119,7 +120,7 @@
 
         (seccion?.categorias || []).forEach((cat) => {
           (cat?.items || []).forEach((it) => {
-            if (String(it?.estado || '').toUpperCase() === 'MAL') {
+            if (esMal(it?.estado)) {
               fallasPorComp[cKey].push({
                 item: it.item || it.nombre || 'Falla de inspección',
                 categoriaSugerida: cat.cat || cat.nombre || 'GENERAL'
@@ -150,7 +151,7 @@
     }
 
     const marcadas = Array.isArray(p.checklist)
-      ? p.checklist.filter((item) => String(item?.estado || '').toUpperCase() === 'MAL').map((item) => item.item)
+      ? p.checklist.filter((item) => esMal(item?.estado)).map((item) => item.item)
       : (Array.isArray(p.fallas) ? p.fallas : []);
 
     marcadas.forEach((clave) => {

@@ -179,14 +179,6 @@ function componenteKey(valor) {
   return texto;
 }
 
-function componenteKeyId(valor) {
-  const texto = String(valor || '').trim().toLowerCase();
-  if (texto === 'dolly') return 'DOLLY';
-  if (texto === 'tolva1') return 'TOLVA1';
-  if (texto === 'tolva2') return 'TOLVA2';
-  return 'TRACTO';
-}
-
 export function extraerFallasReporte(datos) {
   const payload = datos?.payload && typeof datos.payload === 'object' ? datos.payload : datos || {};
   const tipo = String(datos?.report_type || datos?.reportType || payload.reportType || '').toLowerCase();
@@ -226,12 +218,13 @@ function extraerFallasOrden(orden) {
     return [...new Set(firmasGuardadas)].map((firma) => ({ firma }));
   }
   const payload = orden.payload && typeof orden.payload === 'object' ? orden.payload : {};
-  const fallas = Array.isArray(payload.fallas) && payload.fallas.some((falla) => falla && typeof falla === 'object')
-    ? payload.fallas
-    : extraerFallasReporte({ payload });
+  if (!Array.isArray(payload.fallas) || !payload.fallas.some((falla) => falla && typeof falla === 'object')) {
+    return extraerFallasReporte({ payload });
+  }
+  const fallas = payload.fallas;
   return fallas.map((falla) => {
     const componente = componenteKey(falla.componenteKey || falla.componente);
-    const unidad = payload[componenteKeyId(falla.componenteKey || falla.componente)]
+    const unidad = falla.economico_componente || payload[componente.toLowerCase()]
       || (componente === 'TRACTO' ? payload.unitId || orden.unidad : '');
     const firmas = crearFirmasFalla({
       unidad,
@@ -415,13 +408,19 @@ async function procesarPagina(db, jobId) {
   const existentes = refs.length ? await db.getAll(...refs) : [];
   const existentesPorId = new Map(existentes.map((item) => [item.id, item]));
   const reportesUnicos = [...new Set(registrosCoincidentes.map((item) => item.reporteId))];
-  const refsLegadas = reportesUnicos.map((reporteId) =>
-    db.collection('ot_por_reporte').doc(reporteId)
-  );
+  const refsLegadas = reportesUnicos.map((reporteId) => db.collection('ot_por_reporte').doc(reporteId));
   const existentesLegados = refsLegadas.length ? await db.getAll(...refsLegadas) : [];
+  const idsLegados = [...new Set(existentesLegados
+    .filter((legado) => legado.exists && legado.get('ot_id') && legado.get('ot_id') !== job.ot_id)
+    .map((legado) => legado.get('ot_id')))];
+  const ordenesLegadas = idsLegados.length
+    ? await db.getAll(...idsLegados.map((id) => db.collection(COLECCION_ORDENES).doc(id)))
+    : [];
+  const firmasLegadas = new Map(ordenesLegadas.filter((orden) => orden.exists).map((orden) => [
+    orden.id, new Set(extraerFallasOrden(orden.data()).map((falla) => falla.firma))
+  ]));
   const legadosPorReporte = new Map(reportesUnicos.map((reporteId, index) => [
-    reporteId,
-    existentesLegados[index]
+    reporteId, existentesLegados[index]
   ]));
   const batch = db.batch();
   let vinculadas = 0;
@@ -433,11 +432,13 @@ async function procesarPagina(db, jobId) {
       return;
     }
     const legado = legadosPorReporte.get(reporteId);
-    if (legado?.exists && legado.get('ot_id') !== job.ot_id) {
+    const otLegada = legado?.exists ? legado.get('ot_id') : '';
+    const firmasDeLegado = firmasLegadas.get(otLegada);
+    if (otLegada && otLegada !== job.ot_id && firmasDeLegado
+      && (!firmasDeLegado.size || firmasDeLegado.has(falla.firma))) {
       yaVinculadas += 1;
       return;
     }
-
     batch.set(ref, {
       reporte_id: reporteId,
       folio: reporte.folio || reporte.payload?.folio || reporteId,
