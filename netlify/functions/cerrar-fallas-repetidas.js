@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldPath, getFirestore } from 'firebase-admin/firestore';
-import { crearFirmasFalla, normalizarTextoFalla } from '../../apptolva_bitacora/js/firmaFalla.js';
+import { clavePosibleDuplicado, crearFirmasFalla, normalizarTextoFalla } from '../../apptolva_bitacora/js/firmaFalla.js';
 import '../../apptolva_bitacora/js/catalogoBachoco.js';
 import '../../apptolva_bitacora/js/normalizadorFallas.js';
 
@@ -206,6 +206,7 @@ export function extraerFallasReporte(datos) {
     });
     return firmas.map((firma) => ({
       firma,
+      componenteKeyId: falla.componenteKeyId || '',
       unidad: String(unidad).trim(),
       componente: componenteKey(key)
     }));
@@ -364,6 +365,7 @@ async function procesarPagina(db, jobId) {
   if (!ordenSnapshot.exists) throw new Error('La OT asociada al cierre ya no existe.');
 
   const firmas = new Set(job.firmas_falla || []);
+  const equivalentes = new Set([...firmas].map(clavePosibleDuplicado).filter(Boolean));
   if (firmas.size > 400) throw new Error('La OT contiene más de 400 fallas distintas y no puede procesarse en un lote seguro.');
   const limitePagina = Math.min(
     TAMANO_PAGINA,
@@ -392,7 +394,8 @@ async function procesarPagina(db, jobId) {
     if (!fecha || fecha > job.cerrada_at) return;
     const fallas = extraerFallasReporte({ id: reporte.id, ...reporte.data() });
     fallas.forEach((falla) => {
-      if (!firmas.has(falla.firma)) return;
+      if (!firmas.has(falla.firma)
+        && !(falla.componenteKeyId && equivalentes.has(clavePosibleDuplicado(falla.firma)))) return;
       const ref = db.collection(COLECCION_COBERTURAS).doc(idCobertura(reporte.id, falla.firma));
       coincidencias.set(ref.id, {
         ref,
@@ -435,7 +438,9 @@ async function procesarPagina(db, jobId) {
     const otLegada = legado?.exists ? legado.get('ot_id') : '';
     const firmasDeLegado = firmasLegadas.get(otLegada);
     if (otLegada && otLegada !== job.ot_id && firmasDeLegado
-      && (!firmasDeLegado.size || firmasDeLegado.has(falla.firma))) {
+      && (!firmasDeLegado.size || firmasDeLegado.has(falla.firma)
+        || (falla.componenteKeyId && [...firmasDeLegado].some((firma) =>
+          clavePosibleDuplicado(firma) === clavePosibleDuplicado(falla.firma))))) {
       yaVinculadas += 1;
       return;
     }

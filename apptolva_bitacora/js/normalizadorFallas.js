@@ -19,6 +19,14 @@
       .trim();
   }
 
+  function normalizarTokensNota(texto) {
+    const conectores = new Set(['a', 'al', 'de', 'del', 'el', 'en', 'la', 'las', 'los', 'un', 'una', 'y']);
+    const palabras = (normalizarTexto(texto).match(/[a-z0-9]+/g) || [])
+      .filter((palabra) => !conectores.has(palabra))
+      .sort();
+    return palabras.length >= 2 ? palabras.join(' ') : '';
+  }
+
   function resolverCatalogo(catKey) {
     const maestro = (typeof window !== 'undefined' && window.CATALOGO_MAESTRO_BACHOCO)
       || globalThis.CATALOGO_MAESTRO_BACHOCO
@@ -264,6 +272,9 @@
 
       [...fallasComp, ...soloNota.values()].forEach((falla) => {
         falla.descripcion = describirFalla(falla);
+        if (falla.origen === 'OBSERVACIÓN OPERADOR' && falla.categoria === CATEGORIA_GENERAL) {
+          falla.componenteKeyId = normalizarTokensNota(falla.itemReportado);
+        }
         delete falla.detalles;
         fallasOficiales.push(falla);
       });
@@ -281,6 +292,7 @@
   }
 
   if (typeof globalThis !== 'undefined') {
+    globalThis.normalizarTokensNotaFalla = normalizarTokensNota;
     globalThis.procesarReporteFallas = procesarReporteFallas;
     globalThis.clasificarFallasInspeccion = procesarReporteFallas;
   }

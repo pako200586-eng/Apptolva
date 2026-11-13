@@ -40,32 +40,83 @@ export function crearFirmasFalla({ unidad, componente, sistema, item }) {
 
 export function indiceOrdenesFalla(ordenes, firmasDeOrden, esCerrada) {
   const abiertas = new Set();
+  const ordenesAbiertas = new Map();
+  const equivalentesAbiertas = new Map();
   const legadas = new Map();
+  const legadasEquivalentes = new Map();
   ordenes.forEach((orden) => {
     const firmas = firmasDeOrden(orden);
     const cerrada = esCerrada(orden);
-    if (!cerrada) firmas.forEach((firma) => abiertas.add(firma));
+    if (!cerrada) firmas.forEach((firma) => {
+      abiertas.add(firma);
+      if (!ordenesAbiertas.has(firma)) ordenesAbiertas.set(firma, []);
+      ordenesAbiertas.get(firma).push(orden);
+      const equivalente = clavePosibleDuplicado(firma);
+      if (equivalente) {
+        if (!equivalentesAbiertas.has(equivalente)) equivalentesAbiertas.set(equivalente, []);
+        equivalentesAbiertas.get(equivalente).push(orden);
+      }
+    });
     if (orden.cobertura_por_falla || !orden.reporte_id) return;
     const reporteId = String(orden.reporte_id);
     if (!legadas.has(reporteId)) legadas.set(reporteId, new Map());
+    if (!legadasEquivalentes.has(reporteId)) legadasEquivalentes.set(reporteId, new Map());
     const estados = legadas.get(reporteId);
     firmas.forEach((firma) => {
-      if (!estados.has(firma) || !cerrada) estados.set(firma, cerrada ? 'ATENDIDA' : 'ASIGNADA');
+      const detalle = {
+        estado: cerrada ? 'ATENDIDA' : 'ASIGNADA',
+        ordenes: [orden]
+      };
+      if (!estados.has(firma) || !cerrada) estados.set(firma, detalle);
+      const equivalente = clavePosibleDuplicado(firma);
+      const estadosEquivalentes = legadasEquivalentes.get(reporteId);
+      if (equivalente && (!estadosEquivalentes.has(equivalente) || !cerrada)) {
+        estadosEquivalentes.set(equivalente, detalle);
+      }
     });
   });
-  return { abiertas, legadas };
+  return { abiertas, ordenesAbiertas, equivalentesAbiertas, legadas, legadasEquivalentes };
 }
 
-export function estadoFallaReporte(reporteId, firma, coberturas, indice) {
-  if (!firma) return 'PENDIENTE';
+export function detalleFallaReporte(reporteId, firma, coberturas, indice, ordenesPorId, esNotaLibre = false) {
+  if (!firma) return { estado: 'PENDIENTE', ordenes: [] };
   const cobertura = coberturas.get(`${reporteId}|${firma}`);
   if (cobertura) {
-    if (cobertura.estado === 'DESCARTADA') return 'DESCARTADA';
-    return cobertura.estado === 'ATENDIDA' ? 'ATENDIDA' : 'ASIGNADA';
+    const estado = cobertura.estado === 'DESCARTADA'
+      ? 'DESCARTADA'
+      : (cobertura.estado === 'ATENDIDA' ? 'ATENDIDA' : 'ASIGNADA');
+    const orden = cobertura.ot_id && ordenesPorId?.get(String(cobertura.ot_id));
+    return { estado, ordenes: orden ? [orden] : [], otId: cobertura.ot_id || '' };
   }
-  const legado = indice.legadas.get(String(reporteId))?.get(firma);
+  const legado = indice.legadas.get(String(reporteId))?.get(firma)
+    || (esNotaLibre && indice.legadasEquivalentes.get(String(reporteId))?.get(clavePosibleDuplicado(firma)));
   if (legado) return legado;
-  return indice.abiertas.has(firma) ? 'ASIGNADA' : 'PENDIENTE';
+  const equivalentes = esNotaLibre ? (indice.equivalentesAbiertas.get(clavePosibleDuplicado(firma)) || []) : [];
+  return indice.abiertas.has(firma) || equivalentes.length
+    ? { estado: 'ASIGNADA', ordenes: indice.ordenesAbiertas.get(firma) || equivalentes }
+    : { estado: 'PENDIENTE', ordenes: [] };
+}
+
+export function estadoFallaReporte(reporteId, firma, coberturas, indice, esNotaLibre = false) {
+  return detalleFallaReporte(reporteId, firma, coberturas, indice, undefined, esNotaLibre).estado;
+}
+
+export function clavePosibleDuplicado(firma) {
+  let partes;
+  try {
+    partes = JSON.parse(firma);
+  } catch (error) {
+    throw new Error(`Firma de falla inválida: ${error.message}`);
+  }
+  if (!Array.isArray(partes) || partes.length !== 4 || partes.some((parte) => typeof parte !== 'string')) {
+    throw new Error('Firma de falla inválida: se esperaban equipo, componente, sistema y elemento.');
+  }
+  if (normalizarTextoFalla(partes[2]) !== 'GENERAL / REVISION TALLER') return '';
+  if (typeof globalThis.normalizarTokensNotaFalla !== 'function') {
+    throw new Error('No está disponible el normalizador de notas de fallas.');
+  }
+  const tokens = globalThis.normalizarTokensNotaFalla(partes[3]);
+  return tokens ? JSON.stringify([...partes.slice(0, 3).map(normalizarTextoFalla), tokens]) : '';
 }
 
 export async function idCoberturaFalla(reporteId, firma) {

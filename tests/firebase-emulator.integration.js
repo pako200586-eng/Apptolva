@@ -97,6 +97,9 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     posterior: `reporte-posterior-${appId}`,
     otroComponente: `reporte-componente-${appId}`,
     legadoCoincidente: `reporte-legado-${appId}`,
+    notaEquivalente: `reporte-nota-${appId}`,
+    notaPosterior: `reporte-nota-posterior-${appId}`,
+    notaOtroEquipo: `reporte-nota-otro-${appId}`,
     sincronizadoTarde: `reporte-tardio-${appId}`
   };
   const firmaTracto = crearFirmaFalla({
@@ -112,6 +115,18 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     item: 'Fuga de aceite'
   });
   const firmaOrden = firmaTracto;
+  const firmaNota = crearFirmaFalla({
+    unidad: '14096', componente: 'TOLVA2', sistema: 'GENERAL / REVISIÓN TALLER',
+    item: 'Motor de arrastre tira aceite'
+  });
+  const firmaNotaEquivalente = crearFirmaFalla({
+    unidad: '14096', componente: 'TOLVA2', sistema: 'GENERAL / REVISIÓN TALLER',
+    item: 'Tira aceite el motor de arrastre'
+  });
+  const firmaNotaOtro = crearFirmaFalla({
+    unidad: '14097', componente: 'TOLVA2', sistema: 'GENERAL / REVISIÓN TALLER',
+    item: 'Tira aceite el motor de arrastre'
+  });
   const cierreBase = Date.now();
   const antes = new Date(cierreBase - 5 * 60 * 1000).toISOString();
   const despues = new Date(cierreBase + 5 * 60 * 1000).toISOString();
@@ -139,6 +154,9 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     idCobertura(reportesIds.posterior, firmaTracto),
     idCobertura(reportesIds.otroComponente, firmaTolva),
     idCobertura(reportesIds.legadoCoincidente, firmaTracto),
+    idCobertura(reportesIds.notaEquivalente, firmaNotaEquivalente),
+    idCobertura(reportesIds.notaPosterior, firmaNotaEquivalente),
+    idCobertura(reportesIds.notaOtroEquipo, firmaNotaOtro),
     idCobertura(reportesIds.sincronizadoTarde, firmaTracto),
     `directo-${appId}`
   ];
@@ -186,7 +204,7 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     payload: {
       unitId: 'TR-101',
       tolva1: 'TL-202',
-      cobertura_falla_keys: [firmaOrden],
+      cobertura_falla_keys: [firmaOrden, firmaNota],
       fallas: [{
         componenteKey: 'tracto',
         sistema: 'MOTOR',
@@ -215,7 +233,15 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     [reportesIds.anterior, construirReporte(reportesIds.anterior, antes)],
     [reportesIds.posterior, construirReporte(reportesIds.posterior, despues)],
     [reportesIds.otroComponente, construirReporte(reportesIds.otroComponente, antes, 'tolva1')],
-    [reportesIds.legadoCoincidente, construirReporte(reportesIds.legadoCoincidente, antes)]
+    [reportesIds.legadoCoincidente, construirReporte(reportesIds.legadoCoincidente, antes)],
+    ...[
+      [reportesIds.notaEquivalente, antes, '14096'],
+      [reportesIds.notaPosterior, despues, '14096'],
+      [reportesIds.notaOtroEquipo, antes, '14097']
+    ].map(([id, fecha, unidad]) => [id, {
+      id, report_type: 'checklist', created_at: fecha,
+      payload: { unitId: 'TR-101', tolva2: unidad, observaciones: { tolva2: 'Tira aceite el motor de arrastre' } }
+    }])
   ];
   await Promise.all(reportesIniciales.map(([id, reporte]) =>
     adminDb.collection('bitacora_reports').doc(id).set(reporte)
@@ -260,6 +286,12 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     .doc(idCobertura(reportesIds.otroComponente, firmaTolva)).get()).exists, false);
   assert.equal((await adminDb.collection('falla_ot_cobertura')
     .doc(idCobertura(reportesIds.legadoCoincidente, firmaTracto)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaEquivalente, firmaNotaEquivalente)).get()).get('estado'), 'ATENDIDA');
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaPosterior, firmaNotaEquivalente)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaOtroEquipo, firmaNotaOtro)).get()).exists, false);
 
   const lateReport = construirReporte(reportesIds.sincronizadoTarde, antes);
   lateReport.synced_at = new Date().toISOString();

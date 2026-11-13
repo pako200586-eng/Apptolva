@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { crearFirmaFalla, crearFirmasFalla, estadoFallaReporte, idCoberturaFalla, indiceOrdenesFalla, separarSistemasFalla } from '../apptolva_bitacora/js/firmaFalla.js';
+import { clavePosibleDuplicado, crearFirmaFalla, crearFirmasFalla, detalleFallaReporte, estadoFallaReporte, idCoberturaFalla, indiceOrdenesFalla, separarSistemasFalla } from '../apptolva_bitacora/js/firmaFalla.js';
 import { extraerFallasReporte, idCobertura } from '../netlify/functions/cerrar-fallas-repetidas.js';
 
 test('normalizes accents, case, and spacing while preserving equipment identity', () => {
@@ -173,6 +173,170 @@ test('legacy orders and coverage only affect the matching report and fault', () 
   assert.equal(estadoFallaReporte('otro', dolly, new Map(), abierta), 'ASIGNADA');
 });
 
+test('possible duplicates compare reordered words without changing persisted signatures', () => {
+  const datos = { unidad: '14096', componente: 'tolva2', sistema: 'GENERAL / REVISIÓN TALLER' };
+  const primera = crearFirmaFalla({ ...datos, item: 'Motor de arrastre tira aceite' });
+  const segunda = crearFirmaFalla({ ...datos, item: 'Tira aceite el motor de arrastre.' });
+  assert.notEqual(primera, segunda);
+  assert.equal(clavePosibleDuplicado(primera), clavePosibleDuplicado(segunda));
+  assert.notEqual(clavePosibleDuplicado(primera), clavePosibleDuplicado(crearFirmaFalla({
+    ...datos, item: 'Motor de arrastre no tira aceite'
+  })));
+  assert.notEqual(clavePosibleDuplicado(primera), clavePosibleDuplicado(crearFirmaFalla({
+    ...datos, unidad: '14097', item: 'Tira aceite el motor de arrastre'
+  })));
+  assert.notEqual(clavePosibleDuplicado(primera), clavePosibleDuplicado(crearFirmaFalla({
+    ...datos, sistema: 'FRENOS', item: 'Tira aceite el motor de arrastre'
+  })));
+  assert.equal(clavePosibleDuplicado(crearFirmaFalla({ ...datos, item: 'Llantas' })), '');
+  const primerReporte = { payload: { unitId: '14132', tolva2: '14096', observaciones: { tolva2: 'Motor de arrastre tira aceite' } } };
+  const segundoReporte = { payload: { unitId: '14132', tolva2: '14096', observaciones: { tolva2: 'Tira aceite el motor de arrastre' } } };
+  const primeraNota = globalThis.procesarReporteFallas(primerReporte).fallas[0];
+  const segundaNota = globalThis.procesarReporteFallas(segundoReporte).fallas[0];
+  assert.equal(primeraNota.componenteKeyId, segundaNota.componenteKeyId);
+  const [fallaPrimera] = extraerFallasReporte(primerReporte);
+  const [fallaSegunda] = extraerFallasReporte(segundoReporte);
+  const indice = indiceOrdenesFalla([{ firmas: [fallaPrimera.firma] }], (orden) => orden.firmas, () => false);
+  assert.equal(estadoFallaReporte('nuevo', fallaSegunda.firma, new Map(), indice, true), 'ASIGNADA');
+  assert.equal(estadoFallaReporte('nuevo', fallaSegunda.firma, new Map(), indice, false), 'PENDIENTE');
+  assert.equal(estadoFallaReporte('nuevo', fallaSegunda.firma, new Map([
+    [`nuevo|${fallaSegunda.firma}`, { estado: 'DESCARTADA' }]
+  ]), indice, true), 'DESCARTADA');
+  const legado = indiceOrdenesFalla(
+    [{ reporte_id: 'mismo', firmas: [fallaPrimera.firma] }], (orden) => orden.firmas, () => true
+  );
+  assert.equal(estadoFallaReporte('mismo', fallaSegunda.firma, new Map(), legado, true), 'ATENDIDA');
+  assert.equal(estadoFallaReporte('otro', fallaSegunda.firma, new Map(), legado, true), 'PENDIENTE');
+});
+
+test('recurrences show each fault coverage instead of an unrelated report order', () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  const inicio = html.indexOf('    function calcularFallasRecurrentes(');
+  const fin = html.indexOf('    function renderFallasRecurrentes(', inicio);
+  assert.ok(inicio >= 0 && fin > inicio);
+  const firma = crearFirmaFalla({ unidad: '14132', componente: 'tracto', sistema: 'INTERIOR', item: 'Asientos' });
+  const otraFirma = crearFirmaFalla({ unidad: '14132', componente: 'tracto', sistema: 'FRENOS', item: 'ABS' });
+  const ordenes = [
+    { id: 'ot-445', folio_ot: 445, estatus: 'TERMINADA', cobertura_por_falla: true, firmas: [firma] },
+    { id: 'ot-999', folio_ot: 999, estatus: 'NUEVA', reporte_id: 'r3', firmas: [otraFirma] }
+  ];
+  const indice = indiceOrdenesFalla(ordenes, (orden) => orden.firmas, (orden) => orden.estatus === 'TERMINADA');
+  const coberturas = new Map([
+    [`r1|${firma}`, { estado: 'ATENDIDA', ot_id: 'ot-445' }],
+    [`r2|${firma}`, { estado: 'DESCARTADA' }]
+  ]);
+  const calcular = runInNewContext(`${html.slice(inicio, fin)}; calcularFallasRecurrentes`, {
+    dashState: { ordenes, coberturas }, indiceOrdenesPanel: () => indice,
+    numerosEconomicos: () => ({ tracto: '14132' }),
+    fallasPorComponente: () => ({ tracto: [{ categoria: 'INTERIOR', item: 'Asientos' }] }),
+    COMPONENTES: [{ key: 'tracto', nombre: 'Tracto' }],
+    sinAcentos: (texto) => texto.toUpperCase(), crearFirmaFalla, detalleFallaReporte
+  });
+  const [grupo] = calcular([
+    { id: 'r1', folio: 'F-3033', createdAt: '2026-11-10T12:00:00Z' },
+    { id: 'r2', folio: 'F-2909', createdAt: '2026-11-11T12:00:00Z' },
+    { id: 'r3', folio: 'F-3040', createdAt: '2026-11-12T12:00:00Z' }
+  ]);
+  assert.match(grupo.estadoOt, /OT-445.*F-3033/);
+  assert.match(grupo.estadoOt, /Descartada: F-2909/);
+  assert.match(grupo.estadoOt, /Pendiente sin OT: F-3040/);
+  assert.doesNotMatch(grupo.estadoOt, /OT-999/);
+});
+
+test('recurrences group reordered free notes and show their individual states', () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  const inicio = html.indexOf('    function calcularFallasRecurrentes(');
+  const fin = html.indexOf('    function renderFallasRecurrentes(', inicio);
+  assert.ok(inicio >= 0 && fin > inicio);
+  const orden = { id: '484', folio_ot: 484, estatus: 'NUEVA' };
+  const firma = crearFirmaFalla({ unidad: '14096', componente: 'tolva2', sistema: 'GENERAL / REVISIÓN TALLER', item: 'Motor de arrastre tira aceite' });
+  const indice = indiceOrdenesFalla([{ ...orden, firmas: [firma] }], (ot) => ot.firmas, () => false);
+  const calcular = runInNewContext(`${html.slice(inicio, fin)}; calcularFallasRecurrentes`, {
+    dashState: { ordenes: [orden], coberturas: new Map() }, indiceOrdenesPanel: () => indice,
+    numerosEconomicos: () => ({ tolva2: '14096' }),
+    fallasPorComponente: (reporte) => ({ tolva2: [{
+      categoria: 'GENERAL / REVISIÓN TALLER', item: reporte.item, componenteKeyId: 'aceite arrastre motor tira'
+    }] }),
+    COMPONENTES: [{ key: 'tolva2', nombre: 'Tolva 2' }],
+    sinAcentos: (texto) => texto.toUpperCase(), crearFirmaFalla, detalleFallaReporte, clavePosibleDuplicado
+  });
+  const grupos = calcular([
+    { id: 'r1', folio: 'F-3279', item: 'Motor de arrastre tira aceite', createdAt: '2026-11-10T12:00:00Z' },
+    { id: 'r2', folio: 'F-3285', item: 'Tira aceite el motor de arrastre', createdAt: '2026-11-11T12:00:00Z' }
+  ]);
+  assert.equal(grupos.length, 1);
+  assert.equal(grupos[0].incidencias, 2);
+  assert.match(grupos[0].estadoOt, /OT-484.*F-3279, F-3285/);
+});
+
+test('canceling a possible duplicate stops OT creation', async () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  const inicio = html.indexOf('    async function crearOTDesdeFallas(');
+  const fin = html.indexOf('    const ORDEN_COMPONENTES', inicio);
+  assert.ok(inicio >= 0 && fin > inicio);
+  const datos = { unidad: '14096', componente: 'tolva2', sistema: 'GENERAL / REVISIÓN TALLER' };
+  const seleccion = crearFirmaFalla({ ...datos, item: 'Motor de arrastre tira aceite' });
+  const existente = crearFirmaFalla({ ...datos, item: 'Tira aceite el motor de arrastre' });
+  let aviso = '';
+  const crear = runInNewContext(`${html.slice(inicio, fin)}; crearOTDesdeFallas`, {
+    state: { role: 'admin' },
+    obtenerOrdenes: async (forzar) => {
+      assert.equal(forzar, true);
+      return [{ folio_ot: 484, estatus: 'NUEVA', firmas: [existente] }];
+    },
+    ESTATUS_REALIZADA: new Set(['TERMINADA', 'CERRADA']), sinAcentos: (texto) => texto,
+    firmasDeOrden: (orden) => orden.firmas, clavePosibleDuplicado,
+    window: { confirm: (mensaje) => { aviso = mensaje; return false; } }
+  });
+  await crear([{ firma: seleccion, componenteKeyId: 'aceite arrastre motor tira', reportes: [{ reporte: { id: 'r1' } }] }]);
+  assert.match(aviso, /OT-484/);
+  assert.match(aviso, /TIRA ACEITE EL MOTOR DE ARRASTRE/);
+});
+
+test('one OT for equivalent notes preserves each report coverage signature', async () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  const inicio = html.indexOf('    async function crearOTDesdeFallas(');
+  const fin = html.indexOf('    const ORDEN_COMPONENTES', inicio);
+  assert.ok(inicio >= 0 && fin > inicio);
+  const datos = { unidad: '14096', componente: 'tolva2', sistema: 'GENERAL / REVISIÓN TALLER' };
+  const primera = crearFirmaFalla({ ...datos, item: 'Motor de arrastre tira aceite' });
+  const segunda = crearFirmaFalla({ ...datos, item: 'Tira aceite el motor de arrastre' });
+  const escrituras = [];
+  const crear = runInNewContext(`${html.slice(inicio, fin)}; crearOTDesdeFallas`, {
+    state: { role: 'admin', user: { email: 'admin@example.test' } },
+    dashState: { ordenes: [] }, db: {},
+    obtenerOrdenes: async () => [], ESTATUS_REALIZADA: new Set(), sinAcentos: (texto) => texto,
+    firmasDeOrden: (orden) => orden.firmas, clavePosibleDuplicado,
+    crypto: { randomUUID: () => 'id-unico' },
+    idCoberturaFalla: async (id, firma) => `${id}|${firma}`,
+    doc: (db, coleccion, id) => ({ coleccion, id }),
+    runTransaction: async (db, fn) => fn({
+      get: async () => ({ exists: () => false, data: () => ({ folio_ot_actual: 164 }) }),
+      set: (ref, data) => escrituras.push({ ref, data })
+    }),
+    window: { etiquetasOT: { etiquetaComponente: () => 'Tolva 2' } },
+    renderDashboard: () => {}, generarPDFOT: async () => {}, cargarFallas: async () => {},
+    cargarOrdenes: async () => {}, mostrarVistaOrdenes: () => {}
+  });
+  await crear([{
+    firma: primera, componenteKeyId: 'aceite arrastre motor tira', unidad: '14096',
+    componente: 'Tolva 2', componenteKey: 'tolva2', sistema: datos.sistema,
+    item: 'Motor de arrastre tira aceite',
+    reportes: [
+      { reporte: { id: 'r1', folio: 'F-3279', createdAt: '2026-11-10T12:00:00Z' }, falla: { firma: primera } },
+      { reporte: { id: 'r2', folio: 'F-3285', createdAt: '2026-11-11T12:00:00Z' }, falla: { firma: segunda } }
+    ]
+  }]);
+  const coberturas = escrituras.filter(({ ref }) => ref.coleccion === 'falla_ot_cobertura');
+  assert.equal(coberturas.length, 2);
+  assert.equal(coberturas[0].data.falla_key, primera);
+  assert.equal(coberturas[1].data.falla_key, segunda);
+  const orden = escrituras.find(({ ref }) => ref.coleccion === 'ordenes_trabajo').data;
+  assert.equal(orden.payload.cobertura_falla_keys.length, 2);
+  assert.ok(orden.payload.cobertura_falla_keys.includes(primera));
+  assert.ok(orden.payload.cobertura_falla_keys.includes(segunda));
+});
+
 test('dashboard keeps a repeated fault pending when a later report is not covered', () => {
   const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
   const inicio = html.indexOf('    function calcularMetricas() {');
@@ -207,6 +371,11 @@ test('dashboard keeps a repeated fault pending when a later report is not covere
   metricas = calcular();
   assert.equal(metricas.fallasNuevas, 1);
   assert.equal(metricas.celdas.reduce((total, celda) => total + celda.realizadas, 0), 1);
+  const firmaDolly = crearFirmaFalla({ unidad: '14150', componente: 'dolly', sistema: 'FRENOS', item: 'ABS' });
+  dashState.coberturas.set(`antes|${firmaDolly}`, { estado: 'DESCARTADA' });
+  metricas = calcular();
+  assert.equal(metricas.fallasNuevas, 0);
+  assert.equal(metricas.celdas.reduce((total, celda) => total + celda.reportadas, 0), 1);
 });
 
 test('differential synchronization replaces existing reports with server updates', async () => {
