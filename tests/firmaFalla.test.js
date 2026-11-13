@@ -459,7 +459,9 @@ test('cards group the same trailer across tractors and retain both position sign
   ];
   const contenedor = { innerHTML: '', children: [], appendChild: function (elemento) { this.children.push(elemento); } };
   const tarjetas = [];
-  const cargar = runInNewContext(`${html.slice(inicio, fin)}; cargarFallas`, {
+  const inicioPendientes = html.indexOf('    function fallasPendientesDeReportes(');
+  const finPendientes = html.indexOf('    function renderAlertasSeguridad(', inicioPendientes);
+  const cargar = runInNewContext(`${html.slice(inicioPendientes, finPendientes)}\n${html.slice(inicio, fin)}; cargarFallas`, {
     state: { reports: reportes }, dashState: {}, $: () => contenedor,
     obtenerOrdenes: async () => [], obtenerCoberturas: async () => new Map(),
     indiceOrdenesPanel: () => ({}), renderAlertasSeguridad: () => {},
@@ -500,13 +502,13 @@ test('unit filters match attached equipment but do not include unrelated equipme
   assert.equal(funciones.coincideEquipoFiltro(reporte, '14151'), true);
 });
 
-test('security alerts use distinct reports, critical terms, seven-day bounds and open states', () => {
+test('security alerts use distinct pending reports, critical terms, seven-day bounds and details', () => {
   const ahora = Date.parse('2026-11-13T12:00:00Z');
   const base = { equipoId: '14107', tipoEquipo: 'Tolva', fecha: new Date(ahora).toISOString(), estado: 'PENDIENTE', otAbierta: false };
   const incidencias = [
-    { ...base, reporteId: 'r1', texto: 'Manivela' },
-    { ...base, reporteId: 'r1', texto: 'Manivela' },
-    { ...base, reporteId: 'r2', texto: 'Compuerta dura', fecha: new Date(ahora - 7 * 86400000).toISOString() },
+    { ...base, reporteId: 'r1', folio: 'F-1', texto: 'Manivela', detalle: 'Manivela' },
+    { ...base, reporteId: 'r1', folio: 'F-1', texto: 'Manivela', detalle: 'Manivela' },
+    { ...base, reporteId: 'r2', folio: 'F-2', texto: 'Compuerta dura', detalle: 'Compuerta dura', fecha: new Date(ahora - 7 * 86400000).toISOString() },
     { ...base, equipoId: '14151', reporteId: 'r3', texto: 'Falta cable eléctrico', estado: 'ASIGNADA', otAbierta: true },
     { ...base, equipoId: '14152', reporteId: 'r4', texto: 'Cinturón roto', estado: 'ATENDIDA' },
     { ...base, equipoId: '14153', reporteId: 'r5', texto: 'Pasamanos roto', estado: 'DESCARTADA' },
@@ -515,9 +517,13 @@ test('security alerts use distinct reports, critical terms, seven-day bounds and
     { ...base, equipoId: '14156', reporteId: 'r8', texto: 'Asiento roto', estado: 'ASIGNADA', otAbierta: false }
   ];
   const alertas = calcularAlertasSeguridad(incidencias, ahora);
-  assert.deepEqual(alertas.map((alerta) => alerta.equipoId).sort(), ['14107', '14151']);
+  assert.deepEqual(alertas.map((alerta) => alerta.equipoId), ['14107']);
   assert.equal(alertas.find((alerta) => alerta.equipoId === '14107').reportes, 2);
-  assert.deepEqual(alertas.find((alerta) => alerta.equipoId === '14151').riesgos, ['VIAL']);
+  assert.deepEqual(alertas[0].detalles, [
+    { folio: 'F-1', detalle: 'Manivela' },
+    { folio: 'F-2', detalle: 'Compuerta dura' }
+  ]);
+  assert.deepEqual(alertas[0].riesgos, ['ERGONÓMICO']);
   assert.equal(calcularAlertasSeguridad([{ ...base, reporteId: 'r1', texto: 'Manivela' }], ahora).length, 0);
   for (const texto of ['cinturón roto', 'pasamanos roto', 'luces roto', 'perno rey con juego']) {
     assert.equal(calcularAlertasSeguridad([{ ...base, reporteId: texto, texto }], ahora).length, 1);
@@ -540,17 +546,89 @@ test('selecting a security alert filters its equipment without loading the old f
     applyFilters: { click: () => pasos.push('filtrar') }
   };
   const renderizar = runInNewContext(`${html.slice(inicio, fin)}; renderAlertasSeguridad`, {
-    dashState: { ordenes: [] }, $: (id) => elementos[id],
-    fallasFirmablesDeReporte: () => [{ unidad: '14107', componenteKey: 'tolva1', itemReportado: 'Cinturón roto', descripcion: 'Cinturón roto', firma: 'firma' }],
-    coincideEquipoFiltro: () => true,
-    detalleFallaReporte: () => ({ estado: 'PENDIENTE', ordenes: [] }),
+    $: (id) => elementos[id],
     calcularAlertasSeguridad, escapeHtml: (valor) => valor,
     mostrarVistaMantenimiento: (id, cargar) => pasos.push(`${id}:${cargar}`)
   });
-  renderizar([{ id: 'r1', createdAt: new Date().toISOString() }], new Map(), {});
+  renderizar([{
+    reporte: { id: 'r1', folio: 'F-123', createdAt: new Date().toISOString() },
+    falla: { unidad: '14107', componenteKey: 'tolva1', itemReportado: 'Cinturón roto', descripcion: 'Cinturón roto', firma: 'firma' }
+  }]);
+  assert.match(elementos['alertas-seguridad-lista'].innerHTML, /F-123.*Cinturón roto/);
   seleccionar();
   assert.equal(elementos.unitFilter.value, '14107');
   assert.deepEqual(pasos, ['vista-fallas:false', 'filtrar']);
+});
+
+test('security panel starts collapsed and toggles accessible state', () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  assert.match(html, /id="lista-alertas-seguridad" hidden/);
+  assert.match(html, /id="toggle-alertas-seguridad"[^>]*aria-expanded="false"[^>]*aria-controls="lista-alertas-seguridad"/);
+  const inicio = html.indexOf("    $('toggle-alertas-seguridad').addEventListener");
+  const fin = html.indexOf('    function fallasPendientesDeReportes(', inicio);
+  assert.ok(inicio >= 0 && fin > inicio);
+  let click;
+  const boton = { addEventListener: (evento, fn) => { click = fn; }, setAttribute: (nombre, valor) => { boton[nombre] = valor; } };
+  const lista = { hidden: true };
+  runInNewContext(html.slice(inicio, fin), { $: (id) => id === 'lista-alertas-seguridad' ? lista : boton });
+  click();
+  assert.equal(lista.hidden, false);
+  assert.equal(boton['aria-expanded'], 'true');
+  assert.equal(boton.textContent, 'Ocultar alertas ▲');
+  click();
+  assert.equal(lista.hidden, true);
+  assert.equal(boton['aria-expanded'], 'false');
+  assert.equal(boton.textContent, 'Ver alertas ▼');
+});
+
+test('security alerts and pending cards use the same incidences and exclude covered faults', async () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  const inicioPendientes = html.indexOf('    function fallasPendientesDeReportes(');
+  const finAlertas = html.indexOf('    async function descartarFalla(', inicioPendientes);
+  const inicioFallas = html.indexOf('    async function cargarFallas() {');
+  const finFallas = html.indexOf('    // CARGA DE ÓRDENES DE TRABAJO', inicioFallas);
+  assert.ok(inicioPendientes >= 0 && finAlertas > inicioPendientes && inicioFallas >= 0 && finFallas > inicioFallas);
+  const falla = (unidad) => ({
+    unidad, componenteKey: 'dolly', componente: 'DOLLY', sistema: 'ELÉCTRICO',
+    itemReportado: 'Enchufes 7 vías', descripcion: 'Enchufes 7 vías roto',
+    firma: crearFirmaFalla({ unidad, componente: 'dolly', sistema: 'ELÉCTRICO', item: 'Enchufes 7 vías' })
+  });
+  const unidades = ['14146', '14147', '14148', '14149', '14150', '14151'];
+  const fallas = unidades.map(falla);
+  const ahora = Date.now();
+  const reportes = fallas.map((item, index) => ({
+    id: `r${index}`, folio: `F-${index + 100}`, type: 'checklist', unitId: '14132',
+    createdAt: new Date(ahora - (index === 5 ? 8 * 86400000 : 1000)).toISOString(), fallas: [item]
+  }));
+  const coberturas = new Map([
+    [`r0|${fallas[0].firma}`, { estado: 'ATENDIDA', ot_id: 'ot-368' }],
+    [`r1|${fallas[1].firma}`, { estado: 'EN_PROCESO', ot_id: 'ot-abierta' }],
+    [`r2|${fallas[2].firma}`, { estado: 'DESCARTADA' }],
+    [`r3|${fallas[3].firma}`, { estado: 'EN_PROCESO', ot_id: 'ot-no-encontrada' }]
+  ]);
+  const indice = indiceOrdenesFalla([], () => [], () => false);
+  const tarjetas = [];
+  const contenedor = { innerHTML: '', children: [], appendChild(elemento) { this.children.push(elemento); } };
+  const lista = { innerHTML: '', querySelectorAll: () => [] };
+  const conteo = {};
+  const elementos = { 'fallas-cards': contenedor, 'alertas-seguridad-lista': lista, 'alertas-seguridad-conteo': conteo };
+  const cargar = runInNewContext(`${html.slice(inicioPendientes, finAlertas)}\n${html.slice(inicioFallas, finFallas)}; cargarFallas`, {
+    state: { reports: reportes }, dashState: {}, $: (id) => elementos[id],
+    obtenerOrdenes: async () => [], obtenerCoberturas: async () => coberturas,
+    indiceOrdenesPanel: () => indice, fallasFirmablesDeReporte: (reporte) => reporte.fallas,
+    coincideEquipoFiltro: () => true, estadoFallaReporte, claveAgrupacionEquipo,
+    calcularAlertasSeguridad, escapeHtml: (valor) => valor,
+    ORDEN_COMPONENTES: { dolly: 2 }, normalizarSistema: (valor) => valor.toLowerCase(),
+    COMPONENTES: [{ key: 'dolly', nombre: 'Dolly' }],
+    tarjetaUnidadHtml: (equipo) => { tarjetas.push(equipo.unitId); return ''; },
+    enlazarTarjetaUnidad: () => {}, document: { createElement: () => ({}) }
+  });
+  await cargar();
+  assert.deepEqual(tarjetas.sort(), ['14150', '14151']);
+  assert.equal(conteo.textContent, '1 activa');
+  assert.match(lista.innerHTML, /14150/);
+  assert.match(lista.innerHTML, /F-104.*Enchufes 7 vías roto/);
+  for (const unidad of ['14146', '14147', '14148', '14149', '14151']) assert.doesNotMatch(lista.innerHTML, new RegExp(unidad));
 });
 
 test('dashboard keeps a repeated fault pending when a later report is not covered', () => {
