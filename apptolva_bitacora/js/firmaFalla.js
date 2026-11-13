@@ -38,6 +38,30 @@ export function crearFirmasFalla({ unidad, componente, sistema, item }) {
     .filter(Boolean))];
 }
 
+export function firmasEquivalentesPosicion(firma) {
+  const partes = JSON.parse(firma);
+  if (!Array.isArray(partes) || partes.length !== 4 || partes.some((parte) => typeof parte !== 'string')) {
+    throw new Error('Firma de falla inválida: se esperaban equipo, componente, sistema y elemento.');
+  }
+  if (!normalizarTextoFalla(partes[0]) || normalizarTextoFalla(partes[0]) === 'S/N'
+    || !['TOLVA1', 'TOLVA2'].includes(partes[1])) return [firma];
+  const alternativa = [...partes];
+  alternativa[1] = partes[1] === 'TOLVA1' ? 'TOLVA2' : 'TOLVA1';
+  return [firma, JSON.stringify(alternativa)];
+}
+
+export function indexarCoberturasFalla(coberturas) {
+  const indice = new Map();
+  coberturas.forEach((cobertura) => {
+    if (!cobertura.reporte_id || !cobertura.falla_key) return;
+    const clave = clavePosibleDuplicado(cobertura.falla_key);
+    if (!clave) return;
+    const id = `${cobertura.reporte_id}|${claveAgrupacionEquipo(cobertura.falla_key, true)}`;
+    if (!indice.has(id)) indice.set(id, cobertura);
+  });
+  return indice;
+}
+
 export function indiceOrdenesFalla(ordenes, firmasDeOrden, esCerrada) {
   const abiertas = new Set();
   const ordenesAbiertas = new Map();
@@ -48,14 +72,16 @@ export function indiceOrdenesFalla(ordenes, firmasDeOrden, esCerrada) {
     const firmas = firmasDeOrden(orden);
     const cerrada = esCerrada(orden);
     if (!cerrada) firmas.forEach((firma) => {
-      abiertas.add(firma);
-      if (!ordenesAbiertas.has(firma)) ordenesAbiertas.set(firma, []);
-      ordenesAbiertas.get(firma).push(orden);
-      const equivalente = clavePosibleDuplicado(firma);
-      if (equivalente) {
-        if (!equivalentesAbiertas.has(equivalente)) equivalentesAbiertas.set(equivalente, []);
-        equivalentesAbiertas.get(equivalente).push(orden);
-      }
+      firmasEquivalentesPosicion(firma).forEach((variante) => {
+        abiertas.add(variante);
+        if (!ordenesAbiertas.has(variante)) ordenesAbiertas.set(variante, []);
+        if (!ordenesAbiertas.get(variante).includes(orden)) ordenesAbiertas.get(variante).push(orden);
+        const equivalente = clavePosibleDuplicado(variante);
+        if (equivalente) {
+          if (!equivalentesAbiertas.has(equivalente)) equivalentesAbiertas.set(equivalente, []);
+          if (!equivalentesAbiertas.get(equivalente).includes(orden)) equivalentesAbiertas.get(equivalente).push(orden);
+        }
+      });
     });
     if (orden.cobertura_por_falla || !orden.reporte_id) return;
     const reporteId = String(orden.reporte_id);
@@ -67,20 +93,34 @@ export function indiceOrdenesFalla(ordenes, firmasDeOrden, esCerrada) {
         estado: cerrada ? 'ATENDIDA' : 'ASIGNADA',
         ordenes: [orden]
       };
-      if (!estados.has(firma) || !cerrada) estados.set(firma, detalle);
-      const equivalente = clavePosibleDuplicado(firma);
-      const estadosEquivalentes = legadasEquivalentes.get(reporteId);
-      if (equivalente && (!estadosEquivalentes.has(equivalente) || !cerrada)) {
-        estadosEquivalentes.set(equivalente, detalle);
-      }
+      firmasEquivalentesPosicion(firma).forEach((variante) => {
+        if (!estados.has(variante) || !cerrada) estados.set(variante, detalle);
+        const equivalente = clavePosibleDuplicado(variante);
+        const estadosEquivalentes = legadasEquivalentes.get(reporteId);
+        if (equivalente && (!estadosEquivalentes.has(equivalente) || !cerrada)) {
+          estadosEquivalentes.set(equivalente, detalle);
+        }
+      });
     });
   });
   return { abiertas, ordenesAbiertas, equivalentesAbiertas, legadas, legadasEquivalentes };
 }
 
+export function coberturaFallaReporte(reporteId, firma, coberturas, esNotaLibre = false) {
+  if (!firma) return undefined;
+  let cobertura = firmasEquivalentesPosicion(firma)
+    .map((variante) => coberturas.get(`${reporteId}|${variante}`))
+    .find(Boolean);
+  if (!cobertura && esNotaLibre && clavePosibleDuplicado(firma)) {
+    const indiceNotas = coberturas.indiceNotas || indexarCoberturasFalla(coberturas);
+    cobertura = indiceNotas.get(`${reporteId}|${claveAgrupacionEquipo(firma, true)}`);
+  }
+  return cobertura;
+}
+
 export function detalleFallaReporte(reporteId, firma, coberturas, indice, ordenesPorId, esNotaLibre = false) {
   if (!firma) return { estado: 'PENDIENTE', ordenes: [] };
-  const cobertura = coberturas.get(`${reporteId}|${firma}`);
+  const cobertura = coberturaFallaReporte(reporteId, firma, coberturas, esNotaLibre);
   if (cobertura) {
     const estado = cobertura.estado === 'DESCARTADA'
       ? 'DESCARTADA'
@@ -117,6 +157,14 @@ export function clavePosibleDuplicado(firma) {
   }
   const tokens = globalThis.normalizarTokensNotaFalla(partes[3]);
   return tokens ? JSON.stringify([...partes.slice(0, 3).map(normalizarTextoFalla), tokens]) : '';
+}
+
+export function claveAgrupacionEquipo(firma, esNotaLibre = false) {
+  const clave = (esNotaLibre && clavePosibleDuplicado(firma)) || firma;
+  const partes = JSON.parse(clave);
+  if (normalizarTextoFalla(partes[0]) && normalizarTextoFalla(partes[0]) !== 'S/N'
+    && (partes[1] === 'TOLVA1' || partes[1] === 'TOLVA2')) partes[1] = 'TOLVA';
+  return JSON.stringify(partes);
 }
 
 export async function idCoberturaFalla(reporteId, firma) {
