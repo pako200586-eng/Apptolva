@@ -181,10 +181,23 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
   const lecturaUser = await createUserWithEmailAndPassword(readerAuth, emailLectura, 'Emulator123!');
   const responsableUser = await createUserWithEmailAndPassword(ownerAuth, emailResponsable, 'Emulator123!');
   const otId = `ot-${appId}`;
+  const otLegadaId = `ot-legada-${appId}`;
+  const otLegadaCoincidenteId = `ot-legada-coincidente-${appId}`;
   const reportesIds = {
     anterior: `reporte-anterior-${appId}`,
     posterior: `reporte-posterior-${appId}`,
     otroComponente: `reporte-componente-${appId}`,
+    legadoCoincidente: `reporte-legado-${appId}`,
+    notaEquivalente: `reporte-nota-${appId}`,
+    notaPosterior: `reporte-nota-posterior-${appId}`,
+    notaOtroEquipo: `reporte-nota-otro-${appId}`,
+    notaDescartada: `reporte-nota-descartada-${appId}`,
+    tolvaPrimera: `tolva-primera-${appId}`,
+    tolvaSegunda: `tolva-segunda-${appId}`,
+    tolvaPosterior: `tolva-posterior-${appId}`,
+    tolvaOtra: `tolva-otra-${appId}`,
+    tolvaDescartada: `tolva-descartada-${appId}`,
+    tolvaOtraOt: `tolva-otra-ot-${appId}`,
     sincronizadoTarde: `reporte-tardio-${appId}`
   };
   const firmaTracto = crearFirmaFalla({
@@ -200,6 +213,25 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     item: 'Fuga de aceite'
   });
   const firmaOrden = firmaTracto;
+  const firmaNota = crearFirmaFalla({
+    unidad: '14096', componente: 'TOLVA2', sistema: 'GENERAL / REVISIÓN TALLER',
+    item: 'Motor de arrastre tira aceite'
+  });
+  const firmaNotaEquivalente = crearFirmaFalla({
+    unidad: '14096', componente: 'TOLVA1', sistema: 'GENERAL / REVISIÓN TALLER',
+    item: 'Tira aceite el motor de arrastre'
+  });
+  const firmaNotaPosterior = crearFirmaFalla({
+    unidad: '14096', componente: 'TOLVA2', sistema: 'GENERAL / REVISIÓN TALLER',
+    item: 'Tira aceite el motor de arrastre'
+  });
+  const firmaNotaOtro = crearFirmaFalla({
+    unidad: '14097', componente: 'TOLVA2', sistema: 'GENERAL / REVISIÓN TALLER',
+    item: 'Tira aceite el motor de arrastre'
+  });
+  const firmaTolvaPrimera = crearFirmaFalla({ unidad: '14107', componente: 'TOLVA1', sistema: 'FRENOS', item: 'ABS' });
+  const firmaTolvaSegunda = crearFirmaFalla({ unidad: '14107', componente: 'TOLVA2', sistema: 'FRENOS', item: 'ABS' });
+  const firmaTolvaOtra = crearFirmaFalla({ unidad: '14108', componente: 'TOLVA2', sistema: 'FRENOS', item: 'ABS' });
   const cierreBase = Date.now();
   const antes = new Date(cierreBase - 5 * 60 * 1000).toISOString();
   const despues = new Date(cierreBase + 5 * 60 * 1000).toISOString();
@@ -222,10 +254,32 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     }
   });
 
+  const construirTolva = (id, createdAt, posicion, unidad = '14107') => ({
+    id, report_type: 'checklist', created_at: createdAt,
+    payload: {
+      unitId: '14132', [posicion]: unidad,
+      checklistData: [{ id: posicion, categorias: [{ cat: 'FRENOS', items: [{ item: 'ABS', estado: 'MAL' }] }] }]
+    }
+  });
+
   const idsCobertura = [
     idCobertura(reportesIds.anterior, firmaTracto),
     idCobertura(reportesIds.posterior, firmaTracto),
     idCobertura(reportesIds.otroComponente, firmaTolva),
+    idCobertura(reportesIds.legadoCoincidente, firmaTracto),
+    idCobertura(reportesIds.notaEquivalente, firmaNotaEquivalente),
+    idCobertura(reportesIds.notaPosterior, firmaNotaPosterior),
+    idCobertura(reportesIds.notaOtroEquipo, firmaNotaOtro),
+    idCobertura(reportesIds.notaDescartada, firmaNota),
+    idCobertura(reportesIds.notaDescartada, firmaNotaEquivalente),
+    idCobertura(reportesIds.tolvaPrimera, firmaTolvaPrimera),
+    idCobertura(reportesIds.tolvaSegunda, firmaTolvaSegunda),
+    idCobertura(reportesIds.tolvaPosterior, firmaTolvaSegunda),
+    idCobertura(reportesIds.tolvaOtra, firmaTolvaOtra),
+    idCobertura(reportesIds.tolvaDescartada, firmaTolvaPrimera),
+    idCobertura(reportesIds.tolvaDescartada, firmaTolvaSegunda),
+    idCobertura(reportesIds.tolvaOtraOt, firmaTolvaPrimera),
+    idCobertura(reportesIds.tolvaOtraOt, firmaTolvaSegunda),
     idCobertura(reportesIds.sincronizadoTarde, firmaTracto),
     `directo-${appId}`
   ];
@@ -242,11 +296,14 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     }
     for (const id of Object.values(reportesIds)) {
       await adminDb.collection('bitacora_reports').doc(id).delete();
+      await adminDb.collection('ot_por_reporte').doc(id).delete();
     }
     for (const id of idsCobertura) {
       await adminDb.collection('falla_ot_cobertura').doc(id).delete();
     }
     await adminDb.collection('ordenes_trabajo').doc(otId).delete();
+    await adminDb.collection('ordenes_trabajo').doc(otLegadaId).delete();
+    await adminDb.collection('ordenes_trabajo').doc(otLegadaCoincidenteId).delete();
     if (jobId) await adminDb.collection('cierres_masivos_ot').doc(jobId).delete();
     await adminDb.collection('control_depuracion').doc('retroactiva').delete();
     const eventos = await adminDb.collection('ot_seguimiento').where('ot_id', '==', otId).get();
@@ -273,7 +330,7 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     payload: {
       unitId: 'TR-101',
       tolva1: 'TL-202',
-      cobertura_falla_keys: [firmaOrden],
+      cobertura_falla_keys: [firmaOrden, firmaNota, firmaTolvaPrimera],
       fallas: [{
         componenteKey: 'tracto',
         sistema: 'MOTOR',
@@ -281,11 +338,49 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
       }]
     }
   });
+  await Promise.all([
+    adminDb.collection('ordenes_trabajo').doc(otLegadaId).set({
+      estatus: 'TERMINADA', payload: {
+        tolva1: 'TL-202',
+        fallas: [{ componente: '1ra TOLVA', sistema: 'MOTOR', itemReportado: 'Fuga de aceite' }]
+      }
+    }),
+    adminDb.collection('ordenes_trabajo').doc(otLegadaCoincidenteId).set({
+      estatus: 'TERMINADA', payload: {
+        unitId: 'TR-101',
+        fallas: [{ componente: 'TRACTOCAMIÓN', sistema: 'MOTOR', itemReportado: 'Fuga de aceite' }]
+      }
+    }),
+    adminDb.collection('ot_por_reporte').doc(reportesIds.anterior).set({ ot_id: otLegadaId }),
+    adminDb.collection('ot_por_reporte').doc(reportesIds.legadoCoincidente).set({ ot_id: otLegadaCoincidenteId }),
+    adminDb.collection('falla_ot_cobertura').doc(idCobertura(reportesIds.tolvaDescartada, firmaTolvaPrimera))
+      .set({ reporte_id: reportesIds.tolvaDescartada, falla_key: firmaTolvaPrimera, estado: 'DESCARTADA', ot_id: '' }),
+    adminDb.collection('falla_ot_cobertura').doc(idCobertura(reportesIds.tolvaOtraOt, firmaTolvaPrimera))
+      .set({ reporte_id: reportesIds.tolvaOtraOt, falla_key: firmaTolvaPrimera, estado: 'EN_PROCESO', ot_id: otLegadaId }),
+    adminDb.collection('falla_ot_cobertura').doc(idCobertura(reportesIds.notaDescartada, firmaNota))
+      .set({ reporte_id: reportesIds.notaDescartada, falla_key: firmaNota, estado: 'DESCARTADA', ot_id: '' })
+  ]);
 
   const reportesIniciales = [
     [reportesIds.anterior, construirReporte(reportesIds.anterior, antes)],
     [reportesIds.posterior, construirReporte(reportesIds.posterior, despues)],
-    [reportesIds.otroComponente, construirReporte(reportesIds.otroComponente, antes, 'tolva1')]
+    [reportesIds.otroComponente, construirReporte(reportesIds.otroComponente, antes, 'tolva1')],
+    [reportesIds.legadoCoincidente, construirReporte(reportesIds.legadoCoincidente, antes)],
+    [reportesIds.tolvaPrimera, construirTolva(reportesIds.tolvaPrimera, antes, 'tolva1')],
+    [reportesIds.tolvaSegunda, construirTolva(reportesIds.tolvaSegunda, antes, 'tolva2')],
+    [reportesIds.tolvaPosterior, construirTolva(reportesIds.tolvaPosterior, despues, 'tolva2')],
+    [reportesIds.tolvaOtra, construirTolva(reportesIds.tolvaOtra, antes, 'tolva2', '14108')],
+    [reportesIds.tolvaDescartada, construirTolva(reportesIds.tolvaDescartada, antes, 'tolva2')],
+    [reportesIds.tolvaOtraOt, construirTolva(reportesIds.tolvaOtraOt, antes, 'tolva2')],
+    ...[
+      [reportesIds.notaEquivalente, antes, '14096', 'tolva1'],
+      [reportesIds.notaDescartada, antes, '14096', 'tolva1'],
+      [reportesIds.notaPosterior, despues, '14096', 'tolva2'],
+      [reportesIds.notaOtroEquipo, antes, '14097', 'tolva2']
+    ].map(([id, fecha, unidad, posicion]) => [id, {
+      id, report_type: 'checklist', created_at: fecha,
+      payload: { unitId: 'TR-101', [posicion]: unidad, observaciones: { [posicion]: 'Tira aceite el motor de arrastre' } }
+    }])
   ];
   await Promise.all(reportesIniciales.map(([id, reporte]) =>
     adminDb.collection('bitacora_reports').doc(id).set(reporte)
@@ -328,6 +423,33 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     .doc(idCobertura(reportesIds.posterior, firmaTracto)).get()).exists, false);
   assert.equal((await adminDb.collection('falla_ot_cobertura')
     .doc(idCobertura(reportesIds.otroComponente, firmaTolva)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.legadoCoincidente, firmaTracto)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaEquivalente, firmaNotaEquivalente)).get()).get('estado'), 'ATENDIDA');
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaPosterior, firmaNotaPosterior)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaOtroEquipo, firmaNotaOtro)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaDescartada, firmaNotaEquivalente)).get()).exists, false);
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.notaDescartada, firmaNota)).get()).get('estado'), 'DESCARTADA');
+  for (const [id, firma] of [[reportesIds.tolvaPrimera, firmaTolvaPrimera], [reportesIds.tolvaSegunda, firmaTolvaSegunda]]) {
+    const cobertura = await adminDb.collection('falla_ot_cobertura').doc(idCobertura(id, firma)).get();
+    assert.equal(cobertura.get('estado'), 'ATENDIDA');
+    assert.equal(cobertura.get('ot_id'), otId);
+  }
+  for (const [id, firma] of [
+    [reportesIds.tolvaPosterior, firmaTolvaSegunda], [reportesIds.tolvaOtra, firmaTolvaOtra],
+    [reportesIds.tolvaDescartada, firmaTolvaSegunda], [reportesIds.tolvaOtraOt, firmaTolvaSegunda]
+  ]) {
+    assert.equal((await adminDb.collection('falla_ot_cobertura').doc(idCobertura(id, firma)).get()).exists, false);
+  }
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.tolvaDescartada, firmaTolvaPrimera)).get()).get('estado'), 'DESCARTADA');
+  assert.equal((await adminDb.collection('falla_ot_cobertura')
+    .doc(idCobertura(reportesIds.tolvaOtraOt, firmaTolvaPrimera)).get()).get('ot_id'), otLegadaId);
 
   const lateReport = construirReporte(reportesIds.sincronizadoTarde, antes);
   lateReport.synced_at = new Date().toISOString();

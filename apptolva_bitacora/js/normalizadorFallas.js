@@ -19,6 +19,14 @@
       .trim();
   }
 
+  function normalizarTokensNota(texto) {
+    const conectores = new Set(['a', 'al', 'de', 'del', 'el', 'en', 'la', 'las', 'los', 'un', 'una', 'y']);
+    const palabras = (normalizarTexto(texto).match(/[a-z0-9]+/g) || [])
+      .filter((palabra) => !conectores.has(palabra))
+      .sort();
+    return palabras.length >= 2 ? palabras.join(' ') : '';
+  }
+
   function resolverCatalogo(catKey) {
     const maestro = (typeof window !== 'undefined' && window.CATALOGO_MAESTRO_BACHOCO)
       || globalThis.CATALOGO_MAESTRO_BACHOCO
@@ -104,6 +112,7 @@
   function extraerFallasChecklist(reporte) {
     const p = reporte?.payload || reporte || {};
     const fallasPorComp = { tracto: [], tolva1: [], dolly: [], tolva2: [] };
+    const esMal = (estado) => estado === false || String(estado ?? '').trim().toUpperCase() === 'MAL';
 
     const mapearCompKey = (texto) => {
       const t = normalizarTexto(texto);
@@ -119,7 +128,7 @@
 
         (seccion?.categorias || []).forEach((cat) => {
           (cat?.items || []).forEach((it) => {
-            if (String(it?.estado || '').toUpperCase() === 'MAL') {
+            if (esMal(it?.estado)) {
               fallasPorComp[cKey].push({
                 item: it.item || it.nombre || 'Falla de inspección',
                 categoriaSugerida: cat.cat || cat.nombre || 'GENERAL'
@@ -150,7 +159,7 @@
     }
 
     const marcadas = Array.isArray(p.checklist)
-      ? p.checklist.filter((item) => String(item?.estado || '').toUpperCase() === 'MAL').map((item) => item.item)
+      ? p.checklist.filter((item) => esMal(item?.estado)).map((item) => item.item)
       : (Array.isArray(p.fallas) ? p.fallas : []);
 
     marcadas.forEach((clave) => {
@@ -263,6 +272,9 @@
 
       [...fallasComp, ...soloNota.values()].forEach((falla) => {
         falla.descripcion = describirFalla(falla);
+        if (falla.origen === 'OBSERVACIÓN OPERADOR' && falla.categoria === CATEGORIA_GENERAL) {
+          falla.componenteKeyId = normalizarTokensNota(falla.itemReportado);
+        }
         delete falla.detalles;
         fallasOficiales.push(falla);
       });
@@ -280,6 +292,7 @@
   }
 
   if (typeof globalThis !== 'undefined') {
+    globalThis.normalizarTokensNotaFalla = normalizarTokensNota;
     globalThis.procesarReporteFallas = procesarReporteFallas;
     globalThis.clasificarFallasInspeccion = procesarReporteFallas;
   }

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldPath, getFirestore } from 'firebase-admin/firestore';
-import { crearFirmasFalla, normalizarTextoFalla } from '../../apptolva_bitacora/js/firmaFalla.js';
+import { claveAgrupacionEquipo, clavePosibleDuplicado, crearFirmasFalla, firmasEquivalentesPosicion, normalizarTextoFalla } from '../../apptolva_bitacora/js/firmaFalla.js';
 import '../../apptolva_bitacora/js/catalogoBachoco.js';
 import '../../apptolva_bitacora/js/normalizadorFallas.js';
 
@@ -179,14 +179,6 @@ function componenteKey(valor) {
   return texto;
 }
 
-function componenteKeyId(valor) {
-  const texto = String(valor || '').trim().toLowerCase();
-  if (texto === 'dolly') return 'DOLLY';
-  if (texto === 'tolva1') return 'TOLVA1';
-  if (texto === 'tolva2') return 'TOLVA2';
-  return 'TRACTO';
-}
-
 export function extraerFallasReporte(datos) {
   const payload = datos?.payload && typeof datos.payload === 'object' ? datos.payload : datos || {};
   const tipo = String(datos?.report_type || datos?.reportType || payload.reportType || '').toLowerCase();
@@ -214,6 +206,7 @@ export function extraerFallasReporte(datos) {
     });
     return firmas.map((firma) => ({
       firma,
+      componenteKeyId: falla.componenteKeyId || '',
       unidad: String(unidad).trim(),
       componente: componenteKey(key)
     }));
@@ -226,12 +219,13 @@ function extraerFallasOrden(orden) {
     return [...new Set(firmasGuardadas)].map((firma) => ({ firma }));
   }
   const payload = orden.payload && typeof orden.payload === 'object' ? orden.payload : {};
-  const fallas = Array.isArray(payload.fallas) && payload.fallas.some((falla) => falla && typeof falla === 'object')
-    ? payload.fallas
-    : extraerFallasReporte({ payload });
+  if (!Array.isArray(payload.fallas) || !payload.fallas.some((falla) => falla && typeof falla === 'object')) {
+    return extraerFallasReporte({ payload });
+  }
+  const fallas = payload.fallas;
   return fallas.map((falla) => {
     const componente = componenteKey(falla.componenteKey || falla.componente);
-    const unidad = payload[componenteKeyId(falla.componenteKey || falla.componente)]
+    const unidad = falla.economico_componente || payload[componente.toLowerCase()]
       || (componente === 'TRACTO' ? payload.unitId || orden.unidad : '');
     const firmas = crearFirmasFalla({
       unidad,
@@ -371,6 +365,9 @@ async function procesarPagina(db, jobId) {
   if (!ordenSnapshot.exists) throw new Error('La OT asociada al cierre ya no existe.');
 
   const firmas = new Set(job.firmas_falla || []);
+  const clavesFisicas = new Set([...firmas].map((firma) => claveAgrupacionEquipo(firma)));
+  const equivalentes = new Set([...firmas].filter((firma) => clavePosibleDuplicado(firma))
+    .map((firma) => claveAgrupacionEquipo(firma, true)));
   if (firmas.size > 400) throw new Error('La OT contiene más de 400 fallas distintas y no puede procesarse en un lote seguro.');
   const limitePagina = Math.min(
     TAMANO_PAGINA,
@@ -394,50 +391,93 @@ async function procesarPagina(db, jobId) {
 
   const snapshot = await consulta.get();
   const coincidencias = new Map();
-  snapshot.forEach((reporte) => {
+  let procesados = 0;
+  for (const reporte of snapshot.docs) {
     const fecha = fechaReporte(reporte.data());
-    if (!fecha || fecha > job.cerrada_at) return;
-    const fallas = extraerFallasReporte({ id: reporte.id, ...reporte.data() });
-    fallas.forEach((falla) => {
-      if (!firmas.has(falla.firma)) return;
-      const ref = db.collection(COLECCION_COBERTURAS).doc(idCobertura(reporte.id, falla.firma));
-      coincidencias.set(ref.id, {
-        ref,
-        reporteId: reporte.id,
-        reporte: reporte.data(),
-        falla
+    const coincidenciasReporte = new Map();
+    if (fecha && fecha <= job.cerrada_at) {
+      const fallas = extraerFallasReporte({ id: reporte.id, ...reporte.data() });
+      fallas.forEach((falla) => {
+        if (!clavesFisicas.has(claveAgrupacionEquipo(falla.firma))
+          && !(falla.componenteKeyId && equivalentes.has(claveAgrupacionEquipo(falla.firma, true)))) return;
+        const ref = db.collection(COLECCION_COBERTURAS).doc(idCobertura(reporte.id, falla.firma));
+        coincidenciasReporte.set(ref.id, {
+          ref,
+          reporteId: reporte.id,
+          reporte: reporte.data(),
+          falla
+        });
       });
-    });
-  });
+    }
+    if (coincidenciasReporte.size > 400) throw new Error('Un reporte contiene más de 400 incidencias coincidentes y no puede cerrarse en un lote seguro.');
+    if (coincidencias.size + coincidenciasReporte.size > 400) break;
+    coincidenciasReporte.forEach((coincidencia, id) => coincidencias.set(id, coincidencia));
+    procesados += 1;
+  }
 
   const registrosCoincidentes = [...coincidencias.values()];
-  const refs = registrosCoincidentes.map((coincidencia) => coincidencia.ref);
+  const refs = [...new Map(registrosCoincidentes.flatMap(({ reporteId, falla }) =>
+    firmasEquivalentesPosicion(falla.firma).map((firma) => {
+      const ref = db.collection(COLECCION_COBERTURAS).doc(idCobertura(reporteId, firma));
+      return [ref.id, ref];
+    }))).values()];
   const existentes = refs.length ? await db.getAll(...refs) : [];
   const existentesPorId = new Map(existentes.map((item) => [item.id, item]));
+  const coberturasNotas = new Map();
+  const reportesNotas = [...new Set(registrosCoincidentes
+    .filter(({ falla }) => falla.componenteKeyId).map(({ reporteId }) => reporteId))];
+  for (let inicio = 0; inicio < reportesNotas.length; inicio += 30) {
+    const lote = reportesNotas.slice(inicio, inicio + 30);
+    const notas = await db.collection(COLECCION_COBERTURAS).where('reporte_id', 'in', lote).get();
+    notas.forEach((cobertura) => {
+      const datos = cobertura.data();
+      if (!datos.falla_key || !clavePosibleDuplicado(datos.falla_key)) return;
+      const clave = `${datos.reporte_id}|${claveAgrupacionEquipo(datos.falla_key, true)}`;
+      if (!coberturasNotas.has(clave)) coberturasNotas.set(clave, []);
+      coberturasNotas.get(clave).push(cobertura);
+    });
+  }
   const reportesUnicos = [...new Set(registrosCoincidentes.map((item) => item.reporteId))];
-  const refsLegadas = reportesUnicos.map((reporteId) =>
-    db.collection('ot_por_reporte').doc(reporteId)
-  );
+  const refsLegadas = reportesUnicos.map((reporteId) => db.collection('ot_por_reporte').doc(reporteId));
   const existentesLegados = refsLegadas.length ? await db.getAll(...refsLegadas) : [];
+  const idsLegados = [...new Set(existentesLegados
+    .filter((legado) => legado.exists && legado.get('ot_id') && legado.get('ot_id') !== job.ot_id)
+    .map((legado) => legado.get('ot_id')))];
+  const ordenesLegadas = idsLegados.length
+    ? await db.getAll(...idsLegados.map((id) => db.collection(COLECCION_ORDENES).doc(id)))
+    : [];
+  const firmasLegadas = new Map(ordenesLegadas.filter((orden) => orden.exists).map((orden) => [
+    orden.id, new Set(extraerFallasOrden(orden.data()).map((falla) => falla.firma))
+  ]));
   const legadosPorReporte = new Map(reportesUnicos.map((reporteId, index) => [
-    reporteId,
-    existentesLegados[index]
+    reporteId, existentesLegados[index]
   ]));
   const batch = db.batch();
   let vinculadas = 0;
   let yaVinculadas = 0;
   registrosCoincidentes.forEach(({ ref, reporteId, reporte, falla }) => {
     const existente = existentesPorId.get(ref.id);
-    if (existente?.exists && existente.get('ot_id') !== job.ot_id) {
+    const coberturasEquivalentes = firmasEquivalentesPosicion(falla.firma)
+      .map((firma) => existentesPorId.get(idCobertura(reporteId, firma)))
+      .filter((cobertura) => cobertura?.exists);
+    if (falla.componenteKeyId) {
+      coberturasEquivalentes.push(...(coberturasNotas.get(`${reporteId}|${claveAgrupacionEquipo(falla.firma, true)}`) || []));
+    }
+    if (coberturasEquivalentes.some((cobertura) => cobertura.get('ot_id') !== job.ot_id)) {
       yaVinculadas += 1;
       return;
     }
     const legado = legadosPorReporte.get(reporteId);
-    if (legado?.exists && legado.get('ot_id') !== job.ot_id) {
+    const otLegada = legado?.exists ? legado.get('ot_id') : '';
+    const firmasDeLegado = firmasLegadas.get(otLegada);
+    if (otLegada && otLegada !== job.ot_id && firmasDeLegado
+      && (!firmasDeLegado.size || [...firmasDeLegado].some((firma) =>
+        claveAgrupacionEquipo(firma) === claveAgrupacionEquipo(falla.firma)
+        || (falla.componenteKeyId && clavePosibleDuplicado(firma)
+          && claveAgrupacionEquipo(firma, true) === claveAgrupacionEquipo(falla.firma, true))))) {
       yaVinculadas += 1;
       return;
     }
-
     batch.set(ref, {
       reporte_id: reporteId,
       folio: reporte.folio || reporte.payload?.folio || reporteId,
@@ -454,9 +494,9 @@ async function procesarPagina(db, jobId) {
     if (!existente?.exists || existente.get('estado') !== 'ATENDIDA') vinculadas += 1;
   });
 
-  const ultimo = snapshot.docs[snapshot.docs.length - 1];
-  const terminado = snapshot.size < limitePagina;
-  const reportesRevisados = Number(job.reportes_revisados || 0) + snapshot.size;
+  const ultimo = snapshot.docs[procesados - 1];
+  const terminado = procesados === snapshot.size && snapshot.size < limitePagina;
+  const reportesRevisados = Number(job.reportes_revisados || 0) + procesados;
   const totalVinculadas = Number(job.incidencias_vinculadas || 0) + vinculadas;
   const totalYaVinculadas = Number(job.incidencias_ya_vinculadas || 0) + yaVinculadas;
   const actualizado = {

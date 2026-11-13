@@ -41,6 +41,7 @@ const OFFLINE_URLS = [
   "./js/catalogoEquipos.js",
   "./js/catalogoBachoco.js",
   "./js/normalizadorFallas.js",
+  "./js/alertasSeguridad.js",
   "./js/firmaFalla.js",
   "./js/procesadorInspeccion.js",
   "./js/etiquetasOT.js",
