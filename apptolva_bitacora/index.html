@@ -133,7 +133,7 @@
     <!-- MENÚ PRINCIPAL -->
     <main id="view-menu" class="section-content p-6 max-w-lg mx-auto">
         <div class="text-center mb-6 mt-4">
-            <h2 class="text-2xl font-bold text-gray-700">Operador</h2>
+            <h2 id="titulo-menu" class="text-2xl font-bold text-gray-700">Operador</h2>
             <p class="text-sm text-gray-500">Selecciona una actividad:</p>
             <div id="draft-notice" class="hidden mt-2 bg-blue-100 text-blue-800 text-xs p-2 rounded border border-blue-200">
                 <i class="fas fa-info-circle"></i> Tienes una revisión guardada pendiente.
@@ -142,7 +142,7 @@
 
         <div class="grid grid-cols-2 gap-4">            
             <!-- 1. CHECK LIST DIARIO -->
-            <button onclick="nav('rev')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-500 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
+            <button data-modulo-operador onclick="nav('rev')" class="hidden menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-500 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">
                 <div class="flex items-center gap-3 mb-1">
                     <i class="fas fa-clipboard-check text-4xl text-orange-500"></i>
                 </div>
@@ -151,7 +151,7 @@
             </button>
 
             <!-- 2. BITÁCORA NOM-087 -->
-            <button onclick="window.location.href='bitacora_master.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-600 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">                
+            <button data-modulo-operador onclick="window.location.href='bitacora_master.html'" class="hidden menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-600 flex flex-col items-center justify-center h-32 col-span-2 transform transition hover:scale-[1.02]">
                 <div class="flex items-center gap-3 mb-2">
                     <i class="fas fa-clock text-3xl text-orange-600"></i>
                     <i class="fas fa-truck-moving text-2xl text-orange-400"></i>
@@ -161,19 +161,19 @@
             </button>
 
             <!-- 3. Procedimiento de Descarga -->
-            <button onclick="nav('guia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-blue-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+            <button data-modulo-operador onclick="nav('guia')" class="hidden menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-blue-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
                 <i class="fas fa-tasks text-3xl text-blue-500 mb-2"></i>                
                 <span class="font-bold text-gray-700 text-xs text-center leading-tight">PROCEDIMIENTO DE DESCARGA</span>            
             </button>
 
             <!-- 4. Asistente IA -->
-            <button onclick="nav('ia')" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-purple-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">                
+            <button data-modulo-operador onclick="nav('ia')" class="hidden menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-purple-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
                 <i class="fas fa-robot text-3xl text-purple-500 mb-2"></i>                
                 <span class="font-bold text-gray-700 text-xs text-center">ASISTENTE IA</span>            
             </button>
 
             <!-- 5. Reporte de Fallas -->
-            <button onclick="window.location.href='emergencia.html'" class="menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-red-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
+            <button data-modulo-operador onclick="window.location.href='emergencia.html'" class="hidden menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-red-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02]">
                 <i class="fas fa-exclamation-triangle text-3xl text-red-500 mb-2"></i>                
                 <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
             </button>
@@ -194,7 +194,7 @@
             <button id="cerrar-sesion" type="button" class="col-span-2 rounded bg-slate-700 p-3 text-white font-bold">Cerrar sesión</button>
 
             <!-- Botón Reset -->
-            <button type="button" onclick="borrarDatosLocales()" class="menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">
+            <button data-modulo-operador type="button" onclick="borrarDatosLocales()" class="hidden menu-btn bg-gray-100 p-2 rounded-xl shadow-sm text-gray-500 flex items-center justify-center h-10 col-span-2 text-xs hover:bg-gray-200 transition">
                 <i class="fas fa-trash mr-2"></i> Iniciar Check List Nuevo (Borrar Guardado)            
             </button>        
         </div>
@@ -1448,7 +1448,7 @@
             where
         } from "./js/firebase-sdk.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "./js/firebase-sdk.js";
-        import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
+        import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
        
         const firebaseConfig = getFirebaseConfig();
 
@@ -1599,13 +1599,18 @@
                 const yaActivo = usuarioActivo?.uid === user.uid && window.apptolvaAccesoActivo;
                 usuarioActivo = user;
                 window.apptolvaAccesoActivo = true;
+                const permisos = permisosMenu(user, profile);
+                document.querySelectorAll('[data-modulo-operador]').forEach((boton) => {
+                    boton.classList.toggle('hidden', !permisos.operacion);
+                });
+                document.getElementById('titulo-menu').textContent = permisos.operacion ? 'Operador' : 'Supervisor';
                 document.getElementById('login-overlay').style.display = 'none';
                 const office = document.getElementById('modulos-oficina');
                 office.replaceChildren();
-                if (profile && ['admin', 'master', 'lectura'].includes(profile.rol)) {
+                if (permisos.panel) {
                     office.append(botonOficina('Panel administrativo', './admin.html', 'M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z'));
                 }
-                if (profile && ['admin', 'evaluador'].includes(profile.rolEvaluaciones)) {
+                if (permisos.evaluaciones) {
                     office.append(botonOficina('Evaluaciones de conducción', './evaluaciones.html', 'M5 12l4 4L19 6'));
                 }
                 document.getElementById('historial-propio').classList.toggle('hidden', user.isAnonymous);

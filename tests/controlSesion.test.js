@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior,
-  intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, registrarEspacio,
+  intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, registrarEspacio,
   validarEntrada, validarEspacio
 } from '../apptolva_bitacora/js/controlSesion.js';
 
@@ -16,6 +16,24 @@ function storage() {
     removeItem(key) { entries.delete(key); }
   };
 }
+
+test('el menú separa operación y supervisión sin cambiar los permisos de evaluaciones', () => {
+  const normal = { isAnonymous: false };
+  assert.deepEqual(permisosMenu(normal, { rol: 'operador' }),
+    { operacion: true, panel: false, evaluaciones: false });
+  assert.deepEqual(permisosMenu(normal, { rol: 'operador', rolEvaluaciones: 'evaluador' }),
+    { operacion: true, panel: false, evaluaciones: true });
+  assert.deepEqual(permisosMenu(normal, { rol: 'admin', rolEvaluaciones: 'admin' }),
+    { operacion: false, panel: true, evaluaciones: true });
+  assert.deepEqual(permisosMenu(normal, { rol: 'master', rolEvaluaciones: 'evaluador' }),
+    { operacion: false, panel: true, evaluaciones: true });
+  assert.deepEqual(permisosMenu(normal, { rol: 'lectura' }),
+    { operacion: false, panel: true, evaluaciones: false });
+  assert.deepEqual(permisosMenu({ isAnonymous: true }, null),
+    { operacion: true, panel: false, evaluaciones: false });
+  assert.deepEqual(permisosMenu(normal, null),
+    { operacion: false, panel: false, evaluaciones: false });
+});
 
 test('el intervalo del historial cubre exactamente 48 horas hasta el instante actual', () => {
   const now = Date.parse('2026-11-11T18:00:00.000Z');

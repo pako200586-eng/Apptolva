@@ -105,6 +105,14 @@ export function perfilValido(data, nombreAlternativo = '') {
   return nombre ? { rol: data.rol, nombre, rolEvaluaciones: data.rol_evaluaciones || null } : null;
 }
 
+export function permisosMenu(user, profile) {
+  return {
+    operacion: user?.isAnonymous === true || profile?.rol === 'operador',
+    panel: ['admin', 'master', 'lectura'].includes(profile?.rol),
+    evaluaciones: ['admin', 'evaluador'].includes(profile?.rolEvaluaciones)
+  };
+}
+
 export function guardarPerfil(storage, projectId, uid, profile) {
   storage.setItem(CLAVE_PERFIL, JSON.stringify({ projectId, uid, profile }));
 }
