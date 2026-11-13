@@ -178,7 +178,7 @@
                 <span class="font-bold text-gray-700 text-xs text-center">REPORTAR FALLA</span>            
             </button>
 
-            <div id="modulos-oficina" class="contents"></div>
+            <div id="modulos-oficina" class="col-span-2 flex flex-wrap gap-4 empty:hidden"></div>
             <section id="historial-propio" class="col-span-2 hidden rounded-xl bg-white p-4 shadow">
                 <h3 class="font-bold">Mis reportes de las últimas 48 horas</h3>
                 <p id="historial-estado" role="status" class="text-xs text-gray-600 mt-2"></p>
@@ -1495,11 +1495,28 @@
                 return Promise.reject(new Error("Inicia sesión antes de guardar o sincronizar."));
             }
 
-            function botonOficina(texto, destino) {
+            function botonOficina(texto, destino, trazado) {
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02] font-bold text-gray-700 text-xs text-center leading-tight';
-                button.textContent = texto;
+                button.className = 'menu-btn w-full sm:w-[48%] md:w-[31%] bg-white p-4 rounded-xl shadow-md border-b-4 border-green-500 flex flex-col items-center justify-center min-h-32 transform transition hover:scale-[1.02] text-gray-800 font-bold text-xs text-center leading-tight';
+                const circulo = document.createElement('span');
+                circulo.className = 'mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700';
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '2');
+                svg.setAttribute('stroke-linecap', 'round');
+                svg.setAttribute('stroke-linejoin', 'round');
+                svg.setAttribute('aria-hidden', 'true');
+                svg.setAttribute('class', 'h-7 w-7');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', trazado);
+                svg.append(path);
+                circulo.append(svg);
+                const etiqueta = document.createElement('span');
+                etiqueta.textContent = texto;
+                button.append(circulo, etiqueta);
                 button.addEventListener('click', () => { window.location.href = destino; });
                 return button;
             }
@@ -1586,10 +1603,10 @@
                 const office = document.getElementById('modulos-oficina');
                 office.replaceChildren();
                 if (profile && ['admin', 'master', 'lectura'].includes(profile.rol)) {
-                    office.append(botonOficina('Panel administrativo', './admin.html'));
+                    office.append(botonOficina('Panel administrativo', './admin.html', 'M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z'));
                 }
                 if (profile && ['admin', 'evaluador'].includes(profile.rolEvaluaciones)) {
-                    office.append(botonOficina('Evaluaciones de conducción', './evaluaciones.html'));
+                    office.append(botonOficina('Evaluaciones de conducción', './evaluaciones.html', 'M5 12l4 4L19 6'));
                 }
                 document.getElementById('historial-propio').classList.toggle('hidden', user.isAnonymous);
                 estadoSesion.textContent = user.isAnonymous ? 'Sesión anterior: finaliza y sincroniza antes de cambiar de cuenta.' :
