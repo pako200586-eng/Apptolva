@@ -1498,7 +1498,7 @@
             function botonOficina(texto, destino) {
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'menu-btn bg-slate-800 text-white p-4 rounded-xl shadow-md h-24 font-bold';
+                button.className = 'menu-btn bg-white p-4 rounded-xl shadow-md border-b-4 border-orange-500 flex flex-col items-center justify-center h-32 transform transition hover:scale-[1.02] font-bold text-gray-700 text-xs text-center leading-tight';
                 button.textContent = texto;
                 button.addEventListener('click', () => { window.location.href = destino; });
                 return button;
