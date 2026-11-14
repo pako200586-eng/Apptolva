@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import * as catalogoEquipos from '../apptolva_bitacora/js/catalogoEquipos.js';
 import {
   CATALOGO_SEMILLA,
   ESTADOS_EQUIPO,
@@ -23,6 +26,68 @@ test('solo el administrador responsable gestiona el catálogo, independientement
   assert.equal(puedeAdministrarCatalogo('master', 'frank@apptolva.com'), false);
   assert.equal(puedeAdministrarCatalogo('operador', 'frank@apptolva.com'), false);
   assert.equal(puedeAdministrarCatalogo('admin', null), false);
+});
+
+test('el panel aplica los permisos de catálogo y operaciones sensibles por separado', () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  const imported = html.match(/import\s*{([^}]+)}\s*from\s*["']\.\/js\/catalogoEquipos\.js["'];/);
+  const start = html.indexOf('    function aplicarPermisosDeInterfaz()');
+  const end = html.indexOf('    function reportRowHtml(', start);
+  assert.ok(imported && start !== -1 && end !== -1);
+
+  function element(hidden = false) {
+    const classes = new Set(hidden ? ['hidden'] : []);
+    return {
+      classList: {
+        add: name => classes.add(name),
+        contains: name => classes.has(name),
+        toggle: (name, force) => force ? classes.add(name) : classes.delete(name)
+      },
+      click() {}
+    };
+  }
+  const ids = ['depurarFallasBtn', 'auditFirestoreBtn', 'backupFirestoreBtn', 'btn-vista-catalogo',
+    'vista-catalogo', 'btn-vista-reportes', 'cargarMasAntiguos', 'firestoreAudit', 'downloadFirestoreAudit'];
+  const elements = Object.fromEntries(ids.map(id => [id, element(id === 'vista-catalogo')]));
+  const adminButton = element();
+  const input = {};
+  const state = { role: 'admin', user: { email: 'frank@apptolva.com' }, operacionesSensibles: false, windowDays: 30 };
+  const context = vm.createContext({
+    catalogoEquipos, state, $: id => elements[id], VENTANA_PASO_DIAS: 7,
+    document: { querySelectorAll: selector => selector === '.btn-accion-admin' ? [adminButton] : [input] }
+  });
+  vm.runInContext(
+    `const {${imported[1]}} = catalogoEquipos; let ultimoInventarioFirestore = null;\n` +
+    html.slice(start, end),
+    context
+  );
+  const hidden = id => elements[id].classList.contains('hidden');
+
+  context.aplicarPermisosDeInterfaz();
+  assert.equal(hidden('btn-vista-catalogo'), false);
+  assert.equal(hidden('depurarFallasBtn'), true);
+  assert.equal(hidden('auditFirestoreBtn'), true);
+  assert.equal(hidden('backupFirestoreBtn'), true);
+  assert.equal(input.disabled, false);
+
+  state.operacionesSensibles = true;
+  context.aplicarPermisosDeInterfaz();
+  assert.equal(hidden('depurarFallasBtn'), false);
+  assert.equal(hidden('auditFirestoreBtn'), false);
+  assert.equal(hidden('backupFirestoreBtn'), false);
+
+  state.user.email = 'otro@example.test';
+  state.operacionesSensibles = false;
+  context.aplicarPermisosDeInterfaz();
+  assert.equal(hidden('btn-vista-catalogo'), true);
+  assert.equal(hidden('depurarFallasBtn'), true);
+
+  state.role = 'lectura';
+  state.user.email = 'frank@apptolva.com';
+  context.aplicarPermisosDeInterfaz();
+  assert.equal(hidden('btn-vista-catalogo'), true);
+  assert.equal(adminButton.classList.contains('hidden'), true);
+  assert.equal(input.disabled, true);
 });
 
 test('la semilla confirmada es consistente y no tiene duplicados', () => {
