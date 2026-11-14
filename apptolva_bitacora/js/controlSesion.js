@@ -106,10 +106,11 @@ export function perfilValido(data, nombreAlternativo = '') {
 }
 
 export function permisosMenu(user, profile) {
+  const accesoCompleto = user?.email?.trim().toLowerCase() === 'frank@apptolva.com';
   return {
-    operacion: user?.isAnonymous === true || profile?.rol === 'operador',
-    panel: ['admin', 'master', 'lectura'].includes(profile?.rol),
-    evaluaciones: ['admin', 'evaluador'].includes(profile?.rolEvaluaciones)
+    operacion: accesoCompleto || user?.isAnonymous === true || profile?.rol === 'operador',
+    panel: accesoCompleto || ['admin', 'master', 'lectura'].includes(profile?.rol),
+    evaluaciones: accesoCompleto || ['admin', 'evaluador'].includes(profile?.rolEvaluaciones)
   };
 }
 
