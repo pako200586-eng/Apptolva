@@ -85,6 +85,12 @@ export function registrarEspacio(storage, projectId, user) {
   storage.setItem(CLAVE_ESPACIO, JSON.stringify({ projectId, uid: user.uid, email: user.email?.toLowerCase() || '' }));
 }
 
+export function normalizarUsuarioAcceso(valor) {
+  const usuario = valor.trim().toLowerCase();
+  if (!usuario) throw new Error('Ingresa tu número de empleado o correo.');
+  return usuario.includes('@') ? usuario : `${usuario}@apptolva.com`;
+}
+
 export function validarEntrada(storage, projectId, email) {
   const espacio = leerObjeto(storage, CLAVE_ESPACIO);
   if (!espacio) {

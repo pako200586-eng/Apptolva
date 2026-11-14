@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import {
   borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior,
-  intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, puedeVerHistorial, registrarEspacio,
+  intervaloHistorial, leerPerfil, listarRespaldosReportes, normalizarUsuarioAcceso, perfilValido, permisosMenu, puedeVerHistorial, registrarEspacio,
   validarEntrada, validarEspacio
 } from '../apptolva_bitacora/js/controlSesion.js';
 
@@ -82,6 +84,57 @@ test('no mezcla datos de otro usuario o de una sesión anterior', () => {
   anterior.setItem('nom087_logs', '[{"status":3}]');
   assert.equal(hayTrabajoAnterior(anterior), true);
   assert.throws(() => validarEntrada(anterior, 'staging', 'a@example.test'));
+});
+
+test('el acceso acepta número de empleado o correo sin perder el aislamiento local', () => {
+  assert.equal(normalizarUsuarioAcceso(' 221417 '), '221417@apptolva.com');
+  assert.equal(normalizarUsuarioAcceso(' Mantenimiento@Ejemplo.com '), 'mantenimiento@ejemplo.com');
+  assert.throws(() => normalizarUsuarioAcceso('  '), /número de empleado o correo/);
+  const s = storage();
+  registrarEspacio(s, 'staging', { uid: 'uid-a', email: '221417@apptolva.com' });
+  validarEntrada(s, 'staging', normalizarUsuarioAcceso('221417'));
+  validarEntrada(s, 'staging', normalizarUsuarioAcceso('221417@apptolva.com'));
+  assert.throws(() => validarEntrada(s, 'staging', normalizarUsuarioAcceso('221418')));
+});
+
+test('el formulario valida y autentica con el mismo correo normalizado', async () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/index.html', import.meta.url), 'utf8');
+  const start = html.indexOf("            form.addEventListener('submit',");
+  const end = html.indexOf("            document.getElementById('legacy-submit')", start);
+  assert.ok(start !== -1 && end !== -1);
+  const s = storage();
+  registrarEspacio(s, 'staging', { uid: 'uid-a', email: '221417@apptolva.com' });
+  const elements = {
+    'login-email': { value: ' 221417 ' },
+    'login-password': { value: 'clave' },
+    'login-submit': { disabled: false }
+  };
+  const calls = [];
+  let submit;
+  const context = vm.createContext({
+    form: { addEventListener: (_event, handler) => { submit = handler; } },
+    document: { getElementById: id => elements[id] },
+    errorElement: { classList: { add() {} } },
+    normalizarUsuarioAcceso, validarEntrada, localStorage: s, projectId: 'staging',
+    esperarEscrituras: async () => {},
+    signInWithEmailAndPassword: async (_auth, email, password) => calls.push([email, password]),
+    auth: {}, mostrarError: message => calls.push(message), console: { error() {} }
+  });
+  vm.runInContext(html.slice(start, end), context);
+  await submit({ preventDefault() {} });
+  assert.deepEqual(calls, [['221417@apptolva.com', 'clave']]);
+  assert.equal(elements['login-password'].value, '');
+
+  elements['login-email'].value = '221417@apptolva.com';
+  elements['login-password'].value = 'clave';
+  await submit({ preventDefault() {} });
+  assert.deepEqual(calls[1], ['221417@apptolva.com', 'clave']);
+
+  elements['login-email'].value = '221418';
+  elements['login-password'].value = 'otra';
+  await submit({ preventDefault() {} });
+  assert.equal(calls.length, 3);
+  assert.match(calls[2], /otra cuenta/);
 });
 
 test('respalda reportes completos por cuenta y solo borra la versión confirmada', () => {

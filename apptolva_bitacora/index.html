@@ -89,8 +89,8 @@
             <p class="text-[10px] text-gray-500 mb-4 font-bold uppercase tracking-widest">FLOTA PROPIA</p>
             
             <form id="form-login" class="text-left">
-                <label for="login-email" class="block text-sm font-bold">Correo</label>
-                <input type="email" id="login-email" name="email" autocomplete="username" required class="w-full p-3 border-2 border-gray-300 rounded-lg mb-3">
+                <label for="login-email" class="block text-sm font-bold">Número de empleado o correo</label>
+                <input type="text" id="login-email" name="email" autocomplete="username" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="Número de empleado o correo" required class="w-full p-3 border-2 border-gray-300 rounded-lg mb-3">
                 <label for="login-password" class="block text-sm font-bold">Contraseña</label>
                 <input type="password" id="login-password" name="password" autocomplete="current-password" required class="w-full p-3 border-2 border-gray-300 rounded-lg mb-3">
                 <p id="errorMsg" role="alert" class="hidden text-xs font-bold text-red-600 mb-3"></p>
@@ -1551,7 +1551,7 @@
             where
         } from "./js/firebase-sdk.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "./js/firebase-sdk.js";
-        import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, puedeVerHistorial, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
+        import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, normalizarUsuarioAcceso, perfilValido, permisosMenu, puedeVerHistorial, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
        
         const firebaseConfig = getFirebaseConfig();
 
@@ -1774,12 +1774,13 @@
 
             form.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                const email = document.getElementById('login-email').value.trim().toLowerCase();
+                const usuario = document.getElementById('login-email').value;
                 const password = document.getElementById('login-password').value;
                 const button = document.getElementById('login-submit');
                 errorElement.classList.add('hidden');
                 button.disabled = true;
                 try {
+                    const email = normalizarUsuarioAcceso(usuario);
                     validarEntrada(localStorage, projectId, email);
                     await esperarEscrituras();
                     await signInWithEmailAndPassword(auth, email, password);
@@ -1787,7 +1788,7 @@
                 } catch (error) {
                     console.error('No se pudo iniciar sesión:', error);
                     const message = error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials'
-                        ? 'Correo o contraseña incorrectos.' : (error.code === 'auth/network-request-failed'
+                        ? 'Número de empleado, correo o contraseña incorrectos.' : (error.code === 'auth/network-request-failed'
                             ? 'No se pudo conectar para iniciar sesión.' : error.message);
                     mostrarError(message);
                 } finally {
