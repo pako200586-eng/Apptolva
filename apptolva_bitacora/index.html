@@ -1334,6 +1334,25 @@
         let recognition = null;
         let isListening = false;
         let activeSpeech = null;
+        let availableVoices = [];
+
+        if ('speechSynthesis' in window) {
+            availableVoices = window.speechSynthesis.getVoices();
+            window.speechSynthesis.addEventListener('voiceschanged', () => {
+                availableVoices = window.speechSynthesis.getVoices();
+            });
+        }
+
+        function obtenerMejorVoz() {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length) availableVoices = voices;
+
+            const idioma = voice => voice.lang.replace(/_/g, '-').toLowerCase();
+            return availableVoices.find(voice => idioma(voice) === 'es-mx' && /natural|google|neural/i.test(voice.name))
+                || availableVoices.find(voice => idioma(voice) === 'es-mx')
+                || availableVoices.find(voice => idioma(voice) === 'es' || idioma(voice).startsWith('es-'))
+                || availableVoices[0];
+        }
 
         function toggleVoiceInput() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1463,8 +1482,11 @@
             stopSpeech();
             const cleanText = text.replace(/\*/g, '').replace(/#/g, '').replace(/-/g, '');
             const utterance = new SpeechSynthesisUtterance(cleanText);
+            const voice = obtenerMejorVoz();
+            if (voice) utterance.voice = voice;
             utterance.lang = 'es-MX';
-            utterance.rate = 1.0;
+            utterance.rate = 1.05;
+            utterance.pitch = 1.0;
             utterance.onend = () => {
                 if (activeSpeech !== utterance) return;
                 activeSpeech = null;
