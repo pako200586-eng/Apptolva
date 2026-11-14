@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes, randomUUID, scryptSync } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, randomInt, randomUUID, scryptSync } from 'node:crypto';
 import { lstat, open, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,16 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 const REPO = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG = path.join(REPO, 'apptolva_bitacora', 'js', 'catalogoOperadores.js');
 const MASTERS = new Set(['221948']);
+const PALABRAS_OPERADOR = [
+  'camion', 'tolva', 'ruta', 'motor', 'llanta', 'freno', 'viaje',
+  'granja', 'planta', 'diesel', 'espejo', 'cabina', 'aceite', 'filtro',
+  'bascula', 'chasis', 'eje', 'clutch', 'luces', 'volante'
+];
+
+function generarContrasenaOperador() {
+  const palabras = Array.from({ length: 8 }, () => PALABRAS_OPERADOR[randomInt(PALABRAS_OPERADOR.length)]);
+  return `${palabras.join('-')}-${String(randomInt(10000)).padStart(4, '0')}`;
+}
 
 export async function leerCatalogo() {
   const source = await readFile(CATALOG, 'utf8');
@@ -86,11 +96,17 @@ export async function abrirCredenciales(filename, projectId, operadores, key, cr
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
     if (!createIfMissing) throw new Error('No existe el archivo de credenciales.');
+    const passwords = new Set();
     journal = {
       projectId,
-      cuentas: operadores.map(({ numero, email, rol }) => ({
-        numero, email, rol, uid: randomUUID(), password: randomBytes(24).toString('base64url')
-      }))
+      cuentas: operadores.map(({ numero, email, rol }) => {
+        let password;
+        do {
+          password = rol === 'operador' ? generarContrasenaOperador() : randomBytes(24).toString('base64url');
+        } while (passwords.has(password));
+        passwords.add(password);
+        return { numero, email, rol, uid: randomUUID(), password };
+      })
     };
     const handle = await open(journalPath, 'wx', 0o600);
     try {
@@ -124,6 +140,19 @@ async function buscarUsuario(auth, method, value) {
   } catch (error) {
     if (error.code === 'auth/user-not-found') return null;
     throw error;
+  }
+}
+
+export async function verificarCredenciales({ auth, db, entries }) {
+  if (!entries.length) throw new Error('No hay credenciales de operadores para mostrar.');
+  for (const entry of entries) {
+    const user = await buscarUsuario(auth, 'getUser', entry.uid);
+    const profile = await db.collection('usuarios').doc(entry.email).get();
+    const data = profile.exists ? profile.data() : null;
+    if (!user || user.disabled || user.email?.toLowerCase() !== entry.email ||
+        !data || data.uid !== entry.uid || data.numero_empleado !== entry.numero || data.rol !== entry.rol) {
+      throw new Error(`La cuenta o el perfil del empleado ${entry.numero} no coincide con la migración o está deshabilitado; no se mostrarán las contraseñas.`);
+    }
   }
 }
 
@@ -165,6 +194,7 @@ async function main(args) {
   for (let i = 0; i < args.length; i++) {
     const key = args[i];
     if (key === '--apply') options.apply = true;
+    else if (key === '--show-credentials') options['--show-credentials'] = true;
     else if (['--project', '--credentials-file', '--confirm', '--show-credential'].includes(key) && args[i + 1]) options[key] = args[++i];
     else throw new Error(`Argumento no reconocido o incompleto: ${key}`);
   }
@@ -173,21 +203,25 @@ async function main(args) {
     throw new Error('Indica un ID de proyecto explícito con --project.');
   }
   const operadores = await leerCatalogo();
-  if (options['--show-credential']) {
+  if (options['--show-credential'] || options['--show-credentials']) {
+    if (options['--show-credential'] && options['--show-credentials']) {
+      throw new Error('Indica solo una opción para mostrar credenciales.');
+    }
     if (options.apply || !options['--credentials-file']) {
-      throw new Error('Para mostrar una credencial indica --credentials-file, sin --apply.');
+      throw new Error('Para mostrar credenciales indica --credentials-file, sin --apply.');
+    }
+    if (options['--show-credentials'] && options['--confirm'] !== projectId) {
+      throw new Error('Para mostrar la lista indica --confirm con el mismo proyecto.');
     }
     const credentials = await abrirCredenciales(options['--credentials-file'], projectId, operadores, process.env.APPTOLVA_MIGRATION_KEY, false);
-    const entry = credentials.get(options['--show-credential']);
-    if (!entry) throw new Error('Empleado fuera del catálogo.');
+    const entry = options['--show-credential'] ? credentials.get(options['--show-credential']) : null;
+    if (options['--show-credential'] && !entry) throw new Error('Empleado fuera del catálogo.');
+    const entries = entry ? [entry] : [...credentials.values()].filter((item) => item.rol === 'operador');
     const app = initializeApp({ projectId, credential: applicationDefault() });
     try {
-      const user = await buscarUsuario(getAuth(app), 'getUser', entry.uid);
-      const profile = await getFirestore(app).collection('usuarios').doc(entry.email).get();
-      if (!user || user.email?.toLowerCase() !== entry.email || !profile.exists || profile.data().uid !== entry.uid) {
-        throw new Error('La cuenta y el perfil no coinciden con la migración; no se mostrará la contraseña.');
-      }
-      console.log(`${entry.email}\n${entry.password}`);
+      await verificarCredenciales({ auth: getAuth(app), db: getFirestore(app), entries });
+      if (entry) console.log(`${entry.email}\n${entry.password}`);
+      else entries.forEach((item) => console.log(`Operador: ${item.numero} | Contraseña: ${item.password}`));
     } finally {
       await deleteApp(app);
     }
