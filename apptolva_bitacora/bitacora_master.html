@@ -94,7 +94,7 @@
 
     <div id="offlineSyncStatus" class="hidden sticky top-[48px] z-40 bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-[11px] font-bold text-amber-800">
         <i class="fas fa-cloud-upload-alt mr-1"></i><span id="offlineSyncText">Bitácora guardada en el dispositivo.</span>
-        <button id="reintentarCierres" type="button" class="ml-2 rounded bg-amber-800 px-3 py-2 text-white">Reintentar cierres</button>
+        <button id="reintentarCierres" type="button" class="ml-2 rounded bg-amber-800 px-3 py-2 text-white">Reintentar sincronización</button>
     </div>
         
     <div class="container mx-auto p-4 max-w-4xl space-y-4">
@@ -865,7 +865,7 @@
             }
         };
 
-        function setCloudStatus(estado) {
+        function setCloudStatus(estado, detalle = "") {
             const icon = document.getElementById('cloudIcon');
             const text = document.getElementById('cloudText');
             const offlineBanner = document.getElementById('offlineSyncStatus');
@@ -873,13 +873,13 @@
             const pendientes = typeof leerCierresPendientes === 'function' ? leerCierresPendientes().length : 0;
 
             if (offlineBanner && offlineText) {
-                if (estado === "offline" || estado === "error" || !navigator.onLine || pendientes > 0) {
+                if (estado === "offline" || estado === "error" || pendientes > 0) {
                     offlineBanner.classList.remove('hidden');
                     offlineText.textContent = estado === "error"
-                        ? "No se pudo confirmar el cierre. La copia permanece en el teléfono; reintenta o contacta al administrador."
+                        ? detalle || "No se pudo sincronizar con la nube. La bitácora permanece guardada en este dispositivo; revisa los datos y vuelve a intentar."
                         : pendientes > 0
-                        ? `Modo sin red: ${pendientes} cierre(s) de bitácora guardado(s) en el teléfono. Se sincronizarán al recuperar cobertura.`
-                        : "Sin cobertura celular: la bitácora se está guardando localmente en el dispositivo.";
+                        ? `${pendientes} cierre(s) de bitácora siguen pendientes de sincronización y están guardados en este dispositivo.`
+                        : "El navegador indica que no hay conexión. La bitácora se guarda localmente y se sincronizará al reconectar.";
                 } else {
                     offlineBanner.classList.add('hidden');
                 }
@@ -905,8 +905,12 @@
         }
 
         async function sincronizarSilencioso() {
-            if (!navigator.onLine || typeof window.guardarBitacoraEnFirestore !== "function") {
+            if (!navigator.onLine) {
                 setCloudStatus("offline");
+                return;
+            }
+            if (typeof window.guardarBitacoraEnFirestore !== "function") {
+                setCloudStatus("error", "La sincronización todavía se está iniciando. Intenta de nuevo en unos segundos.");
                 return;
             }
             try {
@@ -915,7 +919,11 @@
                 await window.guardarBitacoraEnFirestore(payload);
                 setCloudStatus("synced");
             } catch (e) {
-                setCloudStatus("offline");
+                console.error("No se pudo sincronizar la bitácora:", e);
+                const detalle = e?.message === "Selecciona al operador del catálogo oficial antes de sincronizar la bitácora."
+                    ? e.message
+                    : "";
+                setCloudStatus(navigator.onLine ? "error" : "offline", detalle);
             }
         }
 
@@ -933,8 +941,14 @@
 
         // Envía a la nube los cierres pendientes. Si no hay red, se quedan en la cola y se reintentan.
         function sincronizarCierresPendientes() {
-            if (!navigator.onLine || typeof window.guardarBitacoraEnFirestore !== "function") {
+            if (!navigator.onLine) {
                 if (leerCierresPendientes().length) setCloudStatus("offline");
+                return;
+            }
+            if (typeof window.guardarBitacoraEnFirestore !== "function") {
+                if (leerCierresPendientes().length) {
+                    setCloudStatus("error", "La sincronización todavía se está iniciando. Intenta de nuevo en unos segundos.");
+                }
                 return;
             }
             leerCierresPendientes().forEach((cierre) => {
@@ -950,7 +964,10 @@
             });
         }
 
-        document.getElementById('reintentarCierres').addEventListener('click', sincronizarCierresPendientes);
+        document.getElementById('reintentarCierres').addEventListener('click', () => {
+            sincronizarSilencioso();
+            sincronizarCierresPendientes();
+        });
 
         // Reinicia el periodo sin recargar la página y protege contra re-escritura accidental en pagehide
         function iniciarNuevoPeriodo() {
@@ -2141,6 +2158,8 @@
         updateUI(); 
 
         window.addEventListener('online', () => { sincronizarSilencioso(); sincronizarCierresPendientes(); });
+        window.addEventListener('offline', () => setCloudStatus("offline"));
+        if (!navigator.onLine) setCloudStatus("offline");
     </script>
 
     <!-- 3. CONFIGURACIÓN FIREBASE Y FOLIO AUTOMÁTICO -->
