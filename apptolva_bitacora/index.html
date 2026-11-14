@@ -448,6 +448,7 @@
 
     <script>
         const STORAGE_KEY = 'bachoco_tolva_draft_v9';
+        const CHECKLIST_BITACORA_KEY = 'nom087_checklist_compartido';
         const FIRESTORE_PENDING_REPORT_ID_KEY = 'apptolva_pending_firestore_report_id';
         const FIRESTORE_PENDING_REPORT_DRAFT_KEY = 'apptolva_pending_firestore_report_draft';
 
@@ -506,6 +507,18 @@
                     setTimeout(() => { ind.style.display = 'none'; }, 1000);
                 }
             } catch(e) { console.error("AutoSave error"); }
+        }
+
+        function guardarDatosChecklistParaBitacora(reporte) {
+            const inputs = {
+                revUnidad: reporte.unitId,
+                revEmpleado: reporte.employeeNumber,
+                revOperador: reporte.driverName,
+                revOrigen: reporte.origen === '-' ? '' : reporte.origen,
+                revDestino: reporte.destino === '-' ? '' : reporte.destino,
+                revKm: reporte.km === '-' ? '' : reporte.km
+            };
+            localStorage.setItem(CHECKLIST_BITACORA_KEY, JSON.stringify({ inputs, modalidad: reporte.modalidad }));
         }
 
         function limpiarEstadoChecklistPorCompleto() {
@@ -1268,6 +1281,15 @@
                         localStorage.setItem(FIRESTORE_PENDING_REPORT_DRAFT_KEY, localStorage.getItem(STORAGE_KEY) || "");
                     }
                     const resFirestore = await window.guardarReporteEnFirestore(reportePayload, reporteId);
+
+                    try {
+                        guardarDatosChecklistParaBitacora(reportePayload);
+                    } catch (error) {
+                        console.error("No se pudieron conservar los datos para la bitácora:", error);
+                        alert("El reporte se guardó, pero no se pudieron conservar sus datos para la bitácora. El checklist permanece abierto; anota los datos antes de limpiarlo.");
+                        restaurarBoton(btn, originalText, msg);
+                        return;
+                    }
 
                     // Limpieza inmediata en memoria, DOM y localStorage sin recargar ni perder sesión
                     limpiarEstadoChecklistPorCompleto();

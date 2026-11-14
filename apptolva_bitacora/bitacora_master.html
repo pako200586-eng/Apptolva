@@ -553,7 +553,9 @@
         // Prellenado inteligente desde el Checklist (index.html) si los campos de la bitácora están vacíos
         function sincronizarDesdeChecklist() {
             try {
-                const draftRaw = localStorage.getItem('bachoco_tolva_draft_v9');
+                const claveCompartida = 'nom087_checklist_compartido';
+                const pendiente = localStorage.getItem(claveCompartida);
+                const draftRaw = localStorage.getItem('bachoco_tolva_draft_v9') || pendiente;
                 if (!draftRaw) return;
                 const draft = JSON.parse(draftRaw);
                 const inp = draft.inputs || {};
@@ -568,11 +570,25 @@
                 mapa.forEach(([idDest, valorChecklist]) => {
                     const el = document.getElementById(idDest);
                     if (el && !el.value.trim() && valorChecklist && String(valorChecklist).trim()) {
-                        el.value = String(valorChecklist).trim();
-                        localStorage.setItem('nom087_' + idDest, el.value);
+                        const valor = String(valorChecklist).trim();
+                        localStorage.setItem('nom087_' + idDest, valor);
+                        el.value = valor;
                     }
                 });
-            } catch (e) {}
+                if (!localStorage.getItem('nom087_mode') && ['full', 'sencillo'].includes(draft.modalidad)) {
+                    const mode = draft.modalidad === 'full' ? 'Full' : 'Sencillo';
+                    localStorage.setItem('nom087_mode', mode);
+                    document.getElementById('mode').value = mode;
+                }
+                if (getSelectedCatalogOperator()) {
+                    driverNameInput.classList.add('border-green-400', 'bg-green-50');
+                }
+                actualizarNombreOperadorUI();
+                if (pendiente) localStorage.removeItem(claveCompartida);
+            } catch (e) {
+                console.error("No se pudieron cargar los datos del checklist:", e);
+                alert("No se pudieron cargar los datos del checklist en la bitácora. Revisa el almacenamiento del dispositivo.");
+            }
         }
 
         // Semáforo de vigencia de Licencia Federal (activa #licenseExpBadge con LICENSE_EXP_WARNING_DAYS)
