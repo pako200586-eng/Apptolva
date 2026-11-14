@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior,
-  intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, registrarEspacio,
+  intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, puedeVerHistorial, registrarEspacio,
   validarEntrada, validarEspacio
 } from '../apptolva_bitacora/js/controlSesion.js';
 
@@ -44,6 +44,16 @@ test('el intervalo del historial cubre exactamente 48 horas hasta el instante ac
   assert.deepEqual(intervaloHistorial(now), {
     desde: '2026-11-09T18:00:00.000Z', hasta: '2026-11-11T18:00:00.000Z'
   });
+});
+
+test('solo cuentas autenticadas con rol operador pueden ver su historial', () => {
+  const user = { isAnonymous: false };
+  assert.equal(puedeVerHistorial(user, { rol: 'operador' }), true);
+  assert.equal(puedeVerHistorial(user, { rol: 'admin' }), false);
+  assert.equal(puedeVerHistorial(user, { rol: 'master' }), false);
+  assert.equal(puedeVerHistorial(user, { rol: 'lectura' }), false);
+  assert.equal(puedeVerHistorial({ isAnonymous: true }, { rol: 'operador' }), false);
+  assert.equal(puedeVerHistorial(user, null), false);
 });
 
 test('el perfil offline queda vinculado al usuario y proyecto', () => {

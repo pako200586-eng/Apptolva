@@ -114,6 +114,10 @@ export function permisosMenu(user, profile) {
   };
 }
 
+export function puedeVerHistorial(user, profile) {
+  return user?.isAnonymous !== true && profile?.rol === 'operador';
+}
+
 export function guardarPerfil(storage, projectId, uid, profile) {
   storage.setItem(CLAVE_PERFIL, JSON.stringify({ projectId, uid, profile }));
 }

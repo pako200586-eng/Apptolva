@@ -1551,7 +1551,7 @@
             where
         } from "./js/firebase-sdk.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "./js/firebase-sdk.js";
-        import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
+        import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, perfilValido, permisosMenu, puedeVerHistorial, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
        
         const firebaseConfig = getFirebaseConfig();
 
@@ -1570,6 +1570,7 @@
             const estadoSesion = document.getElementById('estado-sesion');
             const legacyKey = `apptolva_legacy_${projectId}`;
             let usuarioActivo = null;
+            let perfilActivo = null;
             let versionAuth = 0;
             let datosCargados = false;
 
@@ -1628,7 +1629,7 @@
                 const status = document.getElementById('historial-estado');
                 const lista = document.getElementById('historial-lista');
                 const user = usuarioActivo;
-                if (!user || user.isAnonymous) return;
+                if (!puedeVerHistorial(user, perfilActivo)) return;
                 status.textContent = 'Cargando reportes…';
                 try {
                     const { desde, hasta } = intervaloHistorial();
@@ -1636,7 +1637,7 @@
                         where('owner_uid', '==', user.uid), where('created_at', '>=', desde),
                         where('created_at', '<=', hasta), orderBy('created_at', 'desc'));
                     const snapshot = await getDocs(consulta);
-                    if (usuarioActivo?.uid !== user.uid) return;
+                    if (usuarioActivo?.uid !== user.uid || !puedeVerHistorial(usuarioActivo, perfilActivo)) return;
                     lista.replaceChildren();
                     for (const report of snapshot.docs) {
                         const data = report.data();
@@ -1701,6 +1702,7 @@
             function habilitarAcceso(user, profile, cached) {
                 const yaActivo = usuarioActivo?.uid === user.uid && window.apptolvaAccesoActivo;
                 usuarioActivo = user;
+                perfilActivo = profile;
                 window.apptolvaAccesoActivo = true;
                 const permisos = permisosMenu(user, profile);
                 document.querySelectorAll('[data-modulo-operador]').forEach((boton) => {
@@ -1716,7 +1718,7 @@
                 if (permisos.evaluaciones) {
                     office.append(botonOficina('Evaluaciones de conducción', './evaluaciones.html', 'M5 12l4 4L19 6'));
                 }
-                document.getElementById('historial-propio').classList.toggle('hidden', user.isAnonymous);
+                document.getElementById('historial-propio').classList.toggle('hidden', !puedeVerHistorial(user, profile));
                 estadoSesion.textContent = user.isAnonymous ? 'Sesión anterior: finaliza y sincroniza antes de cambiar de cuenta.' :
                     `${profile.nombre}${cached ? ' · Perfil guardado: los cambios de permiso se comprobarán al recuperar conexión.' : ''}`;
                 if (!datosCargados) {
@@ -1728,7 +1730,7 @@
                 if (pending) observarSincronizacionReporte(pending);
                 mostrarRespaldos();
                 if (!yaActivo) {
-                    if (!user.isAnonymous) cargarHistorial();
+                    if (puedeVerHistorial(user, profile)) cargarHistorial();
                     window.dispatchEvent(new Event('apptolva-auth-ready'));
                     if (new URLSearchParams(window.location.search).has('logout')) {
                         history.replaceState(null, '', window.location.pathname);
@@ -1822,6 +1824,7 @@
             onAuthStateChanged(auth, (user) => {
                 const version = ++versionAuth;
                 usuarioActivo = null;
+                perfilActivo = null;
                 window.apptolvaAccesoActivo = false;
                 document.getElementById('login-overlay').style.display = 'flex';
                 document.getElementById('legacy-login').classList.toggle('hidden', !(user?.isAnonymous && hayTrabajoAnterior(localStorage)));
