@@ -93,7 +93,7 @@
     <header>
         <div>
             <h1 id="viewer-heading">📋 AppTolva</h1>
-            <p>GRUPO BACHOCO, S.A. DE C.V. · Exhibición Electrónica Oficial · Av. Tecnológico 401, Celaya, Gto.</p>
+            <p>BACHOCO · Exhibición Electrónica Oficial · RFC: BAC800208B25 · Reg. Pat.: Q4010939108 · Régimen fiscal: 622 · AV. TECNOLÓGICO 401, COLONIA CD. INDUSTRIAL, CELAYA, GTO. MX, C.P. 38010</p>
         </div>
     </header>
 
@@ -238,9 +238,11 @@
             };
 
             doc.setFontSize(7);
-            doc.setFont("helvetica", "bold"); doc.text("PERMISIONARIO: GRUPO BACHOCO, S.A. DE C.V. — RFC: GBA940707AH4", 14, y);
+            doc.setFont("helvetica", "bold"); doc.text("PERMISIONARIO: BACHOCO — RFC: BAC800208B25", 14, y);
             y += 4;
-            doc.setFont("helvetica", "normal"); doc.text("Domicilio Fiscal: Av. Tecnológico 401, Celaya, Gto. CP 38010", 14, y);
+            doc.setFont("helvetica", "normal"); doc.text("REG. PAT.: Q4010939108 — RÉGIMEN FISCAL: 622", 14, y);
+            y += 4;
+            doc.text("DOMICILIO DE EXPEDICIÓN: AV. TECNOLÓGICO 401, COLONIA CD. INDUSTRIAL, CELAYA, GTO. MX, C.P. 38010", 14, y);
             y += 5;
             
             row("FOLIO:", folio, 14, 30);
@@ -426,7 +428,7 @@
             y += declaratoria.length * 3 + 2;
 
             doc.setFontSize(4); doc.setTextColor(120);
-            doc.text("GRUPO BACHOCO, S.A. DE C.V. — Permisionario de Autotransporte Federal — Folio: " + folio + " — " + new Date().toISOString(), 105, y + 2, { align: "center" });
+            doc.text("BACHOCO — Permisionario de Autotransporte Federal — Folio: " + folio + " — " + new Date().toISOString(), 105, y + 2, { align: "center" });
 
             // Página 2: Resumen legal NOM-087
             doc.addPage();
