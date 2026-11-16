@@ -16,13 +16,18 @@ import {
   connectFirestoreEmulator,
   collection,
   deleteDoc,
+  disableNetwork,
   doc,
+  enableNetwork,
   getDoc,
   getDocs,
   getFirestore,
+  onSnapshot,
+  orderBy,
   query,
   setLogLevel,
   setDoc,
+  terminate,
   where
 } from 'firebase/firestore';
 import cerrarFallasHandler, { idCobertura } from '../netlify/functions/cerrar-fallas-repetidas.js';
@@ -130,6 +135,7 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
     for (const historico of historicos) await adminDb.collection('bitacora_reports').doc(historico).delete();
     for (const email of emails) await adminDb.collection('usuarios').doc(email).delete();
     for (const user of users) await adminAuth.deleteUser(user.uid);
+    for (const client of clients) await terminate(client.db);
     for (const app of apps) await deleteClientApp(app);
   });
   for (let i = 0; i < clients.length; i++) {
@@ -173,6 +179,107 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
   await assert.rejects(getDocs(collection(clients[1].db, 'bitacora_reports')), { code: 'permission-denied' });
   assert.equal((await getDoc(reference[2])).exists(), true);
   await assert.rejects(setDoc(reference[2], report));
+});
+
+test('emergencias exigen propietario y esquema válido sin alterar otros reportes', async (t) => {
+  const apps = ['owner', 'other', 'anonymous', 'anonymous-other', 'panel', 'guest'].map((suffix) =>
+    initializeClientApp({ apiKey: 'demo-api-key', projectId: proyecto }, `emg-${suffix}-${appId}`));
+  const clients = apps.map((app) => {
+    const auth = getAuth(app);
+    connectAuthEmulator(auth, `http://${authEmulatorHost}`, { disableWarnings: true });
+    const db = getFirestore(app);
+    connectFirestoreEmulator(db, firestoreAddress.hostname, firestoreAddress.port);
+    return { auth, db };
+  });
+  const emails = ['owner', 'other', 'panel'].map((name) => `emg-${name}-${appId}@example.test`);
+  const users = [];
+  const cancelaciones = [];
+  const temporizadores = [];
+  const ids = [`emg-password-${appId}`, `emg-anonymous-${appId}`, `emg-legacy-${appId}`, `emg-offline-${appId}`];
+  t.after(async () => {
+    for (const timeout of temporizadores) clearTimeout(timeout);
+    for (const cancelar of cancelaciones) cancelar();
+    await enableNetwork(clients[0].db);
+    for (const id of ids) await adminDb.collection('bitacora_reports').doc(id).delete();
+    for (const email of emails) await adminDb.collection('usuarios').doc(email).delete();
+    for (const user of users) await adminAuth.deleteUser(user.uid);
+    for (const client of clients) await terminate(client.db);
+    for (const app of apps) await deleteClientApp(app);
+  });
+  for (const [clientIndex, emailIndex] of [[0, 0], [1, 1], [4, 2]]) {
+    const { user } = await createUserWithEmailAndPassword(clients[clientIndex].auth, emails[emailIndex], 'Emulator123!');
+    users.push(user);
+    await adminDb.collection('usuarios').doc(emails[emailIndex]).set({ rol: clientIndex === 4 ? 'lectura' : 'operador' });
+  }
+  for (const index of [2, 3]) users.push((await signInAnonymously(clients[index].auth)).user);
+  const makeReport = (index, id) => ({
+    id, owner_uid: clients[index].auth.currentUser.uid, folio: `EMG-${id}`,
+    report_type: 'emergencia', unit_id: '13817', driver_name: 'OPERADOR',
+    priority: 'maxima', created_at: new Date().toISOString(),
+    payload: { descripcion: 'Falla en ruta', gps: { lat: 0, lng: 0, accuracy: 10, capturedAt: new Date().toISOString() }, fotoBase64: null }
+  });
+  const report = makeReport(0, ids[0]);
+  const ref = clients.map(({ db }) => doc(db, 'bitacora_reports', ids[0]));
+  await setDoc(ref[0], report);
+  await setDoc(ref[0], { synced_at: new Date().toISOString() }, { merge: true });
+  assert.equal((await getDoc(ref[0])).data().payload.gps.lat, 0);
+  await assert.rejects(getDoc(ref[1]), { code: 'permission-denied' });
+  await assert.rejects(getDoc(ref[2]), { code: 'permission-denied' });
+  await assert.rejects(getDoc(ref[5]), { code: 'permission-denied' });
+  await assert.rejects(setDoc(ref[0], { ...report, owner_uid: users[1].uid }));
+  await assert.rejects(setDoc(ref[0], { payload: { ...report.payload, descripcion: 'Alterada' } }, { merge: true }));
+  await assert.rejects(setDoc(doc(clients[1].db, 'bitacora_reports', `invalid-${appId}`), {
+    ...report, id: `invalid-${appId}`, owner_uid: users[1].uid, payload: { ...report.payload, gps: { ...report.payload.gps, lat: 91 } }
+  }));
+  await assert.rejects(setDoc(doc(clients[1].db, 'bitacora_reports', `invalid-${appId}`), {
+    ...report, id: `invalid-${appId}`, owner_uid: users[1].uid, payload: { ...report.payload, fotoBase64: 'x'.repeat(600001) }
+  }));
+  const panel = query(collection(clients[4].db, 'bitacora_reports'),
+    where('report_type', '==', 'emergencia'), where('created_at', '>=', '2000'),
+    orderBy('created_at', 'desc'));
+  let inicial;
+  let llegada;
+  let rechazar;
+  const primeraConsulta = new Promise((resolve) => { inicial = resolve; });
+  const nuevaEmergencia = new Promise((resolve, reject) => { llegada = resolve; rechazar = reject; });
+  const timeout = setTimeout(() => rechazar(new Error('La emergencia no llegó al listener del panel.')), 10000);
+  temporizadores.push(timeout);
+  const cancelar = onSnapshot(panel, (snapshot) => {
+    inicial();
+    if (snapshot.docs.some((entry) => entry.id === ids[1])) llegada(snapshot);
+  }, rechazar);
+  cancelaciones.push(cancelar);
+  await primeraConsulta;
+  const anonReport = makeReport(2, ids[1]);
+  await setDoc(doc(clients[2].db, 'bitacora_reports', ids[1]), anonReport);
+  const snapshot = await nuevaEmergencia;
+  clearTimeout(timeout);
+  cancelar();
+  await assert.rejects(getDoc(doc(clients[3].db, 'bitacora_reports', ids[1])), { code: 'permission-denied' });
+  const legacyRef = doc(clients[2].db, 'bitacora_reports', ids[2]);
+  await setDoc(legacyRef, { id: ids[2], owner_uid: anonReport.owner_uid, report_type: 'checklist', created_at: anonReport.created_at, payload: {} });
+  await assert.rejects(setDoc(legacyRef, { report_type: 'emergencia' }, { merge: true }), { code: 'permission-denied' });
+  assert.ok(snapshot.docs.some((entry) => entry.id === ids[0]));
+  assert.ok(snapshot.docs.some((entry) => entry.id === ids[1]));
+  await disableNetwork(clients[0].db);
+  const offlineRef = doc(clients[0].db, 'bitacora_reports', ids[3]);
+  let localReady;
+  let localError;
+  const localPending = new Promise((resolve, reject) => { localReady = resolve; localError = reject; });
+  const offlineTimeout = setTimeout(() => localError(new Error('No se confirmó la escritura local pendiente.')), 10000);
+  temporizadores.push(offlineTimeout);
+  const cancelarOffline = onSnapshot(offlineRef, { includeMetadataChanges: true }, (entry) => {
+    if (entry.exists() && entry.metadata.hasPendingWrites) localReady();
+  }, localError);
+  cancelaciones.push(cancelarOffline);
+  const offlineWrite = setDoc(offlineRef, makeReport(0, ids[3]));
+  await localPending;
+  clearTimeout(offlineTimeout);
+  cancelarOffline();
+  assert.equal((await getDoc(doc(clients[4].db, 'bitacora_reports', ids[3]))).exists(), false);
+  await enableNetwork(clients[0].db);
+  await offlineWrite;
+  assert.equal((await getDoc(doc(clients[4].db, 'bitacora_reports', ids[3]))).exists(), true);
 });
 
 test('cierre, reintento retroactivo y permisos funcionan con los emuladores', async (t) => {
@@ -314,9 +421,13 @@ test('cierre, reintento retroactivo y permisos funcionan con los emuladores', as
     await adminAuth.deleteUser(adminUser.user.uid);
     await adminAuth.deleteUser(lecturaUser.user.uid);
     await adminAuth.deleteUser(responsableUser.user.uid);
+    await terminate(clientDb);
+    await terminate(readerDb);
+    await terminate(ownerDb);
     await deleteClientApp(clientApp);
     await deleteClientApp(readerApp);
     await deleteClientApp(ownerApp);
+    await adminDb.terminate();
     await deleteAdminApp(adminApp);
   });
 

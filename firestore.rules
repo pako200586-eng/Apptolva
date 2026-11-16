@@ -169,13 +169,18 @@ service cloud.firestore {
 
     match /bitacora_reports/{reportId} {
       // Los clientes anónimos conservan temporalmente los enlaces QR anteriores.
-      allow get: if isAnonymousOperator() || isPanelUser()
+      allow get: if (isAnonymousOperator()
+          && (resource.data.get('report_type', '') != 'emergencia'
+            || resource.data.owner_uid == request.auth.uid)) || isPanelUser()
         || (isPasswordRouteUser() && resource.data.owner_uid == request.auth.uid);
       allow list: if isPanelUser()
         || (isPasswordRouteUser() && resource.data.owner_uid == request.auth.uid);
       // Checklist: permite create aunque aún no envíe owner_uid (compatibilidad).
       // Bitácora: conserva la protección por owner_uid.
-      allow create: if isAdmin()
+      allow create: if request.resource.data.get('report_type', '') == 'emergencia'
+        ? (isRouteUser() && request.resource.data.owner_uid == request.auth.uid
+          && validEmergencyReport(reportId))
+        : (isAdmin()
         || (isAnonymousOperator()
           && (
             request.resource.data.get('report_type', '') == 'checklist'
@@ -183,9 +188,14 @@ service cloud.firestore {
           ))
         || (isPasswordRouteUser() && request.resource.data.owner_uid == request.auth.uid
           && !request.resource.data.keys().hasAny(['folio_definitivo', 'fecha_recepcion_nube'])
-          && validPasswordReport(reportId));
+          && validPasswordReport(reportId)));
 
-      allow update: if isRouteUser()
+      allow update: if resource.data.get('report_type', '') == 'emergencia'
+        ? (isRouteUser() && resource.data.owner_uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['synced_at'])
+          && validEmergencyReport(reportId))
+        : (isRouteUser()
+        && request.resource.data.get('report_type', '') != 'emergencia'
         && resource.data.owner_uid == request.auth.uid
         && resource.data.get('turnoCerrado', false) != true
         && request.resource.data.owner_uid == resource.data.owner_uid
@@ -193,12 +203,38 @@ service cloud.firestore {
         && request.resource.data.get('auditoria', []).size() >= resource.data.get('auditoria', []).size()
         && (isAnonymousOperator() || (validPasswordReport(reportId)
           && request.resource.data.get('folio_definitivo', null) == resource.data.get('folio_definitivo', null)
-          && request.resource.data.get('fecha_recepcion_nube', null) == resource.data.get('fecha_recepcion_nube', null)));
+          && request.resource.data.get('fecha_recepcion_nube', null) == resource.data.get('fecha_recepcion_nube', null))));
       allow delete: if false;
     }
 
     function optionalReportString(d, field, maxLength) {
       return !(field in d) || (d[field] is string && d[field].size() <= maxLength);
+    }
+
+    function validEmergencyReport(reportId) {
+      let d = request.resource.data;
+      let p = d.payload;
+      return d.keys().hasAll(['id', 'owner_uid', 'folio', 'report_type', 'unit_id', 'driver_name', 'priority', 'created_at', 'payload'])
+        && d.keys().hasOnly(['id', 'owner_uid', 'folio', 'report_type', 'unit_id', 'driver_name', 'priority', 'created_at', 'synced_at', 'payload'])
+        && d.id == reportId && d.id is string && d.id.size() <= 128
+        && d.owner_uid is string && d.owner_uid.size() <= 128
+        && d.folio is string && d.folio.size() <= 128
+        && d.report_type == 'emergencia' && d.priority == 'maxima'
+        && d.unit_id is string && d.unit_id.size() > 0 && d.unit_id.size() <= 100
+        && d.driver_name is string && d.driver_name.size() <= 200
+        && d.created_at is string && d.created_at.size() <= 40
+        && optionalReportString(d, 'synced_at', 40)
+        && p is map && p.keys().hasAll(['descripcion', 'gps', 'fotoBase64'])
+        && p.keys().hasOnly(['descripcion', 'gps', 'fotoBase64'])
+        && p.descripcion is string && p.descripcion.size() > 0 && p.descripcion.size() <= 4000
+        && (p.fotoBase64 == null || (p.fotoBase64 is string && p.fotoBase64.size() <= 600000))
+        && (p.gps == null || (p.gps is map
+          && p.gps.keys().hasAll(['lat', 'lng', 'accuracy', 'capturedAt'])
+          && p.gps.keys().hasOnly(['lat', 'lng', 'accuracy', 'capturedAt'])
+          && p.gps.lat is number && p.gps.lat >= -90 && p.gps.lat <= 90
+          && p.gps.lng is number && p.gps.lng >= -180 && p.gps.lng <= 180
+          && p.gps.accuracy is number && p.gps.accuracy >= 0
+          && p.gps.capturedAt is string && p.gps.capturedAt.size() <= 40));
     }
 
     function validPasswordReport(reportId) {

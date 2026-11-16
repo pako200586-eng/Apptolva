@@ -7,7 +7,21 @@
         { "fieldPath": "owner_uid", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "report_type", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.fotoBase64",
+      "indexes": []
+    }
+  ]
 }

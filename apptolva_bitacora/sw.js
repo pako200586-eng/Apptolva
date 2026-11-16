@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v121"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v122"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -34,6 +34,7 @@ const OFFLINE_URLS = [
   "./js/firebase-config.js",
   "./js/firebase-config-runtime.js",
   "./js/controlSesion.js",
+  "./js/emergencias.js",
   "./js/observadorFolio.js",
   "./js/qrcode.min.js",
   "./js/confetti.min.js",
@@ -310,6 +311,7 @@ async function enviarReportesPendientes() {
   if (!pendientes.length) return;
 
   for (const reporte of pendientes) {
+    if (reporte.type === "emergencia") continue;
     const payload = { ...reporte.payload };
     delete payload.offlineQueueId;
     const isEmergency = reporte.type === "emergencia";

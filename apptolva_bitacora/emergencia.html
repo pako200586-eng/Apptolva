@@ -2,6 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <script src="./js/firebase-config.js"></script>
+    <script src="./js/firebase-config-runtime.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#dc2626">
     <title>Reportar emergencia | AppTolva</title>
@@ -36,8 +38,8 @@
                 <option value="5219212656411">TURNO B: Omar</option>
                 <option value="5219211230242">JEFE TRANSPORTE (Ing. B)</option>
             </select>
-            <input id="fallaUnidad" class="w-full p-3 border border-gray-300 rounded mb-3 text-sm font-bold uppercase" placeholder="NO. DE UNIDAD" autocomplete="off">
-            <textarea id="fallaDesc" class="w-full p-4 border border-gray-300 rounded mb-3 text-sm" rows="4" placeholder="Describe la falla..."></textarea>
+            <input id="fallaUnidad" maxlength="100" aria-label="Número de unidad" class="w-full p-3 border border-gray-300 rounded mb-3 text-sm font-bold uppercase" placeholder="NO. DE UNIDAD" autocomplete="off">
+            <textarea id="fallaDesc" maxlength="4000" aria-label="Descripción de la falla" class="w-full p-4 border border-gray-300 rounded mb-3 text-sm" rows="4" placeholder="Describe la falla..."></textarea>
             <label class="mb-3 w-full flex flex-col items-center justify-center border-2 border-dashed border-red-300 rounded-lg p-4 bg-white cursor-pointer">
                 <i class="fas fa-camera text-2xl text-red-500 mb-1"></i>
                 <span id="fallaFotoLabel" class="text-xs font-bold text-gray-600">TOMAR FOTO DE EVIDENCIA</span>
@@ -47,51 +49,18 @@
             <p id="fallaGpsStatus" class="text-[10px] text-gray-500 mb-3 text-center"><i class="fas fa-map-marker-alt mr-1"></i>Obteniendo ubicación...</p>
             <div class="grid grid-cols-2 gap-3">
                 <button onclick="sendWhatsappFalla()" class="bg-green-600 text-white font-bold py-3 rounded shadow active:scale-95"><i class="fab fa-whatsapp mr-1"></i> AVISAR YA</button>
-                <button onclick="registrarEmergenciaEnSistema()" id="btnRegistrarEmergencia" class="bg-red-600 text-white font-bold py-3 rounded shadow active:scale-95"><i class="fas fa-database mr-1"></i> REGISTRAR</button>
+                <button onclick="registrarEmergenciaEnSistema()" id="btnRegistrarEmergencia" disabled class="bg-red-600 text-white font-bold py-3 rounded shadow active:scale-95 disabled:opacity-50"><i class="fas fa-database mr-1"></i> REGISTRAR</button>
             </div>
-            <p id="fallaSaveStatus" class="hidden text-center text-xs font-bold mt-3 p-2 rounded"></p>
+            <p id="fallaSaveStatus" role="status" aria-live="polite" class="text-center text-xs font-bold mt-3 p-2 rounded">Comprobando sesión...</p>
             <button onclick="copyFallaText()" class="w-full mt-3 bg-blue-600 text-white font-bold py-2 rounded">COPIAR PARA GRUPO</button>
             <p id="copyOk" class="hidden text-center text-xs font-bold text-green-700 mt-2">¡Copiado!</p>
         </section>
     </main>
 
 <script>
-const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
 let fallaFotoBase64 = null;
 let fallaUbicacion = null;
-
-async function solicitarSincronizacionPendiente() {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-        const registration = await navigator.serviceWorker.ready;
-        const worker = navigator.serviceWorker.controller || registration.active;
-        worker?.postMessage({ type: 'SYNC_NOW' });
-    } catch (error) {
-        console.error('No se pudo reintentar el envío de emergencias pendientes:', error);
-    }
-}
-
-window.addEventListener('online', solicitarSincronizacionPendiente);
-window.addEventListener('load', () => {
-    if (navigator.onLine) solicitarSincronizacionPendiente();
-});
-
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data?.kind !== 'emergencia') return;
-
-        const status = document.getElementById('fallaSaveStatus');
-        if (!status) return;
-
-        if (event.data.type === 'REPORT_SYNCED') {
-            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-green-100 text-green-700';
-            status.textContent = '✓ Emergencia sincronizada correctamente.';
-        } else if (event.data.type === 'REPORT_SYNC_WAITING') {
-            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-amber-100 text-amber-700';
-            status.textContent = 'Emergencia pendiente; se reintentará cuando haya conexión.';
-        }
-    });
-}
+window.limpiarFotoEmergencia = () => { fallaFotoBase64 = null; };
 
 function iniciarCapturaFalla() {
     const status = document.getElementById('fallaGpsStatus');
@@ -154,12 +123,12 @@ function construirPayload() {
     return {
         tipo: 'emergencia',
         operador, unidad, descripcion,
-        lat: fallaUbicacion?.lat || null,
-        lng: fallaUbicacion?.lng || null,
-        latitud: fallaUbicacion?.lat || null,
-        longitud: fallaUbicacion?.lng || null,
-        precisionGps: fallaUbicacion?.accuracy || null,
-        fechaGps: fallaUbicacion?.capturedAt || null,
+        lat: fallaUbicacion?.lat ?? null,
+        lng: fallaUbicacion?.lng ?? null,
+        latitud: fallaUbicacion?.lat ?? null,
+        longitud: fallaUbicacion?.lng ?? null,
+        precisionGps: fallaUbicacion?.accuracy ?? null,
+        fechaGps: fallaUbicacion?.capturedAt ?? null,
         gps: fallaUbicacion ? { ...fallaUbicacion, source: 'device-geolocation' } : null,
         fotoBase64: fallaFotoBase64,
         fotos: fallaFotoBase64 ? [{ nombre: 'evidencia.jpg', mimeType: 'image/jpeg', data: `data:image/jpeg;base64,${fallaFotoBase64}` }] : [],
@@ -187,57 +156,6 @@ function obtenerUbicacionActual() {
     });
 }
 
-async function registrarEmergenciaEnSistema() {
-    const button = document.getElementById('btnRegistrarEmergencia');
-    const status = document.getElementById('fallaSaveStatus');
-    const unidad = document.getElementById('fallaUnidad').value.trim();
-    const descripcion = document.getElementById('fallaDesc').value.trim();
-    if (!unidad) {
-        alert('Escribe la unidad.');
-        return;
-    }
-    if (!descripcion) {
-        alert('Describe la falla.');
-        return;
-    }
-    button.disabled = true;
-    status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-blue-100 text-blue-700';
-    status.textContent = 'Obteniendo GPS...';
-    try {
-        try {
-            fallaUbicacion = await obtenerUbicacionActual();
-        } catch (error) {
-            // Si el reintento falla, conservamos la ubicación capturada al abrir la pantalla
-            // en vez de borrarla: es la evidencia del lugar de la falla.
-            console.warn('GPS no disponible en el reintento', error);
-        }
-        const payload = construirPayload();
-        button.textContent = 'ENVIANDO...';
-        const response = await fetch(GAS_DOPOST_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
-        const responseText = await response.text();
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (error) {
-            throw new Error('Google Apps Script no devolvió JSON válido');
-        }
-        if (data.offline && data.queued) {
-            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-amber-100 text-amber-700';
-            status.textContent = 'Sin señal. Guardado y pendiente de envío.';
-        } else if (!response.ok || data.success !== true) {
-            throw new Error(data.error || 'Google Apps Script no confirmó el registro');
-        } else {
-            status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-green-100 text-green-700';
-            status.textContent = '✓ Registrado correctamente.';
-        }
-    } catch (error) {
-        status.className = 'text-center text-xs font-bold mt-3 p-2 rounded bg-red-100 text-red-700';
-        status.textContent = `No se pudo registrar: ${error.message}`;
-    } finally {
-        setTimeout(() => { button.disabled = false; button.innerHTML = '<i class="fas fa-database mr-1"></i> REGISTRAR'; }, 3000);
-    }
-}
-
 function textoFalla() {
     const payload = construirPayload();
     const location = payload.gps ? `\nUbicación: https://maps.google.com/?q=${payload.gps.lat},${payload.gps.lng}` : '';
@@ -263,5 +181,6 @@ function copyFallaText() {
 }
 iniciarCapturaFalla();
 </script>
+<script type="module" src="./js/emergencias.js"></script>
 </body>
 </html>

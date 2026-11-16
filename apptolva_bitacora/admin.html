@@ -94,6 +94,7 @@
             <option value="todos">Todos</option>
             <option value="checklist">Checklist</option>
             <option value="bitacora">Bitácora</option>
+            <option value="emergencia">Emergencia</option>
           </select>
           <button id="applyFilters" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white">Filtrar</button>
         </div>
@@ -143,6 +144,9 @@
         <button id="btn-vista-reportes" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white shadow-sm transition">
           Reportes Recibidos
         </button>
+        <button id="btn-vista-emergencias" class="rounded-md border border-red-700 bg-white px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50">
+          <i class="fas fa-exclamation-triangle mr-1"></i>Emergencias en ruta
+        </button>
         <button id="btn-vista-fallas" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           Fallas Detectadas
         </button>
@@ -158,6 +162,26 @@
       </div>
 
       <div class="w-full space-y-5">
+        <section id="vista-emergencias" class="panel-card overflow-hidden rounded-lg hidden">
+          <div class="border-b border-red-200 bg-red-50 px-4 py-3">
+            <h2 class="font-black text-red-700">Emergencias reportadas</h2>
+            <p id="estado-emergencias" role="status" class="mt-1 text-xs text-slate-700">Cargando emergencias...</p>
+          </div>
+          <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Tabla de emergencias">
+            <table class="min-w-full divide-y divide-red-100 text-sm">
+              <caption class="sr-only">Emergencias en ruta y acciones disponibles</caption>
+              <thead class="bg-red-100 text-left text-xs uppercase text-red-800">
+                <tr>
+                  <th scope="col" class="px-4 py-3">Folio</th><th scope="col" class="px-4 py-3">Fecha / operador</th>
+                  <th scope="col" class="px-4 py-3">Unidad</th><th scope="col" class="px-4 py-3">Descripción</th>
+                  <th scope="col" class="px-4 py-3">Ubicación</th><th scope="col" class="px-4 py-3">Evidencia</th>
+                  <th scope="col" class="px-4 py-3">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-datos-emergencias" class="divide-y divide-red-50"></tbody>
+            </table>
+          </div>
+        </section>
         <section id="vista-reportes" class="panel-card overflow-hidden rounded-lg block">
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 px-4 py-3">
             <h2 class="font-black text-[#7c2d12]">Checklist y bitácoras recibidas</h2>
@@ -494,7 +518,8 @@
       startAfter as fsStartAfter,
       setDoc,
       updateDoc,
-      runTransaction
+      runTransaction,
+      onSnapshot
     } from "./js/firebase-sdk.js";
     import { claveAgrupacionEquipo, clavePosibleDuplicado, coberturaFallaReporte, crearFirmaFalla, crearFirmasFalla, detalleFallaReporte, estadoFallaReporte, firmasEquivalentesPosicion, idCoberturaFalla, indexarCoberturasFalla, indiceOrdenesFalla, separarSistemasFalla } from "./js/firmaFalla.js";
     import { calcularAlertasSeguridad } from "./js/alertasSeguridad.js";
@@ -528,6 +553,8 @@
     const INTERVALO_SINCRONIZACION_REPORTES = 3 * 60 * 1000;
     let sincronizacionReportesActiva = false;
     let temporizadorSincronizacion = null;
+    let cancelarEmergencias = null;
+    let emergencias = [];
     const $ = (id) => document.getElementById(id);
     const COLECCIONES_AUDITORIA_FIRESTORE = [
       'bitacora_reports',
@@ -871,7 +898,81 @@
       renderTablaReportes();
       renderResumen();
       renderDashboard();
+      renderTablaEmergencias();
     }
+
+    function renderTablaEmergencias() {
+      const visibles = emergencias.filter((report) => coincideFiltroGlobal(report, {
+        unit: 'unitId', operator: 'driverName', date: 'createdAt', type: 'type'
+      }));
+      $('tabla-datos-emergencias').innerHTML = visibles.map((report) => {
+        const gps = report.payload?.gps;
+        const gpsValido = typeof gps?.lat === 'number' && Number.isFinite(gps.lat)
+          && gps.lat >= -90 && gps.lat <= 90 && typeof gps.lng === 'number'
+          && Number.isFinite(gps.lng) && gps.lng >= -180 && gps.lng <= 180;
+        const mapa = gpsValido
+          ? `<a class="font-bold text-blue-700 underline" href="https://maps.google.com/?q=${gps.lat},${gps.lng}" target="_blank" rel="noopener noreferrer">Ver mapa</a>`
+          : 'Sin GPS';
+        const foto = report.payload?.fotoBase64;
+        const evidencia = typeof foto === 'string' && foto.length <= 600000 && /^[A-Za-z0-9+/]+={0,2}$/.test(foto)
+          ? `<details><summary class="cursor-pointer font-bold text-red-700">Ver foto</summary><img class="mt-2 max-h-48 max-w-48" alt="Evidencia de la emergencia" src="data:image/jpeg;base64,${foto}"></details>`
+          : 'Sin foto';
+        const accion = state.role === 'admin'
+          ? `<button type="button" data-emergencia-id="${escapeHtml(report.id)}" class="crear-ot-emergencia rounded-md bg-red-700 px-3 py-2 font-bold text-white disabled:opacity-50">Crear OT</button>`
+          : 'Solo lectura';
+        return `<tr class="hover:bg-red-50">
+          <td class="px-4 py-3 font-black text-red-700">${escapeHtml(report.folio || 'Sin folio')}</td>
+          <td class="px-4 py-3">${escapeHtml(formatDate(report.createdAt))}<br>${escapeHtml(report.driverName || 'Sin operador')}</td>
+          <td class="px-4 py-3 font-bold">${escapeHtml(report.unitId)}</td>
+          <td class="max-w-xs px-4 py-3">${escapeHtml(report.payload?.descripcion || '')}</td>
+          <td class="px-4 py-3">${mapa}</td><td class="px-4 py-3">${evidencia}</td>
+          <td class="px-4 py-3">${accion}</td></tr>`;
+      }).join('') || '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">No hay emergencias con los filtros y período actuales.</td></tr>';
+    }
+
+    function iniciarEscuchaEmergencias() {
+      if (cancelarEmergencias) cancelarEmergencias();
+      emergencias = [];
+      renderTablaEmergencias();
+      if (!state.user) return;
+      const uid = state.user.uid;
+      const corte = new Date(Date.now() - state.windowDays * 86400000).toISOString();
+      $('estado-emergencias').textContent = 'Cargando emergencias desde Firestore...';
+      cancelarEmergencias = onSnapshot(fsQuery(
+        collection(db, 'bitacora_reports'),
+        fsWhere('report_type', '==', 'emergencia'),
+        fsWhere('created_at', '>=', corte),
+        fsOrderBy('created_at', 'desc'),
+        fsLimit(LIMITE_VENTANA_REPORTES)
+      ), { includeMetadataChanges: true }, (snapshot) => {
+        if (state.user?.uid !== uid) return;
+        emergencias = snapshot.docs.map(convertirSnapshotReporte);
+        $('estado-emergencias').textContent = `${snapshot.metadata.fromCache ? 'Caché, esperando servidor' : 'Actualización en tiempo real'} · últimos ${state.windowDays} días · ${emergencias.length} cargadas${snapshot.size === LIMITE_VENTANA_REPORTES ? ` · límite de ${LIMITE_VENTANA_REPORTES} alcanzado` : ''}. Los filtros generales también aplican.`;
+        renderTablaEmergencias();
+      }, (error) => {
+        console.error('Error al escuchar emergencias:', error);
+        $('estado-emergencias').textContent = `No se pudieron actualizar las emergencias: ${error.message}`;
+        showToast('No se pudieron actualizar las emergencias.');
+      });
+    }
+
+    $('tabla-datos-emergencias').addEventListener('click', async (event) => {
+      const boton = event.target.closest('.crear-ot-emergencia');
+      if (!boton || state.role !== 'admin') return;
+      const reporte = emergencias.find((item) => item.id === boton.dataset.emergenciaId);
+      if (!reporte) return showToast('La emergencia ya no está en la vista actual.');
+      if (!window.confirm(`¿Crear una OT de prioridad máxima para la unidad ${reporte.unitId}?`)) return;
+      boton.disabled = true;
+      try {
+        await crearOTDesdeReporte(reporte, [{
+          componente: 'TRACTOCAMIÓN', sistema: 'EMERGENCIA EN RUTA',
+          descripcion: reporte.payload?.descripcion || 'Falla no descrita',
+          componenteKey: 'tracto', itemOficial: 'Emergencia reportada vía Apptolva'
+        }], [{ componente: 'NOTAS DE EMERGENCIA', texto: reporte.payload?.descripcion || '' }]);
+      } finally {
+        boton.disabled = false;
+      }
+    });
 
     function activarTabReportes(tab = 'checklist') {
       state.reportesTab = tab === 'bitacora' ? 'bitacora' : 'checklist';
@@ -1276,6 +1377,7 @@
     });
 
     $('applyFilters').addEventListener('click', async () => {
+      const ventanaAnterior = state.windowDays;
       const params = filters();
       state.appliedFilters = {
         from: params.get('from') || '',
@@ -1301,6 +1403,8 @@
             showToast(`Solo se consultan los últimos ${state.windowDays} días; las fechas anteriores no tendrán resultados.`);
           }
         }
+        if (state.windowDays !== ventanaAnterior) iniciarEscuchaEmergencias();
+        else renderTablaEmergencias();
         let recargado = false;
         if (!state.allReports) {
           await cargarDatos();
@@ -1538,6 +1642,9 @@
 
     onAuthStateChanged(auth, async (user) => {
       const currentAuthStateVersion = ++authStateVersion;
+      if (cancelarEmergencias) cancelarEmergencias();
+      cancelarEmergencias = null;
+      emergencias = [];
       let authenticatedUser = null;
       let userRole = null;
       let accessError = null;
@@ -1608,6 +1715,8 @@
       $('loginMsg').classList.add('hidden');
       try {
         await cargarDatos();
+        if (currentAuthStateVersion !== authStateVersion) return;
+        iniciarEscuchaEmergencias();
         cargarDashboard().catch(() => {});
         if (currentAuthStateVersion !== authStateVersion) return;
         if (temporizadorSincronizacion) clearInterval(temporizadorSincronizacion);
@@ -1714,6 +1823,7 @@
         const descripcion = fallas.map((f) => `${f.componente} | ${f.sistema || f.categoria}: ${f.descripcion || f.itemOficial}`).join('\n');
         const obsTexto = observaciones.map((o) => `${o.componente}: ${o.texto}`).join('\n');
         const reporteFolio = String(reporte.folio || reporte.payload?.folio || '').trim();
+        const { fotoBase64, ...payloadOT } = reporte.payload || {};
 
         const refCandado = doc(db, 'ot_por_reporte', reporteId);
         const refContador = doc(db, 'sistema', 'contadores');
@@ -1769,7 +1879,8 @@
             fecha_realizacion: null,
             kilometraje: reporte.payload?.km || '',
             comentarios_ejecutor: '',
-            payload: { ...reporte.payload, fallas }
+            ...(reporte.type === 'emergencia' ? { prioridad: 'maxima' } : {}),
+            payload: { ...(reporte.type === 'emergencia' ? payloadOT : reporte.payload), fallas }
           };
 
           transaction.set(refCandado, { ot_id: otId, folio_ot: nuevoFolio, fecha: fechaActual });
@@ -2576,7 +2687,7 @@
           const estatus = orden?.estatus || 'NUEVA';
 
           fila.innerHTML = `
-            <td class="px-4 py-3 font-black text-[#7c2d12]">${escapeHtml(String(folioOt))}</td>
+            <td class="px-4 py-3 font-black text-[#7c2d12]">${escapeHtml(String(folioOt))}${orden.prioridad === 'maxima' ? '<span class="ml-2 rounded bg-red-100 px-2 py-1 text-xs text-red-700">Prioridad máxima</span>' : ''}</td>
             <td class="px-4 py-3">${escapeHtml(String(unidad))}</td>
             <td class="px-4 py-3 truncate max-w-[150px]">${escapeHtml(String(operador))}</td>
             <td class="px-4 py-3">${escapeHtml(String(fecha))}</td>
@@ -3448,7 +3559,7 @@
       }
     });
 
-    const vistasMantenimiento = ['vista-reportes', 'vista-fallas', 'vista-ordenes', 'vista-dashboard', 'vista-catalogo'];
+    const vistasMantenimiento = ['vista-reportes', 'vista-emergencias', 'vista-fallas', 'vista-ordenes', 'vista-dashboard', 'vista-catalogo'];
 
     function mostrarVistaMantenimiento(id, cargar = true) {
       vistasMantenimiento.forEach(v => {

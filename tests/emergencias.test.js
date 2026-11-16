@@ -1,0 +1,228 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+
+const source = readFileSync(new URL('../apptolva_bitacora/js/emergencias.js', import.meta.url), 'utf8')
+  .replace(/^import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];\s*/gm, '');
+
+function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = null } = {}) {
+  const elementos = Object.fromEntries([
+    'btnRegistrarEmergencia', 'fallaSaveStatus', 'fallaUnidad', 'fallaDesc',
+    'fallaFotoInput', 'fallaFotoPreview', 'fallaFotoLabel'
+  ].map((id) => [id, { value: '', classList: { add() {} } }]));
+  elementos.fallaUnidad.value = ' 13817 ';
+  elementos.fallaDesc.value = 'Falla en ruta';
+  const escritos = [];
+  const respaldos = new Map();
+  const callbacks = [];
+  let confirmar;
+  let rechazar;
+  const escritura = new Promise((resolve, reject) => { confirmar = resolve; rechazar = reject; });
+  const auth = { currentUser: user };
+  const window = {
+    obtenerUbicacionActual: async () => ({ lat: 0, lng: 0, accuracy: 10, capturedAt: '2026-01-01T00:00:00.000Z' }),
+    construirPayload: () => ({ operador: 'Operador', fecha: '2026-01-01T00:00:00.000Z', gps: null, fotoBase64: foto }),
+    limpiarFotoEmergencia() {}
+  };
+  const context = vm.createContext({
+    window, Blob, console: { error() {}, warn() {} }, document: { getElementById: (id) => elementos[id] },
+    localStorage: {}, sessionStorage: { getItem: () => null },
+    getFirebaseConfig: () => ({ projectId: 'demo' }), initializeApp: () => ({}), getAuth: () => auth,
+    initializeFirestore: () => ({}), persistentLocalCache: () => ({}), persistentMultipleTabManager: () => ({}),
+    onAuthStateChanged: (_, callback) => callback(user),
+    collection: () => ({}), doc: (...args) => ({ id: args.length === 1 ? 'unico' : args[2] }),
+    onSnapshot: (_, __, next, error) => { callbacks.push({ next, error }); return () => {}; },
+    setDoc: (_, data) => { escritos.push(data); return escritura; },
+    validarEspacio() {}, leerPerfil: () => ({ nombre: 'Operador', rol: 'operador' }),
+    listarRespaldosReportes: () => [...respaldos.values()],
+    guardarRespaldoReporte: (_, __, ___, data) => respaldos.set(data.id, data),
+    borrarRespaldoReporte: (_, __, ___, data) => respaldos.delete(data.id)
+  });
+  vm.runInContext(source, context);
+  return { window, elementos, escritos, respaldos, callbacks, confirmar, rechazar };
+}
+
+test('sin sesión no permite registrar', () => {
+  const env = entorno({ user: null });
+  assert.equal(env.elementos.btnRegistrarEmergencia.disabled, true);
+  assert.match(env.elementos.fallaSaveStatus.textContent, /Inicia sesión/);
+});
+
+test('registra una sola foto y muestra pendiente hasta la confirmación real', async () => {
+  const env = entorno({ foto: 'YWJj' });
+  const registro = env.window.registrarEmergenciaEnSistema();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(env.escritos.length, 1);
+  assert.equal(env.escritos[0].payload.gps.lat, 0);
+  assert.equal(env.escritos[0].payload.fotoBase64, 'YWJj');
+  assert.equal(env.escritos[0].payload.fotos, undefined);
+  assert.equal(env.respaldos.size, 1);
+  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: true, fromCache: true } });
+  await registro;
+  assert.match(env.elementos.fallaSaveStatus.textContent, /pendiente/);
+  assert.equal(env.elementos.fallaUnidad.value, '');
+  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: false, fromCache: true } });
+  assert.equal(env.respaldos.size, 1);
+  env.confirmar();
+  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: false, fromCache: false } });
+  assert.equal(env.respaldos.size, 0);
+  assert.match(env.elementos.fallaSaveStatus.textContent, /confirmada por el servidor/);
+});
+
+test('una foto excesiva se rechaza antes de crear respaldo o escritura', async () => {
+  const env = entorno({ foto: 'a'.repeat(600001) });
+  await env.window.registrarEmergenciaEnSistema();
+  assert.equal(env.escritos.length, 0);
+  assert.equal(env.respaldos.size, 0);
+  assert.match(env.elementos.fallaSaveStatus.textContent, /demasiado grande/);
+});
+
+test('rechazo del servidor conserva respaldo y evita un segundo registro', async () => {
+  const env = entorno();
+  const registro = env.window.registrarEmergenciaEnSistema();
+  await new Promise((resolve) => setImmediate(resolve));
+  env.rechazar(new Error('Permiso denegado'));
+  await registro;
+  assert.equal(env.respaldos.size, 1);
+  assert.equal(env.elementos.btnRegistrarEmergencia.disabled, true);
+  assert.match(env.elementos.fallaSaveStatus.textContent, /Reintenta el respaldo/);
+});
+
+const admin = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+
+function extract(start, end) {
+  const first = admin.indexOf(start);
+  const last = admin.indexOf(end, first);
+  assert.ok(first >= 0 && last > first);
+  return admin.slice(first, last);
+}
+
+test('la vista escapa texto, valida GPS y aplica filtros y permisos', () => {
+  const elements = {
+    'tabla-datos-emergencias': { innerHTML: '' },
+    'estado-emergencias': { textContent: '' }
+  };
+  const context = vm.createContext({
+    state: { role: 'admin', appliedFilters: { unit: '' } },
+    $: (id) => elements[id],
+    formatDate: () => 'fecha',
+    escapeHtml: (v) => String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'),
+    coincideFiltroGlobal: (report) => report.unitId.includes(context.state.appliedFilters.unit)
+  });
+  vm.runInContext(`let emergencias = []; ${extract('    function renderTablaEmergencias()', '    function iniciarEscuchaEmergencias()')}`, context);
+  context.reportes = [{
+    id: 'id-1', folio: 'EMG-1', type: 'emergencia', unitId: '123', driverName: '<img src=x>',
+    createdAt: '2026-01-01', payload: { descripcion: '<script>malicioso</script>', gps: { lat: 0, lng: 0 }, fotoBase64: 'YWJj' }
+  }];
+  vm.runInContext('emergencias = reportes; renderTablaEmergencias()', context);
+  const html = elements['tabla-datos-emergencias'].innerHTML;
+  assert.match(html, /maps\.google\.com\/\?q=0,0/);
+  assert.match(html, /&lt;script&gt;malicioso&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /data:image\/jpeg;base64,YWJj/);
+  assert.match(html, /Crear OT/);
+  context.state.role = 'lectura';
+  context.reportes[0].payload.gps.lat = 91;
+  context.reportes[0].payload.fotoBase64 = '" onerror="alert(1)';
+  vm.runInContext('renderTablaEmergencias()', context);
+  assert.match(elements['tabla-datos-emergencias'].innerHTML, /Sin GPS/);
+  assert.match(elements['tabla-datos-emergencias'].innerHTML, /Sin foto/);
+  assert.doesNotMatch(elements['tabla-datos-emergencias'].innerHTML, /Crear OT|onerror/);
+  context.state.appliedFilters.unit = '999';
+  vm.runInContext('renderTablaEmergencias()', context);
+  assert.match(elements['tabla-datos-emergencias'].innerHTML, /No hay emergencias/);
+});
+
+test('la OT de emergencia conserva candado y prioridad sin duplicar la foto', async () => {
+  const stored = new Map();
+  const alerts = [];
+  let serial = 0;
+  const context = vm.createContext({
+    state: { role: 'admin', user: { email: 'admin@example.test' } },
+    dashState: { ordenes: [] }, ESTATUS_REALIZADA: new Set(['TERMINADA', 'CERRADA']),
+    sinAcentos: (v) => String(v || '').toUpperCase(),
+    db: {}, crypto: { randomUUID: () => `uuid-${++serial}` },
+    collection: (_, name) => name, fsQuery: (...args) => args, fsWhere: (...args) => args,
+    getDocs: async () => ({ docs: [] }), doc: (_, collectionName, id) => `${collectionName}/${id}`,
+    runTransaction: async (_, action) => action({
+      get: async (ref) => ({ exists: () => stored.has(ref), id: ref.split('/')[1], data: () => stored.get(ref) }),
+      set: (ref, data) => stored.set(ref, data)
+    }),
+    alert: (text) => alerts.push(text), showToast: (text) => alerts.push(text),
+    escapeHtml: (text) => String(text), formatDate: () => 'fecha',
+    renderDashboard() {}, enviarAlertaTelegram() {}, generarPDFOT: async () => {},
+    cargarFallas() {}, mostrarVistaOrdenes() {}, abrirSeguimiento() {}, console
+  });
+  vm.runInContext(extract('    async function crearOTDesdeReporte(', '    function tarjetaFallaHtml('), context);
+  const report = { id: 'emg-id', type: 'emergencia', folio: 'EMG-id', unitId: '123', driverName: 'Operador', payload: { descripcion: 'Falla', fotoBase64: 'YWJj' } };
+  const fallas = [{ componente: 'TRACTOCAMIÓN', sistema: 'EMERGENCIA', descripcion: 'Falla' }];
+  await context.crearOTDesdeReporte(report, fallas, []);
+  const orden = [...stored.entries()].find(([key]) => key.startsWith('ordenes_trabajo/'))[1];
+  assert.equal(orden.prioridad, 'maxima');
+  assert.equal(orden.payload.fotoBase64, undefined);
+  assert.equal(orden.reporte_id, 'emg-id');
+  assert.equal(stored.get('ot_por_reporte/emg-id').ot_id, orden.id);
+  await context.crearOTDesdeReporte(report, fallas, []);
+  assert.equal([...stored.keys()].filter((key) => key.startsWith('ordenes_trabajo/')).length, 1);
+  assert.ok(alerts.some((text) => /OT activa/.test(text)));
+});
+
+test('la escucha actualiza emergencias, respeta la sesión y cancela el listener anterior', () => {
+  const callbacks = [];
+  let cancelados = 0;
+  let renders = 0;
+  const estado = { textContent: '' };
+  const context = vm.createContext({
+    state: { user: { uid: 'admin-1' }, windowDays: 30 },
+    LIMITE_VENTANA_REPORTES: 1500, db: {},
+    $: () => estado, renderTablaEmergencias: () => { renders++; },
+    collection: () => ({}), fsQuery: (...args) => args, fsWhere: (...args) => args,
+    fsOrderBy: (...args) => args, fsLimit: (...args) => args,
+    convertirSnapshotReporte: (doc) => ({ id: doc.id }),
+    onSnapshot: (_, __, next, error) => {
+      callbacks.push({ next, error });
+      return () => { cancelados++; };
+    },
+    showToast() {}, console: { error() {} }
+  });
+  vm.runInContext(`let emergencias = []; let cancelarEmergencias = null; ${extract('    function iniciarEscuchaEmergencias()', "    $('tabla-datos-emergencias').addEventListener")}`, context);
+  context.iniciarEscuchaEmergencias();
+  callbacks[0].next({ metadata: { fromCache: false }, size: 1, docs: [{ id: 'primera' }] });
+  assert.equal(vm.runInContext('emergencias[0].id', context), 'primera');
+  assert.match(estado.textContent, /tiempo real/);
+  context.iniciarEscuchaEmergencias();
+  assert.equal(cancelados, 1);
+  context.state.user = { uid: 'otra-sesion' };
+  callbacks[1].next({ metadata: { fromCache: false }, size: 1, docs: [{ id: 'ajena' }] });
+  assert.equal(vm.runInContext('emergencias.length', context), 0);
+  callbacks[1].error(new Error('Sin conexión'));
+  assert.match(estado.textContent, /Sin conexión/);
+  assert.ok(renders >= 3);
+});
+
+test('la cola anterior conserva emergencias y sigue sincronizando bitácoras', async () => {
+  const worker = readFileSync(new URL('../apptolva_bitacora/sw.js', import.meta.url), 'utf8');
+  const start = worker.indexOf('async function enviarReportesPendientes()');
+  const end = worker.indexOf('self.addEventListener("install"', start);
+  assert.ok(start >= 0 && end > start);
+  const peticiones = [];
+  const eliminados = [];
+  const context = vm.createContext({
+    GAS_DOPOST_URL: 'https://example.test/legacy',
+    getPendingReports: async () => [
+      { id: 'emg', type: 'emergencia', payload: { descripcion: 'Falla' } },
+      { id: 'bit', type: 'bitacora', payload: { folio: 'F1' } }
+    ],
+    fetch: async (url) => {
+      peticiones.push(url);
+      return { ok: true, text: async () => '{"success":true}' };
+    },
+    deletePendingReport: async (id) => eliminados.push(id),
+    notifyClients: async () => {}
+  });
+  vm.runInContext(worker.slice(start, end), context);
+  await context.enviarReportesPendientes();
+  assert.deepEqual(peticiones, ['/api/store-bitacora']);
+  assert.deepEqual(eliminados, ['bit']);
+});
