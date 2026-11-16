@@ -59,17 +59,24 @@ try {
     button.disabled = true;
     try {
       if (!user) throw new Error('Inicia sesión desde el menú antes de registrar una emergencia.');
+      let perfil = null;
       if (user.isAnonymous) {
         if (sessionStorage.getItem(`apptolva_legacy_${projectId}`) !== user.uid) {
           throw new Error('Vuelve al menú y habilita la sesión anterior antes de registrar.');
         }
       } else {
         validarEspacio(localStorage, projectId, user);
-        if (!leerPerfil(localStorage, projectId, user.uid)) {
+        perfil = leerPerfil(localStorage, projectId, user.uid);
+        if (!perfil) {
           throw new Error('Vuelve al menú para validar tu sesión antes de registrar.');
         }
       }
       usuario = user;
+      const operador = document.getElementById('fallaOperador');
+      if (!operador.value.trim()) {
+        operador.value = localStorage.getItem('nombreOperadorActual')
+          || localStorage.getItem('nom087_driverName') || localStorage.getItem('driverName') || perfil?.nombre || '';
+      }
       const pendientes = listarRespaldosReportes(localStorage, projectId, user.uid)
         .filter((data) => data.report_type === 'emergencia');
       pendientes.forEach((data) => observarReporte(data, user));
@@ -110,6 +117,9 @@ try {
         throw new Error('La sesión cambió. Vuelve al menú antes de registrar.');
       }
       const payload = window.construirPayload();
+      if (payload.km && !/^\d{1,30}$/.test(payload.km)) {
+        throw new Error('El kilometraje debe contener solo dígitos.');
+      }
       const ubicacion = gps || payload.gps;
       const ref = doc(collection(db, 'bitacora_reports'));
       const data = {
@@ -123,6 +133,10 @@ try {
         created_at: payload.fecha,
         payload: {
           descripcion,
+          tolva1: payload.tolva1,
+          dolly: payload.dolly,
+          tolva2: payload.tolva2,
+          km: payload.km,
           gps: ubicacion ? {
             lat: ubicacion.lat, lng: ubicacion.lng,
             accuracy: ubicacion.accuracy, capturedAt: ubicacion.capturedAt
@@ -148,6 +162,10 @@ try {
       }).catch((error) => console.error('No se pudo actualizar el respaldo de emergencia:', error));
       await Promise.race([escritura, guardadoLocal]);
       document.getElementById('fallaUnidad').value = '';
+      document.getElementById('fallaTolva1').value = '';
+      document.getElementById('fallaDolly').value = '';
+      document.getElementById('fallaTolva2').value = '';
+      document.getElementById('fallaKm').value = '';
       document.getElementById('fallaDesc').value = '';
       document.getElementById('fallaFotoInput').value = '';
       document.getElementById('fallaFotoPreview').classList.add('hidden');

@@ -5,10 +5,13 @@ import vm from 'node:vm';
 
 const source = readFileSync(new URL('../apptolva_bitacora/js/emergencias.js', import.meta.url), 'utf8')
   .replace(/^import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];\s*/gm, '');
+const emergencia = readFileSync(new URL('../apptolva_bitacora/emergencia.html', import.meta.url), 'utf8');
+const payloadSource = emergencia.slice(emergencia.indexOf('function construirPayload()'), emergencia.indexOf('function obtenerUbicacionActual()'));
 
-function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = null } = {}) {
+function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = null, storage = {} } = {}) {
   const elementos = Object.fromEntries([
-    'btnRegistrarEmergencia', 'fallaSaveStatus', 'fallaUnidad', 'fallaDesc',
+    'btnRegistrarEmergencia', 'fallaSaveStatus', 'fallaOperador', 'fallaUnidad', 'fallaDesc',
+    'fallaTolva1', 'fallaDolly', 'fallaTolva2', 'fallaKm',
     'fallaFotoInput', 'fallaFotoPreview', 'fallaFotoLabel'
   ].map((id) => [id, { value: '', classList: { add() {} } }]));
   elementos.fallaUnidad.value = ' 13817 ';
@@ -22,12 +25,11 @@ function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = 
   const auth = { currentUser: user };
   const window = {
     obtenerUbicacionActual: async () => ({ lat: 0, lng: 0, accuracy: 10, capturedAt: '2026-01-01T00:00:00.000Z' }),
-    construirPayload: () => ({ operador: 'Operador', fecha: '2026-01-01T00:00:00.000Z', gps: null, fotoBase64: foto }),
     limpiarFotoEmergencia() {}
   };
   const context = vm.createContext({
     window, Blob, console: { error() {}, warn() {} }, document: { getElementById: (id) => elementos[id] },
-    localStorage: {}, sessionStorage: { getItem: () => null },
+    localStorage: { getItem: (key) => storage[key] || null }, sessionStorage: { getItem: () => null },
     getFirebaseConfig: () => ({ projectId: 'demo' }), initializeApp: () => ({}), getAuth: () => auth,
     initializeFirestore: () => ({}), persistentLocalCache: () => ({}), persistentMultipleTabManager: () => ({}),
     onAuthStateChanged: (_, callback) => callback(user),
@@ -39,6 +41,8 @@ function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = 
     guardarRespaldoReporte: (_, __, ___, data) => respaldos.set(data.id, data),
     borrarRespaldoReporte: (_, __, ___, data) => respaldos.delete(data.id)
   });
+  context.foto = foto;
+  vm.runInContext(`let fallaUbicacion = null; let fallaFotoBase64 = foto; ${payloadSource}; window.construirPayload = construirPayload;`, context);
   vm.runInContext(source, context);
   return { window, elementos, escritos, respaldos, callbacks, confirmar, rechazar };
 }
@@ -50,24 +54,56 @@ test('sin sesión no permite registrar', () => {
 });
 
 test('registra una sola foto y muestra pendiente hasta la confirmación real', async () => {
-  const env = entorno({ foto: 'YWJj' });
+  const env = entorno({ foto: 'YWJj', storage: { nombreOperadorActual: ' Nombre guardado ' } });
+  assert.equal(env.elementos.fallaOperador.value, ' Nombre guardado ');
+  env.elementos.fallaOperador.value = '  operador editado ';
+  env.elementos.fallaTolva1.value = ' t-1 ';
+  env.elementos.fallaDolly.value = ' d-1 ';
+  env.elementos.fallaTolva2.value = ' t-2 ';
+  env.elementos.fallaKm.value = ' 123456 ';
   const registro = env.window.registrarEmergenciaEnSistema();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(env.escritos.length, 1);
   assert.equal(env.escritos[0].payload.gps.lat, 0);
   assert.equal(env.escritos[0].payload.fotoBase64, 'YWJj');
   assert.equal(env.escritos[0].payload.fotos, undefined);
+  assert.equal(env.escritos[0].driver_name, 'OPERADOR EDITADO');
+  assert.equal(env.escritos[0].payload.tolva1, 'T-1');
+  assert.equal(env.escritos[0].payload.dolly, 'D-1');
+  assert.equal(env.escritos[0].payload.tolva2, 'T-2');
+  assert.equal(env.escritos[0].payload.km, '123456');
+  assert.equal(env.respaldos.get('unico').payload.km, '123456');
   assert.equal(env.respaldos.size, 1);
   env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: true, fromCache: true } });
   await registro;
   assert.match(env.elementos.fallaSaveStatus.textContent, /pendiente/);
   assert.equal(env.elementos.fallaUnidad.value, '');
+  assert.equal(env.elementos.fallaTolva1.value, '');
+  assert.equal(env.elementos.fallaDolly.value, '');
+  assert.equal(env.elementos.fallaTolva2.value, '');
+  assert.equal(env.elementos.fallaKm.value, '');
+  assert.equal(env.elementos.fallaOperador.value, '  operador editado ');
   env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: false, fromCache: true } });
   assert.equal(env.respaldos.size, 1);
   env.confirmar();
   env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: false, fromCache: false } });
   assert.equal(env.respaldos.size, 0);
   assert.match(env.elementos.fallaSaveStatus.textContent, /confirmada por el servidor/);
+});
+
+test('autocompleta desde las claves anteriores o el perfil vinculado', () => {
+  assert.equal(entorno({ storage: { nom087_driverName: 'NOM' } }).elementos.fallaOperador.value, 'NOM');
+  assert.equal(entorno({ storage: { driverName: 'DRIVER' } }).elementos.fallaOperador.value, 'DRIVER');
+  assert.equal(entorno().elementos.fallaOperador.value, 'Operador');
+});
+
+test('rechaza kilometraje inválido sin crear respaldo ni escritura', async () => {
+  const env = entorno();
+  env.elementos.fallaKm.value = '-12';
+  await env.window.registrarEmergenciaEnSistema();
+  assert.equal(env.escritos.length, 0);
+  assert.equal(env.respaldos.size, 0);
+  assert.match(env.elementos.fallaSaveStatus.textContent, /solo dígitos/);
 });
 
 test('una foto excesiva se rechaza antes de crear respaldo o escritura', async () => {
@@ -135,6 +171,17 @@ test('la vista escapa texto, valida GPS y aplica filtros y permisos', () => {
 });
 
 test('la OT de emergencia conserva candado y prioridad sin duplicar la foto', async () => {
+  const env = entorno({ foto: 'YWJj' });
+  env.elementos.fallaOperador.value = 'Operador';
+  env.elementos.fallaUnidad.value = '123';
+  env.elementos.fallaTolva1.value = 'T-1';
+  env.elementos.fallaDolly.value = 'D-1';
+  env.elementos.fallaTolva2.value = 'T-2';
+  env.elementos.fallaKm.value = '123456';
+  const registro = env.window.registrarEmergenciaEnSistema();
+  await new Promise((resolve) => setImmediate(resolve));
+  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: true, fromCache: true } });
+  await registro;
   const stored = new Map();
   const alerts = [];
   let serial = 0;
@@ -152,17 +199,31 @@ test('la OT de emergencia conserva candado y prioridad sin duplicar la foto', as
     alert: (text) => alerts.push(text), showToast: (text) => alerts.push(text),
     escapeHtml: (text) => String(text), formatDate: () => 'fecha',
     renderDashboard() {}, enviarAlertaTelegram() {}, generarPDFOT: async () => {},
-    cargarFallas() {}, mostrarVistaOrdenes() {}, abrirSeguimiento() {}, console
+    cargarFallas() {}, mostrarVistaOrdenes() {}, abrirSeguimiento() {},
+    normalizarFechaReporte: (d) => d.created_at, console
   });
+  vm.runInContext(extract('    function convertirSnapshotReporte(', '    function resumenReportes('), context);
   vm.runInContext(extract('    async function crearOTDesdeReporte(', '    function tarjetaFallaHtml('), context);
-  const report = { id: 'emg-id', type: 'emergencia', folio: 'EMG-id', unitId: '123', driverName: 'Operador', payload: { descripcion: 'Falla', fotoBase64: 'YWJj' } };
+  const report = context.convertirSnapshotReporte({ id: env.escritos[0].id, data: () => env.escritos[0] });
   const fallas = [{ componente: 'TRACTOCAMIÓN', sistema: 'EMERGENCIA', descripcion: 'Falla' }];
   await context.crearOTDesdeReporte(report, fallas, []);
   const orden = [...stored.entries()].find(([key]) => key.startsWith('ordenes_trabajo/'))[1];
   assert.equal(orden.prioridad, 'maxima');
   assert.equal(orden.payload.fotoBase64, undefined);
-  assert.equal(orden.reporte_id, 'emg-id');
-  assert.equal(stored.get('ot_por_reporte/emg-id').ot_id, orden.id);
+  const pdf = readFileSync(new URL('../apptolva_bitacora/js/generarPDF_OT.js', import.meta.url), 'utf8');
+  const pdfContext = vm.createContext({ window: {}, SUPERVISOR_DEFAULT: 'Supervisor' });
+  vm.runInContext(pdf.slice(pdf.indexOf('  function texto('), pdf.indexOf('  function dibujarOT(')), pdfContext);
+  const datos = pdfContext.construirDatosOT(orden);
+  assert.equal(datos.operador, 'OPERADOR');
+  assert.equal(datos.tolva1, 'T-1');
+  assert.equal(datos.dolly, 'D-1');
+  assert.equal(datos.tolva2, 'T-2');
+  assert.equal(datos.kilometraje, '123456');
+  const antigua = pdfContext.construirDatosOT({ payload: { descripcion: 'Falla' } });
+  assert.equal(antigua.tolva1, '');
+  assert.equal(antigua.kilometraje, '');
+  assert.equal(orden.reporte_id, 'unico');
+  assert.equal(stored.get('ot_por_reporte/unico').ot_id, orden.id);
   await context.crearOTDesdeReporte(report, fallas, []);
   assert.equal([...stored.keys()].filter((key) => key.startsWith('ordenes_trabajo/')).length, 1);
   assert.ok(alerts.some((text) => /OT activa/.test(text)));

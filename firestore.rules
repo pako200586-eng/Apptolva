@@ -225,8 +225,13 @@ service cloud.firestore {
         && d.created_at is string && d.created_at.size() <= 40
         && optionalReportString(d, 'synced_at', 40)
         && p is map && p.keys().hasAll(['descripcion', 'gps', 'fotoBase64'])
-        && p.keys().hasOnly(['descripcion', 'gps', 'fotoBase64'])
+        && p.keys().hasOnly(['descripcion', 'gps', 'fotoBase64', 'tolva1', 'dolly', 'tolva2', 'km'])
         && p.descripcion is string && p.descripcion.size() > 0 && p.descripcion.size() <= 4000
+        && optionalReportString(p, 'tolva1', 100)
+        && optionalReportString(p, 'dolly', 100)
+        && optionalReportString(p, 'tolva2', 100)
+        && optionalReportString(p, 'km', 30)
+        && (!('km' in p) || p.km == '' || p.km.matches('^[0-9]+$'))
         && (p.fotoBase64 == null || (p.fotoBase64 is string && p.fotoBase64.size() <= 600000))
         && (p.gps == null || (p.gps is map
           && p.gps.keys().hasAll(['lat', 'lng', 'accuracy', 'capturedAt'])

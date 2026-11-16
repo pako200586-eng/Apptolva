@@ -219,6 +219,7 @@ test('emergencias exigen propietario y esquema válido sin alterar otros reporte
     payload: { descripcion: 'Falla en ruta', gps: { lat: 0, lng: 0, accuracy: 10, capturedAt: new Date().toISOString() }, fotoBase64: null }
   });
   const report = makeReport(0, ids[0]);
+  Object.assign(report.payload, { tolva1: 'T-1', dolly: 'D-1', tolva2: 'T-2', km: '123456' });
   const ref = clients.map(({ db }) => doc(db, 'bitacora_reports', ids[0]));
   await setDoc(ref[0], report);
   await setDoc(ref[0], { synced_at: new Date().toISOString() }, { merge: true });
@@ -234,6 +235,19 @@ test('emergencias exigen propietario y esquema válido sin alterar otros reporte
   await assert.rejects(setDoc(doc(clients[1].db, 'bitacora_reports', `invalid-${appId}`), {
     ...report, id: `invalid-${appId}`, owner_uid: users[1].uid, payload: { ...report.payload, fotoBase64: 'x'.repeat(600001) }
   }));
+  for (const payload of [
+    { ...report.payload, tolva1: 1 },
+    { ...report.payload, dolly: 'x'.repeat(101) },
+    { ...report.payload, tolva2: null },
+    { ...report.payload, km: '-1' },
+    { ...report.payload, km: '1'.repeat(31) },
+    { ...report.payload, extra: 'no permitido' }
+  ]) {
+    await assert.rejects(setDoc(doc(clients[1].db, 'bitacora_reports', `invalid-${appId}`), {
+      ...report, id: `invalid-${appId}`, owner_uid: users[1].uid, payload
+    }), { code: 'permission-denied' });
+  }
+  await assert.rejects(setDoc(ref[0], { payload: { ...report.payload, km: 'no válido' } }, { merge: true }), { code: 'permission-denied' });
   const panel = query(collection(clients[4].db, 'bitacora_reports'),
     where('report_type', '==', 'emergencia'), where('created_at', '>=', '2000'),
     orderBy('created_at', 'desc'));
@@ -272,7 +286,9 @@ test('emergencias exigen propietario y esquema válido sin alterar otros reporte
     if (entry.exists() && entry.metadata.hasPendingWrites) localReady();
   }, localError);
   cancelaciones.push(cancelarOffline);
-  const offlineWrite = setDoc(offlineRef, makeReport(0, ids[3]));
+  const offlineReport = makeReport(0, ids[3]);
+  Object.assign(offlineReport.payload, { tolva1: 'T-1', dolly: '', tolva2: 'T-2', km: '123456' });
+  const offlineWrite = setDoc(offlineRef, offlineReport);
   await localPending;
   clearTimeout(offlineTimeout);
   cancelarOffline();
