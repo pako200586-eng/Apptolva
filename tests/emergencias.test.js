@@ -6,9 +6,9 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('../apptolva_bitacora/js/emergencias.js', import.meta.url), 'utf8')
   .replace(/^import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];\s*/gm, '');
 const emergencia = readFileSync(new URL('../apptolva_bitacora/emergencia.html', import.meta.url), 'utf8');
-const payloadSource = emergencia.slice(emergencia.indexOf('function construirPayload()'), emergencia.indexOf('function obtenerUbicacionActual()'));
+const payloadSource = emergencia.slice(emergencia.indexOf('function construirPayload()'), emergencia.indexOf('function textoFalla('));
 
-function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = null, storage = {} } = {}) {
+function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = null, storage = {}, errorRespaldo = false } = {}) {
   const elementos = Object.fromEntries([
     'btnRegistrarEmergencia', 'fallaSaveStatus', 'fallaOperador', 'fallaUnidad', 'fallaDesc',
     'fallaTolva1', 'fallaDolly', 'fallaTolva2', 'fallaKm',
@@ -19,12 +19,13 @@ function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = 
   const escritos = [];
   const respaldos = new Map();
   const callbacks = [];
+  const avisos = [];
   let confirmar;
   let rechazar;
   const escritura = new Promise((resolve, reject) => { confirmar = resolve; rechazar = reject; });
   const auth = { currentUser: user };
   const window = {
-    obtenerUbicacionActual: async () => ({ lat: 0, lng: 0, accuracy: 10, capturedAt: '2026-01-01T00:00:00.000Z' }),
+    abrirWhatsappFalla: (payload) => avisos.push(payload),
     limpiarFotoEmergencia() {}
   };
   const context = vm.createContext({
@@ -34,17 +35,25 @@ function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = 
     initializeFirestore: () => ({}), persistentLocalCache: () => ({}), persistentMultipleTabManager: () => ({}),
     onAuthStateChanged: (_, callback) => callback(user),
     collection: () => ({}), doc: (...args) => ({ id: args.length === 1 ? 'unico' : args[2] }),
-    onSnapshot: (_, __, next, error) => { callbacks.push({ next, error }); return () => {}; },
+    query: (_, ...filtros) => ({ filtros }), where: (...args) => args,
+    onSnapshot: (ref, __, next, error) => { callbacks.push({ ref, next, error }); return () => {}; },
     setDoc: (_, data) => { escritos.push(data); return escritura; },
     validarEspacio() {}, leerPerfil: () => ({ nombre: 'Operador', rol: 'operador' }),
     listarRespaldosReportes: () => [...respaldos.values()],
-    guardarRespaldoReporte: (_, __, ___, data) => respaldos.set(data.id, data),
+    guardarRespaldoReporte: (_, __, ___, data) => {
+      if (errorRespaldo) throw new Error('Sin espacio');
+      respaldos.set(data.id, data);
+    },
     borrarRespaldoReporte: (_, __, ___, data) => respaldos.delete(data.id)
   });
   context.foto = foto;
-  vm.runInContext(`let fallaUbicacion = null; let fallaFotoBase64 = foto; ${payloadSource}; window.construirPayload = construirPayload;`, context);
+  vm.runInContext(`let fallaUbicacion = { lat: 0, lng: 0, accuracy: 10, capturedAt: '2026-01-01T00:00:00.000Z' }; let fallaFotoBase64 = foto; ${payloadSource}; window.construirPayload = construirPayload;`, context);
   vm.runInContext(source, context);
-  return { window, elementos, escritos, respaldos, callbacks, confirmar, rechazar };
+  return { window, elementos, escritos, respaldos, callbacks, avisos, confirmar, rechazar };
+}
+
+function instantanea(meta, id = 'unico') {
+  return { docs: [{ id, exists: () => true, metadata: meta }] };
 }
 
 test('sin sesión no permite registrar', () => {
@@ -62,6 +71,11 @@ test('registra una sola foto y muestra pendiente hasta la confirmación real', a
   env.elementos.fallaTolva2.value = ' t-2 ';
   env.elementos.fallaKm.value = ' 123456 ';
   const registro = env.window.registrarEmergenciaEnSistema();
+  assert.equal(env.avisos.length, 1);
+  assert.equal(env.escritos.length, 1);
+  assert.deepEqual(env.callbacks[0].ref.filtros.map((f) => [...f]), [
+    ['owner_uid', '==', 'operador'], ['id', '==', 'unico']
+  ]);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(env.escritos.length, 1);
   assert.equal(env.escritos[0].payload.gps.lat, 0);
@@ -74,7 +88,7 @@ test('registra una sola foto y muestra pendiente hasta la confirmación real', a
   assert.equal(env.escritos[0].payload.km, '123456');
   assert.equal(env.respaldos.get('unico').payload.km, '123456');
   assert.equal(env.respaldos.size, 1);
-  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: true, fromCache: true } });
+  env.callbacks[0].next(instantanea({ hasPendingWrites: true, fromCache: true }));
   await registro;
   assert.match(env.elementos.fallaSaveStatus.textContent, /pendiente/);
   assert.equal(env.elementos.fallaUnidad.value, '');
@@ -83,10 +97,10 @@ test('registra una sola foto y muestra pendiente hasta la confirmación real', a
   assert.equal(env.elementos.fallaTolva2.value, '');
   assert.equal(env.elementos.fallaKm.value, '');
   assert.equal(env.elementos.fallaOperador.value, '  operador editado ');
-  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: false, fromCache: true } });
+  env.callbacks[0].next(instantanea({ hasPendingWrites: false, fromCache: true }));
   assert.equal(env.respaldos.size, 1);
   env.confirmar();
-  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: false, fromCache: false } });
+  env.callbacks[0].next(instantanea({ hasPendingWrites: false, fromCache: false }));
   assert.equal(env.respaldos.size, 0);
   assert.match(env.elementos.fallaSaveStatus.textContent, /confirmada por el servidor/);
 });
@@ -103,6 +117,7 @@ test('rechaza kilometraje inválido sin crear respaldo ni escritura', async () =
   await env.window.registrarEmergenciaEnSistema();
   assert.equal(env.escritos.length, 0);
   assert.equal(env.respaldos.size, 0);
+  assert.equal(env.avisos.length, 0);
   assert.match(env.elementos.fallaSaveStatus.textContent, /solo dígitos/);
 });
 
@@ -121,8 +136,42 @@ test('rechazo del servidor conserva respaldo y evita un segundo registro', async
   env.rechazar(new Error('Permiso denegado'));
   await registro;
   assert.equal(env.respaldos.size, 1);
+  assert.equal(env.avisos.length, 1);
   assert.equal(env.elementos.btnRegistrarEmergencia.disabled, true);
   assert.match(env.elementos.fallaSaveStatus.textContent, /Reintenta el respaldo/);
+});
+
+test('si falla el respaldo aún abre WhatsApp e informa el error de registro', async () => {
+  const env = entorno({ errorRespaldo: true });
+  await env.window.registrarEmergenciaEnSistema();
+  assert.equal(env.avisos.length, 1);
+  assert.equal(env.escritos.length, 0);
+  assert.match(env.elementos.fallaSaveStatus.textContent, /Sin espacio/);
+});
+
+test('WhatsApp conserva contacto, mensaje y enlace alternativo si falla la apertura', () => {
+  const elementos = {
+    fallaContact: { value: '5211234567890' },
+    fallaWhatsappEnlace: { classList: { remove: (name) => { elementos.fallaWhatsappEnlace.visible = name === 'hidden'; } } },
+    fallaWhatsappInfo: { classList: { remove: (name) => { elementos.fallaWhatsappInfo.visible = name === 'hidden'; } } }
+  };
+  const context = vm.createContext({
+    document: { getElementById: (id) => elementos[id] },
+    window: { open: () => { throw new Error('Bloqueado'); } },
+    console: { error() {} },
+    encodeURIComponent
+  });
+  const inicio = emergencia.indexOf('function textoFalla(');
+  const fin = emergencia.indexOf('function copyFallaText()', inicio);
+  vm.runInContext(emergencia.slice(inicio, fin), context);
+  context.abrirWhatsappFalla({ unidad: '13817', descripcion: 'Falla', gps: { lat: 0, lng: 0 } });
+  const url = new URL(elementos.fallaWhatsappEnlace.href);
+  assert.equal(url.pathname, '/5211234567890');
+  assert.match(url.searchParams.get('text'), /Unidad: 13817/);
+  assert.match(url.searchParams.get('text'), /q=0,0/);
+  assert.equal(elementos.fallaWhatsappEnlace.visible, true);
+  assert.equal(elementos.fallaWhatsappInfo.visible, true);
+  assert.doesNotMatch(emergencia, /TURNO A: J\.M\. Pérez|TURNO B: Salas/);
 });
 
 const admin = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
@@ -180,7 +229,7 @@ test('la OT de emergencia conserva candado y prioridad sin duplicar la foto', as
   env.elementos.fallaKm.value = '123456';
   const registro = env.window.registrarEmergenciaEnSistema();
   await new Promise((resolve) => setImmediate(resolve));
-  env.callbacks[0].next({ exists: () => true, metadata: { hasPendingWrites: true, fromCache: true } });
+  env.callbacks[0].next(instantanea({ hasPendingWrites: true, fromCache: true }));
   await registro;
   const stored = new Map();
   const alerts = [];

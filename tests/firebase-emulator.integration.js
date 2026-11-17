@@ -229,7 +229,12 @@ test('emergencias exigen propietario y esquema válido sin alterar otros reporte
   const report = makeReport(0, ids[0]);
   Object.assign(report.payload, { tolva1: 'T-1', dolly: 'D-1', tolva2: 'T-2', km: '123456' });
   const ref = clients.map(({ db }) => doc(db, 'bitacora_reports', ids[0]));
+  await assert.rejects(getDoc(ref[0]), { code: 'permission-denied' });
+  const consultaPropia = query(collection(clients[0].db, 'bitacora_reports'),
+    where('owner_uid', '==', users[0].uid), where('id', '==', ids[0]));
+  assert.equal((await getDocs(consultaPropia)).size, 0);
   await setDoc(ref[0], report);
+  assert.equal((await getDocs(consultaPropia)).size, 1);
   await setDoc(ref[0], { synced_at: new Date().toISOString() }, { merge: true });
   assert.equal((await getDoc(ref[0])).data().payload.gps.lat, 0);
   await assert.rejects(getDoc(ref[1]), { code: 'permission-denied' });
@@ -290,8 +295,11 @@ test('emergencias exigen propietario y esquema válido sin alterar otros reporte
   const localPending = new Promise((resolve, reject) => { localReady = resolve; localError = reject; });
   const offlineTimeout = setTimeout(() => localError(new Error('No se confirmó la escritura local pendiente.')), 10000);
   temporizadores.push(offlineTimeout);
-  const cancelarOffline = onSnapshot(offlineRef, { includeMetadataChanges: true }, (entry) => {
-    if (entry.exists() && entry.metadata.hasPendingWrites) localReady();
+  const consultaOffline = query(collection(clients[0].db, 'bitacora_reports'),
+    where('owner_uid', '==', clients[0].auth.currentUser.uid), where('id', '==', ids[3]));
+  const cancelarOffline = onSnapshot(consultaOffline, { includeMetadataChanges: true }, (snapshot) => {
+    const entry = snapshot.docs.find((documento) => documento.id === ids[3]);
+    if (entry?.metadata.hasPendingWrites) localReady();
   }, localError);
   cancelaciones.push(cancelarOffline);
   const offlineReport = makeReport(0, ids[3]);

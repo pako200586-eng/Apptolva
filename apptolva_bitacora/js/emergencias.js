@@ -1,7 +1,7 @@
 import {
   getFirebaseConfig, initializeApp, getAuth, onAuthStateChanged,
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, onSnapshot, setDoc
+  collection, doc, onSnapshot, query, setDoc, where
 } from './firebase-sdk.js';
 import {
   borrarRespaldoReporte, guardarRespaldoReporte, leerPerfil,
@@ -22,13 +22,15 @@ function mostrarEstado(texto, color) {
 
 function observarReporte(data, user, alPendiente = () => {}, alError = () => {}) {
   if (observadores.has(data.id)) return;
-  const ref = doc(db, 'bitacora_reports', data.id);
+  const ref = user.isAnonymous ? doc(db, 'bitacora_reports', data.id) :
+    query(collection(db, 'bitacora_reports'), where('owner_uid', '==', user.uid), where('id', '==', data.id));
   const unsubscribe = onSnapshot(ref, { includeMetadataChanges: true }, (snap) => {
-    if (!snap.exists() || usuario?.uid !== user.uid) return;
-    if (snap.metadata.hasPendingWrites) {
+    const reporte = user.isAnonymous ? snap : snap.docs.find((entry) => entry.id === data.id);
+    if (!reporte?.exists() || usuario?.uid !== user.uid) return;
+    if (reporte.metadata.hasPendingWrites) {
       mostrarEstado('Guardado en este dispositivo; pendiente de sincronización con el servidor.', 'bg-amber-100 text-amber-700');
       alPendiente();
-    } else if (!snap.metadata.fromCache) {
+    } else if (!reporte.metadata.fromCache) {
       borrarRespaldoReporte(localStorage, projectId, user.uid, data);
       mostrarEstado(`Emergencia ${data.folio} confirmada por el servidor.`, 'bg-green-100 text-green-700');
       observadores.get(data.id)?.();
@@ -98,21 +100,16 @@ try {
     const user = usuario;
     const unidad = document.getElementById('fallaUnidad').value.trim().toUpperCase();
     const descripcion = document.getElementById('fallaDesc').value.trim();
-    if (!unidad || !descripcion) {
-      mostrarEstado('Escribe la unidad y describe la falla.', 'bg-red-100 text-red-700');
+    const operador = document.getElementById('fallaOperador').value.trim();
+    if (!operador || !unidad || !descripcion) {
+      mostrarEstado('Escribe el nombre del operador, la unidad y describe la falla.', 'bg-red-100 text-red-700');
       return;
     }
     button.disabled = true;
-    mostrarEstado('Obteniendo ubicación y preparando el registro...', 'bg-blue-100 text-blue-700');
+    mostrarEstado('Preparando el registro...', 'bg-blue-100 text-blue-700');
     let respaldoCreado = false;
     let bloquearReintento = false;
     try {
-      let gps;
-      try {
-        gps = await window.obtenerUbicacionActual();
-      } catch (error) {
-        console.warn('Se usará la ubicación capturada anteriormente, si está disponible:', error);
-      }
       if (auth.currentUser?.uid !== user.uid || usuario?.uid !== user.uid) {
         throw new Error('La sesión cambió. Vuelve al menú antes de registrar.');
       }
@@ -120,7 +117,7 @@ try {
       if (payload.km && !/^\d{1,30}$/.test(payload.km)) {
         throw new Error('El kilometraje debe contener solo dígitos.');
       }
-      const ubicacion = gps || payload.gps;
+      const ubicacion = payload.gps;
       const ref = doc(collection(db, 'bitacora_reports'));
       const data = {
         id: ref.id,
@@ -147,8 +144,12 @@ try {
       if ((data.payload.fotoBase64?.length || 0) > 600000 || new Blob([JSON.stringify(data)]).size > 800000) {
         throw new Error('La foto es demasiado grande. Selecciona una imagen más pequeña.');
       }
-      guardarRespaldoReporte(localStorage, projectId, user.uid, data);
-      respaldoCreado = true;
+      try {
+        guardarRespaldoReporte(localStorage, projectId, user.uid, data);
+        respaldoCreado = true;
+      } finally {
+        window.abrirWhatsappFalla(payload);
+      }
       let pendiente;
       let errorLocal;
       const guardadoLocal = new Promise((resolve, reject) => { pendiente = resolve; errorLocal = reject; });
