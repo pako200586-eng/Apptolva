@@ -112,12 +112,11 @@ export function perfilValido(data, nombreAlternativo = '') {
 }
 
 export function permisosMenu(user, profile) {
-  const accesoCompleto = ['frank@apptolva.com', 'omar_master@apptolva.com']
-    .includes(user?.email?.trim().toLowerCase());
+  const rolValido = ROLES.has(profile?.rol);
   return {
-    operacion: accesoCompleto || user?.isAnonymous === true || profile?.rol === 'operador',
-    panel: accesoCompleto || ['admin', 'master', 'lectura'].includes(profile?.rol),
-    evaluaciones: accesoCompleto || ['admin', 'evaluador'].includes(profile?.rolEvaluaciones)
+    operacion: rolValido || user?.isAnonymous === true,
+    panel: ['admin', 'master', 'lectura'].includes(profile?.rol),
+    evaluaciones: rolValido && ['admin', 'evaluador'].includes(profile?.rolEvaluaciones)
   };
 }
 

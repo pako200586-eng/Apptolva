@@ -1708,7 +1708,7 @@
                 document.querySelectorAll('[data-modulo-operador]').forEach((boton) => {
                     boton.classList.toggle('hidden', !permisos.operacion);
                 });
-                document.getElementById('titulo-menu').textContent = permisos.operacion ? 'Operador' : 'Supervisor';
+                document.getElementById('titulo-menu').textContent = user.isAnonymous || profile?.rol === 'operador' ? 'Operador' : 'Supervisor';
                 document.getElementById('login-overlay').style.display = 'none';
                 const office = document.getElementById('modulos-oficina');
                 office.replaceChildren();

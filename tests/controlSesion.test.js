@@ -19,29 +19,31 @@ function storage() {
   };
 }
 
-test('el menú separa operación y supervisión sin cambiar los permisos de evaluaciones', () => {
+test('el menú muestra operación a los roles válidos y respeta los permisos de supervisión y evaluaciones', () => {
   const normal = { isAnonymous: false };
   assert.deepEqual(permisosMenu(normal, { rol: 'operador' }),
     { operacion: true, panel: false, evaluaciones: false });
   assert.deepEqual(permisosMenu(normal, { rol: 'operador', rolEvaluaciones: 'evaluador' }),
     { operacion: true, panel: false, evaluaciones: true });
   assert.deepEqual(permisosMenu(normal, { rol: 'admin', rolEvaluaciones: 'admin' }),
-    { operacion: false, panel: true, evaluaciones: true });
+    { operacion: true, panel: true, evaluaciones: true });
   assert.deepEqual(permisosMenu(normal, { rol: 'master', rolEvaluaciones: 'evaluador' }),
-    { operacion: false, panel: true, evaluaciones: true });
+    { operacion: true, panel: true, evaluaciones: true });
   assert.deepEqual(permisosMenu(normal, { rol: 'lectura' }),
-    { operacion: false, panel: true, evaluaciones: false });
+    { operacion: true, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ ...normal, email: ' FRANK@APPTOLVA.COM ' }, { rol: 'master' }),
-    { operacion: true, panel: true, evaluaciones: true });
+    { operacion: true, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ ...normal, email: ' OMAR_MASTER@APPTOLVA.COM ' }, { rol: 'master' }),
-    { operacion: true, panel: true, evaluaciones: true });
+    { operacion: true, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ ...normal, email: 'omar_master@otro.com' }, { rol: 'master' }),
-    { operacion: false, panel: true, evaluaciones: false });
+    { operacion: true, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ ...normal, email: 'otra@apptolva.com' }, { rol: 'admin' }),
-    { operacion: false, panel: true, evaluaciones: false });
+    { operacion: true, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ isAnonymous: true }, null),
     { operacion: true, panel: false, evaluaciones: false });
   assert.deepEqual(permisosMenu(normal, null),
+    { operacion: false, panel: false, evaluaciones: false });
+  assert.deepEqual(permisosMenu(normal, { rol: 'invalido', rolEvaluaciones: 'admin' }),
     { operacion: false, panel: false, evaluaciones: false });
 });
 

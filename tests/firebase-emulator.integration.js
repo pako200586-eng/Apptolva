@@ -116,7 +116,7 @@ test('migración crea el perfil por correo y es reanudable en Auth y Firestore',
 });
 
 test('operadores autenticados solo consultan y modifican sus propios reportes', async (t) => {
-  const apps = ['a', 'b', 'master'].map((suffix) => initializeClientApp({
+  const apps = ['a', 'b', 'master', 'lectura'].map((suffix) => initializeClientApp({
     apiKey: 'demo-api-key', projectId: proyecto
   }, `route-${suffix}-${appId}`));
   const clients = apps.map((app) => {
@@ -129,9 +129,11 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
   const emails = clients.map((_, i) => `route-${i}-${appId}@example.test`);
   const users = [];
   const id = `route-report-${appId}`;
+  const idLectura = `route-reader-${appId}`;
   const historicos = ['inside', 'outside', 'future'].map((suffix) => `${id}-${suffix}`);
   t.after(async () => {
     await adminDb.collection('bitacora_reports').doc(id).delete();
+    await adminDb.collection('bitacora_reports').doc(idLectura).delete();
     for (const historico of historicos) await adminDb.collection('bitacora_reports').doc(historico).delete();
     for (const email of emails) await adminDb.collection('usuarios').doc(email).delete();
     for (const user of users) await adminAuth.deleteUser(user.uid);
@@ -142,7 +144,7 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
     const { user } = await createUserWithEmailAndPassword(clients[i].auth, emails[i], 'Emulator123!');
     users.push(user);
     await adminDb.collection('usuarios').doc(emails[i]).set({
-      rol: i === 2 ? 'master' : 'operador',
+      rol: i === 2 ? 'master' : (i === 3 ? 'lectura' : 'operador'),
       ...(i === 2 ? { rol_evaluaciones: 'evaluador' } : {})
     });
   }
@@ -179,6 +181,12 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
   await assert.rejects(getDocs(collection(clients[1].db, 'bitacora_reports')), { code: 'permission-denied' });
   assert.equal((await getDoc(reference[2])).exists(), true);
   await assert.rejects(setDoc(reference[2], report));
+  const refLectura = doc(clients[3].db, 'bitacora_reports', idLectura);
+  const reporteLectura = { ...report, id: idLectura, owner_uid: users[3].uid };
+  await setDoc(refLectura, reporteLectura);
+  assert.equal((await getDoc(refLectura)).data().owner_uid, users[3].uid);
+  await setDoc(refLectura, { synced_at: new Date().toISOString() }, { merge: true });
+  await assert.rejects(setDoc(reference[3], { synced_at: new Date().toISOString() }, { merge: true }), { code: 'permission-denied' });
 });
 
 test('emergencias exigen propietario y esquema válido sin alterar otros reportes', async (t) => {
