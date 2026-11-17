@@ -71,8 +71,6 @@
             <p id="fallaSaveStatus" role="status" aria-live="polite" class="text-center text-xs font-bold mt-3 p-2 rounded">Comprobando sesión...</p>
             <a id="fallaWhatsappEnlace" target="_blank" rel="noopener noreferrer" class="hidden block w-full mt-3 bg-green-700 text-white text-center font-bold py-3 rounded">ABRIR WHATSAPP SI NO SE ABRIÓ</a>
             <p id="fallaWhatsappInfo" class="hidden text-center text-xs text-slate-700 mt-2">Confirma el envío en WhatsApp. Si tomaste una foto, adjúntala allí manualmente.</p>
-            <button onclick="copyFallaText()" class="w-full mt-3 bg-blue-600 text-white font-bold py-2 rounded">COPIAR PARA GRUPO</button>
-            <p id="copyOk" class="hidden text-center text-xs font-bold text-green-700 mt-2">¡Copiado!</p>
         </section>
     </main>
 
@@ -170,13 +168,6 @@ function abrirWhatsappFalla(payload) {
     } catch (error) {
         console.error('No se pudo abrir WhatsApp:', error);
     }
-}
-function copyFallaText() {
-    navigator.clipboard.writeText(textoFalla()).then(() => {
-        const ok = document.getElementById('copyOk');
-        ok.classList.remove('hidden');
-        setTimeout(() => ok.classList.add('hidden'), 2500);
-    }).catch(() => alert('No se pudo copiar el reporte.'));
 }
 iniciarCapturaFalla();
 </script>

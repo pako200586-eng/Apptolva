@@ -162,7 +162,7 @@ test('WhatsApp conserva contacto, mensaje y enlace alternativo si falla la apert
     encodeURIComponent
   });
   const inicio = emergencia.indexOf('function textoFalla(');
-  const fin = emergencia.indexOf('function copyFallaText()', inicio);
+  const fin = emergencia.indexOf('iniciarCapturaFalla();', inicio);
   vm.runInContext(emergencia.slice(inicio, fin), context);
   context.abrirWhatsappFalla({ unidad: '13817', descripcion: 'Falla', gps: { lat: 0, lng: 0 } });
   const url = new URL(elementos.fallaWhatsappEnlace.href);
