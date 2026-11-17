@@ -33,6 +33,10 @@ test('el menú separa operación y supervisión sin cambiar los permisos de eval
     { operacion: false, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ ...normal, email: ' FRANK@APPTOLVA.COM ' }, { rol: 'master' }),
     { operacion: true, panel: true, evaluaciones: true });
+  assert.deepEqual(permisosMenu({ ...normal, email: ' OMAR_MASTER@APPTOLVA.COM ' }, { rol: 'master' }),
+    { operacion: true, panel: true, evaluaciones: true });
+  assert.deepEqual(permisosMenu({ ...normal, email: 'omar_master@otro.com' }, { rol: 'master' }),
+    { operacion: false, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ ...normal, email: 'otra@apptolva.com' }, { rol: 'admin' }),
     { operacion: false, panel: true, evaluaciones: false });
   assert.deepEqual(permisosMenu({ isAnonymous: true }, null),
