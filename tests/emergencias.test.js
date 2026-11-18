@@ -218,6 +218,62 @@ test('el reporte no envía ubicación caducada y conserva el aviso de emergencia
   assert.match(status.textContent, /antigua/);
 });
 
+test('el visor genera PDFs distintos y conserva los datos de cada reporte', async () => {
+  globalThis.self = globalThis;
+  await import('../apptolva_bitacora/js/jspdf.min.js');
+  const viewer = readFileSync(new URL('../apptolva_bitacora/viewer.html', import.meta.url), 'utf8');
+  const checklist = readFileSync(new URL('../apptolva_bitacora/js/checklistPdf.js', import.meta.url), 'utf8');
+  const script = viewer.slice(viewer.indexOf('        const OCHO_HORAS_MS'), viewer.lastIndexOf('    </script>'))
+    .replace('        cargarBitacora();', '');
+  const context = vm.createContext({
+    jspdf: globalThis.jspdf, fetch: async () => ({ ok: false }),
+    console, setTimeout, URLSearchParams
+  });
+  context.window = context;
+  vm.runInContext(checklist, context);
+  vm.runInContext(script, context);
+  const foto = readFileSync(new URL('../apptolva_bitacora/img/logo-bachoco.jpg', import.meta.url)).toString('base64');
+  const emergenciaData = context.normalizarReporte({
+    report_type: 'emergencia', folio: 'EMG-123', unit_id: '14123', driver_name: 'OPERADOR PRUEBA',
+    created_at: '2026-11-18T00:16:50.223Z',
+    payload: { descripcion: 'Falla de frenos', km: '456', tolva1: '11',
+      gps: { lat: 18.1, lng: -94.2, accuracy: 80, capturedAt: '2026-11-18T00:16:00.000Z' }, fotoBase64: foto }
+  });
+  const pdfEmergencia = await context.generarPDF(emergenciaData);
+  const contenido = pdfEmergencia.output();
+  assert.equal(pdfEmergencia._docTipo, 'emergencia');
+  for (const texto of ['REPORTE DE FALLA / EMERGENCIA', 'EMG-123', 'OPERADOR PRUEBA', '14123', 'Falla de frenos', '18.100000', '456']) {
+    assert.ok(contenido.includes(texto), `Falta ${texto} en el PDF`);
+  }
+  assert.match(contenido, /\/Subtype \/Image/);
+  assert.doesNotMatch(contenido, /BITÁCORA DE HORAS DE SERVICIO/);
+
+  const pdfChecklist = await context.generarPDF({
+    reportType: 'checklist', folio: 'F-123', driverName: 'OPERADOR',
+    checklistData: [{ id: 'tracto', titulo: 'TRACTO', categorias: [] }]
+  });
+  assert.equal(pdfChecklist._docTipo, 'checklist');
+  assert.match(pdfChecklist.output(), /TRACTO/);
+  const pdfBitacora = await context.generarPDF({ reportType: 'bitacora', folio: 'FB123', logs: [] });
+  assert.equal(pdfBitacora._docTipo, 'bitacora');
+  assert.match(pdfBitacora.output(), /NOM-087/);
+  await assert.rejects(context.generarPDF({ reportType: 'desconocido' }), /tipo de reporte/);
+});
+
+test('el PDF de emergencia pagina descripciones largas y no inventa ubicación', async () => {
+  globalThis.self = globalThis;
+  await import('../apptolva_bitacora/js/jspdf.min.js');
+  const viewer = readFileSync(new URL('../apptolva_bitacora/viewer.html', import.meta.url), 'utf8');
+  const context = vm.createContext({ window: { jspdf: globalThis.jspdf }, console });
+  const gps = viewer.slice(viewer.indexOf('        function formatGps('), viewer.indexOf('        function getActivityStatus('));
+  const generator = viewer.slice(viewer.indexOf('        function generarPDFEmergencia('), viewer.indexOf('        async function generarPDF('));
+  vm.runInContext(gps + generator, context);
+  const pdf = context.generarPDFEmergencia({ folio: 'EMG-1', descripcion: 'WWWWWWWWW '.repeat(380), gps: null });
+  assert.ok(pdf.getNumberOfPages() > 1);
+  assert.match(pdf.output(), /No disponible/);
+  assert.doesNotMatch(pdf.output(), /maps\.google\.com/);
+});
+
 const admin = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
 
 function extract(start, end) {

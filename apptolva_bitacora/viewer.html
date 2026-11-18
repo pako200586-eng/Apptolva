@@ -103,8 +103,10 @@
 
     <div id="status-box">
         <div class="spinner" id="spinner"></div>
-        <div id="status-title">Cargando reporte…</div>
-        <div id="status-msg">Obteniendo datos del servidor, por favor espera.</div>
+        <div role="status" aria-live="polite">
+            <div id="status-title">Cargando reporte…</div>
+            <div id="status-msg">Obteniendo datos del servidor, por favor espera.</div>
+        </div>
         <button id="download-btn" onclick="descargarPDF()">⬇️ Descargar PDF</button>
     </div>
 
@@ -130,9 +132,13 @@
         }
 
         function detectarTipo(data) {
-            const t = String(data.reportType || data.tipo || data.report_type || '').toLowerCase();
+            const t = String(data.report_type || data.reportType || data.tipo || '').trim().toLowerCase();
+            if (/emergencia|falla/.test(t)) return 'emergencia';
             if (/(check|revis|inspec)/.test(t)) return 'checklist';
-            return 'bitacora';
+            if (/bit[aá]cora/.test(t)) return 'bitacora';
+            if (!t && Array.isArray(data.checklistData)) return 'checklist';
+            if (!t && Array.isArray(data.logs)) return 'bitacora';
+            throw new Error('El tipo de reporte no está disponible o no es compatible.');
         }
 
         function formatGps(gps) {
@@ -488,14 +494,74 @@
             return doc;
         }
 
+        function generarPDFEmergencia(data) {
+            if (!window.jspdf) throw new Error('Librería PDF no disponible.');
+            const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            let y = 18;
+            const nuevaLinea = (texto, bold = false) => {
+                doc.setFont('helvetica', bold ? 'bold' : 'normal');
+                doc.setFontSize(bold ? 11 : 10);
+                for (const linea of doc.splitTextToSize(String(texto), 180)) {
+                    if (y > 278) { doc.addPage(); y = 18; }
+                    doc.text(linea, 15, y);
+                    y += 6;
+                }
+            };
+            const valor = (v) => v === null || v === undefined || v === '' ? 'No registrado' : String(v);
+            nuevaLinea('REPORTE DE FALLA / EMERGENCIA', true);
+            y += 3;
+            nuevaLinea(`Folio: ${valor(data.folio)}`);
+            nuevaLinea(`Fecha de registro: ${valor(data.createdAt || data.fecha)}`);
+            nuevaLinea(`Operador: ${valor(data.driverName || data.operador)}`);
+            nuevaLinea(`Unidad: ${valor(data.unitId || data.unidad)}`);
+            nuevaLinea(`Tolva 1: ${valor(data.tolva1)}   Dolly: ${valor(data.dolly)}   Tolva 2: ${valor(data.tolva2)}`);
+            nuevaLinea(`Kilometraje: ${valor(data.km)}`);
+            y += 3;
+            nuevaLinea('Descripción:', true);
+            nuevaLinea(valor(data.descripcion));
+            y += 3;
+            nuevaLinea('Ubicación aproximada:', true);
+            const gps = data.gps;
+            if (gps && Number.isFinite(gps.lat) && gps.lat >= -90 && gps.lat <= 90 &&
+                Number.isFinite(gps.lng) && gps.lng >= -180 && gps.lng <= 180) {
+                nuevaLinea(formatGps(gps));
+                nuevaLinea(`Capturada: ${valor(gps.capturedAt)}`);
+                nuevaLinea(`Mapa: https://maps.google.com/?q=${gps.lat},${gps.lng}`);
+            } else {
+                nuevaLinea('No disponible');
+            }
+            if (data.fotoBase64) {
+                if (y > 165) { doc.addPage(); y = 18; }
+                y += 3;
+                nuevaLinea('Foto de evidencia:', true);
+                try {
+                    const imagen = `data:image/jpeg;base64,${data.fotoBase64}`;
+                    const dimensiones = doc.getImageProperties(imagen);
+                    const escala = Math.min(180 / dimensiones.width, 100 / dimensiones.height);
+                    doc.addImage(imagen, 'JPEG', 15, y, dimensiones.width * escala, dimensiones.height * escala);
+                } catch (error) {
+                    console.error('No se pudo incluir la foto de evidencia:', error);
+                    nuevaLinea('No se pudo incluir la foto de evidencia.');
+                }
+            }
+            doc._docTipo = 'emergencia';
+            return doc;
+        }
+
         async function generarPDF(data) {
-            return detectarTipo(data) === 'checklist' ? await generarPDFChecklist(data) : generarPDFBitacora(data);
+            switch (detectarTipo(data)) {
+                case 'checklist': return generarPDFChecklist(data);
+                case 'bitacora': return generarPDFBitacora(data);
+                case 'emergencia': return generarPDFEmergencia(data);
+                default: throw new Error('Tipo de reporte no compatible.');
+            }
         }
 
         function descargarPDF() {
             if (!pdfDoc) return;
             const folio = pdfDoc._bitacoraFolio || "PDF";
-            const prefijo = pdfDoc._docTipo === 'checklist' ? 'Checklist' : 'Bitacora';
+            const prefijo = { checklist: 'Checklist', bitacora: 'Bitacora', emergencia: 'Emergencia' }[pdfDoc._docTipo];
+            if (!prefijo) { showError('Tipo de reporte no compatible para descargar.'); return; }
             pdfDoc.save(`${prefijo}_${folio.replace(/[\\/]/g, '-')}.pdf`);
         }
 
@@ -503,23 +569,42 @@
             const firebaseSdk = await import("./js/firebase-sdk.js");
             const { getFirebaseConfig, initializeApp } = firebaseSdk;
             const { getAuth, signInAnonymously } = firebaseSdk;
-            const { getFirestore, doc, getDoc } = firebaseSdk;
+            const { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc } = firebaseSdk;
             const firebaseConfig = getFirebaseConfig();
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             await auth.authStateReady();
             if (!auth.currentUser) await signInAnonymously(auth);
 
-            const db = getFirestore(app);
+            const db = initializeFirestore(app, {
+                localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+            });
+            const rawBackup = localStorage.getItem(`apptolva_pending_firestore_backup_${id}`);
+            if (rawBackup) {
+                const backup = JSON.parse(rawBackup);
+                if (backup.projectId === firebaseConfig.projectId && backup.uid === auth.currentUser.uid &&
+                    backup.data?.id === id && backup.data.owner_uid === auth.currentUser.uid) {
+                    return { ...normalizarReporte(backup.data), avisoVisor: 'Respaldo local pendiente de confirmación del servidor.' };
+                }
+            }
             const snapshot = await getDoc(doc(db, "bitacora_reports", id));
             if (!snapshot.exists()) return null;
+            return {
+                ...normalizarReporte(snapshot.data()),
+                avisoVisor: snapshot.metadata.hasPendingWrites
+                    ? 'Guardado localmente; pendiente de confirmación del servidor.'
+                    : snapshot.metadata.fromCache ? 'Mostrando datos disponibles en el dispositivo.' : ''
+            };
+        }
 
-            const stored = snapshot.data();
+        function normalizarReporte(stored) {
             const payload = stored.payload && typeof stored.payload === "object" ? stored.payload : stored;
             return {
                 ...payload,
                 folio: stored.folio || payload.folio,
+                report_type: stored.report_type || payload.report_type,
                 reportType: stored.report_type || payload.reportType,
+                createdAt: stored.created_at || payload.createdAt,
                 unitId: stored.unit_id || payload.unitId,
                 driverName: stored.driver_name || payload.driverName,
                 employeeNumber: stored.employee_number || payload.employeeNumber,
@@ -531,20 +616,7 @@
         }
 
         async function obtenerDatosReporte(id) {
-            try {
-                const localKey = Object.keys(localStorage).find(k => k.includes(id));
-                if (localKey) {
-                    const localData = JSON.parse(localStorage.getItem(localKey));
-                    if (localData) return localData.payload || localData;
-                }
-            } catch (e) {}
-
-            try {
-                const rep = await obtenerReporteFirestore(id);
-                if (rep) return rep;
-            } catch (e) {}
-
-            return null;
+            return obtenerReporteFirestore(id);
         }
 
         async function cargarBitacora() {
@@ -567,9 +639,17 @@
                 if (tipo === 'checklist') {
                     document.title = 'Check List de Revisión Diaria | AppTolva';
                     document.getElementById('viewer-heading').textContent = '📋 Check List de Revisión Diaria';
+                    document.getElementById('viewer-info').textContent = 'Check List de Revisión Diaria';
+                } else if (tipo === 'emergencia') {
+                    document.title = 'Reporte de emergencia | AppTolva';
+                    document.getElementById('viewer-heading').textContent = '🚨 Reporte de falla / emergencia';
+                    document.getElementById('viewer-info').textContent = 'Reporte de falla / emergencia';
                 } else {
                     document.title = 'Bitácora NOM-087 | AppTolva';
                     document.getElementById('viewer-heading').textContent = '📋 Bitácora Oficial NOM-087';
+                }
+                if (data.avisoVisor) {
+                    document.getElementById('viewer-info').append(document.createTextNode(` — ${data.avisoVisor}`));
                 }
 
                 setStatus("Generando documento oficial…", "Construyendo el PDF para exhibición, un momento…", false);
@@ -589,6 +669,7 @@
 
                 frame.onerror = () => showDownloadFallback();
             } catch (err) {
+                console.error('No se pudo cargar el reporte:', err);
                 showError("No se pudo cargar el reporte: " + err.message);
             }
         }
