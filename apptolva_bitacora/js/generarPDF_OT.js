@@ -123,8 +123,9 @@
       ? window.etiquetasOT.descripcionConEconomicos(descripcion, payload)
       : descripcion;
 
+    const esEmergencia = ordenData.tipo_reporte === 'emergencia' || /^EMG-/i.test(texto(ordenData.folio_ot));
     return {
-      folioOT: ordenData.folio_ot ? `OT-${ordenData.folio_ot}` : (pick('folio') || 'S/F'),
+      folioOT: ordenData.folio_ot ? window.etiquetasOT.folioOrden(ordenData) : (pick('folio') || 'S/F'),
       unidad: pick('unidad'),
       operador: pick('operador'),
       electromecanico: pick('electromecanico'),
@@ -132,7 +133,7 @@
       tolva1: pick('tolva1'),
       tolva2: pick('tolva2'),
       dolly: pick('dolly'),
-      folioCheckList: pick('folio_bitacora', 'folio_checklist', 'reporte_folio') || 'S/F',
+      folioCheckList: esEmergencia ? 'N/A' : (pick('folio_bitacora', 'folio_checklist', 'reporte_folio') || 'S/F'),
       fechaSolicitud: formatearFecha(ordenData.fecha_apertura || payload.fecha),
       fechaRealizacion: formatearFechaCorta(pick('fecha_realizacion')),
       kilometraje: pick('kilometraje', 'km'),
@@ -248,7 +249,11 @@
     etiqueta('UNIDAD', X0, f1.y, X1 - X0, f1.h);
     valor(datos.unidad, X1, f1.y, X2 - X1, f1.h, { negrita: true, tamano: 8 });
     etiqueta('FOLIO ORDEN TRABAJO', X2, f1.y, X3 - X2, f1.h, { sinRelleno: true, vAlign: 'bottom' });
-    valor(datos.folioOT, X3, f1.y, XF - X3, f1.h, { grosor: 0.5, bordeColor: COLORES.negro, negrita: true, tamano: 9, color: [200, 30, 30], align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    const anchoFolio = doc.getTextWidth(datos.folioOT);
+    const tamanoFolio = anchoFolio > XF - X3 - 1.6 ? 8.9 * (XF - X3 - 1.6) / anchoFolio : 9;
+    valor(datos.folioOT, X3, f1.y, XF - X3, f1.h, { grosor: 0.5, bordeColor: COLORES.negro, negrita: true, tamano: tamanoFolio, color: [200, 30, 30], align: 'center' });
 
     etiqueta('NOMBRE DEL OPERADOR', X0, f2.y, X1 - X0, f2.h);
     valor(datos.operador, X1, f2.y, X2 - X1, f2.h);

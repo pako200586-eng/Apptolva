@@ -6,6 +6,10 @@ import { claveAgrupacionEquipo, clavePosibleDuplicado, coberturaFallaReporte, cr
 import { calcularAlertasSeguridad } from '../apptolva_bitacora/js/alertasSeguridad.js';
 import { extraerFallasReporte, idCobertura } from '../netlify/functions/cerrar-fallas-repetidas.js';
 
+const etiquetasContext = { window: {} };
+runInNewContext(readFileSync(new URL('../apptolva_bitacora/js/etiquetasOT.js', import.meta.url), 'utf8'), etiquetasContext);
+const etiquetasOT = etiquetasContext.window.etiquetasOT;
+
 test('normalizes accents, case, and spacing while preserving equipment identity', () => {
   const first = crearFirmaFalla({
     unidad: ' tolva-02 ',
@@ -268,6 +272,7 @@ test('recurrences show each fault coverage instead of an unrelated report order'
     [`r2|${firma}`, { estado: 'DESCARTADA' }]
   ]);
   const calcular = runInNewContext(`${html.slice(inicio, fin)}; calcularFallasRecurrentes`, {
+    window: { etiquetasOT },
     dashState: { ordenes, coberturas }, indiceOrdenesPanel: () => indice,
     numerosEconomicos: () => ({ tracto: '14132' }),
     fallasPorComponente: () => ({ tracto: [{ categoria: 'INTERIOR', item: 'Asientos' }] }),
@@ -295,6 +300,7 @@ test('recurrences group reordered free notes and show their individual states', 
   const firma = crearFirmaFalla({ unidad: '14096', componente: 'tolva2', sistema: 'GENERAL / REVISIÓN TALLER', item: 'Motor de arrastre tira aceite' });
   const indice = indiceOrdenesFalla([{ ...orden, firmas: [firma] }], (ot) => ot.firmas, () => false);
   const calcular = runInNewContext(`${html.slice(inicio, fin)}; calcularFallasRecurrentes`, {
+    window: { etiquetasOT },
     dashState: { ordenes: [orden], coberturas: new Map() }, indiceOrdenesPanel: () => indice,
     numerosEconomicos: () => ({ tolva2: '14096' }),
     fallasPorComponente: (reporte) => ({ tolva2: [{
@@ -321,6 +327,7 @@ test('dashboard groups trailer positions and resolves them against the same open
   const orden = { id: 'ot1', folio_ot: 123, estatus: 'NUEVA', firmas: [firma] };
   const indice = indiceOrdenesFalla([orden], (ot) => ot.firmas, () => false);
   const calcular = runInNewContext(`${html.slice(inicio, fin)}; calcularFallasRecurrentes`, {
+    window: { etiquetasOT },
     dashState: { ordenes: [orden], coberturas: new Map() }, indiceOrdenesPanel: () => indice,
     numerosEconomicos: (reporte) => ({ [reporte.posicion]: '14107' }),
     fallasPorComponente: (reporte) => ({
@@ -356,7 +363,7 @@ test('canceling a possible duplicate stops OT creation', async () => {
     },
     ESTATUS_REALIZADA: new Set(['TERMINADA', 'CERRADA']), sinAcentos: (texto) => texto,
     firmasDeOrden: (orden) => orden.firmas, clavePosibleDuplicado, claveAgrupacionEquipo,
-    window: { confirm: (mensaje) => { aviso = mensaje; return false; } }
+    window: { etiquetasOT, confirm: (mensaje) => { aviso = mensaje; return false; } }
   });
   await crear([{ firma: seleccion, unidad: '14096', componenteKeyId: 'aceite arrastre motor tira', reportes: [{ reporte: { id: 'r1' } }] }]);
   assert.match(aviso, /OT-484/);
@@ -382,7 +389,7 @@ test('one OT for equivalent notes preserves each report coverage signature', asy
     idCoberturaFalla: async (id, firma) => `${id}|${firma}`,
     doc: (db, coleccion, id) => ({ coleccion, id }),
     runTransaction: async (db, fn) => fn({
-      get: async () => ({ exists: () => false, data: () => ({ folio_ot_actual: 164 }) }),
+      get: async () => ({ exists: () => false, data: () => ({ folio_ot_actual: 164, folio_ot: 169 }) }),
       set: (ref, data) => escrituras.push({ ref, data })
     }),
     window: { etiquetasOT: { etiquetaComponente: () => 'Tolva 2' } },
@@ -403,6 +410,8 @@ test('one OT for equivalent notes preserves each report coverage signature', asy
   assert.equal(coberturas[0].data.falla_key, primera);
   assert.equal(coberturas[1].data.falla_key, segunda);
   const orden = escrituras.find(({ ref }) => ref.coleccion === 'ordenes_trabajo').data;
+  assert.equal(orden.folio_ot, 170);
+  assert.equal(escrituras.find(({ ref }) => ref.coleccion === 'sistema').data.folio_ot_actual, 170);
   assert.equal(orden.unidad, '14096');
   assert.equal(orden.tractoAsociado, '14121');
   assert.equal(orden.payload.cobertura_falla_keys.length, 2);

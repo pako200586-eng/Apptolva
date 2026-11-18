@@ -1295,7 +1295,7 @@
 
         for (let indice = 0; indice < ordenes.length; indice += 1) {
           const orden = ordenes[indice];
-          showToast(`Depuración ${indice + 1}/${ordenes.length}: OT-${orden.folio_ot || ''}`);
+          showToast(`Depuración ${indice + 1}/${ordenes.length}: ${window.etiquetasOT.folioOrden(orden)}`);
           let resultado = await solicitarCierreBackend({
             action: 'retroactive-close',
             run_id: runId,
@@ -1738,6 +1738,7 @@
         return;
       }
       try {
+        const esEmergencia = orden.tipo_reporte === 'emergencia' || /^EMG-/i.test(String(orden.folio_ot || ''));
         const esFolioLegible = (valor) => {
           const folio = String(valor || '').trim();
           return folio && folio.length <= 20 ? folio : '';
@@ -1747,7 +1748,7 @@
           orden.reporte_folio,
           orden.folio_bitacora
         ].map(esFolioLegible).find(Boolean) || '';
-        if (!folioChecklist && orden.reporte_id) {
+        if (!esEmergencia && !folioChecklist && orden.reporte_id) {
           const reporte = [...(state.reports || []), ...(state.allReports || [])]
             .find((item) => String(item.id) === String(orden.reporte_id));
           folioChecklist = esFolioLegible(reporte?.folio || reporte?.payload?.folio);
@@ -1763,7 +1764,7 @@
           ...orden,
           folio_checklist: folioChecklist || ''
         };
-        showToast(`Generando PDF de OT-${orden?.folio_ot ?? ''}...`);
+        showToast(`Generando PDF de ${window.etiquetasOT.folioOrden(orden)}...`);
         await window.imprimirOT_Bachoco(ordenParaImprimir);
       } catch (error) {
         console.error('Error al generar PDF:', error);
@@ -1791,7 +1792,7 @@
             (Array.isArray(o.reportes_vinculados) && o.reportes_vinculados.includes(reporteId)))
           );
           if (existenteActiva) {
-            alert(`Esta incidencia ya cuenta con una OT activa en proceso (Folio: OT-${existenteActiva.folio_ot}, Estatus: ${existenteActiva.estatus}).`);
+            alert(`Esta incidencia ya cuenta con una OT activa en proceso (Folio: ${window.etiquetasOT.folioOrden(existenteActiva)}, Estatus: ${existenteActiva.estatus}).`);
             mostrarVistaOrdenes();
             abrirSeguimiento(existenteActiva);
             return;
@@ -1808,7 +1809,7 @@
 
         if (existenteEnNube) {
           if (Array.isArray(dashState.ordenes)) dashState.ordenes.unshift(existenteEnNube);
-          alert(`Esta incidencia ya cuenta con una OT activa en proceso (Folio: OT-${existenteEnNube.folio_ot}, Estatus: ${existenteEnNube.estatus}).`);
+          alert(`Esta incidencia ya cuenta con una OT activa en proceso (Folio: ${window.etiquetasOT.folioOrden(existenteEnNube)}, Estatus: ${existenteEnNube.estatus}).`);
           mostrarVistaOrdenes();
           abrirSeguimiento(existenteEnNube);
           return;
@@ -1823,6 +1824,9 @@
         const descripcion = fallas.map((f) => `${f.componente} | ${f.sistema || f.categoria}: ${f.descripcion || f.itemOficial}`).join('\n');
         const obsTexto = observaciones.map((o) => `${o.componente}: ${o.texto}`).join('\n');
         const reporteFolio = String(reporte.folio || reporte.payload?.folio || '').trim();
+        const esEmergencia = [reporte.report_type, reporte.type].some((tipo) => String(tipo || '').toLowerCase().trim() === 'emergencia')
+          || /^EMG-/i.test(reporteFolio);
+        if (esEmergencia && !reporteFolio) throw new Error('La emergencia no tiene folio; no se puede generar la OT.');
         const { fotoBase64, ...payloadOT } = reporte.payload || {};
 
         const refCandado = doc(db, 'ot_por_reporte', reporteId);
@@ -1849,17 +1853,22 @@
             }
           }
 
-          const snapContador = await transaction.get(refContador);
-          const maxFolioLocal = (dashState.ordenes || []).reduce((max, orden) => {
-            const folio = Number.parseInt(orden.folio_ot, 10);
-            return Number.isFinite(folio) ? Math.max(max, folio) : max;
-          }, 164);
-          const folioGuardado = Number(snapContador.data()?.folio_ot_actual) || 164;
-          const nuevoFolio = Math.max(maxFolioLocal, folioGuardado) + 1;
+          let nuevoFolio = reporteFolio;
+          if (!esEmergencia) {
+            const snapContador = await transaction.get(refContador);
+            const maxFolioLocal = (dashState.ordenes || []).reduce((max, orden) => {
+              if (orden.tipo_reporte === 'emergencia' || /^EMG-/i.test(String(orden.folio_ot || ''))) return max;
+              const folio = Number.parseInt(orden.folio_ot, 10);
+              return Number.isFinite(folio) ? Math.max(max, folio) : max;
+            }, 164);
+            const folioGuardado = Math.max(164, Number(snapContador.data()?.folio_ot_actual) || 0, Number(snapContador.data()?.folio_ot) || 0);
+            nuevoFolio = Math.max(maxFolioLocal, folioGuardado) + 1;
+          }
 
           const datosOT = {
             id: otId,
             folio_ot: nuevoFolio,
+            ...(esEmergencia ? { tipo_reporte: 'emergencia' } : {}),
             reporte_id: reporteId,
             folio_checklist: reporteFolio,
             reporte_folio: reporteFolio,
@@ -1879,12 +1888,12 @@
             fecha_realizacion: null,
             kilometraje: reporte.payload?.km || '',
             comentarios_ejecutor: '',
-            ...(reporte.type === 'emergencia' ? { prioridad: 'maxima' } : {}),
-            payload: { ...(reporte.type === 'emergencia' ? payloadOT : reporte.payload), fallas }
+            ...(esEmergencia ? { prioridad: 'maxima' } : {}),
+            payload: { ...(esEmergencia ? payloadOT : reporte.payload), fallas }
           };
 
           transaction.set(refCandado, { ot_id: otId, folio_ot: nuevoFolio, fecha: fechaActual });
-          transaction.set(refContador, { folio_ot_actual: nuevoFolio }, { merge: true });
+          if (!esEmergencia) transaction.set(refContador, { folio_ot_actual: nuevoFolio }, { merge: true });
           transaction.set(refOT, datosOT);
           transaction.set(refSeguimiento, {
             id: segId,
@@ -1911,7 +1920,7 @@
           return;
         }
         const ordenCreada = nuevaOT.orden;
-        alert(`OT generada con éxito en Firebase. Folio: OT-${ordenCreada.folio_ot}\nIncluye ${fallas.length} falla(s) de la unidad ${ordenCreada.unidad}.`);
+        alert(`OT generada con éxito en Firebase. Folio: ${window.etiquetasOT.folioOrden(ordenCreada)}\nIncluye ${fallas.length} falla(s) de la unidad ${ordenCreada.unidad}.`);
 
         if (Array.isArray(dashState.ordenes)) {
           dashState.ordenes.unshift(ordenCreada);
@@ -1919,7 +1928,7 @@
         renderDashboard();
         const resumenFallas = fallas.map((f) => `• <b>${escapeHtml(String(f.componente || ''))}</b>: ${escapeHtml(String(f.descripcion || f.itemOficial || ''))}`).join('\n');
         enviarAlertaTelegram(`🚨 <b>NUEVA ORDEN DE TRABAJO GENERADA</b>\n\n` +
-          `📋 <b>Folio:</b> OT-${escapeHtml(String(ordenCreada.folio_ot))}\n` +
+          `📋 <b>Folio:</b> ${escapeHtml(window.etiquetasOT.folioOrden(ordenCreada))}\n` +
           `🚛 <b>Unidad:</b> ${escapeHtml(String(ordenCreada.unidad))}\n` +
           `👤 <b>Operador:</b> ${escapeHtml(String(ordenCreada.operador))}\n` +
           `⚙️ <b>Componente:</b> ${escapeHtml(String(ordenCreada.componente))}\n` +
@@ -2208,7 +2217,7 @@
           const clave = clavePosibleDuplicado(firma) && claveAgrupacionEquipo(firma, true);
           if (!clave || !clavesSeleccionadas.has(clave)) return;
           const [unidad, componente, sistema, item] = JSON.parse(firma);
-          posiblesDuplicados.push(`OT-${orden.folio_ot || 's/n'} (${orden.estatus || 'NUEVA'}): ${unidad} · ${componente} · ${sistema} · ${item}`);
+          posiblesDuplicados.push(`${window.etiquetasOT.folioOrden(orden)} (${orden.estatus || 'NUEVA'}): ${unidad} · ${componente} · ${sistema} · ${item}`);
         });
       });
       if (posiblesDuplicados.length && !window.confirm(
@@ -2255,10 +2264,11 @@
 
         const contador = await transaction.get(refContador);
         const maxFolioLocal = (dashState.ordenes || []).reduce((max, orden) => {
+          if (orden.tipo_reporte === 'emergencia' || /^EMG-/i.test(String(orden.folio_ot || ''))) return max;
           const folio = Number.parseInt(orden.folio_ot, 10);
           return Number.isFinite(folio) ? Math.max(max, folio) : max;
         }, 164);
-        const folioGuardado = Number(contador.data()?.folio_ot_actual) || 164;
+        const folioGuardado = Math.max(164, Number(contador.data()?.folio_ot_actual) || 0, Number(contador.data()?.folio_ot) || 0);
         const nuevoFolio = Math.max(maxFolioLocal, folioGuardado) + 1;
         const datosOT = {
           id: otId,
@@ -2295,7 +2305,7 @@
           }
         };
 
-        transaction.set(refContador, { folio_ot: nuevoFolio }, { merge: true });
+        transaction.set(refContador, { folio_ot_actual: nuevoFolio }, { merge: true });
         transaction.set(refOT, datosOT);
         transaction.set(refSeguimiento, {
           id: segId,
@@ -2678,7 +2688,7 @@
           const fila = document.createElement('tr');
           fila.className = 'hover:bg-orange-50/70';
 
-          const folioOt = orden?.folio_ot || 'N/A';
+          const folioOt = window.etiquetasOT.folioOrden(orden);
           const unidad = orden?.unidad || 'N/A';
           const operador = orden?.operador || 'N/A';
           const fecha = orden?.fecha_apertura ? new Date(orden.fecha_apertura).toLocaleDateString('es-MX') : 'Sin fecha';
@@ -2749,13 +2759,13 @@
                     ot_id: otId,
                     estatus: nuevoEstatus
                   });
-                  resultado = await completarCierreBackend(resultado, `Cerrando OT-${orden.folio_ot || ''}`);
+                  resultado = await completarCierreBackend(resultado, `Cerrando ${window.etiquetasOT.folioOrden(orden)}`);
                   orden.cerrada_at = resultado.cerrada_at;
-                  showToast(`OT-${orden.folio_ot || ''} cerrada · ${resultado.incidencias_vinculadas || 0} falla(s) atendida(s)`);
+                  showToast(`${window.etiquetasOT.folioOrden(orden)} cerrada · ${resultado.incidencias_vinculadas || 0} falla(s) atendida(s)`);
                   const tallerTexto = orden.proveedor_externo || orden.electromecanico || orden.supervisor_mantenimiento || 'Flota Propia (PA Chapo)';
                   const totalCerrados = Array.isArray(orden.reportes_vinculados) ? orden.reportes_vinculados.length : (orden.recurrencia || 1);
                   enviarAlertaTelegram(`✅ <b>OT CONCLUIDA / REPARACIÓN DE TALLER</b>\n\n` +
-                    `📋 <b>OT-${escapeHtml(String(orden.folio_ot))}</b> (${escapeHtml(String(nuevoEstatus))})\n` +
+                    `📋 <b>${escapeHtml(window.etiquetasOT.folioOrden(orden))}</b> (${escapeHtml(String(nuevoEstatus))})\n` +
                     `🚛 <b>Unidad:</b> ${escapeHtml(String(orden.unidad))}\n` +
                     `🛠️ <b>Ejecutor / Taller:</b> ${escapeHtml(String(tallerTexto))}\n` +
                     `⚙️ <b>Sistema atendido:</b> ${escapeHtml(String(orden.sistema || 'General'))}\n` +
@@ -2832,7 +2842,7 @@
       ordenEnSeguimiento = orden;
       const form = $('segForm');
       const esAdmin = state.role === 'admin';
-      $('segTitulo').textContent = `Seguimiento de OT-${orden?.folio_ot ?? ''}`;
+      $('segTitulo').textContent = `Seguimiento de ${window.etiquetasOT.folioOrden(orden)}`;
       const etiquetas = window.etiquetasOT;
       const payloadOT = orden?.payload || {};
       const componentesOT = etiquetas.encabezadoComponentes(payloadOT) || orden?.componente || '';
@@ -2901,7 +2911,7 @@
             });
             resultado = await completarCierreBackend(
               resultado,
-              `Cerrando OT-${ordenEnSeguimiento.folio_ot || ''}`
+              `Cerrando ${window.etiquetasOT.folioOrden(ordenEnSeguimiento)}`
             );
             ordenEnSeguimiento.cerrada_at = resultado.cerrada_at;
           } else {
@@ -2921,7 +2931,7 @@
           }
           ordenEnSeguimiento.estatus = nuevoEstatus;
         }
-        showToast(`OT-${ordenEnSeguimiento?.folio_ot ?? ''} actualizada en Firebase`);
+        showToast(`${window.etiquetasOT.folioOrden(ordenEnSeguimiento)} actualizada en Firebase`);
 
         renderDashboard();
         if (generarPdf) await generarPDFOT(ordenEnSeguimiento);
@@ -3222,7 +3232,7 @@
             else if (detalle.estado === 'DESCARTADA') etiquetas = ['Descartada'];
             else if (detalle.ordenes.length) {
               etiquetas = detalle.ordenes.map((orden) =>
-                `OT-${orden.folio_ot || 's/n'} · ${orden.estatus || 'NUEVA'} (${detalle.estado === 'ATENDIDA' ? 'atendida' : 'asignada'})`);
+                `${window.etiquetasOT.folioOrden(orden)} · ${orden.estatus || 'NUEVA'} (${detalle.estado === 'ATENDIDA' ? 'atendida' : 'asignada'})`);
             } else {
               etiquetas = [`${detalle.estado === 'ATENDIDA' ? 'Atendida' : 'Asignada'} · OT ${detalle.otId ? 'no encontrada' : 'sin identificar'}`];
             }

@@ -7,6 +7,13 @@
     return String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
   }
 
+  function folioOrden(orden) {
+    const folio = String(orden?.folio_ot ?? '').trim();
+    if (!folio) return 'S/F';
+    if (orden?.tipo_reporte === 'emergencia' || /^EMG-/i.test(folio)) return folio;
+    return `OT-${folio}`;
+  }
+
   function claveComponente(etiqueta) {
     const t = normalizar(etiqueta);
     if (!t) return '';
@@ -60,7 +67,7 @@
       .join('');
   }
 
-  const api = { claveComponente, etiquetaComponente, encabezadoComponentes, descripcionConEconomicos };
+  const api = { folioOrden, claveComponente, etiquetaComponente, encabezadoComponentes, descripcionConEconomicos };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.etiquetasOT = api;
 })(typeof window !== 'undefined' ? window : globalThis);

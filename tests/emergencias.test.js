@@ -7,6 +7,9 @@ const source = readFileSync(new URL('../apptolva_bitacora/js/emergencias.js', im
   .replace(/^import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];\s*/gm, '');
 const emergencia = readFileSync(new URL('../apptolva_bitacora/emergencia.html', import.meta.url), 'utf8');
 const payloadSource = emergencia.slice(emergencia.indexOf('function construirPayload()'), emergencia.indexOf('function textoFalla('));
+const etiquetasContext = vm.createContext({ window: {} });
+vm.runInContext(readFileSync(new URL('../apptolva_bitacora/js/etiquetasOT.js', import.meta.url), 'utf8'), etiquetasContext);
+const etiquetasOT = etiquetasContext.window.etiquetasOT;
 
 function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = null, storage = {}, errorRespaldo = false } = {}) {
   const elementos = Object.fromEntries([
@@ -332,24 +335,28 @@ test('la OT de emergencia conserva candado y prioridad sin duplicar la foto', as
   env.callbacks[0].next(instantanea({ hasPendingWrites: true, fromCache: true }));
   await registro;
   const stored = new Map();
+  const lecturas = [];
   const alerts = [];
   let serial = 0;
   const context = vm.createContext({
-    state: { role: 'admin', user: { email: 'admin@example.test' } },
+    window: { etiquetasOT }, state: { role: 'admin', user: { email: 'admin@example.test' } },
     dashState: { ordenes: [] }, ESTATUS_REALIZADA: new Set(['TERMINADA', 'CERRADA']),
     sinAcentos: (v) => String(v || '').toUpperCase(),
     db: {}, crypto: { randomUUID: () => `uuid-${++serial}` },
     collection: (_, name) => name, fsQuery: (...args) => args, fsWhere: (...args) => args,
     getDocs: async () => ({ docs: [] }), doc: (_, collectionName, id) => `${collectionName}/${id}`,
     runTransaction: async (_, action) => action({
-      get: async (ref) => ({ exists: () => stored.has(ref), id: ref.split('/')[1], data: () => stored.get(ref) }),
+      get: async (ref) => {
+        lecturas.push(ref);
+        return { exists: () => stored.has(ref), id: ref.split('/')[1], data: () => stored.get(ref) };
+      },
       set: (ref, data) => stored.set(ref, data)
     }),
     alert: (text) => alerts.push(text), showToast: (text) => alerts.push(text),
     escapeHtml: (text) => String(text), formatDate: () => 'fecha',
     renderDashboard() {}, enviarAlertaTelegram() {}, generarPDFOT: async () => {},
     cargarFallas() {}, mostrarVistaOrdenes() {}, abrirSeguimiento() {},
-    normalizarFechaReporte: (d) => d.created_at, console
+    normalizarFechaReporte: (d) => d.created_at, console: { error() {} }
   });
   vm.runInContext(extract('    function convertirSnapshotReporte(', '    function resumenReportes('), context);
   vm.runInContext(extract('    async function crearOTDesdeReporte(', '    function tarjetaFallaHtml('), context);
@@ -359,10 +366,16 @@ test('la OT de emergencia conserva candado y prioridad sin duplicar la foto', as
   const orden = [...stored.entries()].find(([key]) => key.startsWith('ordenes_trabajo/'))[1];
   assert.equal(orden.prioridad, 'maxima');
   assert.equal(orden.payload.fotoBase64, undefined);
+  assert.equal(orden.folio_ot, 'EMG-unico');
+  assert.equal(stored.get('ot_por_reporte/unico').folio_ot, 'EMG-unico');
+  assert.equal(stored.has('sistema/contadores'), false);
+  assert.equal(lecturas.includes('sistema/contadores'), false);
   const pdf = readFileSync(new URL('../apptolva_bitacora/js/generarPDF_OT.js', import.meta.url), 'utf8');
-  const pdfContext = vm.createContext({ window: {}, SUPERVISOR_DEFAULT: 'Supervisor' });
+  const pdfContext = vm.createContext({ window: { etiquetasOT }, SUPERVISOR_DEFAULT: 'Supervisor' });
   vm.runInContext(pdf.slice(pdf.indexOf('  function texto('), pdf.indexOf('  function dibujarOT(')), pdfContext);
   const datos = pdfContext.construirDatosOT(orden);
+  assert.equal(datos.folioOT, 'EMG-unico');
+  assert.equal(datos.folioCheckList, 'N/A');
   assert.equal(datos.operador, 'OPERADOR');
   assert.equal(datos.tolva1, 'T-1');
   assert.equal(datos.dolly, 'D-1');
@@ -376,6 +389,66 @@ test('la OT de emergencia conserva candado y prioridad sin duplicar la foto', as
   await context.crearOTDesdeReporte(report, fallas, []);
   assert.equal([...stored.keys()].filter((key) => key.startsWith('ordenes_trabajo/')).length, 1);
   assert.ok(alerts.some((text) => /OT activa/.test(text)));
+
+  const folioLargo = 'EMG-YBR2lc4uSpAjNYEGibVv';
+  await context.crearOTDesdeReporte({ ...report, id: 'prefijo', type: 'checklist', folio: folioLargo }, fallas, []);
+  const porPrefijo = [...stored.values()].find((item) => item.reporte_id === 'prefijo');
+  assert.equal(porPrefijo.folio_ot, folioLargo);
+  assert.equal(porPrefijo.prioridad, 'maxima');
+  assert.equal(lecturas.includes('sistema/contadores'), false);
+
+  await context.crearOTDesdeReporte({ ...report, id: 'sin-folio', folio: '', payload: {} }, fallas, []);
+  assert.match(alerts.at(-1), /emergencia no tiene folio/);
+  assert.equal(stored.has('ot_por_reporte/sin-folio'), false);
+
+  await context.crearOTDesdeReporte({ ...report, id: 'tipo-directo', report_type: 'emergencia', type: 'checklist', folio: '999999' }, fallas, []);
+  assert.equal(etiquetasOT.folioOrden([...stored.values()].find((item) => item.reporte_id === 'tipo-directo')), '999999');
+  await context.crearOTDesdeReporte({ ...report, id: 'tipo-normalizado', report_type: 'checklist', type: 'emergencia', folio: '123456' }, fallas, []);
+  assert.equal(etiquetasOT.folioOrden([...stored.values()].find((item) => item.reporte_id === 'tipo-normalizado')), '123456');
+  assert.equal(lecturas.includes('sistema/contadores'), false);
+  stored.set('sistema/contadores', { folio_ot_actual: 167, folio_ot: 169 });
+  await context.crearOTDesdeReporte({ ...report, id: 'programado', type: 'checklist', folio: 'F-123' }, fallas, []);
+  const programada = [...stored.values()].find((item) => item.reporte_id === 'programado');
+  assert.equal(programada.folio_ot, 170);
+  assert.equal(stored.get('sistema/contadores').folio_ot_actual, 170);
+  assert.equal(etiquetasOT.folioOrden(programada), 'OT-170');
+  assert.equal(pdfContext.construirDatosOT(programada).folioOT, 'OT-170');
+});
+
+test('reimprimir una OT de emergencia no consulta el reporte por la longitud del folio', async () => {
+  const orden = { folio_ot: 'EMG-YBR2lc4uSpAjNYEGibVv', tipo_reporte: 'emergencia', reporte_id: 'reporte' };
+  let impresa;
+  const contexto = vm.createContext({
+    window: { etiquetasOT, imprimirOT_Bachoco: async (datos) => { impresa = datos; } },
+    state: { reports: [], allReports: [] }, showToast() {}, console,
+    getDoc: () => { throw new Error('No debe consultar Firestore'); }
+  });
+  vm.runInContext(extract('    async function generarPDFOT(', '    function mostrarVistaOrdenes('), contexto);
+  await contexto.generarPDFOT(orden);
+  assert.equal(impresa.folio_ot, orden.folio_ot);
+});
+
+test('el PDF imprime completo el folio largo de emergencia dentro del encabezado', () => {
+  const jsPDFContext = { exports: {}, module: {}, console, atob, btoa };
+  jsPDFContext.module.exports = jsPDFContext.exports;
+  jsPDFContext.global = jsPDFContext;
+  vm.runInNewContext(readFileSync(new URL('../apptolva_bitacora/js/jspdf.min.js', import.meta.url), 'utf8'), jsPDFContext);
+  const pdfContext = { window: { etiquetasOT } };
+  const sourcePDF = readFileSync(new URL('../apptolva_bitacora/js/generarPDF_OT.js', import.meta.url), 'utf8')
+    .replace('  window.CATALOGO_SISTEMAS_OT =', '  window.dibujarOT = dibujarOT; window.construirDatosOT = construirDatosOT;\n  window.CATALOGO_SISTEMAS_OT =');
+  vm.runInNewContext(sourcePDF, pdfContext);
+  const folio = 'EMG-YBR2lc4uSpAjNYEGibVv';
+  const datos = pdfContext.window.construirDatosOT({ folio_ot: folio, tipo_reporte: 'emergencia' });
+  const doc = new jsPDFContext.exports.jsPDF();
+  const textoOriginal = doc.text.bind(doc);
+  let ancho = null;
+  doc.text = (texto, ...args) => {
+    if (texto === folio) ancho = doc.getTextWidth(texto);
+    return textoOriginal(texto, ...args);
+  };
+  pdfContext.window.dibujarOT(doc, datos, {});
+  assert.ok(ancho !== null && ancho <= 161.4 - 113.6 - 1.6);
+  assert.ok(doc.output().includes(`(${folio}) Tj`));
 });
 
 test('la escucha actualiza emergencias, respeta la sesión y cancela el listener anterior', () => {
