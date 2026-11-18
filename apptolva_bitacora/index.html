@@ -1649,11 +1649,17 @@
                         li.append(link);
                         lista.append(li);
                     }
-                    status.textContent = snapshot.empty ? 'No hay reportes en este intervalo.' :
-                        (snapshot.metadata.fromCache ? 'Mostrando datos disponibles en el dispositivo.' : `${snapshot.size} reporte(s).`);
+                    status.textContent = snapshot.metadata.fromCache
+                        ? (snapshot.empty ? 'No hay reportes guardados en este dispositivo para este intervalo.' : 'Mostrando datos disponibles en el dispositivo.')
+                        : (snapshot.empty ? 'No hay reportes en este intervalo.' : `${snapshot.size} reporte(s).`);
                 } catch (error) {
+                    if (usuarioActivo?.uid !== user.uid || !puedeVerHistorial(usuarioActivo, perfilActivo)) return;
                     console.error('No se pudo cargar el historial:', error);
-                    status.textContent = 'No se pudo cargar el historial. Verifica la conexión y los permisos.';
+                    status.textContent = error.code === 'failed-precondition'
+                        ? 'El historial necesita un índice de Firestore. Contacta al administrador.'
+                        : error.code === 'permission-denied'
+                            ? 'No tienes permiso para consultar el historial. Contacta al administrador.'
+                            : 'No se pudo cargar el historial. Verifica la conexión e inténtalo de nuevo.';
                 }
             }
 

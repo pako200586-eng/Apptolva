@@ -54,6 +54,32 @@ test('el intervalo del historial cubre exactamente 48 horas hasta el instante ac
   });
 });
 
+test('el historial consulta solo al propietario y distingue un índice faltante', async () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/index.html', import.meta.url), 'utf8');
+  const start = html.indexOf('            async function cargarHistorial()');
+  const end = html.indexOf('            function mostrarRespaldos()', start);
+  assert.ok(start >= 0 && end > start);
+  const elements = {
+    'historial-estado': { textContent: '' },
+    'historial-lista': { replaceChildren() {}, append() {} }
+  };
+  let constraints;
+  const context = vm.createContext({
+    document: { getElementById: (id) => elements[id] },
+    usuarioActivo: { uid: 'operador' }, perfilActivo: { rol: 'operador' },
+    puedeVerHistorial, intervaloHistorial, db: {},
+    collection: () => ({}), where: (...args) => args, orderBy: (...args) => args,
+    query: (_, ...args) => { constraints = args; return {}; },
+    getDocs: async () => { const error = new Error('Índice'); error.code = 'failed-precondition'; throw error; },
+    console: { error() {} }
+  });
+  vm.runInContext(html.slice(start, end), context);
+  await context.cargarHistorial();
+  assert.deepEqual([...constraints[0]], ['owner_uid', '==', 'operador']);
+  assert.deepEqual([...constraints[3]], ['created_at', 'desc']);
+  assert.match(elements['historial-estado'].textContent, /índice de Firestore/);
+});
+
 test('solo cuentas autenticadas con rol operador pueden ver su historial', () => {
   const user = { isAnonymous: false };
   assert.equal(puedeVerHistorial(user, { rol: 'operador' }), true);

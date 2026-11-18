@@ -12,7 +12,7 @@ function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = 
   const elementos = Object.fromEntries([
     'btnRegistrarEmergencia', 'fallaSaveStatus', 'fallaOperador', 'fallaUnidad', 'fallaDesc',
     'fallaTolva1', 'fallaDolly', 'fallaTolva2', 'fallaKm',
-    'fallaFotoInput', 'fallaFotoPreview', 'fallaFotoLabel'
+    'fallaFotoInput', 'fallaFotoPreview', 'fallaFotoLabel', 'fallaGpsStatus'
   ].map((id) => [id, { value: '', classList: { add() {} } }]));
   elementos.fallaUnidad.value = ' 13817 ';
   elementos.fallaDesc.value = 'Falla en ruta';
@@ -47,7 +47,7 @@ function entorno({ user = { uid: 'operador', email: 'op@example.test' }, foto = 
     borrarRespaldoReporte: (_, __, ___, data) => respaldos.delete(data.id)
   });
   context.foto = foto;
-  vm.runInContext(`let fallaUbicacion = { lat: 0, lng: 0, accuracy: 10, capturedAt: '2026-01-01T00:00:00.000Z' }; let fallaFotoBase64 = foto; ${payloadSource}; window.construirPayload = construirPayload;`, context);
+  vm.runInContext(`const MAX_EDAD_UBICACION_MS = 120000; let fallaUbicacion = { lat: 0, lng: 0, accuracy: 10, capturedAt: new Date().toISOString() }; let fallaFotoBase64 = foto; ${payloadSource}; window.construirPayload = construirPayload;`, context);
   vm.runInContext(source, context);
   return { window, elementos, escritos, respaldos, callbacks, avisos, confirmar, rechazar };
 }
@@ -164,14 +164,58 @@ test('WhatsApp conserva contacto, mensaje y enlace alternativo si falla la apert
   const inicio = emergencia.indexOf('function textoFalla(');
   const fin = emergencia.indexOf('iniciarCapturaFalla();', inicio);
   vm.runInContext(emergencia.slice(inicio, fin), context);
-  context.abrirWhatsappFalla({ unidad: '13817', descripcion: 'Falla', gps: { lat: 0, lng: 0 } });
+  context.abrirWhatsappFalla({ unidad: '13817', descripcion: 'Falla', gps: { lat: 0, lng: 0, accuracy: 125 } });
   const url = new URL(elementos.fallaWhatsappEnlace.href);
   assert.equal(url.pathname, '/5211234567890');
   assert.match(url.searchParams.get('text'), /Unidad: 13817/);
   assert.match(url.searchParams.get('text'), /q=0,0/);
+  assert.match(url.searchParams.get('text'), /precisión estimada: 125 m/);
   assert.equal(elementos.fallaWhatsappEnlace.visible, true);
   assert.equal(elementos.fallaWhatsappInfo.visible, true);
   assert.doesNotMatch(emergencia, /TURNO A: J\.M\. Pérez|TURNO B: Salas/);
+});
+
+test('la ubicación muestra precisión, permite reintentar y descarta mediciones antiguas', () => {
+  const status = { textContent: '' };
+  const callbacks = [];
+  const context = vm.createContext({
+    document: { getElementById: () => status },
+    navigator: { geolocation: { getCurrentPosition: (success, error, options) => callbacks.push({ success, error, options }) } },
+    window: {}, console: { warn() {} }
+  });
+  const start = emergencia.indexOf('let fallaFotoBase64');
+  const end = emergencia.indexOf('function comprimirImagen', start);
+  vm.runInContext(emergencia.slice(start, end), context);
+  context.iniciarCapturaFalla();
+  assert.equal(callbacks[0].options.enableHighAccuracy, true);
+  assert.equal(callbacks[0].options.maximumAge, 0);
+  context.iniciarCapturaFalla();
+  callbacks[0].success({ coords: { latitude: 1, longitude: 2, accuracy: 5 }, timestamp: Date.now() });
+  assert.match(status.textContent, /Obteniendo/);
+  callbacks[1].success({ coords: { latitude: 3, longitude: 4, accuracy: 950.2 }, timestamp: Date.now() });
+  assert.match(status.textContent, /951 m/);
+  assert.equal(vm.runInContext('fallaUbicacion.lat', context), 3);
+  context.iniciarCapturaFalla();
+  callbacks[2].success({ coords: { latitude: 1, longitude: 2, accuracy: 5 }, timestamp: Date.now() - 120001 });
+  assert.equal(vm.runInContext('fallaUbicacion', context), null);
+  assert.match(status.textContent, /antigua/);
+  context.iniciarCapturaFalla();
+  callbacks[3].error({ code: 1, message: 'denegado' });
+  assert.match(status.textContent, /denegado/);
+});
+
+test('el reporte no envía ubicación caducada y conserva el aviso de emergencia', () => {
+  const status = { textContent: '' };
+  const input = { value: '' };
+  const context = vm.createContext({
+    document: { getElementById: (id) => id === 'fallaGpsStatus' ? status : input }
+  });
+  vm.runInContext(`const MAX_EDAD_UBICACION_MS = 120000; let fallaUbicacion = {
+    lat: 1, lng: 2, accuracy: 10, capturedAt: new Date(Date.now() - 120001).toISOString()
+  }; let fallaFotoBase64 = null; ${payloadSource}`, context);
+  const payload = context.construirPayload();
+  assert.equal(payload.gps, null);
+  assert.match(status.textContent, /antigua/);
 });
 
 const admin = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');

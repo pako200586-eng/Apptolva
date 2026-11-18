@@ -176,8 +176,9 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
   const reciente = query(collection(clients[0].db, 'bitacora_reports'),
     where('owner_uid', '==', users[0].uid),
     where('created_at', '>=', new Date(ahora - 48 * 3600000).toISOString()),
-    where('created_at', '<=', new Date(ahora).toISOString()));
-  assert.deepEqual((await getDocs(reciente)).docs.map((d) => d.id).sort(), [id, historicos[0]].sort());
+    where('created_at', '<=', new Date(ahora).toISOString()),
+    orderBy('created_at', 'desc'));
+  assert.deepEqual((await getDocs(reciente)).docs.map((d) => d.id), [id, historicos[0]]);
   await assert.rejects(getDocs(collection(clients[1].db, 'bitacora_reports')), { code: 'permission-denied' });
   assert.equal((await getDoc(reference[2])).exists(), true);
   await assert.rejects(setDoc(reference[2], report));
