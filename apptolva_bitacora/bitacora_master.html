@@ -2097,9 +2097,17 @@
             const qrText = buildFullOfflineQrData(payload);
             document.getElementById('qrcode').innerHTML = "";
             new QRCode(document.getElementById("qrcode"), { text: qrText, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.L });
-            document.getElementById('qrTextContent').innerHTML =
-                `<span style="color:#F28B00;font-weight:bold">${mensaje || 'QR de Inspección Directa (Offline)'}</span><br>` +
-                `<span style="font-size:10px;color:#4b5563;white-space:pre-wrap">${qrText}</span>`;
+            const titulo = document.createElement('span');
+            titulo.style.cssText = 'color:#F28B00;font-weight:bold';
+            titulo.textContent = mensaje || 'QR de Inspección Directa (Offline)';
+            const contenido = document.createElement('span');
+            contenido.style.cssText = 'font-size:10px;color:#4b5563;white-space:pre-wrap';
+            contenido.textContent = qrText;
+            document.getElementById('qrTextContent').replaceChildren(
+                titulo,
+                document.createElement('br'),
+                contenido
+            );
             document.getElementById('qrModal').classList.remove('hidden');
         }
 
@@ -2130,10 +2138,22 @@
 
                 document.getElementById('qrcode').innerHTML = "";
                 new QRCode(document.getElementById("qrcode"), { text: viewerUrl, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
-                document.getElementById('qrTextContent').innerHTML =
-                    `<span style="color:#16a34a;font-weight:bold">✅ Sincronizado en la nube</span><br>` +
-                    `<span style="font-size:10px;color:#4b5563;word-break:break-all">${viewerUrl}</span><br>` +
-                    `<span style="color:#9ca3af;font-size:10px">FOLIO: ${payload.folio}</span>`;
+                const estado = document.createElement('span');
+                estado.style.cssText = 'color:#16a34a;font-weight:bold';
+                estado.textContent = '✅ Sincronizado en la nube';
+                const enlace = document.createElement('span');
+                enlace.style.cssText = 'font-size:10px;color:#4b5563;word-break:break-all';
+                enlace.textContent = viewerUrl;
+                const folio = document.createElement('span');
+                folio.style.cssText = 'color:#9ca3af;font-size:10px';
+                folio.textContent = `FOLIO: ${payload.folio}`;
+                document.getElementById('qrTextContent').replaceChildren(
+                    estado,
+                    document.createElement('br'),
+                    enlace,
+                    document.createElement('br'),
+                    folio
+                );
             } catch (err) {
                 showOfflineQrModal(payload, "⚠️ Sin señal de nube — Mostrando QR de inspección local");
             }
