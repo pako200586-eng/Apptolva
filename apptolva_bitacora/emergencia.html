@@ -186,7 +186,8 @@ function textoFalla(payload = construirPayload()) {
     return `🚨 EMERGENCIA/FALLA\nUnidad: ${payload.unidad}\n${payload.descripcion}${location}`;
 }
 function abrirWhatsappFalla(payload) {
-    const url = `https://wa.me/${document.getElementById('fallaContact').value}?text=${encodeURIComponent(textoFalla(payload))}`;
+    const telefono = String(document.getElementById('fallaContact').value || '').replace(/\D/g, '');
+    const url = `https://wa.me/${telefono}?text=${encodeURIComponent(textoFalla(payload))}`;
     const enlace = document.getElementById('fallaWhatsappEnlace');
     enlace.href = url;
     enlace.classList.remove('hidden');
