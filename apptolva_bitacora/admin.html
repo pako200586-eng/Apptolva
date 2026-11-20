@@ -994,7 +994,13 @@
         const configuracion = configuracionRankingFormulario();
         const csv = await archivo.text();
         const samsara = parsearCsvSamsara(csv, window.CATALOGO_OPERADORES || {});
-        let velocidad = { totalRegistros: 0, eventosVelocidad: [], sinEmpatar: [] };
+        let velocidad = {
+          totalRegistros: 0,
+          filtradosFueraDeRango: 0,
+          sinNombre: 0,
+          eventosVelocidad: [],
+          sinEmpatar: []
+        };
         if (archivoVelocidad) {
           if (typeof rankingOperadores.parsearCsvVelocidadSamsara !== 'function') {
             throw new Error('El módulo de ranking no incluye el parser de exceso de velocidad. Actualiza rankingOperadores.js.');
@@ -1002,7 +1008,11 @@
           const csvVelocidad = await archivoVelocidad.text();
           velocidad = rankingOperadores.parsearCsvVelocidadSamsara(
             csvVelocidad,
-            window.CATALOGO_OPERADORES || {}
+            window.CATALOGO_OPERADORES || {},
+            {
+              fechaInicio: semana.inicioTexto,
+              fechaFin: semana.finTexto
+            }
           );
         }
         const desde = semana.inicio.toISOString();
@@ -1027,6 +1037,8 @@
           },
           estadisticasVelocidadCsv: {
             totalRegistros: velocidad.totalRegistros,
+            filtradosFueraDeRango: velocidad.filtradosFueraDeRango,
+            sinNombre: velocidad.sinNombre,
             sinEmpatar: velocidad.sinEmpatar
           },
           documentosConsultados: snapshotReportes.size + snapshotBitacoras.size
@@ -1039,11 +1051,14 @@
         const sinEmpatarVelocidad = velocidad.sinEmpatar.length
           ? ` · ${velocidad.sinEmpatar.length} nombre(s) de velocidad sin empatar`
           : '';
+        const descartadosVelocidad = velocidad.filtradosFueraDeRango || velocidad.sinNombre
+          ? ` · ${velocidad.filtradosFueraDeRango || 0} fuera de rango · ${velocidad.sinNombre || 0} sin Nombre Operador`
+          : '';
         $('ranking-preview-estado').textContent =
           `${rankingState.datosSemana.documentosConsultados} reportes consultados · ` +
           `${samsara.aplican} alertas aplicables · ${samsara.noAplican} no aplican · ` +
           `${samsara.sinRevisar} sin revisar${sinEmpatar} · ` +
-          `${velocidad.totalRegistros} registros de velocidad${sinEmpatarVelocidad}.`;
+          `${velocidad.totalRegistros} registros de velocidad${descartadosVelocidad}${sinEmpatarVelocidad}.`;
       } catch (error) {
         console.error('No se pudo calcular la vista previa del ranking:', error);
         $('ranking-preview-estado').textContent = error.message;
