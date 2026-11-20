@@ -28,13 +28,12 @@
         <p id="rankingSemanaSubtitulo" class="text-xs text-orange-100">Cargando semana...</p>
       </div>
     </div>
-    <span class="bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">
+    <span id="badgeTopResumen" class="bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">
       Top 5 · Últimos 3
     </span>
   </header>
 
   <main class="p-4 max-w-lg mx-auto space-y-4">
-    <!-- Selector de Categoría (Full vs Sencillo) -->
     <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
       <button id="tabFull" type="button" class="py-2 px-3 rounded-lg text-xs font-black bg-orange-600 text-white transition">
         <i class="fas fa-truck-moving mr-1"></i> Full (T3-S2-R4)
@@ -44,22 +43,19 @@
       </button>
     </div>
 
-    <!-- Tarjeta Personal del Operador -->
     <section id="miPosicionCard" class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-4 rounded-2xl shadow-md">
       <p class="text-xs text-slate-300 font-bold uppercase tracking-wider">Tu posición esta semana</p>
       <p class="text-sm text-slate-200 mt-1">Consultando tu calificación...</p>
     </section>
 
-    <!-- Podio Top 5 -->
     <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="bg-emerald-600 text-white px-4 py-2.5 flex items-center justify-between">
-        <h2 class="font-black text-sm"><i class="fas fa-trophy mr-2"></i>Top 5 de la Semana</h2>
+        <h2 id="tituloTop" class="font-black text-sm"><i class="fas fa-trophy mr-2"></i>Top 5 de la Semana</h2>
         <span class="text-[11px] font-bold opacity-90">Mejores calificaciones</span>
       </div>
-      <div id="listaTop5" class="divide-y divide-slate-100"></div>
+      <div id="listaTop" class="divide-y divide-slate-100"></div>
     </section>
 
-    <!-- Últimos 3 Lugares -->
     <section class="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
       <div class="bg-amber-600 text-white px-4 py-2.5 flex items-center justify-between">
         <h2 class="font-black text-sm"><i class="fas fa-exclamation-circle mr-2"></i>Área de Atención (Últimos 3)</h2>
@@ -78,6 +74,7 @@
       doc, getDoc
     } from './js/firebase-sdk.js';
     import { leerPerfil } from './js/controlSesion.js';
+    import { normalizarTexto } from './js/rankingOperadores.js';
 
     const app = initializeApp(getFirebaseConfig());
     const auth = getAuth(app);
@@ -88,14 +85,39 @@
     let rankingData = null;
     let categoriaActiva = 'full';
     let miNoEmpleado = null;
+    let miNombrePerfil = null;
 
     const tabFull = document.getElementById('tabFull');
     const tabSencillo = document.getElementById('tabSencillo');
     const subtitulo = document.getElementById('rankingSemanaSubtitulo');
+    const badgeTopResumen = document.getElementById('badgeTopResumen');
+    const tituloTop = document.getElementById('tituloTop');
     const miCard = document.getElementById('miPosicionCard');
-    const listaTop5 = document.getElementById('listaTop5');
+    const listaTop = document.getElementById('listaTop');
     const listaUltimos3 = document.getElementById('listaUltimos3');
     const estadoEl = document.getElementById('rankingEstado');
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined && text !== null) node.textContent = String(text);
+      return node;
+    }
+
+    function buscarMiRegistro(posiciones = []) {
+      if (miNoEmpleado) {
+        const porNum = posiciones.find((p) => String(p.noEmpleado) === String(miNoEmpleado));
+        if (porNum) return porNum;
+      }
+      if (miNombrePerfil) {
+        const normPerfil = normalizarTexto(miNombrePerfil);
+        if (normPerfil) {
+          const porNombre = posiciones.find((p) => normalizarTexto(p.nombre) === normPerfil);
+          if (porNombre) return porNombre;
+        }
+      }
+      return null;
+    }
 
     function actualizarTabs() {
       const activo = 'py-2 px-3 rounded-lg text-xs font-black bg-orange-600 text-white transition';
@@ -104,89 +126,89 @@
       tabSencillo.className = categoriaActiva === 'sencillo' ? activo : inactivo;
     }
 
-    function crearElemento(tag, className, texto) {
-      const elemento = document.createElement(tag);
-      elemento.className = className;
-      if (texto !== undefined) elemento.textContent = texto;
-      return elemento;
-    }
-
-    function renderFila(op, tipo) {
-      const esMio = miNoEmpleado && String(op.noEmpleado) === String(miNoEmpleado);
+    function crearFila(op, tipo, miRegistro) {
+      const esMio = miRegistro && String(op.noEmpleado) === String(miRegistro.noEmpleado);
       const badgeColor = tipo === 'top'
         ? (op.posicion === 1 ? 'bg-amber-400 text-slate-900' : 'bg-emerald-100 text-emerald-800')
         : 'bg-amber-100 text-amber-900';
 
-      const fila = crearElemento('div', `p-3.5 flex items-center justify-between gap-3 ${esMio ? 'bg-orange-50' : ''}`);
-      const bloque = crearElemento('div', 'flex items-center gap-3 min-w-0');
-      const posicion = crearElemento('span', `w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${badgeColor}`, `#${op.posicion}`);
-      const detalle = crearElemento('div', 'min-w-0');
-      detalle.append(
-        crearElemento('p', 'font-bold text-sm text-slate-800 truncate', op.nombre),
-        crearElemento(
-          'p',
-          'text-[11px] text-slate-500',
-          `Samsara: ${op.rubros.samsara} · Bitácora: ${op.rubros.bitacoras} · Checklist: ${op.rubros.checklists}`
-        )
-      );
-      bloque.append(posicion, detalle);
-      fila.append(bloque, crearElemento('span', 'font-black text-base text-slate-900 shrink-0', op.total));
+      const fila = el('div', `p-3.5 flex items-center justify-between gap-3 ${esMio ? 'bg-orange-50' : ''}`);
+      const izq = el('div', 'flex items-center gap-3 min-w-0');
+      izq.appendChild(el('span', `w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${badgeColor}`, `#${op.posicion}`));
+
+      const info = el('div', 'min-w-0');
+      info.appendChild(el('p', 'font-bold text-sm text-slate-800 truncate', op.nombre));
+      const velTxt = op.rubros?.velocidad !== undefined ? ` · Vel: ${op.rubros.velocidad}` : '';
+      info.appendChild(el('p', 'text-[11px] text-slate-500', `Alertas: ${op.rubros.samsara}${velTxt} · Bit: ${op.rubros.bitacoras} · Check: ${op.rubros.checklists}`));
+      izq.appendChild(info);
+
+      fila.appendChild(izq);
+      fila.appendChild(el('span', 'font-black text-base text-slate-900 shrink-0', op.total));
       return fila;
+    }
+
+    function renderMiTarjeta(miRegistro, totalOperadores) {
+      if (!miRegistro) {
+        miCard.replaceChildren(
+          el('p', 'text-xs text-slate-300 font-bold uppercase tracking-wider', 'Tu posición esta semana'),
+          el('p', 'text-sm text-slate-200 mt-1', 'Sin registro en esta categoría para la semana seleccionada.')
+        );
+        return;
+      }
+
+      const pesos = rankingData.pesos || {};
+      const topRow = el('div', 'flex items-center justify-between');
+      const left = el('div');
+      left.appendChild(el('p', 'text-[11px] text-orange-300 font-bold uppercase tracking-wider', `Tu posición (${miRegistro.esquemaEtiqueta})`));
+      const h2 = el('h2', 'text-xl font-black mt-0.5', `#${miRegistro.posicion} `);
+      h2.appendChild(el('span', 'text-sm font-normal text-slate-300', `de ${totalOperadores}`));
+      left.appendChild(h2);
+      left.appendChild(el('p', 'text-xs text-slate-300 mt-0.5', miRegistro.nombre));
+
+      const right = el('div', 'text-right');
+      right.appendChild(el('span', 'text-3xl font-black text-orange-400', miRegistro.total));
+      right.appendChild(el('span', 'block text-[10px] text-slate-400', 'de 100 pts'));
+      topRow.append(left, right);
+
+      const tieneVel = miRegistro.rubros?.velocidad !== undefined;
+      const grid = el('div', `grid ${tieneVel ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mt-3 pt-3 border-t border-white/10 text-center text-xs`);
+      const items = [
+        ['Alertas', `${miRegistro.rubros.samsara}/${pesos.samsara ?? 20}`],
+        ...(tieneVel ? [['Velocidad', `${miRegistro.rubros.velocidad}/${pesos.velocidad ?? 20}`]] : []),
+        ['Bitácora', `${miRegistro.rubros.bitacoras}/${pesos.bitacoras ?? 35}`],
+        ['Checklist', `${miRegistro.rubros.checklists}/${pesos.checklists ?? 25}`]
+      ];
+      for (const [label, val] of items) {
+        const cell = el('div');
+        cell.appendChild(el('span', 'block text-slate-400 text-[10px]', label));
+        cell.appendChild(el('strong', '', val));
+        grid.appendChild(cell);
+      }
+
+      miCard.replaceChildren(topRow, grid);
     }
 
     function renderVista() {
       actualizarTabs();
       if (!rankingData) return;
 
-      const seg = rankingData[categoriaActiva] || { totalOperadores: 0, top5: [], ultimos3: [], posiciones: [] };
-      const miRegistro = miNoEmpleado
-        ? (seg.posiciones || []).find((p) => String(p.noEmpleado) === String(miNoEmpleado))
-        : null;
+      const seg = rankingData[categoriaActiva] || { totalOperadores: 0, topLimit: 5, top5: [], ultimos3: [], posiciones: [] };
+      const topN = seg.topLimit || (seg.totalOperadores <= 8 ? 3 : 5);
+      badgeTopResumen.textContent = `Top ${topN} · Últimos 3`;
+      tituloTop.replaceChildren(el('i', 'fas fa-trophy mr-2'), document.createTextNode(`Top ${topN} de la Semana`));
 
-      if (miRegistro) {
-        const encabezado = crearElemento('div', 'flex items-center justify-between');
-        const identidad = crearElemento('div');
-        const titulo = crearElemento('h2', 'text-xl font-black mt-0.5', `#${miRegistro.posicion} `);
-        titulo.append(crearElemento('span', 'text-sm font-normal text-slate-300', `de ${seg.totalOperadores}`));
-        identidad.append(
-          crearElemento('p', 'text-[11px] text-orange-300 font-bold uppercase tracking-wider', `Tu posición (${miRegistro.esquemaEtiqueta})`),
-          titulo,
-          crearElemento('p', 'text-xs text-slate-300 mt-0.5', miRegistro.nombre)
-        );
-        const puntuacion = crearElemento('div', 'text-right');
-        puntuacion.append(
-          crearElemento('span', 'text-3xl font-black text-orange-400', miRegistro.total),
-          crearElemento('span', 'block text-[10px] text-slate-400', 'de 100 pts')
-        );
-        encabezado.append(identidad, puntuacion);
+      const miRegistro = buscarMiRegistro(seg.posiciones || []);
+      renderMiTarjeta(miRegistro, seg.totalOperadores);
 
-        const rubros = crearElemento('div', 'grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10 text-center text-xs');
-        [
-          ['Samsara', miRegistro.rubros.samsara, rankingData.pesos?.samsara ?? 40],
-          ['Bitácora 087', miRegistro.rubros.bitacoras, rankingData.pesos?.bitacoras ?? 35],
-          ['Checklists', miRegistro.rubros.checklists, rankingData.pesos?.checklists ?? 25]
-        ].forEach(([etiqueta, obtenido, maximo]) => {
-          const rubro = crearElemento('div');
-          rubro.append(
-            crearElemento('span', 'block text-slate-400 text-[10px]', etiqueta),
-            crearElemento('strong', '', `${obtenido}/${maximo}`)
-          );
-          rubros.append(rubro);
-        });
-        miCard.replaceChildren(encabezado, rubros);
-      } else {
-        miCard.replaceChildren(
-          crearElemento('p', 'text-xs text-slate-300 font-bold uppercase tracking-wider', 'Tu posición esta semana'),
-          crearElemento('p', 'text-sm text-slate-200 mt-1', 'Sin registro en esta categoría para la semana seleccionada.')
-        );
-      }
+      const topNodes = seg.top5?.length
+        ? seg.top5.map((op) => crearFila(op, 'top', miRegistro))
+        : [el('p', 'p-4 text-xs text-slate-400 text-center', 'Sin datos publicados aún.')];
+      listaTop.replaceChildren(...topNodes);
 
-      listaTop5.replaceChildren(...(seg.top5.length
-        ? seg.top5.map((op) => renderFila(op, 'top'))
-        : [crearElemento('p', 'p-4 text-xs text-slate-400 text-center', 'Sin datos publicados aún.')]));
-      listaUltimos3.replaceChildren(...(seg.ultimos3.length
-        ? seg.ultimos3.map((op) => renderFila(op, 'bottom'))
-        : [crearElemento('p', 'p-4 text-xs text-slate-400 text-center', 'Sin registros suficientes para mostrar últimos 3.')]));
+      const ultimosNodes = seg.ultimos3?.length
+        ? seg.ultimos3.map((op) => crearFila(op, 'bottom', miRegistro))
+        : [el('p', 'p-4 text-xs text-slate-400 text-center', 'Sin registros suficientes para mostrar últimos 3.')];
+      listaUltimos3.replaceChildren(...ultimosNodes);
     }
 
     tabFull.addEventListener('click', () => { categoriaActiva = 'full'; renderVista(); });
@@ -198,7 +220,8 @@
         return;
       }
       const perfil = leerPerfil(localStorage);
-      miNoEmpleado = perfil?.noEmpleado || (user.email ? user.email.split('@')[0] : null);
+      miNoEmpleado = perfil?.noEmpleado || (user.email && user.email.endsWith('@apptolva.com') ? user.email.split('@')[0] : null);
+      miNombrePerfil = perfil?.nombre || user.displayName || null;
 
       try {
         const snap = await getDoc(doc(db, 'ranking_semanal', 'actual'));
@@ -210,8 +233,7 @@
         rankingData = snap.data();
         subtitulo.textContent = rankingData.etiquetaSemana || rankingData.semanaId || 'Semana actual';
 
-        // Seleccionar automáticamente la categoría del operador logueado
-        if (miNoEmpleado && rankingData.sencillo?.posiciones?.some((p) => String(p.noEmpleado) === String(miNoEmpleado))) {
+        if (buscarMiRegistro(rankingData.sencillo?.posiciones || [])) {
           categoriaActiva = 'sencillo';
         }
         renderVista();

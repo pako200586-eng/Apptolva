@@ -1,11 +1,12 @@
 /**
  * js/rankingOperadores.js
- * Motor de cálculo y parser de Samsara para Ranking Semanal de Operadores - AppTolva
+ * Motor de cálculo y parsers de Samsara (Alertas + Exceso de Velocidad) para Ranking Semanal - AppTolva
  * Soporta esquemas 48x48 Zona Larga (Arriaga/Chiapas), 24h Full y 24h Sencillo (T3-S2).
  */
 
 export const PESOS_INICIALES = {
-  samsara: 40,
+  samsara: 20,
+  velocidad: 20,
   bitacoras: 35,
   checklists: 25
 };
@@ -24,8 +25,8 @@ export const ESQUEMAS_OPERATIVOS = {
     id: 'full_24h',
     categoria: 'full',
     etiqueta: 'Full 24h',
-    checklistPorTurno: 1,     // 1 checklist por turno de 24h
-    bitacoraPorTurno: 1,      // 1 bitácora por turno de 24h
+    checklistPorTurno: 1,
+    bitacoraPorTurno: 1,
     metaChecklistsSemana: 5,
     descripcion: '1 checklist y 1 bitácora por turno de 24h'
   },
@@ -33,20 +34,32 @@ export const ESQUEMAS_OPERATIVOS = {
     id: 'sencillo_24h',
     categoria: 'sencillo',
     etiqueta: 'Articulado Sencillo 24h',
-    checklistPorTurno: 1,     // 1 checklist por turno de 24h
-    bitacoraPorTurno: 1,      // 1 bitácora por turno de 24h
+    checklistPorTurno: 1,
+    bitacoraPorTurno: 1,
     metaChecklistsSemana: 5,
     descripcion: 'Categoría independiente · 1 checklist y 1 bitácora por turno de 24h'
   }
 };
 
-const PENALIZACION_SAMSARA = {
-  'USO DE MOVIL': 15,
-  'SIN CINTURON DE SEGURIDAD': 15,
-  'EXCESO DE VELOCIDAD': 15,
-  'FRENADO BRUSCO': 15,
-  'CONDUCCION DISTRAIDA': 10,
-  'POSIBLE FATIGA': 10
+const PENALIZACION_ALERTAS_SAMSARA = {
+  'USO DE MOVIL': 10,
+  'SIN CINTURON DE SEGURIDAD': 10,
+  'CINTURON DE SEGURIDAD': 10,
+  'CAMARA OBSTRUIDA': 10,
+  'CONDUCCION DISTRAIDA': 6,
+  'POSIBLE FATIGA': 6
+};
+
+const PENALIZACION_VELOCIDAD_SEVERIDAD = {
+  GRAVE: 10,
+  SEVERE: 10,
+  CRITICO: 10,
+  FUERTE: 7,
+  HEAVY: 7,
+  MODERADO: 4,
+  MODERATE: 4,
+  LEVE: 4,
+  LIGHT: 4
 };
 
 export function normalizarTexto(texto = '') {
@@ -113,7 +126,7 @@ export function empatarOperadorPorNombre(nombreSamsara, catalogoOperadores) {
 }
 
 /**
- * Parsea el CSV exportado desde la hoja semanal de Samsara.
+ * Parsea el CSV semanal de Alertas de cámara de Samsara.
  * Ignora filas de resumen y separadores de fecha; solo penaliza "Revisión === Aplica".
  */
 export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
@@ -134,7 +147,7 @@ export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
   }
 
   if (idxHeader === -1) {
-    throw new Error('No se encontró el encabezado esperado (Unidad, Operador, Tipo de alerta) en el CSV de Samsara.');
+    throw new Error('No se encontró el encabezado esperado (Unidad, Operador, Tipo de alerta) en el CSV de Alertas Samsara.');
   }
 
   const iUnidad = cols.indexOf('UNIDAD');
@@ -153,7 +166,7 @@ export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
     const c = dividirLineaCsv(lineas[i]);
     const operador = (c[iOperador] || '').trim();
     const alerta = (c[iAlerta] || '').trim();
-    if (!operador || !alerta) continue; // Salta filas separadoras de fecha ("02 DE NOVIEMBRE 2026")
+    if (!operador || !alerta) continue;
 
     totalEventos++;
     const revisionNorm = normalizarTexto(c[iRevision] || '');
@@ -168,17 +181,16 @@ export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
 
     const noEmpleado = empatarOperadorPorNombre(operador, catalogoOperadores);
     const alertaNorm = normalizarTexto(alerta);
-    const descuento = PENALIZACION_SAMSARA[alertaNorm] ?? 10;
+    const descuento = PENALIZACION_ALERTAS_SAMSARA[alertaNorm] ?? 6;
 
-    const evento = {
+    eventosAplicables.push({
       noEmpleado,
       nombreSamsara: operador,
       unidad: (c[iUnidad] || '').trim(),
       fechaHora: (c[iFecha] || '').trim(),
       tipoAlerta: alerta,
       descuento
-    };
-    eventosAplicables.push(evento);
+    });
     if (!noEmpleado) sinEmpatar.push(operador);
   }
 
@@ -193,49 +205,127 @@ export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
 }
 
 /**
+ * Parsea el CSV semanal de Excesos de Velocidad de Samsara (Speeding Report).
+ * Soporta encabezados en español o inglés (Conductor/Operador/Driver, Severidad/Severity, Eventos/Cantidad).
+ */
+export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}) {
+  const lineas = String(csvTexto || '')
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((l) => l.trim() !== '');
+
+  if (lineas.length === 0) {
+    return { totalRegistros: 0, eventosVelocidad: [], sinEmpatar: [] };
+  }
+
+  let idxHeader = -1;
+  let cols = [];
+  for (let i = 0; i < lineas.length; i++) {
+    const campos = dividirLineaCsv(lineas[i]).map((c) => normalizarTexto(c));
+    const tieneOperador = campos.some((c) => ['OPERADOR', 'CONDUCTOR', 'DRIVER', 'DRIVER NAME', 'NOMBRE DEL CONDUCTOR'].includes(c));
+    if (tieneOperador) {
+      idxHeader = i;
+      cols = campos;
+      break;
+    }
+  }
+
+  if (idxHeader === -1) {
+    throw new Error('No se encontró columna de Operador/Conductor en el CSV de Exceso de Velocidad.');
+  }
+
+  const iOperador = cols.findIndex((c) => ['OPERADOR', 'CONDUCTOR', 'DRIVER', 'DRIVER NAME', 'NOMBRE DEL CONDUCTOR'].includes(c));
+  const iSeveridad = cols.findIndex((c) => ['SEVERIDAD', 'SEVERITY', 'GRAVEDAD', 'NIVEL'].includes(c));
+  const iCantidad = cols.findIndex((c) => ['EVENTOS', 'CANTIDAD', 'EXCESOS', 'TOTAL EVENTOS', 'SPEEDING EVENTS', 'INTERVALS'].includes(c));
+  const iVelMax = cols.findIndex((c) => ['VELOCIDAD MAXIMA', 'MAX SPEED', 'VELOCIDAD'].includes(c));
+  const iRevision = cols.findIndex((c) => ['REVISION', 'ESTADO', 'STATUS'].includes(c));
+
+  const eventosVelocidad = [];
+  const sinEmpatar = [];
+
+  for (let i = idxHeader + 1; i < lineas.length; i++) {
+    const c = dividirLineaCsv(lineas[i]);
+    const operador = (c[iOperador] || '').trim();
+    if (!operador || normalizarTexto(operador) === 'SIN CONDUCTOR' || normalizarTexto(operador) === 'UNASSIGNED') continue;
+
+    if (iRevision !== -1 && normalizarTexto(c[iRevision] || '') === 'NO APLICA') continue;
+
+    const cantidad = iCantidad !== -1 ? Math.max(1, Number(String(c[iCantidad]).replace(/[^\d.]/g, '')) || 1) : 1;
+    const severidadRaw = iSeveridad !== -1 ? normalizarTexto(c[iSeveridad] || '') : '';
+    const descuentoUnitario = PENALIZACION_VELOCIDAD_SEVERIDAD[severidadRaw] ?? 5;
+    const noEmpleado = empatarOperadorPorNombre(operador, catalogoOperadores);
+
+    eventosVelocidad.push({
+      noEmpleado,
+      nombreSamsara: operador,
+      cantidad,
+      severidad: iSeveridad !== -1 ? (c[iSeveridad] || '').trim() : 'Estándar',
+      velocidadMax: iVelMax !== -1 ? (c[iVelMax] || '').trim() : '',
+      descuento: cantidad * descuentoUnitario
+    });
+    if (!noEmpleado) sinEmpatar.push(operador);
+  }
+
+  return {
+    totalRegistros: eventosVelocidad.length,
+    eventosVelocidad,
+    sinEmpatar: [...new Set(sinEmpatar)]
+  };
+}
+
+/**
  * Calcula las calificaciones de la semana separando Full (48h + 24h) y Sencillo (24h).
- * Cada operador se evalúa contra las reglas de su propio esquema.
+ * En categorías con <= 8 operadores muestra Top 3 + Últimos 3; en > 8 muestra Top 5 + Últimos 3.
  */
 export function calcularRankingSemanal({
   catalogoOperadores = {},
   esquemasPorEmpleado = {},
   eventosAplicables = [],
+  eventosVelocidad = [],
   checklistsPorEmpleado = {},
   bitacorasPorEmpleado = {},
   excluidos = {},
   pesos = PESOS_INICIALES
 }) {
-  const descuentoPorEmpleado = {};
-  const alertasPorEmpleado = {};
-
+  const descuentoAlertas = {};
+  const conteoAlertas = {};
   for (const ev of eventosAplicables) {
     if (!ev.noEmpleado) continue;
-    descuentoPorEmpleado[ev.noEmpleado] = (descuentoPorEmpleado[ev.noEmpleado] || 0) + ev.descuento;
-    alertasPorEmpleado[ev.noEmpleado] = (alertasPorEmpleado[ev.noEmpleado] || 0) + 1;
+    descuentoAlertas[ev.noEmpleado] = (descuentoAlertas[ev.noEmpleado] || 0) + ev.descuento;
+    conteoAlertas[ev.noEmpleado] = (conteoAlertas[ev.noEmpleado] || 0) + 1;
+  }
+
+  const descuentoVelocidad = {};
+  const conteoVelocidad = {};
+  for (const ev of eventosVelocidad) {
+    if (!ev.noEmpleado) continue;
+    descuentoVelocidad[ev.noEmpleado] = (descuentoVelocidad[ev.noEmpleado] || 0) + ev.descuento;
+    conteoVelocidad[ev.noEmpleado] = (conteoVelocidad[ev.noEmpleado] || 0) + (ev.cantidad || 1);
   }
 
   const evaluados = { full: [], sencillo: [] };
 
   for (const [noEmpleado, info] of Object.entries(catalogoOperadores)) {
-    if (excluidos[noEmpleado]) continue; // Vacaciones, incapacidad, staff o unidad parada
+    if (excluidos[noEmpleado]) continue;
 
     const esquemaId = esquemasPorEmpleado[noEmpleado] || 'full_48h';
+    if (esquemaId === 'excluido') continue;
     const esquema = ESQUEMAS_OPERATIVOS[esquemaId] || ESQUEMAS_OPERATIVOS.full_48h;
 
     const checklists = Number(checklistsPorEmpleado[noEmpleado] || 0);
     const bitacoras = Number(bitacorasPorEmpleado[noEmpleado] || 0);
-    const descuentoSamsara = descuentoPorEmpleado[noEmpleado] || 0;
 
-    // 1. Samsara (40 pts base)
-    const ptsSamsara = Math.max(0, pesos.samsara - descuentoSamsara);
+    // 1. Alertas Samsara
+    const ptsSamsara = Math.max(0, (pesos.samsara ?? 20) - (descuentoAlertas[noEmpleado] || 0));
 
-    // 2. Checklists según meta semanal de su esquema
+    // 2. Exceso de Velocidad Samsara
+    const ptsVelocidad = Math.max(0, (pesos.velocidad ?? 20) - (descuentoVelocidad[noEmpleado] || 0));
+
+    // 3. Checklists preoperativos
     const ratioChecklists = Math.min(1, checklists / Math.max(1, esquema.metaChecklistsSemana));
-    const ptsChecklists = Math.round(ratioChecklists * pesos.checklists * 10) / 10;
+    const ptsChecklists = Math.round(ratioChecklists * (pesos.checklists ?? 25) * 10) / 10;
 
-    // 3. Bitácoras NOM-087 según relación de su turno:
-    //    48h -> 1 bitácora por cada 2 checklists (cada 48h)
-    //    24h -> 1 bitácora por cada 1 checklist (cada 24h)
+    // 4. Bitácoras NOM-087 (48h -> 1 por cada 2 checklists; 24h -> 1:1)
     const proporcionTurno = esquema.bitacoraPorTurno / esquema.checklistPorTurno;
     const metaBitacorasReales = checklists > 0
       ? Math.max(1, Math.ceil(checklists * proporcionTurno))
@@ -243,9 +333,9 @@ export function calcularRankingSemanal({
     const ratioBitacoras = checklists === 0 && bitacoras === 0
       ? 0
       : Math.min(1, bitacoras / metaBitacorasReales);
-    const ptsBitacoras = Math.round(ratioBitacoras * pesos.bitacoras * 10) / 10;
+    const ptsBitacoras = Math.round(ratioBitacoras * (pesos.bitacoras ?? 35) * 10) / 10;
 
-    const total = Math.round((ptsSamsara + ptsChecklists + ptsBitacoras) * 10) / 10;
+    const total = Math.round((ptsSamsara + ptsVelocidad + ptsChecklists + ptsBitacoras) * 10) / 10;
 
     evaluados[esquema.categoria].push({
       noEmpleado,
@@ -255,11 +345,13 @@ export function calcularRankingSemanal({
       total,
       rubros: {
         samsara: ptsSamsara,
+        velocidad: ptsVelocidad,
         bitacoras: ptsBitacoras,
         checklists: ptsChecklists
       },
       metricas: {
-        alertasAplican: alertasPorEmpleado[noEmpleado] || 0,
+        alertasAplican: conteoAlertas[noEmpleado] || 0,
+        excesosVelocidad: conteoVelocidad[noEmpleado] || 0,
         checklists,
         bitacoras,
         metaBitacoras: metaBitacorasReales
@@ -271,13 +363,15 @@ export function calcularRankingSemanal({
     lista.sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
     const conPosicion = lista.map((item, idx) => ({ ...item, posicion: idx + 1 }));
     const totalOperadores = conPosicion.length;
-    const top5 = conPosicion.slice(0, 5);
-    const ultimos3 = totalOperadores > 5
-      ? conPosicion.slice(Math.max(5, totalOperadores - 3))
+    const topLimit = totalOperadores <= 8 ? 3 : 5;
+    const topLista = conPosicion.slice(0, topLimit);
+    const ultimos3 = totalOperadores > topLimit
+      ? conPosicion.slice(Math.max(topLimit, totalOperadores - 3))
       : [];
     return {
       totalOperadores,
-      top5,
+      topLimit,
+      top5: topLista, // Mantiene compatibilidad de clave con vistas previas
       ultimos3,
       posiciones: conPosicion
     };

@@ -311,9 +311,12 @@
             </summary>
             <div class="p-4">
               <p class="text-xs text-slate-500">Esta configuración se guarda en un solo documento de Firestore y permanece disponible para futuras semanas.</p>
-              <div class="mt-4 grid gap-3 sm:grid-cols-3">
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <label class="text-xs font-bold uppercase text-slate-600">Samsara
-                  <input id="ranking-peso-samsara" type="number" min="0" max="100" value="40" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
+                  <input id="ranking-peso-samsara" type="number" min="0" max="100" value="20" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
+                </label>
+                <label class="text-xs font-bold uppercase text-slate-600">Velocidad
+                  <input id="ranking-peso-velocidad" type="number" min="0" max="100" value="20" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
                 </label>
                 <label class="text-xs font-bold uppercase text-slate-600">Bitácoras
                   <input id="ranking-peso-bitacoras" type="number" min="0" max="100" value="35" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
@@ -348,8 +351,11 @@
               <label class="text-xs font-bold uppercase text-slate-600">Fin (domingo)
                 <input id="ranking-fecha-fin" type="date" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
               </label>
-              <label class="text-xs font-bold uppercase text-slate-600 lg:col-span-2">CSV de Samsara
+              <label class="text-xs font-bold uppercase text-slate-600">CSV de Samsara
                 <input id="ranking-csv" type="file" accept=".csv,text/csv" class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal">
+              </label>
+              <label class="text-xs font-bold uppercase text-slate-600">Exceso de Velocidad (Samsara)
+                <input id="ranking-csv-velocidad" type="file" accept=".csv,text/csv" class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal">
               </label>
             </div>
             <div class="mt-4 flex flex-wrap gap-2">
@@ -360,7 +366,7 @@
                 Publicar Semana
               </button>
             </div>
-            <p id="ranking-preview-estado" role="status" class="mt-3 text-xs text-slate-500">Sube el CSV y calcula la vista previa.</p>
+            <p id="ranking-preview-estado" role="status" class="mt-3 text-xs text-slate-500">Sube el CSV de alertas y calcula la vista previa; el reporte de velocidad es opcional.</p>
           </div>
 
           <div id="ranking-resumen" class="hidden grid gap-4 lg:grid-cols-2"></div>
@@ -376,6 +382,7 @@
                   <tr>
                     <th class="px-3 py-2">Incluir</th><th class="px-3 py-2">Pos.</th><th class="px-3 py-2">Operador</th>
                     <th class="px-3 py-2">Categoría</th><th class="px-3 py-2 text-right">Samsara</th>
+                    <th class="px-3 py-2 text-right">Velocidad</th>
                     <th class="px-3 py-2 text-right">Bitácoras</th><th class="px-3 py-2 text-right">Checklists</th>
                     <th class="px-3 py-2 text-right">Total</th>
                   </tr>
@@ -621,7 +628,23 @@
     import { claveAgrupacionEquipo, clavePosibleDuplicado, coberturaFallaReporte, crearFirmaFalla, crearFirmasFalla, detalleFallaReporte, estadoFallaReporte, firmasEquivalentesPosicion, idCoberturaFalla, indexarCoberturasFalla, indiceOrdenesFalla, separarSistemasFalla } from "./js/firmaFalla.js";
     import { calcularAlertasSeguridad } from "./js/alertasSeguridad.js";
     import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, puedeAdministrarCatalogo, validarCatalogo } from "./js/catalogoEquipos.js";
-    import { PESOS_INICIALES, ESQUEMAS_OPERATIVOS, parsearCsvSamsara, calcularRankingSemanal } from "./js/rankingOperadores.js";
+    import * as rankingOperadores from "./js/rankingOperadores.js";
+
+    const {
+      PESOS_INICIALES,
+      ESQUEMAS_OPERATIVOS,
+      parsearCsvSamsara,
+      calcularRankingSemanal
+    } = rankingOperadores;
+    const PESOS_RANKING_DEFAULT = {
+      samsara: 20,
+      velocidad: 20,
+      bitacoras: 35,
+      checklists: 25,
+      ...PESOS_INICIALES,
+      samsara: 20,
+      velocidad: 20
+    };
 
     const firebaseConfig = getFirebaseConfig();
 
@@ -711,6 +734,7 @@
       });
       const pesos = {
         samsara: Number($('ranking-peso-samsara').value),
+        velocidad: Number($('ranking-peso-velocidad').value),
         bitacoras: Number($('ranking-peso-bitacoras').value),
         checklists: Number($('ranking-peso-checklists').value)
       };
@@ -725,10 +749,18 @@
 
     function renderConfiguracionRanking(configuracion = {}) {
       const esquemas = configuracion.esquemasPorEmpleado || {};
-      const pesos = configuracion.pesos || PESOS_INICIALES;
-      $('ranking-peso-samsara').value = pesos.samsara ?? PESOS_INICIALES.samsara;
-      $('ranking-peso-bitacoras').value = pesos.bitacoras ?? PESOS_INICIALES.bitacoras;
-      $('ranking-peso-checklists').value = pesos.checklists ?? PESOS_INICIALES.checklists;
+      const guardados = configuracion.pesos || {};
+      const pesos = guardados.velocidad === undefined
+        ? {
+            ...PESOS_RANKING_DEFAULT,
+            bitacoras: guardados.bitacoras ?? PESOS_RANKING_DEFAULT.bitacoras,
+            checklists: guardados.checklists ?? PESOS_RANKING_DEFAULT.checklists
+          }
+        : { ...PESOS_RANKING_DEFAULT, ...guardados };
+      $('ranking-peso-samsara').value = pesos.samsara;
+      $('ranking-peso-velocidad').value = pesos.velocidad;
+      $('ranking-peso-bitacoras').value = pesos.bitacoras;
+      $('ranking-peso-checklists').value = pesos.checklists;
 
       const opciones = Object.values(ESQUEMAS_OPERATIVOS)
         .map((esquema) => ({ id: esquema.id, etiqueta: esquema.etiqueta }));
@@ -755,7 +787,7 @@
         const snapshot = await getDoc(doc(db, 'metadata', 'ranking_config'));
         const configuracion = snapshot.exists() ? snapshot.data() : {
           esquemasPorEmpleado: {},
-          pesos: PESOS_INICIALES
+          pesos: PESOS_RANKING_DEFAULT
         };
         rankingState.configuracion = configuracion;
         renderConfiguracionRanking(configuracion);
@@ -871,6 +903,7 @@
         catalogoOperadores: window.CATALOGO_OPERADORES || {},
         esquemasPorEmpleado: configuracion.esquemasPorEmpleado,
         eventosAplicables: rankingState.datosSemana.eventosAplicables,
+        eventosVelocidad: rankingState.datosSemana.eventosVelocidad,
         checklistsPorEmpleado: rankingState.datosSemana.checklistsPorEmpleado,
         bitacorasPorEmpleado: rankingState.datosSemana.bitacorasPorEmpleado,
         pesos: configuracion.pesos,
@@ -924,6 +957,7 @@
           <td class="px-3 py-2"><strong>${escapeHtml(operador.nombre)}</strong><span class="block text-[10px] text-slate-500">${escapeHtml(operador.noEmpleado)}</span></td>
           <td class="px-3 py-2">${operador.categoriaEtiqueta}<span class="block text-[10px] text-slate-500">${escapeHtml(operador.esquemaEtiqueta)}</span></td>
           <td class="px-3 py-2 text-right">${operador.rubros.samsara}</td>
+          <td class="px-3 py-2 text-right">${operador.rubros.velocidad ?? 0}</td>
           <td class="px-3 py-2 text-right">${operador.rubros.bitacoras}</td>
           <td class="px-3 py-2 text-right">${operador.rubros.checklists}</td>
           <td class="px-3 py-2 text-right font-black">${operador.total}</td>
@@ -938,12 +972,17 @@
     async function calcularPreviewRanking() {
       const boton = $('ranking-calcular');
       const archivo = $('ranking-csv').files?.[0];
+      const archivoVelocidad = $('ranking-csv-velocidad').files?.[0] || null;
       if (!archivo) {
         showToast('Selecciona el archivo CSV semanal de Samsara.');
         return;
       }
       if (!archivo.name.toLowerCase().endsWith('.csv')) {
         showToast('El archivo de Samsara debe tener formato .csv.');
+        return;
+      }
+      if (archivoVelocidad && !archivoVelocidad.name.toLowerCase().endsWith('.csv')) {
+        showToast('El reporte de exceso de velocidad debe tener formato .csv.');
         return;
       }
 
@@ -955,6 +994,17 @@
         const configuracion = configuracionRankingFormulario();
         const csv = await archivo.text();
         const samsara = parsearCsvSamsara(csv, window.CATALOGO_OPERADORES || {});
+        let velocidad = { totalRegistros: 0, eventosVelocidad: [], sinEmpatar: [] };
+        if (archivoVelocidad) {
+          if (typeof rankingOperadores.parsearCsvVelocidadSamsara !== 'function') {
+            throw new Error('El módulo de ranking no incluye el parser de exceso de velocidad. Actualiza rankingOperadores.js.');
+          }
+          const csvVelocidad = await archivoVelocidad.text();
+          velocidad = rankingOperadores.parsearCsvVelocidadSamsara(
+            csvVelocidad,
+            window.CATALOGO_OPERADORES || {}
+          );
+        }
         const desde = semana.inicio.toISOString();
         const fin = new Date(`${semana.finTexto}T23:59:59.999`).toISOString();
         const [snapshotReportes, snapshotBitacoras] = await consultarReportesRanking(desde, fin);
@@ -966,6 +1016,7 @@
           etiquetaSemana: `${semana.inicio.toLocaleDateString('es-MX')} – ${semana.fin.toLocaleDateString('es-MX')}`,
           configuracion,
           eventosAplicables: samsara.eventosAplicables,
+          eventosVelocidad: velocidad.eventosVelocidad,
           ...actividad,
           estadisticasCsv: {
             totalEventos: samsara.totalEventos,
@@ -974,6 +1025,10 @@
             sinRevisar: samsara.sinRevisar,
             sinEmpatar: samsara.sinEmpatar
           },
+          estadisticasVelocidadCsv: {
+            totalRegistros: velocidad.totalRegistros,
+            sinEmpatar: velocidad.sinEmpatar
+          },
           documentosConsultados: snapshotReportes.size + snapshotBitacoras.size
         };
         rankingState.excluidosSemana = {};
@@ -981,10 +1036,14 @@
         const sinEmpatar = samsara.sinEmpatar.length
           ? ` · ${samsara.sinEmpatar.length} nombre(s) Samsara sin empatar`
           : '';
+        const sinEmpatarVelocidad = velocidad.sinEmpatar.length
+          ? ` · ${velocidad.sinEmpatar.length} nombre(s) de velocidad sin empatar`
+          : '';
         $('ranking-preview-estado').textContent =
           `${rankingState.datosSemana.documentosConsultados} reportes consultados · ` +
           `${samsara.aplican} alertas aplicables · ${samsara.noAplican} no aplican · ` +
-          `${samsara.sinRevisar} sin revisar${sinEmpatar}.`;
+          `${samsara.sinRevisar} sin revisar${sinEmpatar} · ` +
+          `${velocidad.totalRegistros} registros de velocidad${sinEmpatarVelocidad}.`;
       } catch (error) {
         console.error('No se pudo calcular la vista previa del ranking:', error);
         $('ranking-preview-estado').textContent = error.message;
@@ -1010,6 +1069,7 @@
           sencillo: rankingState.preview.sencillo,
           excluidosSemana: rankingState.excluidosSemana,
           estadisticasCsv: datos.estadisticasCsv,
+          estadisticasVelocidadCsv: datos.estadisticasVelocidadCsv,
           documentosConsultados: datos.documentosConsultados,
           publicadoEn: new Date().toISOString(),
           publicadoPor: state.user?.email || ''
@@ -4046,8 +4106,10 @@
     });
     $('ranking-fecha-fin').addEventListener('change', invalidarPreviewRanking);
     $('ranking-csv').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-csv-velocidad').addEventListener('change', invalidarPreviewRanking);
     $('ranking-config-operadores').addEventListener('change', invalidarPreviewRanking);
     $('ranking-peso-samsara').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-peso-velocidad').addEventListener('change', invalidarPreviewRanking);
     $('ranking-peso-bitacoras').addEventListener('change', invalidarPreviewRanking);
     $('ranking-peso-checklists').addEventListener('change', invalidarPreviewRanking);
     $('ranking-guardar-config').addEventListener('click', guardarConfiguracionRanking);
