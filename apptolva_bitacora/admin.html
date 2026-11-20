@@ -833,9 +833,12 @@
     }
 
     function empleadoDocumentoRanking(dato, payload) {
-      return String(
+      const numero = String(
         dato.employee_number || dato.employeeNumber || payload.employeeNumber || payload.employee_number || payload.numeroEmpleado || ''
       ).trim();
+      if (numero) return numero;
+      const nombre = dato.driver_name || dato.driverName || dato.operador || payload.driver_name || payload.driverName || payload.operador || '';
+      return rankingOperadores.empatarOperadorPorNombre(nombre, window.CATALOGO_OPERADORES || {}) || '';
     }
 
     function registrarConteoRanking(conteos, noEmpleado, clave) {
@@ -860,15 +863,23 @@
     function contarActividadRanking(snapshotReportes, snapshotBitacoras) {
       const clavesChecklists = {};
       const clavesBitacoras = {};
+      const foliosBitacoras = new Set();
+
+      const registrarBitacora = (noEmpleado, folio) => {
+        const clave = String(folio || '').trim().toUpperCase();
+        if (!clave || !window.CATALOGO_OPERADORES?.[noEmpleado] || foliosBitacoras.has(clave)) return;
+        foliosBitacoras.add(clave);
+        registrarConteoRanking(clavesBitacoras, noEmpleado, clave);
+      };
 
       snapshotReportes.forEach((documento) => {
         const dato = documento.data();
         const payload = dato.payload && typeof dato.payload === 'object' ? dato.payload : dato;
         const noEmpleado = empleadoDocumentoRanking(dato, payload);
-        const folio = String(dato.folio || payload.folio || documento.id);
-        const tipo = String(dato.report_type || payload.report_type || payload.reportType || '').toLowerCase().trim();
+        const folio = String(dato.folio || payload.folio || documento.id).trim();
+        const tipo = String(dato.report_type || dato.reportType || payload.report_type || payload.reportType || '').toLowerCase().trim();
         const esBitacora = tipo === 'bitacora' || Array.isArray(payload.logs) || /^(FB\d+|OFF-\d+)/i.test(folio);
-        if (esBitacora) registrarConteoRanking(clavesBitacoras, noEmpleado, folio);
+        if (esBitacora) registrarBitacora(noEmpleado, folio);
         else if (tipo === 'checklist' || tipo === '') registrarConteoRanking(clavesChecklists, noEmpleado, folio);
       });
 
@@ -876,8 +887,8 @@
         const dato = documento.data();
         const payload = dato.payload && typeof dato.payload === 'object' ? dato.payload : dato;
         const noEmpleado = empleadoDocumentoRanking(dato, payload);
-        const folio = String(dato.folio || payload.folio || documento.id);
-        registrarConteoRanking(clavesBitacoras, noEmpleado, folio);
+        const folio = String(dato.folio || payload.folio || documento.id).trim();
+        registrarBitacora(noEmpleado, folio);
       });
 
       return {
