@@ -332,6 +332,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /ranking_semanal/{semanaId} {
+      allow read: if isRouteUser();
+      allow write: if isPanelUser();
+    }
+
+    match /metadata/ranking_config {
+      allow read, write: if isPanelUser();
+    }
+
     match /cierres_masivos_ot/{jobId} {
       allow read: if isAdmin();
       allow write: if false;

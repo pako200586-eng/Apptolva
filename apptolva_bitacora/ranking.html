@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <script src="./js/firebase-config.js"></script>
+  <script src="./js/firebase-config-runtime.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ea580c">
+  <title>Ranking Semanal | AppTolva</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+  <link rel="stylesheet" href="./css/fontawesome.min.css">
+  <script src="./js/tailwindcss.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+    }
+  </script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 pb-10">
+  <header class="bg-orange-600 text-white p-4 sticky top-0 z-10 shadow flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <a href="index.html" aria-label="Volver al menú" class="text-white text-2xl">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <div>
+        <h1 class="font-black text-lg leading-tight">Ranking Semanal de Seguridad</h1>
+        <p id="rankingSemanaSubtitulo" class="text-xs text-orange-100">Cargando semana...</p>
+      </div>
+    </div>
+    <span class="bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">
+      Top 5 · Últimos 3
+    </span>
+  </header>
+
+  <main class="p-4 max-w-lg mx-auto space-y-4">
+    <!-- Selector de Categoría (Full vs Sencillo) -->
+    <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+      <button id="tabFull" type="button" class="py-2 px-3 rounded-lg text-xs font-black bg-orange-600 text-white transition">
+        <i class="fas fa-truck-moving mr-1"></i> Full (T3-S2-R4)
+      </button>
+      <button id="tabSencillo" type="button" class="py-2 px-3 rounded-lg text-xs font-black text-slate-600 hover:bg-slate-100 transition">
+        <i class="fas fa-truck mr-1"></i> Sencillo (T3-S2)
+      </button>
+    </div>
+
+    <!-- Tarjeta Personal del Operador -->
+    <section id="miPosicionCard" class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-4 rounded-2xl shadow-md">
+      <p class="text-xs text-slate-300 font-bold uppercase tracking-wider">Tu posición esta semana</p>
+      <p class="text-sm text-slate-200 mt-1">Consultando tu calificación...</p>
+    </section>
+
+    <!-- Podio Top 5 -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="bg-emerald-600 text-white px-4 py-2.5 flex items-center justify-between">
+        <h2 class="font-black text-sm"><i class="fas fa-trophy mr-2"></i>Top 5 de la Semana</h2>
+        <span class="text-[11px] font-bold opacity-90">Mejores calificaciones</span>
+      </div>
+      <div id="listaTop5" class="divide-y divide-slate-100"></div>
+    </section>
+
+    <!-- Últimos 3 Lugares -->
+    <section class="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+      <div class="bg-amber-600 text-white px-4 py-2.5 flex items-center justify-between">
+        <h2 class="font-black text-sm"><i class="fas fa-exclamation-circle mr-2"></i>Área de Atención (Últimos 3)</h2>
+        <span class="text-[11px] font-bold opacity-90">Oportunidad de mejora</span>
+      </div>
+      <div id="listaUltimos3" class="divide-y divide-amber-50"></div>
+    </section>
+
+    <p id="rankingEstado" class="text-center text-xs text-slate-400 font-medium"></p>
+  </main>
+
+  <script type="module">
+    import {
+      getFirebaseConfig, initializeApp, getAuth, onAuthStateChanged,
+      initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+      doc, getDoc
+    } from './js/firebase-sdk.js';
+    import { leerPerfil } from './js/controlSesion.js';
+
+    const app = initializeApp(getFirebaseConfig());
+    const auth = getAuth(app);
+    const db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+
+    let rankingData = null;
+    let categoriaActiva = 'full';
+    let miNoEmpleado = null;
+
+    const tabFull = document.getElementById('tabFull');
+    const tabSencillo = document.getElementById('tabSencillo');
+    const subtitulo = document.getElementById('rankingSemanaSubtitulo');
+    const miCard = document.getElementById('miPosicionCard');
+    const listaTop5 = document.getElementById('listaTop5');
+    const listaUltimos3 = document.getElementById('listaUltimos3');
+    const estadoEl = document.getElementById('rankingEstado');
+
+    function actualizarTabs() {
+      const activo = 'py-2 px-3 rounded-lg text-xs font-black bg-orange-600 text-white transition';
+      const inactivo = 'py-2 px-3 rounded-lg text-xs font-black text-slate-600 hover:bg-slate-100 transition';
+      tabFull.className = categoriaActiva === 'full' ? activo : inactivo;
+      tabSencillo.className = categoriaActiva === 'sencillo' ? activo : inactivo;
+    }
+
+    function crearElemento(tag, className, texto) {
+      const elemento = document.createElement(tag);
+      elemento.className = className;
+      if (texto !== undefined) elemento.textContent = texto;
+      return elemento;
+    }
+
+    function renderFila(op, tipo) {
+      const esMio = miNoEmpleado && String(op.noEmpleado) === String(miNoEmpleado);
+      const badgeColor = tipo === 'top'
+        ? (op.posicion === 1 ? 'bg-amber-400 text-slate-900' : 'bg-emerald-100 text-emerald-800')
+        : 'bg-amber-100 text-amber-900';
+
+      const fila = crearElemento('div', `p-3.5 flex items-center justify-between gap-3 ${esMio ? 'bg-orange-50' : ''}`);
+      const bloque = crearElemento('div', 'flex items-center gap-3 min-w-0');
+      const posicion = crearElemento('span', `w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${badgeColor}`, `#${op.posicion}`);
+      const detalle = crearElemento('div', 'min-w-0');
+      detalle.append(
+        crearElemento('p', 'font-bold text-sm text-slate-800 truncate', op.nombre),
+        crearElemento(
+          'p',
+          'text-[11px] text-slate-500',
+          `Samsara: ${op.rubros.samsara} · Bitácora: ${op.rubros.bitacoras} · Checklist: ${op.rubros.checklists}`
+        )
+      );
+      bloque.append(posicion, detalle);
+      fila.append(bloque, crearElemento('span', 'font-black text-base text-slate-900 shrink-0', op.total));
+      return fila;
+    }
+
+    function renderVista() {
+      actualizarTabs();
+      if (!rankingData) return;
+
+      const seg = rankingData[categoriaActiva] || { totalOperadores: 0, top5: [], ultimos3: [], posiciones: [] };
+      const miRegistro = miNoEmpleado
+        ? (seg.posiciones || []).find((p) => String(p.noEmpleado) === String(miNoEmpleado))
+        : null;
+
+      if (miRegistro) {
+        const encabezado = crearElemento('div', 'flex items-center justify-between');
+        const identidad = crearElemento('div');
+        const titulo = crearElemento('h2', 'text-xl font-black mt-0.5', `#${miRegistro.posicion} `);
+        titulo.append(crearElemento('span', 'text-sm font-normal text-slate-300', `de ${seg.totalOperadores}`));
+        identidad.append(
+          crearElemento('p', 'text-[11px] text-orange-300 font-bold uppercase tracking-wider', `Tu posición (${miRegistro.esquemaEtiqueta})`),
+          titulo,
+          crearElemento('p', 'text-xs text-slate-300 mt-0.5', miRegistro.nombre)
+        );
+        const puntuacion = crearElemento('div', 'text-right');
+        puntuacion.append(
+          crearElemento('span', 'text-3xl font-black text-orange-400', miRegistro.total),
+          crearElemento('span', 'block text-[10px] text-slate-400', 'de 100 pts')
+        );
+        encabezado.append(identidad, puntuacion);
+
+        const rubros = crearElemento('div', 'grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10 text-center text-xs');
+        [
+          ['Samsara', miRegistro.rubros.samsara, rankingData.pesos?.samsara ?? 40],
+          ['Bitácora 087', miRegistro.rubros.bitacoras, rankingData.pesos?.bitacoras ?? 35],
+          ['Checklists', miRegistro.rubros.checklists, rankingData.pesos?.checklists ?? 25]
+        ].forEach(([etiqueta, obtenido, maximo]) => {
+          const rubro = crearElemento('div');
+          rubro.append(
+            crearElemento('span', 'block text-slate-400 text-[10px]', etiqueta),
+            crearElemento('strong', '', `${obtenido}/${maximo}`)
+          );
+          rubros.append(rubro);
+        });
+        miCard.replaceChildren(encabezado, rubros);
+      } else {
+        miCard.replaceChildren(
+          crearElemento('p', 'text-xs text-slate-300 font-bold uppercase tracking-wider', 'Tu posición esta semana'),
+          crearElemento('p', 'text-sm text-slate-200 mt-1', 'Sin registro en esta categoría para la semana seleccionada.')
+        );
+      }
+
+      listaTop5.replaceChildren(...(seg.top5.length
+        ? seg.top5.map((op) => renderFila(op, 'top'))
+        : [crearElemento('p', 'p-4 text-xs text-slate-400 text-center', 'Sin datos publicados aún.')]));
+      listaUltimos3.replaceChildren(...(seg.ultimos3.length
+        ? seg.ultimos3.map((op) => renderFila(op, 'bottom'))
+        : [crearElemento('p', 'p-4 text-xs text-slate-400 text-center', 'Sin registros suficientes para mostrar últimos 3.')]));
+    }
+
+    tabFull.addEventListener('click', () => { categoriaActiva = 'full'; renderVista(); });
+    tabSencillo.addEventListener('click', () => { categoriaActiva = 'sencillo'; renderVista(); });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = 'index.html';
+        return;
+      }
+      const perfil = leerPerfil(localStorage);
+      miNoEmpleado = perfil?.noEmpleado || (user.email ? user.email.split('@')[0] : null);
+
+      try {
+        const snap = await getDoc(doc(db, 'ranking_semanal', 'actual'));
+        if (!snap.exists()) {
+          subtitulo.textContent = 'Sin corte semanal publicado';
+          estadoEl.textContent = 'Aún no hay un ranking publicado.';
+          return;
+        }
+        rankingData = snap.data();
+        subtitulo.textContent = rankingData.etiquetaSemana || rankingData.semanaId || 'Semana actual';
+
+        // Seleccionar automáticamente la categoría del operador logueado
+        if (miNoEmpleado && rankingData.sencillo?.posiciones?.some((p) => String(p.noEmpleado) === String(miNoEmpleado))) {
+          categoriaActiva = 'sencillo';
+        }
+        renderVista();
+        estadoEl.textContent = `Actualizado: ${rankingData.publicadoEn ? new Date(rankingData.publicadoEn).toLocaleDateString('es-MX') : 'reciente'}`;
+      } catch (err) {
+        console.error('Error cargando ranking:', err);
+        estadoEl.textContent = 'Sin conexión y sin caché previo del ranking.';
+      }
+    });
+  </script>
+</body>
+</html>

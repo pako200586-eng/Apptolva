@@ -9,6 +9,7 @@
   <title>Panel Administrativo | AppTolva</title>
   <script src="./js/tailwindcss.js"></script>
   <script src="./js/jspdf.min.js"></script>
+  <script src="./js/catalogoOperadores.js"></script>
   <script src="./js/catalogoBachoco.js"></script>
   <script src="./js/normalizadorFallas.js"></script>
   <script src="./js/etiquetasOT.js"></script>
@@ -156,6 +157,9 @@
         <button id="btn-vista-dashboard" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           <i class="fas fa-chart-pie mr-1"></i>Dashboard
         </button>
+        <button id="btn-vista-ranking" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
+          <i class="fas fa-trophy mr-1"></i>Ranking Semanal
+        </button>
         <button id="btn-vista-catalogo" class="hidden rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           <i class="fas fa-truck mr-1"></i>Catálogo de Equipos
         </button>
@@ -286,6 +290,99 @@
               </thead>
               <tbody id="tabla-catalogo-body" class="divide-y divide-orange-50"></tbody>
             </table>
+          </div>
+        </section>
+
+        <!-- VISTA: RANKING SEMANAL -->
+        <section id="vista-ranking" class="hidden space-y-5">
+          <div class="panel-card rounded-lg p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-black text-[#7c2d12]">Ranking Semanal de Operadores</h2>
+                <p class="mt-1 text-xs text-slate-500">Consulta únicamente la semana seleccionada y publica el corte visible para operadores.</p>
+              </div>
+              <span id="ranking-panel-estado" role="status" class="text-xs font-bold uppercase tracking-wide text-slate-500">Selecciona una semana</span>
+            </div>
+          </div>
+
+          <details class="panel-card overflow-hidden rounded-lg" open>
+            <summary class="cursor-pointer border-b border-orange-100 bg-orange-50 px-4 py-3 font-black text-[#7c2d12]">
+              Configuración de Operadores y Pesos
+            </summary>
+            <div class="p-4">
+              <p class="text-xs text-slate-500">Esta configuración se guarda en un solo documento de Firestore y permanece disponible para futuras semanas.</p>
+              <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                <label class="text-xs font-bold uppercase text-slate-600">Samsara
+                  <input id="ranking-peso-samsara" type="number" min="0" max="100" value="40" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
+                </label>
+                <label class="text-xs font-bold uppercase text-slate-600">Bitácoras
+                  <input id="ranking-peso-bitacoras" type="number" min="0" max="100" value="35" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
+                </label>
+                <label class="text-xs font-bold uppercase text-slate-600">Checklists
+                  <input id="ranking-peso-checklists" type="number" min="0" max="100" value="25" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
+                </label>
+              </div>
+              <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                    <tr><th class="px-3 py-2">No. empleado</th><th class="px-3 py-2">Operador</th><th class="px-3 py-2">Esquema operativo</th></tr>
+                  </thead>
+                  <tbody id="ranking-config-operadores" class="divide-y divide-slate-100"></tbody>
+                </table>
+              </div>
+              <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+                <p id="ranking-config-estado" role="status" class="text-xs text-slate-500">Cargando configuración...</p>
+                <button id="ranking-guardar-config" type="button" class="rounded-md bg-[#294936] px-4 py-2 text-sm font-black text-white disabled:cursor-wait disabled:opacity-60">
+                  Guardar configuración
+                </button>
+              </div>
+            </div>
+          </details>
+
+          <div class="panel-card rounded-lg p-4">
+            <h3 class="font-black text-slate-800">Publicación semanal</h3>
+            <div class="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <label class="text-xs font-bold uppercase text-slate-600">Inicio (lunes)
+                <input id="ranking-fecha-inicio" type="date" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
+              </label>
+              <label class="text-xs font-bold uppercase text-slate-600">Fin (domingo)
+                <input id="ranking-fecha-fin" type="date" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal">
+              </label>
+              <label class="text-xs font-bold uppercase text-slate-600 lg:col-span-2">CSV de Samsara
+                <input id="ranking-csv" type="file" accept=".csv,text/csv" class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal">
+              </label>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button id="ranking-calcular" type="button" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white disabled:cursor-wait disabled:opacity-60">
+                Calcular Vista Previa
+              </button>
+              <button id="ranking-publicar" type="button" disabled class="rounded-md bg-[#294936] px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50">
+                Publicar Semana
+              </button>
+            </div>
+            <p id="ranking-preview-estado" role="status" class="mt-3 text-xs text-slate-500">Sube el CSV y calcula la vista previa.</p>
+          </div>
+
+          <div id="ranking-resumen" class="hidden grid gap-4 lg:grid-cols-2"></div>
+
+          <div id="ranking-preview-panel" class="panel-card hidden overflow-hidden rounded-lg">
+            <div class="border-b border-orange-100 bg-orange-50 px-4 py-3">
+              <h3 class="font-black text-[#7c2d12]">Vista previa</h3>
+              <p class="text-xs text-slate-500">Desmarca operadores temporalmente por vacaciones, incapacidad o unidad en taller.</p>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-orange-100 text-sm">
+                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                  <tr>
+                    <th class="px-3 py-2">Incluir</th><th class="px-3 py-2">Pos.</th><th class="px-3 py-2">Operador</th>
+                    <th class="px-3 py-2">Categoría</th><th class="px-3 py-2 text-right">Samsara</th>
+                    <th class="px-3 py-2 text-right">Bitácoras</th><th class="px-3 py-2 text-right">Checklists</th>
+                    <th class="px-3 py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="ranking-preview-body" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -524,6 +621,7 @@
     import { claveAgrupacionEquipo, clavePosibleDuplicado, coberturaFallaReporte, crearFirmaFalla, crearFirmasFalla, detalleFallaReporte, estadoFallaReporte, firmasEquivalentesPosicion, idCoberturaFalla, indexarCoberturasFalla, indiceOrdenesFalla, separarSistemasFalla } from "./js/firmaFalla.js";
     import { calcularAlertasSeguridad } from "./js/alertasSeguridad.js";
     import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, puedeAdministrarCatalogo, validarCatalogo } from "./js/catalogoEquipos.js";
+    import { PESOS_INICIALES, ESQUEMAS_OPERATIVOS, parsearCsvSamsara, calcularRankingSemanal } from "./js/rankingOperadores.js";
 
     const firebaseConfig = getFirebaseConfig();
 
@@ -565,6 +663,371 @@
       'cierres_masivos_ot'
     ];
     let ultimoInventarioFirestore = null;
+    const rankingState = {
+      configCargada: false,
+      configuracion: null,
+      datosSemana: null,
+      excluidosSemana: {},
+      preview: null
+    };
+
+    function fechaIsoLocalRanking(fecha) {
+      const anio = fecha.getFullYear();
+      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+      const dia = String(fecha.getDate()).padStart(2, '0');
+      return `${anio}-${mes}-${dia}`;
+    }
+
+    function semanaActualRanking() {
+      const lunes = new Date();
+      lunes.setHours(0, 0, 0, 0);
+      const desplazamiento = (lunes.getDay() + 6) % 7;
+      lunes.setDate(lunes.getDate() - desplazamiento);
+      const domingo = new Date(lunes);
+      domingo.setDate(lunes.getDate() + 6);
+      return { inicio: fechaIsoLocalRanking(lunes), fin: fechaIsoLocalRanking(domingo) };
+    }
+
+    function validarSemanaRanking() {
+      const inicioTexto = $('ranking-fecha-inicio').value;
+      const finTexto = $('ranking-fecha-fin').value;
+      const inicio = new Date(`${inicioTexto}T00:00:00`);
+      const fin = new Date(`${finTexto}T00:00:00`);
+      if (!inicioTexto || !finTexto || Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime())) {
+        throw new Error('Selecciona la fecha inicial y final de la semana.');
+      }
+      if (inicio.getDay() !== 1 || fin.getDay() !== 0) {
+        throw new Error('La semana debe iniciar en lunes y terminar en domingo.');
+      }
+      const dias = Math.round((fin.getTime() - inicio.getTime()) / 86400000);
+      if (dias !== 6) throw new Error('El rango semanal debe cubrir exactamente siete días consecutivos.');
+      return { inicioTexto, finTexto, inicio, fin };
+    }
+
+    function configuracionRankingFormulario() {
+      const esquemasPorEmpleado = {};
+      document.querySelectorAll('[data-ranking-esquema]').forEach((select) => {
+        esquemasPorEmpleado[select.dataset.rankingEsquema] = select.value;
+      });
+      const pesos = {
+        samsara: Number($('ranking-peso-samsara').value),
+        bitacoras: Number($('ranking-peso-bitacoras').value),
+        checklists: Number($('ranking-peso-checklists').value)
+      };
+      if (Object.values(pesos).some((peso) => !Number.isFinite(peso) || peso < 0)) {
+        throw new Error('Los pesos deben ser números mayores o iguales a cero.');
+      }
+      if (Object.values(pesos).reduce((total, peso) => total + peso, 0) !== 100) {
+        throw new Error('La suma de pesos debe ser exactamente 100.');
+      }
+      return { esquemasPorEmpleado, pesos };
+    }
+
+    function renderConfiguracionRanking(configuracion = {}) {
+      const esquemas = configuracion.esquemasPorEmpleado || {};
+      const pesos = configuracion.pesos || PESOS_INICIALES;
+      $('ranking-peso-samsara').value = pesos.samsara ?? PESOS_INICIALES.samsara;
+      $('ranking-peso-bitacoras').value = pesos.bitacoras ?? PESOS_INICIALES.bitacoras;
+      $('ranking-peso-checklists').value = pesos.checklists ?? PESOS_INICIALES.checklists;
+
+      const opciones = Object.values(ESQUEMAS_OPERATIVOS)
+        .map((esquema) => ({ id: esquema.id, etiqueta: esquema.etiqueta }));
+      opciones.push({ id: 'excluido', etiqueta: 'Excluido permanentemente' });
+      const catalogo = window.CATALOGO_OPERADORES || {};
+      $('ranking-config-operadores').innerHTML = Object.entries(catalogo)
+        .sort(([, a], [, b]) => a.nombre.localeCompare(b.nombre, 'es-MX'))
+        .map(([noEmpleado, operador]) => `
+          <tr>
+            <td class="px-3 py-2 font-black text-slate-700">${escapeHtml(noEmpleado)}</td>
+            <td class="px-3 py-2">${escapeHtml(operador.nombre)}</td>
+            <td class="px-3 py-2">
+              <select data-ranking-esquema="${escapeHtml(noEmpleado)}" class="min-w-56 rounded-md border border-slate-300 px-2 py-2 text-xs">
+                ${opciones.map((opcion) => `<option value="${opcion.id}" ${esquemas[noEmpleado] === opcion.id || (!esquemas[noEmpleado] && opcion.id === 'full_48h') ? 'selected' : ''}>${escapeHtml(opcion.etiqueta)}</option>`).join('')}
+              </select>
+            </td>
+          </tr>`).join('');
+    }
+
+    async function cargarConfiguracionRanking() {
+      if (!state.user || rankingState.configCargada) return;
+      $('ranking-config-estado').textContent = 'Leyendo configuración de Firestore...';
+      try {
+        const snapshot = await getDoc(doc(db, 'metadata', 'ranking_config'));
+        const configuracion = snapshot.exists() ? snapshot.data() : {
+          esquemasPorEmpleado: {},
+          pesos: PESOS_INICIALES
+        };
+        rankingState.configuracion = configuracion;
+        renderConfiguracionRanking(configuracion);
+        rankingState.configCargada = true;
+        $('ranking-config-estado').textContent = snapshot.exists()
+          ? 'Configuración cargada desde Firestore.'
+          : 'Sin configuración guardada: se muestran los valores iniciales.';
+      } catch (error) {
+        console.error('No se pudo cargar la configuración del ranking:', error);
+        $('ranking-config-estado').textContent = `No se pudo cargar: ${error.message}`;
+        showToast('No se pudo cargar la configuración del ranking.');
+      }
+    }
+
+    async function guardarConfiguracionRanking() {
+      if (!state.user) return;
+      const boton = $('ranking-guardar-config');
+      boton.disabled = true;
+      try {
+        const configuracion = configuracionRankingFormulario();
+        await setDoc(doc(db, 'metadata', 'ranking_config'), configuracion);
+        rankingState.configuracion = configuracion;
+        rankingState.preview = null;
+        $('ranking-publicar').disabled = true;
+        $('ranking-config-estado').textContent = 'Configuración guardada.';
+        showToast('Configuración del ranking guardada.');
+      } catch (error) {
+        console.error('No se pudo guardar la configuración del ranking:', error);
+        $('ranking-config-estado').textContent = error.message;
+        showToast(error.message || 'No se pudo guardar la configuración.');
+      } finally {
+        boton.disabled = false;
+      }
+    }
+
+    function invalidarPreviewRanking() {
+      rankingState.preview = null;
+      rankingState.datosSemana = null;
+      rankingState.excluidosSemana = {};
+      $('ranking-publicar').disabled = true;
+      $('ranking-preview-panel').classList.add('hidden');
+      $('ranking-resumen').classList.add('hidden');
+    }
+
+    function empleadoDocumentoRanking(dato, payload) {
+      return String(
+        dato.employee_number || dato.employeeNumber || payload.employeeNumber || payload.employee_number || payload.numeroEmpleado || ''
+      ).trim();
+    }
+
+    function registrarConteoRanking(conteos, noEmpleado, clave) {
+      if (!noEmpleado || !window.CATALOGO_OPERADORES?.[noEmpleado]) return;
+      if (!conteos[noEmpleado]) conteos[noEmpleado] = new Set();
+      conteos[noEmpleado].add(clave);
+    }
+
+    async function consultarReportesRanking(desde, hasta) {
+      const rango = (nombre) => fsQuery(
+        collection(db, nombre),
+        fsWhere('created_at', '>=', desde),
+        fsWhere('created_at', '<=', hasta),
+        fsOrderBy('created_at', 'asc')
+      );
+      return Promise.all([
+        getDocsFromServer(rango('bitacora_reports')),
+        getDocsFromServer(rango('bitacoras_087'))
+      ]);
+    }
+
+    function contarActividadRanking(snapshotReportes, snapshotBitacoras) {
+      const clavesChecklists = {};
+      const clavesBitacoras = {};
+
+      snapshotReportes.forEach((documento) => {
+        const dato = documento.data();
+        const payload = dato.payload && typeof dato.payload === 'object' ? dato.payload : dato;
+        const noEmpleado = empleadoDocumentoRanking(dato, payload);
+        const folio = String(dato.folio || payload.folio || documento.id);
+        const tipo = String(dato.report_type || payload.report_type || payload.reportType || '').toLowerCase().trim();
+        const esBitacora = tipo === 'bitacora' || Array.isArray(payload.logs) || /^(FB\d+|OFF-\d+)/i.test(folio);
+        if (esBitacora) registrarConteoRanking(clavesBitacoras, noEmpleado, folio);
+        else if (tipo === 'checklist' || tipo === '') registrarConteoRanking(clavesChecklists, noEmpleado, folio);
+      });
+
+      snapshotBitacoras.forEach((documento) => {
+        const dato = documento.data();
+        const payload = dato.payload && typeof dato.payload === 'object' ? dato.payload : dato;
+        const noEmpleado = empleadoDocumentoRanking(dato, payload);
+        const folio = String(dato.folio || payload.folio || documento.id);
+        registrarConteoRanking(clavesBitacoras, noEmpleado, folio);
+      });
+
+      return {
+        checklistsPorEmpleado: Object.fromEntries(Object.entries(clavesChecklists).map(([id, claves]) => [id, claves.size])),
+        bitacorasPorEmpleado: Object.fromEntries(Object.entries(clavesBitacoras).map(([id, claves]) => [id, claves.size]))
+      };
+    }
+
+    function exclusionesPermanentesRanking(esquemasPorEmpleado) {
+      return Object.fromEntries(
+        Object.entries(esquemasPorEmpleado)
+          .filter(([, esquema]) => esquema === 'excluido')
+          .map(([noEmpleado]) => [noEmpleado, true])
+      );
+    }
+
+    function recalcularRankingPreview() {
+      if (!rankingState.datosSemana) return;
+      const configuracion = rankingState.datosSemana.configuracion;
+      const excluidosPermanentes = exclusionesPermanentesRanking(configuracion.esquemasPorEmpleado);
+      const excluidosFinales = { ...excluidosPermanentes, ...rankingState.excluidosSemana };
+      const parametros = {
+        catalogoOperadores: window.CATALOGO_OPERADORES || {},
+        esquemasPorEmpleado: configuracion.esquemasPorEmpleado,
+        eventosAplicables: rankingState.datosSemana.eventosAplicables,
+        checklistsPorEmpleado: rankingState.datosSemana.checklistsPorEmpleado,
+        bitacorasPorEmpleado: rankingState.datosSemana.bitacorasPorEmpleado,
+        pesos: configuracion.pesos,
+        excluidos: excluidosFinales
+      };
+      rankingState.preview = calcularRankingSemanal(parametros);
+      rankingState.datosSemana.rankingSinExcluidosSemana = calcularRankingSemanal({
+        ...parametros,
+        excluidos: excluidosPermanentes
+      });
+      renderRankingPreview();
+      $('ranking-publicar').disabled = false;
+    }
+
+    function renderResumenRankingCategoria(titulo, segmento) {
+      const filas = (lista, etiqueta) => lista.length
+        ? lista.map((operador) => `<li class="flex items-center justify-between gap-2"><span>#${operador.posicion} ${escapeHtml(operador.nombre)}</span><strong>${operador.total}</strong></li>`).join('')
+        : `<li class="text-slate-400">${etiqueta}</li>`;
+      return `
+        <article class="panel-card rounded-lg p-4">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-black text-slate-800">${escapeHtml(titulo)}</h3>
+            <span class="text-xs font-bold text-slate-500">${segmento.totalOperadores} operadores</span>
+          </div>
+          <div class="mt-3 grid gap-4 sm:grid-cols-2">
+            <div>
+              <p class="text-xs font-black uppercase text-emerald-700">Top 5</p>
+              <ol class="mt-2 space-y-1 text-sm">${filas(segmento.top5, 'Sin operadores evaluados')}</ol>
+            </div>
+            <div>
+              <p class="text-xs font-black uppercase text-amber-700">Últimos 3</p>
+              <ol class="mt-2 space-y-1 text-sm">${filas(segmento.ultimos3, 'No hay suficientes operadores')}</ol>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function renderRankingPreview() {
+      if (!rankingState.preview || !rankingState.datosSemana) return;
+      const rankingBase = rankingState.datosSemana.rankingSinExcluidosSemana;
+      const posiciones = [
+        ...rankingBase.full.posiciones.map((operador) => ({ ...operador, categoriaEtiqueta: 'Full' })),
+        ...rankingBase.sencillo.posiciones.map((operador) => ({ ...operador, categoriaEtiqueta: 'Sencillo' }))
+      ];
+      $('ranking-preview-body').innerHTML = posiciones.map((operador) => `
+        <tr class="${rankingState.excluidosSemana[operador.noEmpleado] ? 'bg-slate-100 text-slate-400' : ''}">
+          <td class="px-3 py-2">
+            <input type="checkbox" data-ranking-operador="${escapeHtml(operador.noEmpleado)}" ${rankingState.excluidosSemana[operador.noEmpleado] ? '' : 'checked'} class="h-4 w-4 accent-[#294936]" aria-label="Incluir a ${escapeHtml(operador.nombre)}">
+          </td>
+          <td class="px-3 py-2 font-black">#${operador.posicion}</td>
+          <td class="px-3 py-2"><strong>${escapeHtml(operador.nombre)}</strong><span class="block text-[10px] text-slate-500">${escapeHtml(operador.noEmpleado)}</span></td>
+          <td class="px-3 py-2">${operador.categoriaEtiqueta}<span class="block text-[10px] text-slate-500">${escapeHtml(operador.esquemaEtiqueta)}</span></td>
+          <td class="px-3 py-2 text-right">${operador.rubros.samsara}</td>
+          <td class="px-3 py-2 text-right">${operador.rubros.bitacoras}</td>
+          <td class="px-3 py-2 text-right">${operador.rubros.checklists}</td>
+          <td class="px-3 py-2 text-right font-black">${operador.total}</td>
+        </tr>`).join('');
+      $('ranking-preview-panel').classList.remove('hidden');
+      $('ranking-resumen').innerHTML =
+        renderResumenRankingCategoria('Categoría Full', rankingState.preview.full)
+        + renderResumenRankingCategoria('Categoría Sencillo', rankingState.preview.sencillo);
+      $('ranking-resumen').classList.remove('hidden');
+    }
+
+    async function calcularPreviewRanking() {
+      const boton = $('ranking-calcular');
+      const archivo = $('ranking-csv').files?.[0];
+      if (!archivo) {
+        showToast('Selecciona el archivo CSV semanal de Samsara.');
+        return;
+      }
+      if (!archivo.name.toLowerCase().endsWith('.csv')) {
+        showToast('El archivo de Samsara debe tener formato .csv.');
+        return;
+      }
+
+      boton.disabled = true;
+      $('ranking-publicar').disabled = true;
+      $('ranking-preview-estado').textContent = 'Leyendo CSV y consultando exclusivamente la semana seleccionada...';
+      try {
+        const semana = validarSemanaRanking();
+        const configuracion = configuracionRankingFormulario();
+        const csv = await archivo.text();
+        const samsara = parsearCsvSamsara(csv, window.CATALOGO_OPERADORES || {});
+        const desde = semana.inicio.toISOString();
+        const fin = new Date(`${semana.finTexto}T23:59:59.999`).toISOString();
+        const [snapshotReportes, snapshotBitacoras] = await consultarReportesRanking(desde, fin);
+        const actividad = contarActividadRanking(snapshotReportes, snapshotBitacoras);
+        rankingState.datosSemana = {
+          inicio: semana.inicioTexto,
+          fin: semana.finTexto,
+          semanaId: `${semana.inicioTexto}_${semana.finTexto}`,
+          etiquetaSemana: `${semana.inicio.toLocaleDateString('es-MX')} – ${semana.fin.toLocaleDateString('es-MX')}`,
+          configuracion,
+          eventosAplicables: samsara.eventosAplicables,
+          ...actividad,
+          estadisticasCsv: {
+            totalEventos: samsara.totalEventos,
+            aplican: samsara.aplican,
+            noAplican: samsara.noAplican,
+            sinRevisar: samsara.sinRevisar,
+            sinEmpatar: samsara.sinEmpatar
+          },
+          documentosConsultados: snapshotReportes.size + snapshotBitacoras.size
+        };
+        rankingState.excluidosSemana = {};
+        recalcularRankingPreview();
+        const sinEmpatar = samsara.sinEmpatar.length
+          ? ` · ${samsara.sinEmpatar.length} nombre(s) Samsara sin empatar`
+          : '';
+        $('ranking-preview-estado').textContent =
+          `${rankingState.datosSemana.documentosConsultados} reportes consultados · ` +
+          `${samsara.aplican} alertas aplicables · ${samsara.noAplican} no aplican · ` +
+          `${samsara.sinRevisar} sin revisar${sinEmpatar}.`;
+      } catch (error) {
+        console.error('No se pudo calcular la vista previa del ranking:', error);
+        $('ranking-preview-estado').textContent = error.message;
+        showToast(error.message || 'No se pudo calcular el ranking.');
+      } finally {
+        boton.disabled = false;
+      }
+    }
+
+    async function publicarSemanaRanking() {
+      if (!rankingState.preview || !rankingState.datosSemana) return;
+      const boton = $('ranking-publicar');
+      boton.disabled = true;
+      try {
+        const datos = rankingState.datosSemana;
+        const publicado = {
+          semanaId: datos.semanaId,
+          inicio: datos.inicio,
+          fin: datos.fin,
+          etiquetaSemana: datos.etiquetaSemana,
+          pesos: rankingState.preview.pesos,
+          full: rankingState.preview.full,
+          sencillo: rankingState.preview.sencillo,
+          excluidosSemana: rankingState.excluidosSemana,
+          estadisticasCsv: datos.estadisticasCsv,
+          documentosConsultados: datos.documentosConsultados,
+          publicadoEn: new Date().toISOString(),
+          publicadoPor: state.user?.email || ''
+        };
+        await runTransaction(db, async (transaction) => {
+          transaction.set(doc(db, 'ranking_semanal', datos.semanaId), publicado);
+          transaction.set(doc(db, 'ranking_semanal', 'actual'), publicado);
+        });
+        $('ranking-preview-estado').textContent = `Semana ${datos.etiquetaSemana} publicada correctamente.`;
+        showToast('Ranking semanal publicado.');
+      } catch (error) {
+        console.error('No se pudo publicar el ranking:', error);
+        $('ranking-preview-estado').textContent = error.message;
+        showToast(error.message || 'No se pudo publicar la semana.');
+      } finally {
+        boton.disabled = false;
+      }
+    }
 
     function formatoBytes(bytes) {
       if (bytes < 1024) return `${bytes} B`;
@@ -3569,7 +4032,36 @@
       }
     });
 
-    const vistasMantenimiento = ['vista-reportes', 'vista-emergencias', 'vista-fallas', 'vista-ordenes', 'vista-dashboard', 'vista-catalogo'];
+    const semanaRanking = semanaActualRanking();
+    $('ranking-fecha-inicio').value = semanaRanking.inicio;
+    $('ranking-fecha-fin').value = semanaRanking.fin;
+    $('ranking-fecha-inicio').addEventListener('change', () => {
+      const inicio = new Date(`${$('ranking-fecha-inicio').value}T00:00:00`);
+      if (!Number.isNaN(inicio.getTime())) {
+        const fin = new Date(inicio);
+        fin.setDate(fin.getDate() + 6);
+        $('ranking-fecha-fin').value = fechaIsoLocalRanking(fin);
+      }
+      invalidarPreviewRanking();
+    });
+    $('ranking-fecha-fin').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-csv').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-config-operadores').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-peso-samsara').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-peso-bitacoras').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-peso-checklists').addEventListener('change', invalidarPreviewRanking);
+    $('ranking-guardar-config').addEventListener('click', guardarConfiguracionRanking);
+    $('ranking-calcular').addEventListener('click', calcularPreviewRanking);
+    $('ranking-publicar').addEventListener('click', publicarSemanaRanking);
+    $('ranking-preview-body').addEventListener('change', (evento) => {
+      const noEmpleado = evento.target?.dataset?.rankingOperador;
+      if (!noEmpleado) return;
+      if (evento.target.checked) delete rankingState.excluidosSemana[noEmpleado];
+      else rankingState.excluidosSemana[noEmpleado] = true;
+      recalcularRankingPreview();
+    });
+
+    const vistasMantenimiento = ['vista-reportes', 'vista-emergencias', 'vista-fallas', 'vista-ordenes', 'vista-dashboard', 'vista-ranking', 'vista-catalogo'];
 
     function mostrarVistaMantenimiento(id, cargar = true) {
       vistasMantenimiento.forEach(v => {
@@ -3595,6 +4087,7 @@
       if (id === 'vista-fallas') cargarFallas();
       if (id === 'vista-ordenes') cargarOrdenes();
       if (id === 'vista-dashboard') cargarDashboard(true);
+      if (id === 'vista-ranking') cargarConfiguracionRanking();
       if (id === 'vista-catalogo') cargarCatalogoEquipos();
     }
 
