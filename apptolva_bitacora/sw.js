@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v130"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v131"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";
@@ -56,25 +56,7 @@ const OFFLINE_URLS = [
   "./img/ot/dolly2.jpg",
   "./webfonts/fa-solid-900.woff2",
   "./webfonts/fa-brands-400.woff2",
-  "./webfonts/fa-regular-400.woff2",
-  "./aceite2.jpg",
-  "./arco.jpg",
-  "./arco1.jpg",
-  "./atasco.jpg",
-  "./atras.jpg",
-  "./cable1.jpg",
-  "./des.jpg",
-  "./descfin.jpg",
-  "./final.jpg",
-  "./mangue.jpg",
-  "./manometros.jpg",
-  "./palancas.jpg",
-  "./peligro.jpg",
-  "./pto.jpg",
-  "./reg.jpg",
-  "./reg1.jpg",
-  "./silo.jpg",
-  "./suelo.jpg"
+  "./webfonts/fa-regular-400.woff2"
 ];
 
 function generateSafeUUID() {
