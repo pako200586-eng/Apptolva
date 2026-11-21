@@ -47,11 +47,12 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
     };
   }
   const ids = ['depurarFallasBtn', 'auditFirestoreBtn', 'backupFirestoreBtn', 'btn-vista-catalogo',
-    'vista-catalogo', 'btn-vista-reportes', 'cargarMasAntiguos', 'firestoreAudit', 'downloadFirestoreAudit'];
-  const elements = Object.fromEntries(ids.map(id => [id, element(id === 'vista-catalogo')]));
+    'vista-catalogo', 'btn-vista-ranking', 'vista-ranking', 'btn-vista-reportes', 'cargarMasAntiguos',
+    'firestoreAudit', 'downloadFirestoreAudit'];
+  const elements = Object.fromEntries(ids.map(id => [id, element(id === 'vista-catalogo' || id === 'vista-ranking' || id === 'btn-vista-ranking')]));
   const adminButton = element();
   const input = {};
-  const state = { role: 'admin', user: { email: 'frank@apptolva.com' }, operacionesSensibles: false, windowDays: 30 };
+  const state = { role: 'admin', user: { email: 'frank@apptolva.com' }, operacionesSensibles: false, rankingSemanal: false, windowDays: 30 };
   const context = vm.createContext({
     catalogoEquipos, state, $: id => elements[id], VENTANA_PASO_DIAS: 7,
     document: { querySelectorAll: selector => selector === '.btn-accion-admin' ? [adminButton] : [input] }
@@ -68,19 +69,24 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
   assert.equal(hidden('depurarFallasBtn'), true);
   assert.equal(hidden('auditFirestoreBtn'), true);
   assert.equal(hidden('backupFirestoreBtn'), true);
+  assert.equal(hidden('btn-vista-ranking'), true);
   assert.equal(input.disabled, false);
 
   state.operacionesSensibles = true;
+  state.rankingSemanal = true;
   context.aplicarPermisosDeInterfaz();
   assert.equal(hidden('depurarFallasBtn'), false);
   assert.equal(hidden('auditFirestoreBtn'), false);
   assert.equal(hidden('backupFirestoreBtn'), false);
+  assert.equal(hidden('btn-vista-ranking'), false);
 
   state.user.email = 'otro@example.test';
   state.operacionesSensibles = false;
+  state.rankingSemanal = false;
   context.aplicarPermisosDeInterfaz();
   assert.equal(hidden('btn-vista-catalogo'), true);
   assert.equal(hidden('depurarFallasBtn'), true);
+  assert.equal(hidden('btn-vista-ranking'), true);
 
   state.role = 'lectura';
   state.user.email = 'frank@apptolva.com';

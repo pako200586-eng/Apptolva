@@ -30,6 +30,10 @@ service cloud.firestore {
       return isAdmin() && request.auth.token.email.lower() == 'frank@apptolva.com';
     }
 
+    function isRankingOwner() {
+      return isAdmin() && request.auth.token.email.lower() == 'frank@apptolva.com';
+    }
+
     // Keep evaluation access independent from usuarios/{email}.rol (panel role).
     function isEmailPasswordUser() {
       return signedIn()
@@ -334,11 +338,11 @@ service cloud.firestore {
 
     match /ranking_semanal/{semanaId} {
       allow read: if isRouteUser();
-      allow write: if isPanelUser();
+      allow write: if isRankingOwner();
     }
 
     match /metadata/ranking_config {
-      allow read, write: if isPanelUser();
+      allow read, write: if isRankingOwner();
     }
 
     match /cierres_masivos_ot/{jobId} {

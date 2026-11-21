@@ -559,7 +559,11 @@ export default async function handler(request) {
     }
 
     if (body.action === 'privileges') {
-      return respuesta(200, { sensibles: correosDepuracion().has(usuario.correo) });
+      const esResponsable = correosDepuracion().has(usuario.correo);
+      return respuesta(200, {
+        sensibles: esResponsable,
+        ranking: esResponsable && usuario.correo === 'frank@apptolva.com'
+      });
     }
 
     if (String(body.action || '').startsWith('retroactive-') || String(body.action || '').startsWith('firestore-')) {

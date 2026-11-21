@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v132"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v137"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
 const DB_NAME = "apptolva-offline-db";

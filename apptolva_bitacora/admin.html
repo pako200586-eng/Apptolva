@@ -157,7 +157,7 @@
         <button id="btn-vista-dashboard" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           <i class="fas fa-chart-pie mr-1"></i>Dashboard
         </button>
-        <button id="btn-vista-ranking" class="rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
+        <button id="btn-vista-ranking" class="hidden rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
           <i class="fas fa-trophy mr-1"></i>Ranking Semanal
         </button>
         <button id="btn-vista-catalogo" class="hidden rounded-md bg-white border border-[#7c2d12] px-4 py-2 text-sm font-bold text-[#7c2d12] hover:bg-orange-50 transition">
@@ -667,7 +667,7 @@
       }
     }
 
-    const state = { user: null, role: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '', windowDays: 30, pageSize: 50, page: 1, reportesTab: 'checklist', prefiltroEstatusOT: '', historyCursor: null, historyLoaded: false, historyExhausted: false, hitLimit: false, syncWatermark: null };
+    const state = { user: null, role: null, reports: [], allReports: [], appliedFilters: { from: '', to: '', unit: '', operator: '', type: 'todos' }, lastTotal: 0, tableSignature: '', windowDays: 30, pageSize: 50, page: 1, reportesTab: 'checklist', prefiltroEstatusOT: '', historyCursor: null, historyLoaded: false, historyExhausted: false, hitLimit: false, syncWatermark: null, operacionesSensibles: false, rankingSemanal: false };
     const VENTANA_PASO_DIAS = 30;
     const LIMITE_PAGINA_REPORTES = 250;
     const LIMITE_VENTANA_REPORTES = 1500;
@@ -781,7 +781,7 @@
     }
 
     async function cargarConfiguracionRanking() {
-      if (!state.user || rankingState.configCargada) return;
+      if (!state.user || state.rankingSemanal !== true || rankingState.configCargada) return;
       $('ranking-config-estado').textContent = 'Leyendo configuración de Firestore...';
       try {
         const snapshot = await getDoc(doc(db, 'metadata', 'ranking_config'));
@@ -803,7 +803,10 @@
     }
 
     async function guardarConfiguracionRanking() {
-      if (!state.user) return;
+      if (!state.user || state.rankingSemanal !== true) {
+        showToast('El Ranking Semanal está reservado al responsable autorizado.');
+        return;
+      }
       const boton = $('ranking-guardar-config');
       boton.disabled = true;
       try {
@@ -970,6 +973,10 @@
     }
 
     async function calcularPreviewRanking() {
+      if (state.rankingSemanal !== true) {
+        showToast('El Ranking Semanal está reservado al responsable autorizado.');
+        return;
+      }
       const boton = $('ranking-calcular');
       const archivo = $('ranking-csv').files?.[0];
       const archivoVelocidad = $('ranking-csv-velocidad').files?.[0] || null;
@@ -1054,6 +1061,10 @@
     }
 
     async function publicarSemanaRanking() {
+      if (state.rankingSemanal !== true) {
+        showToast('El Ranking Semanal está reservado al responsable autorizado.');
+        return;
+      }
       if (!rankingState.preview || !rankingState.datosSemana) return;
       const boton = $('ranking-publicar');
       boton.disabled = true;
@@ -1338,6 +1349,7 @@
     function aplicarPermisosDeInterfaz() {
       const esAdmin = state.role === 'admin';
       const esResponsable = esAdmin && state.operacionesSensibles === true;
+      const puedeAdministrarRanking = esResponsable && state.rankingSemanal === true;
       const esResponsableCatalogo = puedeAdministrarCatalogo(state.role, state.user?.email);
       document.querySelectorAll('.btn-accion-admin').forEach((element) => {
         element.classList.toggle('hidden', !esAdmin);
@@ -1348,6 +1360,10 @@
       });
       $('auditFirestoreBtn').classList.toggle('hidden', !esResponsable);
       $('backupFirestoreBtn').classList.toggle('hidden', !esResponsable);
+      $('btn-vista-ranking').classList.toggle('hidden', !puedeAdministrarRanking);
+      if (!puedeAdministrarRanking && !$('vista-ranking').classList.contains('hidden')) {
+        $('btn-vista-reportes').click();
+      }
       $('btn-vista-catalogo').classList.toggle('hidden', !esResponsableCatalogo);
       if (!esResponsableCatalogo && !$('vista-catalogo').classList.contains('hidden')) $('btn-vista-reportes').click();
       $('cargarMasAntiguos').classList.toggle('hidden', !esAdmin);
@@ -2152,6 +2168,7 @@
         const privilegios = await respuesta.json();
         if (version !== authStateVersion) return;
         state.operacionesSensibles = privilegios.sensibles === true;
+        state.rankingSemanal = privilegios.ranking === true;
         aplicarPermisosDeInterfaz();
         if (!state.operacionesSensibles && puedeAdministrarCatalogo(state.role, state.user?.email)) {
           showToast('Las operaciones sensibles no están habilitadas en Netlify.');
@@ -2193,6 +2210,7 @@
       state.user = authenticatedUser;
       state.role = userRole;
       state.operacionesSensibles = false;
+      state.rankingSemanal = false;
       if (authenticatedUser && userRole === 'admin') {
         consultarOperacionesSensibles(authenticatedUser, currentAuthStateVersion);
       }
@@ -4126,6 +4144,10 @@
     const vistasMantenimiento = ['vista-reportes', 'vista-emergencias', 'vista-fallas', 'vista-ordenes', 'vista-dashboard', 'vista-ranking', 'vista-catalogo'];
 
     function mostrarVistaMantenimiento(id, cargar = true) {
+      if (id === 'vista-ranking' && (state.role !== 'admin' || state.operacionesSensibles !== true || state.rankingSemanal !== true)) {
+        showToast('El Ranking Semanal está reservado al responsable autorizado.');
+        return;
+      }
       vistasMantenimiento.forEach(v => {
         const vista = $(v);
         const boton = $(`btn-${v}`);
