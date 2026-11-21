@@ -1,6 +1,6 @@
 /**
  * js/rankingOperadores.js
- * Motor de cálculo y parsers de Samsara (Alertas + Exceso de Velocidad) para Ranking Semanal - AppTolva
+ * Motor de cálculo y parsers de Samsara (Alertas + Exceso de Velocidad Data 25) para Ranking Semanal - AppTolva
  * Soporta esquemas 48x48 Zona Larga (Arriaga/Chiapas), 24h Full y 24h Sencillo (T3-S2).
  */
 
@@ -94,6 +94,27 @@ function dividirLineaCsv(linea) {
   }
   resultado.push(actual.trim());
   return resultado;
+}
+
+function parsearFechaEventoMDY(fechaStr = '') {
+  const m = String(fechaStr).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const mes = Number(m[1]);
+  const dia = Number(m[2]);
+  const anio = Number(m[3]);
+  if (anio < 2000) return null;
+  const mm = String(mes).padStart(2, '0');
+  const dd = String(dia).padStart(2, '0');
+  return `${anio}-${mm}-${dd}`; // YYYY-MM-DD
+}
+
+export function descuentoPorVelocidadKmh(velocidadKmh) {
+  const vel = Number(velocidadKmh);
+  if (!Number.isFinite(vel) || vel <= 0) return 4;
+  if (vel >= 100) return 10; // Grave (>= 100 km/h)
+  if (vel >= 95) return 7;   // Fuerte (95 - 99 km/h)
+  if (vel >= 88) return 4;   // Moderado (88 - 94 km/h)
+  return 2;
 }
 
 /**
@@ -205,24 +226,28 @@ export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
 }
 
 /**
- * Parsea el CSV semanal de Excesos de Velocidad de Samsara (Speeding Report).
- * Soporta encabezados en español o inglés (Conductor/Operador/Driver, Severidad/Severity, Eventos/Cantidad).
+ * Parsea el CSV de Excesos de Velocidad de Samsara (hoja "Data 25" o reporte Speeding).
+ * Prioriza "Nombre Operador" sobre "Operador" (ya que en Data 25 "Operador" trae "OP-78317 -").
+ * Permite filtrar por rango de fechas (fechaInicio/fechaFin YYYY-MM-DD) o número de semana.
  */
-export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}) {
+export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}, opciones = {}) {
+  const { fechaInicio = null, fechaFin = null, numeroSemana = null } = opciones || {};
   const lineas = String(csvTexto || '')
     .replace(/^\uFEFF/, '')
     .split(/\r?\n/)
     .filter((l) => l.trim() !== '');
 
   if (lineas.length === 0) {
-    return { totalRegistros: 0, eventosVelocidad: [], sinEmpatar: [] };
+    return { totalRegistros: 0, filtradosFueraDeRango: 0, sinNombre: 0, eventosVelocidad: [], sinEmpatar: [] };
   }
 
   let idxHeader = -1;
   let cols = [];
   for (let i = 0; i < lineas.length; i++) {
     const campos = dividirLineaCsv(lineas[i]).map((c) => normalizarTexto(c));
-    const tieneOperador = campos.some((c) => ['OPERADOR', 'CONDUCTOR', 'DRIVER', 'DRIVER NAME', 'NOMBRE DEL CONDUCTOR'].includes(c));
+    const tieneOperador = campos.some((c) =>
+      ['NOMBRE OPERADOR', 'NOMBRE DEL CONDUCTOR', 'CONDUCTOR', 'DRIVER', 'DRIVER NAME', 'OPERADOR'].includes(c)
+    );
     if (tieneOperador) {
       idxHeader = i;
       cols = campos;
@@ -231,36 +256,70 @@ export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}) {
   }
 
   if (idxHeader === -1) {
-    throw new Error('No se encontró columna de Operador/Conductor en el CSV de Exceso de Velocidad.');
+    throw new Error('No se encontró columna de Nombre Operador / Conductor en el CSV de Exceso de Velocidad.');
   }
 
-  const iOperador = cols.findIndex((c) => ['OPERADOR', 'CONDUCTOR', 'DRIVER', 'DRIVER NAME', 'NOMBRE DEL CONDUCTOR'].includes(c));
+  // Priorizar "NOMBRE OPERADOR" antes que "OPERADOR" (en Data 25, OPERADOR es código OP-xxxxx)
+  let iNombre = cols.findIndex((c) => ['NOMBRE OPERADOR', 'NOMBRE DEL CONDUCTOR', 'CONDUCTOR', 'DRIVER', 'DRIVER NAME'].includes(c));
+  if (iNombre === -1) iNombre = cols.indexOf('OPERADOR');
+
+  const iFecha = cols.findIndex((c) => ['FECHA DEL EVENTO', 'FECHA', 'DATE'].includes(c));
+  const iSemana = cols.indexOf('SEMANA');
+  const iEconomico = cols.findIndex((c) => ['ECONOMICO', 'UNIDAD', 'VEHICLE'].includes(c));
+  const iVelocidad = cols.findIndex((c) => ['VELOCIDAD', 'VELOCIDAD MAXIMA', 'MAX SPEED'].includes(c));
   const iSeveridad = cols.findIndex((c) => ['SEVERIDAD', 'SEVERITY', 'GRAVEDAD', 'NIVEL'].includes(c));
-  const iCantidad = cols.findIndex((c) => ['EVENTOS', 'CANTIDAD', 'EXCESOS', 'TOTAL EVENTOS', 'SPEEDING EVENTS', 'INTERVALS'].includes(c));
-  const iVelMax = cols.findIndex((c) => ['VELOCIDAD MAXIMA', 'MAX SPEED', 'VELOCIDAD'].includes(c));
+  const iCantidad = cols.findIndex((c) => ['EVENTOS', 'CANTIDAD', 'EXCESOS', 'TOTAL EVENTOS', 'SPEEDING EVENTS'].includes(c));
   const iRevision = cols.findIndex((c) => ['REVISION', 'ESTADO', 'STATUS'].includes(c));
 
   const eventosVelocidad = [];
   const sinEmpatar = [];
+  let filtradosFueraDeRango = 0;
+  let sinNombre = 0;
 
   for (let i = idxHeader + 1; i < lineas.length; i++) {
     const c = dividirLineaCsv(lineas[i]);
-    const operador = (c[iOperador] || '').trim();
-    if (!operador || normalizarTexto(operador) === 'SIN CONDUCTOR' || normalizarTexto(operador) === 'UNASSIGNED') continue;
-
     if (iRevision !== -1 && normalizarTexto(c[iRevision] || '') === 'NO APLICA') continue;
 
-    const cantidad = iCantidad !== -1 ? Math.max(1, Number(String(c[iCantidad]).replace(/[^\d.]/g, '')) || 1) : 1;
+    // Filtrar por semana si se indicó numeroSemana y existe columna Semana
+    if (numeroSemana !== null && numeroSemana !== undefined && iSemana !== -1) {
+      const semFila = Number(c[iSemana]);
+      if (semFila !== Number(numeroSemana)) {
+        filtradosFueraDeRango++;
+        continue;
+      }
+    } else if ((fechaInicio || fechaFin) && iFecha !== -1) {
+      const fechaISO = parsearFechaEventoMDY(c[iFecha]);
+      if (!fechaISO) continue;
+      if ((fechaInicio && fechaISO < fechaInicio) || (fechaFin && fechaISO > fechaFin)) {
+        filtradosFueraDeRango++;
+        continue;
+      }
+    }
+
+    const operador = (c[iNombre] || '').trim();
+    if (!operador || normalizarTexto(operador) === 'SIN CONDUCTOR' || normalizarTexto(operador) === 'UNASSIGNED') {
+      sinNombre++;
+      continue;
+    }
+
+    const velNum = iVelocidad !== -1 ? Number(String(c[iVelocidad]).replace(/[^\d.]/g, '')) : 0;
     const severidadRaw = iSeveridad !== -1 ? normalizarTexto(c[iSeveridad] || '') : '';
-    const descuentoUnitario = PENALIZACION_VELOCIDAD_SEVERIDAD[severidadRaw] ?? 5;
+    const cantidad = iCantidad !== -1 ? Math.max(1, Number(String(c[iCantidad]).replace(/[^\d.]/g, '')) || 1) : 1;
+
+    const descuentoUnitario = severidadRaw && PENALIZACION_VELOCIDAD_SEVERIDAD[severidadRaw]
+      ? PENALIZACION_VELOCIDAD_SEVERIDAD[severidadRaw]
+      : descuentoPorVelocidadKmh(velNum);
+
     const noEmpleado = empatarOperadorPorNombre(operador, catalogoOperadores);
 
     eventosVelocidad.push({
       noEmpleado,
       nombreSamsara: operador,
+      unidad: iEconomico !== -1 ? (c[iEconomico] || '').trim() : '',
+      fecha: iFecha !== -1 ? (c[iFecha] || '').trim() : '',
+      semana: iSemana !== -1 ? Number(c[iSemana]) || null : null,
+      velocidadMax: velNum || '',
       cantidad,
-      severidad: iSeveridad !== -1 ? (c[iSeveridad] || '').trim() : 'Estándar',
-      velocidadMax: iVelMax !== -1 ? (c[iVelMax] || '').trim() : '',
       descuento: cantidad * descuentoUnitario
     });
     if (!noEmpleado) sinEmpatar.push(operador);
@@ -268,6 +327,8 @@ export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}) {
 
   return {
     totalRegistros: eventosVelocidad.length,
+    filtradosFueraDeRango,
+    sinNombre,
     eventosVelocidad,
     sinEmpatar: [...new Set(sinEmpatar)]
   };
@@ -315,17 +376,12 @@ export function calcularRankingSemanal({
     const checklists = Number(checklistsPorEmpleado[noEmpleado] || 0);
     const bitacoras = Number(bitacorasPorEmpleado[noEmpleado] || 0);
 
-    // 1. Alertas Samsara
     const ptsSamsara = Math.max(0, (pesos.samsara ?? 20) - (descuentoAlertas[noEmpleado] || 0));
-
-    // 2. Exceso de Velocidad Samsara
     const ptsVelocidad = Math.max(0, (pesos.velocidad ?? 20) - (descuentoVelocidad[noEmpleado] || 0));
 
-    // 3. Checklists preoperativos
     const ratioChecklists = Math.min(1, checklists / Math.max(1, esquema.metaChecklistsSemana));
     const ptsChecklists = Math.round(ratioChecklists * (pesos.checklists ?? 25) * 10) / 10;
 
-    // 4. Bitácoras NOM-087 (48h -> 1 por cada 2 checklists; 24h -> 1:1)
     const proporcionTurno = esquema.bitacoraPorTurno / esquema.checklistPorTurno;
     const metaBitacorasReales = checklists > 0
       ? Math.max(1, Math.ceil(checklists * proporcionTurno))
@@ -371,7 +427,7 @@ export function calcularRankingSemanal({
     return {
       totalOperadores,
       topLimit,
-      top5: topLista, // Mantiene compatibilidad de clave con vistas previas
+      top5: topLista,
       ultimos3,
       posiciones: conPosicion
     };

@@ -836,9 +836,12 @@
     }
 
     function empleadoDocumentoRanking(dato, payload) {
-      return String(
+      const numero = String(
         dato.employee_number || dato.employeeNumber || payload.employeeNumber || payload.employee_number || payload.numeroEmpleado || ''
       ).trim();
+      if (numero) return numero;
+      const nombre = dato.driver_name || dato.driverName || dato.operador || payload.driver_name || payload.driverName || payload.operador || '';
+      return rankingOperadores.empatarOperadorPorNombre(nombre, window.CATALOGO_OPERADORES || {}) || '';
     }
 
     function registrarConteoRanking(conteos, noEmpleado, clave) {
@@ -863,15 +866,23 @@
     function contarActividadRanking(snapshotReportes, snapshotBitacoras) {
       const clavesChecklists = {};
       const clavesBitacoras = {};
+      const foliosBitacoras = new Set();
+
+      const registrarBitacora = (noEmpleado, folio) => {
+        const clave = String(folio || '').trim().toUpperCase();
+        if (!clave || !window.CATALOGO_OPERADORES?.[noEmpleado] || foliosBitacoras.has(clave)) return;
+        foliosBitacoras.add(clave);
+        registrarConteoRanking(clavesBitacoras, noEmpleado, clave);
+      };
 
       snapshotReportes.forEach((documento) => {
         const dato = documento.data();
         const payload = dato.payload && typeof dato.payload === 'object' ? dato.payload : dato;
         const noEmpleado = empleadoDocumentoRanking(dato, payload);
-        const folio = String(dato.folio || payload.folio || documento.id);
-        const tipo = String(dato.report_type || payload.report_type || payload.reportType || '').toLowerCase().trim();
+        const folio = String(dato.folio || payload.folio || documento.id).trim();
+        const tipo = String(dato.report_type || dato.reportType || payload.report_type || payload.reportType || '').toLowerCase().trim();
         const esBitacora = tipo === 'bitacora' || Array.isArray(payload.logs) || /^(FB\d+|OFF-\d+)/i.test(folio);
-        if (esBitacora) registrarConteoRanking(clavesBitacoras, noEmpleado, folio);
+        if (esBitacora) registrarBitacora(noEmpleado, folio);
         else if (tipo === 'checklist' || tipo === '') registrarConteoRanking(clavesChecklists, noEmpleado, folio);
       });
 
@@ -879,8 +890,8 @@
         const dato = documento.data();
         const payload = dato.payload && typeof dato.payload === 'object' ? dato.payload : dato;
         const noEmpleado = empleadoDocumentoRanking(dato, payload);
-        const folio = String(dato.folio || payload.folio || documento.id);
-        registrarConteoRanking(clavesBitacoras, noEmpleado, folio);
+        const folio = String(dato.folio || payload.folio || documento.id).trim();
+        registrarBitacora(noEmpleado, folio);
       });
 
       return {
@@ -1001,7 +1012,13 @@
         const configuracion = configuracionRankingFormulario();
         const csv = await archivo.text();
         const samsara = parsearCsvSamsara(csv, window.CATALOGO_OPERADORES || {});
-        let velocidad = { totalRegistros: 0, eventosVelocidad: [], sinEmpatar: [] };
+        let velocidad = {
+          totalRegistros: 0,
+          filtradosFueraDeRango: 0,
+          sinNombre: 0,
+          eventosVelocidad: [],
+          sinEmpatar: []
+        };
         if (archivoVelocidad) {
           if (typeof rankingOperadores.parsearCsvVelocidadSamsara !== 'function') {
             throw new Error('El módulo de ranking no incluye el parser de exceso de velocidad. Actualiza rankingOperadores.js.');
@@ -1009,7 +1026,11 @@
           const csvVelocidad = await archivoVelocidad.text();
           velocidad = rankingOperadores.parsearCsvVelocidadSamsara(
             csvVelocidad,
-            window.CATALOGO_OPERADORES || {}
+            window.CATALOGO_OPERADORES || {},
+            {
+              fechaInicio: semana.inicioTexto,
+              fechaFin: semana.finTexto
+            }
           );
         }
         const desde = semana.inicio.toISOString();
@@ -1026,17 +1047,19 @@
           eventosVelocidad: velocidad.eventosVelocidad,
           ...actividad,
           estadisticasCsv: {
-            totalEventos: samsara.totalEventos,
-            aplican: samsara.aplican,
-            noAplican: samsara.noAplican,
-            sinRevisar: samsara.sinRevisar,
-            sinEmpatar: samsara.sinEmpatar
+            totalEventos: Number(samsara.totalEventos ?? 0),
+            aplican: Number(samsara.aplican ?? 0),
+            noAplican: Number(samsara.noAplican ?? 0),
+            sinRevisar: Number(samsara.sinRevisar ?? 0),
+            sinEmpatar: Array.isArray(samsara.sinEmpatar) ? samsara.sinEmpatar : []
           },
           estadisticasVelocidadCsv: {
-            totalRegistros: velocidad.totalRegistros,
-            sinEmpatar: velocidad.sinEmpatar
+            totalRegistros: Number(velocidad.totalRegistros ?? 0),
+            filtradosFueraDeRango: Number(velocidad.filtradosFueraDeRango ?? 0),
+            sinNombre: Number(velocidad.sinNombre ?? 0),
+            sinEmpatar: Array.isArray(velocidad.sinEmpatar) ? velocidad.sinEmpatar : []
           },
-          documentosConsultados: snapshotReportes.size + snapshotBitacoras.size
+          documentosConsultados: Number(snapshotReportes.size + snapshotBitacoras.size ?? 0)
         };
         rankingState.excluidosSemana = {};
         recalcularRankingPreview();
@@ -1046,11 +1069,14 @@
         const sinEmpatarVelocidad = velocidad.sinEmpatar.length
           ? ` · ${velocidad.sinEmpatar.length} nombre(s) de velocidad sin empatar`
           : '';
+        const descartadosVelocidad = velocidad.filtradosFueraDeRango || velocidad.sinNombre
+          ? ` · ${velocidad.filtradosFueraDeRango || 0} fuera de rango · ${velocidad.sinNombre || 0} sin Nombre Operador`
+          : '';
         $('ranking-preview-estado').textContent =
           `${rankingState.datosSemana.documentosConsultados} reportes consultados · ` +
           `${samsara.aplican} alertas aplicables · ${samsara.noAplican} no aplican · ` +
           `${samsara.sinRevisar} sin revisar${sinEmpatar} · ` +
-          `${velocidad.totalRegistros} registros de velocidad${sinEmpatarVelocidad}.`;
+          `${velocidad.totalRegistros} registros de velocidad${descartadosVelocidad}${sinEmpatarVelocidad}.`;
       } catch (error) {
         console.error('No se pudo calcular la vista previa del ranking:', error);
         $('ranking-preview-estado').textContent = error.message;
@@ -1070,20 +1096,33 @@
       boton.disabled = true;
       try {
         const datos = rankingState.datosSemana;
+        const estadisticasCsv = datos.estadisticasCsv || {};
+        const estadisticasVelocidadCsv = datos.estadisticasVelocidadCsv || {};
         const publicado = {
-          semanaId: datos.semanaId,
-          inicio: datos.inicio,
-          fin: datos.fin,
-          etiquetaSemana: datos.etiquetaSemana,
-          pesos: rankingState.preview.pesos,
-          full: rankingState.preview.full,
-          sencillo: rankingState.preview.sencillo,
-          excluidosSemana: rankingState.excluidosSemana,
-          estadisticasCsv: datos.estadisticasCsv,
-          estadisticasVelocidadCsv: datos.estadisticasVelocidadCsv,
-          documentosConsultados: datos.documentosConsultados,
+          semanaId: String(datos.semanaId ?? ''),
+          inicio: String(datos.inicio ?? ''),
+          fin: String(datos.fin ?? ''),
+          etiquetaSemana: String(datos.etiquetaSemana ?? ''),
+          pesos: rankingState.preview.pesos ?? {},
+          full: rankingState.preview.full ?? {},
+          sencillo: rankingState.preview.sencillo ?? {},
+          excluidosSemana: rankingState.excluidosSemana ?? {},
+          estadisticasCsv: {
+            totalEventos: Number(estadisticasCsv.totalEventos ?? 0),
+            aplican: Number(estadisticasCsv.aplican ?? 0),
+            noAplican: Number(estadisticasCsv.noAplican ?? 0),
+            sinRevisar: Number(estadisticasCsv.sinRevisar ?? 0),
+            sinEmpatar: Array.isArray(estadisticasCsv.sinEmpatar) ? estadisticasCsv.sinEmpatar : []
+          },
+          estadisticasVelocidadCsv: {
+            totalRegistros: Number(estadisticasVelocidadCsv.totalRegistros ?? 0),
+            filtradosFueraDeRango: Number(estadisticasVelocidadCsv.filtradosFueraDeRango ?? 0),
+            sinNombre: Number(estadisticasVelocidadCsv.sinNombre ?? 0),
+            sinEmpatar: Array.isArray(estadisticasVelocidadCsv.sinEmpatar) ? estadisticasVelocidadCsv.sinEmpatar : []
+          },
+          documentosConsultados: Number(datos.documentosConsultados ?? 0),
           publicadoEn: new Date().toISOString(),
-          publicadoPor: state.user?.email || ''
+          publicadoPor: state.user?.email ?? ''
         };
         await runTransaction(db, async (transaction) => {
           transaction.set(doc(db, 'ranking_semanal', datos.semanaId), publicado);

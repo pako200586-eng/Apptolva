@@ -22,7 +22,8 @@ const CATALOGO_PRUEBA = {
   '257715': { nombre: 'LAGUNES BARRADAS JORGE' },
   '288150': { nombre: 'DE DIOS LAZARO CARLOS DAVID' },
   '297285': { nombre: 'TOLEDO SANTIAGO ALEJANDRO' },
-  '234380': { nombre: 'HERNANDEZ CERDA RAFAEL' }
+  '234380': { nombre: 'HERNANDEZ CERDA RAFAEL' },
+  '262185': { nombre: 'JUNCO GONZALEZ KENI DANIEL' }
 };
 
 test('empata nombres de Samsara aunque cambie el orden o falten acentos', () => {
@@ -30,7 +31,7 @@ test('empata nombres de Samsara aunque cambie el orden o falten acentos', () => 
   assert.equal(empatarOperadorPorNombre('VICTOR ALEJANDRO VALENZUELA', CATALOGO_PRUEBA), '231782');
 });
 
-test('parsearCsvSamsara y parsearCsvVelocidadSamsara procesan alertas y excesos de velocidad', () => {
+test('parsearCsvSamsara y parsearCsvVelocidadSamsara (Data 25) filtran por rango y descuentan por km/h', () => {
   const csvAlertas = [
     'Total de eventos,42,,,,,',
     'Unidad,Fecha y hora,Operador,Tipo de alerta,Comentarios,Evidencia fotográfica,Revisión',
@@ -39,19 +40,25 @@ test('parsearCsvSamsara y parsearCsvVelocidadSamsara procesan alertas y excesos 
     'T14138,4 de nov. de 2026 11:33,REYES CABAÑAS ELVIRA,CONDUCCIÓN DISTRAÍDA,OK,#VALUE!,Aplica'
   ].join('\n');
 
-  const csvVelocidad = [
-    'Conductor,Unidad,Severidad,Eventos,Velocidad máxima',
-    'MORALES SOTO JOSE LUIS,T14137,Fuerte,1,96 km/h'
+  const csvData25 = [
+    'Fecha del Evento,Horario,Economico,Operador,Flota,Velocidad,Semana,Nombre Operador,,',
+    '10/30/2026,10:36:40 a. m.,T14132,OP-82837 -,PA CHAPO,92,44,Wilmer Rodriguez Martinez,#VALUE!,',
+    '11/04/2026,12:29:44 a. m.,T14132,OP-82837 -,PA CHAPO,96,45,MORALES SOTO JOSE LUIS,#VALUE!,',
+    '11/05/2026,07:40:27 p. m.,T14132,OP-82837 -,PA CHAPO,88,45,,,',
+    '12/30/1899,12:00:00 AM,,,,,,,,'
   ].join('\n');
 
   const alertas = parsearCsvSamsara(csvAlertas, CATALOGO_PRUEBA);
-  const velocidad = parsearCsvVelocidadSamsara(csvVelocidad, CATALOGO_PRUEBA);
+  const velocidad = parsearCsvVelocidadSamsara(csvData25, CATALOGO_PRUEBA, {
+    fechaInicio: '2026-11-02',
+    fechaFin: '2026-11-08'
+  });
 
   assert.equal(alertas.aplican, 1);
   assert.equal(alertas.eventosAplicables[0].descuento, 6);
-  assert.equal(velocidad.totalRegistros, 1);
+  assert.equal(velocidad.totalRegistros, 1); // Solo 11/04/2026 con nombre; excluye Sem 44, fila sin nombre y 1899
   assert.equal(velocidad.eventosVelocidad[0].noEmpleado, '272019');
-  assert.equal(velocidad.eventosVelocidad[0].descuento, 7);
+  assert.equal(velocidad.eventosVelocidad[0].descuento, 7); // 96 km/h -> -7 pts
 });
 
 test('calcularRankingSemanal usa Top 5 + Últimos 3 en Full (>8) y Top 3 + Últimos 3 en Sencillo (<=8)', () => {

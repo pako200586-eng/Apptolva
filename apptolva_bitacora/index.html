@@ -83,7 +83,12 @@
                 <label for="login-email" class="block text-sm font-bold">Número de empleado o correo</label>
                 <input type="text" id="login-email" name="email" autocomplete="username" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="Número de empleado o correo" required class="w-full p-3 border-2 border-gray-300 rounded-lg mb-3">
                 <label for="login-password" class="block text-sm font-bold">Contraseña</label>
-                <input type="password" id="login-password" name="password" autocomplete="current-password" required class="w-full p-3 border-2 border-gray-300 rounded-lg mb-3">
+                <div class="relative mb-3">
+                    <input type="password" id="login-password" name="password" autocomplete="current-password" required class="w-full p-3 pr-12 border-2 border-gray-300 rounded-lg">
+                    <button type="button" id="btn-toggle-password" aria-label="Mostrar contraseña" aria-pressed="false" aria-controls="login-password" class="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-gray-500 hover:text-orange-600 focus-visible:outline-2 focus-visible:outline-orange-600">
+                        <i class="fas fa-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <p id="errorMsg" role="alert" class="hidden text-xs font-bold text-red-600 mb-3"></p>
                 <button id="login-submit" type="submit" class="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition uppercase">Entrar</button>
             </form>
@@ -1480,6 +1485,20 @@
             const auth = getAuth(app);
             const projectId = firebaseConfig.projectId;
             const form = document.getElementById('form-login');
+            const passwordInput = document.getElementById('login-password');
+            const togglePasswordButton = document.getElementById('btn-toggle-password');
+            const togglePasswordIcon = togglePasswordButton.querySelector('i');
+            const mostrarPassword = (mostrar) => {
+                passwordInput.type = mostrar ? 'text' : 'password';
+                togglePasswordButton.setAttribute('aria-pressed', String(mostrar));
+                togglePasswordButton.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+                togglePasswordIcon.classList.toggle('fa-eye', !mostrar);
+                togglePasswordIcon.classList.toggle('fa-eye-slash', mostrar);
+            };
+            togglePasswordButton.addEventListener('click', () => {
+                mostrarPassword(passwordInput.type === 'password');
+            });
+            form.addEventListener('reset', () => mostrarPassword(false));
             const errorElement = document.getElementById('errorMsg');
             const estadoSesion = document.getElementById('estado-sesion');
             const legacyKey = `apptolva_legacy_${projectId}`;
@@ -1705,6 +1724,7 @@
                     await esperarEscrituras();
                     await signInWithEmailAndPassword(auth, email, password);
                     document.getElementById('login-password').value = '';
+                    if (typeof mostrarPassword === 'function') mostrarPassword(false);
                 } catch (error) {
                     console.error('No se pudo iniciar sesión:', error);
                     const message = error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials'
@@ -1726,6 +1746,7 @@
             });
 
             document.getElementById('cerrar-sesion').addEventListener('click', async () => {
+                mostrarPassword(false);
                 try {
                     if (auth.currentUser?.isAnonymous && hayTrabajoAnterior(localStorage)) {
                         throw new Error('La sesión anterior contiene trabajo local. No cierres la sesión hasta recuperarlo y sincronizarlo.');
