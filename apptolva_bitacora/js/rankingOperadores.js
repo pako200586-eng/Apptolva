@@ -16,9 +16,9 @@ export const ESQUEMAS_OPERATIVOS = {
     id: 'full_48h',
     categoria: 'full',
     etiqueta: 'Full 48x48 (Zona Larga)',
-    checklistPorTurno: 2,     // 1 checklist cada 24h = 2 por turno de 48h
-    bitacoraPorTurno: 1,      // 1 bitácora individual NOM-087 por cada 48h
-    metaChecklistsSemana: 4,  // Referencia semanal típica (2 turnos de 48h / 4 días)
+    checklistPorTurno: 2,
+    bitacoraPorTurno: 1,
+    metaChecklistsSemana: 4,
     descripcion: '1 checklist c/24h por operador · 1 bitácora individual c/48h'
   },
   full_24h: {
@@ -105,22 +105,18 @@ function parsearFechaEventoMDY(fechaStr = '') {
   if (anio < 2000) return null;
   const mm = String(mes).padStart(2, '0');
   const dd = String(dia).padStart(2, '0');
-  return `${anio}-${mm}-${dd}`; // YYYY-MM-DD
+  return `${anio}-${mm}-${dd}`;
 }
 
 export function descuentoPorVelocidadKmh(velocidadKmh) {
   const vel = Number(velocidadKmh);
   if (!Number.isFinite(vel) || vel <= 0) return 4;
-  if (vel >= 100) return 10; // Grave (>= 100 km/h)
-  if (vel >= 95) return 7;   // Fuerte (95 - 99 km/h)
-  if (vel >= 88) return 4;   // Moderado (88 - 94 km/h)
+  if (vel >= 100) return 10;
+  if (vel >= 95) return 7;
+  if (vel >= 88) return 4;
   return 2;
 }
 
-/**
- * Empata un nombre de Samsara (ej. "REYES CABAÑAS ELVIRA") contra CATALOGO_OPERADORES
- * tolerando distinto orden de apellidos/nombres y sin acentos.
- */
 export function empatarOperadorPorNombre(nombreSamsara, catalogoOperadores) {
   const tokensSamsara = new Set(normalizarTexto(nombreSamsara).split(' ').filter(Boolean));
   if (tokensSamsara.size === 0) return null;
@@ -146,10 +142,6 @@ export function empatarOperadorPorNombre(nombreSamsara, catalogoOperadores) {
   return mejorPuntaje >= 0.75 ? mejorId : null;
 }
 
-/**
- * Parsea el CSV semanal de Alertas de cámara de Samsara.
- * Ignora filas de resumen y separadores de fecha; solo penaliza "Revisión === Aplica".
- */
 export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
   const lineas = String(csvTexto || '')
     .replace(/^\uFEFF/, '')
@@ -225,11 +217,6 @@ export function parsearCsvSamsara(csvTexto, catalogoOperadores = {}) {
   };
 }
 
-/**
- * Parsea el CSV de Excesos de Velocidad de Samsara (hoja "Data 25" o reporte Speeding).
- * Prioriza "Nombre Operador" sobre "Operador" (ya que en Data 25 "Operador" trae "OP-78317 -").
- * Permite filtrar por rango de fechas (fechaInicio/fechaFin YYYY-MM-DD) o número de semana.
- */
 export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}, opciones = {}) {
   const { fechaInicio = null, fechaFin = null, numeroSemana = null } = opciones || {};
   const lineas = String(csvTexto || '')
@@ -259,7 +246,6 @@ export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}, op
     throw new Error('No se encontró columna de Nombre Operador / Conductor en el CSV de Exceso de Velocidad.');
   }
 
-  // Priorizar "NOMBRE OPERADOR" antes que "OPERADOR" (en Data 25, OPERADOR es código OP-xxxxx)
   let iNombre = cols.findIndex((c) => ['NOMBRE OPERADOR', 'NOMBRE DEL CONDUCTOR', 'CONDUCTOR', 'DRIVER', 'DRIVER NAME'].includes(c));
   if (iNombre === -1) iNombre = cols.indexOf('OPERADOR');
 
@@ -280,7 +266,6 @@ export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}, op
     const c = dividirLineaCsv(lineas[i]);
     if (iRevision !== -1 && normalizarTexto(c[iRevision] || '') === 'NO APLICA') continue;
 
-    // Filtrar por semana si se indicó numeroSemana y existe columna Semana
     if (numeroSemana !== null && numeroSemana !== undefined && iSemana !== -1) {
       const semFila = Number(c[iSemana]);
       if (semFila !== Number(numeroSemana)) {
@@ -334,10 +319,6 @@ export function parsearCsvVelocidadSamsara(csvTexto, catalogoOperadores = {}, op
   };
 }
 
-/**
- * Calcula las calificaciones de la semana separando Full (48h + 24h) y Sencillo (24h).
- * En categorías con <= 8 operadores muestra Top 3 + Últimos 3; en > 8 muestra Top 5 + Últimos 3.
- */
 export function calcularRankingSemanal({
   catalogoOperadores = {},
   esquemasPorEmpleado = {},
@@ -437,5 +418,63 @@ export function calcularRankingSemanal({
     pesos,
     full: construirSegmento(evaluados.full),
     sencillo: construirSegmento(evaluados.sencillo)
+  };
+}
+
+/**
+ * Reordena un segmento publicado por un filtro de evento específico sin lecturas extra.
+ * filtro: 'general' | 'velocidad' | 'samsara' | 'bitacoras' | 'checklists'
+ */
+export function filtrarSegmentoPorEvento(segmento = {}, filtro = 'general') {
+  const posicionesBase = Array.isArray(segmento.posiciones) ? [...segmento.posiciones] : [];
+  if (filtro === 'general' || posicionesBase.length === 0) {
+    return {
+      totalOperadores: segmento.totalOperadores || posicionesBase.length,
+      topLimit: segmento.topLimit || (posicionesBase.length <= 8 ? 3 : 5),
+      top5: segmento.top5 || [],
+      ultimos3: segmento.ultimos3 || [],
+      posiciones: posicionesBase
+    };
+  }
+
+  posicionesBase.sort((a, b) => {
+    if (filtro === 'velocidad') {
+      return (b.rubros?.velocidad ?? 0) - (a.rubros?.velocidad ?? 0)
+        || (a.metricas?.excesosVelocidad ?? 0) - (b.metricas?.excesosVelocidad ?? 0)
+        || (b.total ?? 0) - (a.total ?? 0)
+        || a.nombre.localeCompare(b.nombre);
+    }
+    if (filtro === 'samsara') {
+      return (b.rubros?.samsara ?? 0) - (a.rubros?.samsara ?? 0)
+        || (a.metricas?.alertasAplican ?? 0) - (b.metricas?.alertasAplican ?? 0)
+        || (b.total ?? 0) - (a.total ?? 0)
+        || a.nombre.localeCompare(b.nombre);
+    }
+    if (filtro === 'bitacoras') {
+      return (b.rubros?.bitacoras ?? 0) - (a.rubros?.bitacoras ?? 0)
+        || (b.metricas?.bitacoras ?? 0) - (a.metricas?.bitacoras ?? 0)
+        || (b.total ?? 0) - (a.total ?? 0)
+        || a.nombre.localeCompare(b.nombre);
+    }
+    if (filtro === 'checklists') {
+      return (b.rubros?.checklists ?? 0) - (a.rubros?.checklists ?? 0)
+        || (b.metricas?.checklists ?? 0) - (a.metricas?.checklists ?? 0)
+        || (b.total ?? 0) - (a.total ?? 0)
+        || a.nombre.localeCompare(b.nombre);
+    }
+    return 0;
+  });
+
+  const conPosicion = posicionesBase.map((item, idx) => ({ ...item, posicion: idx + 1 }));
+  const totalOperadores = conPosicion.length;
+  const topLimit = totalOperadores <= 8 ? 3 : 5;
+  return {
+    totalOperadores,
+    topLimit,
+    top5: conPosicion.slice(0, topLimit),
+    ultimos3: totalOperadores > topLimit
+      ? conPosicion.slice(Math.max(topLimit, totalOperadores - 3))
+      : [],
+    posiciones: conPosicion
   };
 }

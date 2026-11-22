@@ -28,12 +28,13 @@
         <p id="rankingSemanaSubtitulo" class="text-xs text-orange-100">Cargando semana...</p>
       </div>
     </div>
-    <span id="badgeTopResumen" class="bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">
+    <span id="badgeTopResumen" class="bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0">
       Top 5 · Últimos 3
     </span>
   </header>
 
   <main class="p-4 max-w-lg mx-auto space-y-4">
+    <!-- Categoría Full vs Sencillo -->
     <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
       <button id="tabFull" type="button" class="py-2 px-3 rounded-lg text-xs font-black bg-orange-600 text-white transition">
         <i class="fas fa-truck-moving mr-1"></i> Full (T3-S2-R4)
@@ -41,6 +42,15 @@
       <button id="tabSencillo" type="button" class="py-2 px-3 rounded-lg text-xs font-black text-slate-600 hover:bg-slate-100 transition">
         <i class="fas fa-truck mr-1"></i> Sencillo (T3-S2)
       </button>
+    </div>
+
+    <!-- Filtro por Evento / Rubro -->
+    <div id="filtrosEvento" class="flex gap-1.5 overflow-x-auto pb-1">
+      <button type="button" data-filtro="general" class="filtro-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-800 text-white">General</button>
+      <button type="button" data-filtro="velocidad" class="filtro-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-white text-slate-600 border border-slate-200">Velocidad</button>
+      <button type="button" data-filtro="samsara" class="filtro-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-white text-slate-600 border border-slate-200">Alertas</button>
+      <button type="button" data-filtro="bitacoras" class="filtro-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-white text-slate-600 border border-slate-200">Bitácoras</button>
+      <button type="button" data-filtro="checklists" class="filtro-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-white text-slate-600 border border-slate-200">Checklists</button>
     </div>
 
     <section id="miPosicionCard" class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-4 rounded-2xl shadow-md">
@@ -51,7 +61,7 @@
     <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="bg-emerald-600 text-white px-4 py-2.5 flex items-center justify-between">
         <h2 id="tituloTop" class="font-black text-sm"><i class="fas fa-trophy mr-2"></i>Top 5 de la Semana</h2>
-        <span class="text-[11px] font-bold opacity-90">Mejores calificaciones</span>
+        <span id="subtituloTop" class="text-[11px] font-bold opacity-90">Mejores calificaciones</span>
       </div>
       <div id="listaTop" class="divide-y divide-slate-100"></div>
     </section>
@@ -74,7 +84,7 @@
       doc, getDoc
     } from './js/firebase-sdk.js';
     import { leerPerfil } from './js/controlSesion.js';
-    import { normalizarTexto } from './js/rankingOperadores.js';
+    import { normalizarTexto, filtrarSegmentoPorEvento } from './js/rankingOperadores.js';
 
     const app = initializeApp(getFirebaseConfig());
     const auth = getAuth(app);
@@ -82,16 +92,27 @@
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     });
 
+    const ETIQUETAS_FILTRO = {
+      general: 'General',
+      velocidad: 'Excesos de Velocidad',
+      samsara: 'Alertas en Cabina',
+      bitacoras: 'Bitácoras NOM-087',
+      checklists: 'Checklists Preoperativos'
+    };
+
     let rankingData = null;
     let categoriaActiva = 'full';
+    let filtroEvento = 'general';
     let miNoEmpleado = null;
     let miNombrePerfil = null;
 
     const tabFull = document.getElementById('tabFull');
     const tabSencillo = document.getElementById('tabSencillo');
+    const filtroBtns = Array.from(document.querySelectorAll('.filtro-btn'));
     const subtitulo = document.getElementById('rankingSemanaSubtitulo');
     const badgeTopResumen = document.getElementById('badgeTopResumen');
     const tituloTop = document.getElementById('tituloTop');
+    const subtituloTop = document.getElementById('subtituloTop');
     const miCard = document.getElementById('miPosicionCard');
     const listaTop = document.getElementById('listaTop');
     const listaUltimos3 = document.getElementById('listaUltimos3');
@@ -119,11 +140,55 @@
       return null;
     }
 
-    function actualizarTabs() {
+    function actualizarControles() {
       const activo = 'py-2 px-3 rounded-lg text-xs font-black bg-orange-600 text-white transition';
       const inactivo = 'py-2 px-3 rounded-lg text-xs font-black text-slate-600 hover:bg-slate-100 transition';
       tabFull.className = categoriaActiva === 'full' ? activo : inactivo;
       tabSencillo.className = categoriaActiva === 'sencillo' ? activo : inactivo;
+
+      for (const btn of filtroBtns) {
+        const esActivo = btn.dataset.filtro === filtroEvento;
+        btn.className = esActivo
+          ? 'filtro-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-800 text-white'
+          : 'filtro-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-white text-slate-600 border border-slate-200';
+      }
+    }
+
+    function detallePorFiltro(op) {
+      const m = op.metricas || {};
+      const r = op.rubros || {};
+      if (filtroEvento === 'velocidad') {
+        const ev = m.excesosVelocidad ?? 0;
+        return {
+          detalle: `${ev} ${ev === 1 ? 'exceso' : 'excesos'} de velocidad`,
+          valorDerecha: `${r.velocidad ?? 0} pts`
+        };
+      }
+      if (filtroEvento === 'samsara') {
+        const al = m.alertasAplican ?? 0;
+        return {
+          detalle: `${al} ${al === 1 ? 'alerta aplicada' : 'alertas aplicadas'}`,
+          valorDerecha: `${r.samsara ?? 0} pts`
+        };
+      }
+      if (filtroEvento === 'bitacoras') {
+        return {
+          detalle: `${m.bitacoras ?? 0} de ${m.metaBitacoras ?? '-'} bitácoras NOM-087`,
+          valorDerecha: `${r.bitacoras ?? 0} pts`
+        };
+      }
+      if (filtroEvento === 'checklists') {
+        const ch = m.checklists ?? 0;
+        return {
+          detalle: `${ch} ${ch === 1 ? 'checklist entregado' : 'checklists entregados'}`,
+          valorDerecha: `${r.checklists ?? 0} pts`
+        };
+      }
+      const velTxt = r.velocidad !== undefined ? ` · Vel: ${r.velocidad} (${m.excesosVelocidad ?? 0} ev)` : '';
+      return {
+        detalle: `Alertas: ${r.samsara ?? 0} (${m.alertasAplican ?? 0} ev)${velTxt} · Bit: ${r.bitacoras ?? 0} · Check: ${r.checklists ?? 0}`,
+        valorDerecha: String(op.total)
+      };
     }
 
     function crearFila(op, tipo, miRegistro) {
@@ -132,18 +197,19 @@
         ? (op.posicion === 1 ? 'bg-amber-400 text-slate-900' : 'bg-emerald-100 text-emerald-800')
         : 'bg-amber-100 text-amber-900';
 
+      const { detalle, valorDerecha } = detallePorFiltro(op);
+
       const fila = el('div', `p-3.5 flex items-center justify-between gap-3 ${esMio ? 'bg-orange-50' : ''}`);
       const izq = el('div', 'flex items-center gap-3 min-w-0');
       izq.appendChild(el('span', `w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${badgeColor}`, `#${op.posicion}`));
 
       const info = el('div', 'min-w-0');
       info.appendChild(el('p', 'font-bold text-sm text-slate-800 truncate', op.nombre));
-      const velTxt = op.rubros?.velocidad !== undefined ? ` · Vel: ${op.rubros.velocidad}` : '';
-      info.appendChild(el('p', 'text-[11px] text-slate-500', `Alertas: ${op.rubros.samsara}${velTxt} · Bit: ${op.rubros.bitacoras} · Check: ${op.rubros.checklists}`));
+      info.appendChild(el('p', 'text-[11px] text-slate-500', detalle));
       izq.appendChild(info);
 
       fila.appendChild(izq);
-      fila.appendChild(el('span', 'font-black text-base text-slate-900 shrink-0', op.total));
+      fila.appendChild(el('span', 'font-black text-base text-slate-900 shrink-0', valorDerecha));
       return fila;
     }
 
@@ -157,31 +223,34 @@
       }
 
       const pesos = rankingData.pesos || {};
+      const m = miRegistro.metricas || {};
       const topRow = el('div', 'flex items-center justify-between');
       const left = el('div');
-      left.appendChild(el('p', 'text-[11px] text-orange-300 font-bold uppercase tracking-wider', `Tu posición (${miRegistro.esquemaEtiqueta})`));
+      left.appendChild(el('p', 'text-[11px] text-orange-300 font-bold uppercase tracking-wider', `Tu posición · ${ETIQUETAS_FILTRO[filtroEvento]} (${miRegistro.esquemaEtiqueta})`));
       const h2 = el('h2', 'text-xl font-black mt-0.5', `#${miRegistro.posicion} `);
       h2.appendChild(el('span', 'text-sm font-normal text-slate-300', `de ${totalOperadores}`));
       left.appendChild(h2);
       left.appendChild(el('p', 'text-xs text-slate-300 mt-0.5', miRegistro.nombre));
 
       const right = el('div', 'text-right');
-      right.appendChild(el('span', 'text-3xl font-black text-orange-400', miRegistro.total));
-      right.appendChild(el('span', 'block text-[10px] text-slate-400', 'de 100 pts'));
+      const { valorDerecha } = detallePorFiltro(miRegistro);
+      right.appendChild(el('span', 'text-2xl font-black text-orange-400', valorDerecha));
+      right.appendChild(el('span', 'block text-[10px] text-slate-400', filtroEvento === 'general' ? 'de 100 pts' : ETIQUETAS_FILTRO[filtroEvento]));
       topRow.append(left, right);
 
       const tieneVel = miRegistro.rubros?.velocidad !== undefined;
       const grid = el('div', `grid ${tieneVel ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mt-3 pt-3 border-t border-white/10 text-center text-xs`);
       const items = [
-        ['Alertas', `${miRegistro.rubros.samsara}/${pesos.samsara ?? 20}`],
-        ...(tieneVel ? [['Velocidad', `${miRegistro.rubros.velocidad}/${pesos.velocidad ?? 20}`]] : []),
-        ['Bitácora', `${miRegistro.rubros.bitacoras}/${pesos.bitacoras ?? 35}`],
-        ['Checklist', `${miRegistro.rubros.checklists}/${pesos.checklists ?? 25}`]
+        ['Alertas', `${miRegistro.rubros.samsara}/${pesos.samsara ?? 20}`, `${m.alertasAplican ?? 0} ev`],
+        ...(tieneVel ? [['Velocidad', `${miRegistro.rubros.velocidad}/${pesos.velocidad ?? 20}`, `${m.excesosVelocidad ?? 0} ev`]] : []),
+        ['Bitácora', `${miRegistro.rubros.bitacoras}/${pesos.bitacoras ?? 35}`, `${m.bitacoras ?? 0}/${m.metaBitacoras ?? '-'}`],
+        ['Checklist', `${miRegistro.rubros.checklists}/${pesos.checklists ?? 25}`, `${m.checklists ?? 0} reg`]
       ];
-      for (const [label, val] of items) {
+      for (const [label, val, sub] of items) {
         const cell = el('div');
         cell.appendChild(el('span', 'block text-slate-400 text-[10px]', label));
-        cell.appendChild(el('strong', '', val));
+        cell.appendChild(el('strong', 'block', val));
+        cell.appendChild(el('span', 'block text-slate-400 text-[10px]', sub));
         grid.appendChild(cell);
       }
 
@@ -189,13 +258,15 @@
     }
 
     function renderVista() {
-      actualizarTabs();
+      actualizarControles();
       if (!rankingData) return;
 
-      const seg = rankingData[categoriaActiva] || { totalOperadores: 0, topLimit: 5, top5: [], ultimos3: [], posiciones: [] };
+      const segBase = rankingData[categoriaActiva] || { totalOperadores: 0, topLimit: 5, top5: [], ultimos3: [], posiciones: [] };
+      const seg = filtrarSegmentoPorEvento(segBase, filtroEvento);
       const topN = seg.topLimit || (seg.totalOperadores <= 8 ? 3 : 5);
       badgeTopResumen.textContent = `Top ${topN} · Últimos 3`;
-      tituloTop.replaceChildren(el('i', 'fas fa-trophy mr-2'), document.createTextNode(`Top ${topN} de la Semana`));
+      tituloTop.replaceChildren(el('i', 'fas fa-trophy mr-2'), document.createTextNode(`Top ${topN} · ${ETIQUETAS_FILTRO[filtroEvento]}`));
+      subtituloTop.textContent = filtroEvento === 'general' ? 'Mejores calificaciones' : 'Menor incidencia / mayor cumplimiento';
 
       const miRegistro = buscarMiRegistro(seg.posiciones || []);
       renderMiTarjeta(miRegistro, seg.totalOperadores);
@@ -213,6 +284,12 @@
 
     tabFull.addEventListener('click', () => { categoriaActiva = 'full'; renderVista(); });
     tabSencillo.addEventListener('click', () => { categoriaActiva = 'sencillo'; renderVista(); });
+    for (const btn of filtroBtns) {
+      btn.addEventListener('click', () => {
+        filtroEvento = btn.dataset.filtro || 'general';
+        renderVista();
+      });
+    }
 
     onAuthStateChanged(auth, async (user) => {
       if (!user) {

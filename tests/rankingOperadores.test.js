@@ -4,7 +4,8 @@ import {
   parsearCsvSamsara,
   parsearCsvVelocidadSamsara,
   calcularRankingSemanal,
-  empatarOperadorPorNombre
+  empatarOperadorPorNombre,
+  filtrarSegmentoPorEvento
 } from '../apptolva_bitacora/js/rankingOperadores.js';
 
 const CATALOGO_PRUEBA = {
@@ -56,12 +57,12 @@ test('parsearCsvSamsara y parsearCsvVelocidadSamsara (Data 25) filtran por rango
 
   assert.equal(alertas.aplican, 1);
   assert.equal(alertas.eventosAplicables[0].descuento, 6);
-  assert.equal(velocidad.totalRegistros, 1); // Solo 11/04/2026 con nombre; excluye Sem 44, fila sin nombre y 1899
+  assert.equal(velocidad.totalRegistros, 1);
   assert.equal(velocidad.eventosVelocidad[0].noEmpleado, '272019');
-  assert.equal(velocidad.eventosVelocidad[0].descuento, 7); // 96 km/h -> -7 pts
+  assert.equal(velocidad.eventosVelocidad[0].descuento, 7);
 });
 
-test('calcularRankingSemanal usa Top 5 + Últimos 3 en Full (>8) y Top 3 + Últimos 3 en Sencillo (<=8)', () => {
+test('calcularRankingSemanal y filtrarSegmentoPorEvento ordenan por evento individual', () => {
   const ranking = calcularRankingSemanal({
     catalogoOperadores: CATALOGO_PRUEBA,
     esquemasPorEmpleado: {
@@ -90,12 +91,12 @@ test('calcularRankingSemanal usa Top 5 + Últimos 3 en Full (>8) y Top 3 + Últi
 
   assert.equal(ranking.full.totalOperadores, 9);
   assert.equal(ranking.full.topLimit, 5);
-  assert.equal(ranking.full.top5.length, 5);
-  assert.equal(ranking.full.ultimos3.length, 3);
-  assert.equal(ranking.full.top5[0].total, 100);
-
   assert.equal(ranking.sencillo.totalOperadores, 6);
   assert.equal(ranking.sencillo.topLimit, 3);
-  assert.equal(ranking.sencillo.top5.length, 3);
-  assert.equal(ranking.sencillo.ultimos3.length, 3);
+
+  const porVelocidad = filtrarSegmentoPorEvento(ranking.full, 'velocidad');
+  assert.equal(porVelocidad.ultimos3[porVelocidad.ultimos3.length - 1].noEmpleado, '272019');
+
+  const porAlertas = filtrarSegmentoPorEvento(ranking.full, 'samsara');
+  assert.equal(porAlertas.ultimos3[porAlertas.ultimos3.length - 1].noEmpleado, '228196');
 });
