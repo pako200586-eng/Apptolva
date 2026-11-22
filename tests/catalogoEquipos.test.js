@@ -81,6 +81,13 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
   assert.equal(hidden('backupFirestoreBtn'), false);
   assert.equal(hidden('btn-vista-ranking'), false);
   assert.equal(hidden('gestion-operadores'), false);
+  context.firebaseConfig.projectId = 'gen-lang-client-0015118308';
+  context.aplicarPermisosDeInterfaz();
+  assert.equal(hidden('gestion-operadores'), false);
+  state.operacionesSensibles = false;
+  context.aplicarPermisosDeInterfaz();
+  assert.equal(hidden('gestion-operadores'), true);
+  state.operacionesSensibles = true;
   context.firebaseConfig.projectId = 'production';
   context.aplicarPermisosDeInterfaz();
   assert.equal(hidden('gestion-operadores'), true);

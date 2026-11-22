@@ -3,12 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-function preparar(consultar) {
+function preparar(consultar, projectId = 'apptolva-staging', storage = new Map()) {
   const source = readFileSync(new URL('../apptolva_bitacora/js/sincronizarOperadores.js', import.meta.url), 'utf8')
     .replace(/^import .*;\s*/m, '')
     .replace('export function iniciarSincronizacionOperadores', 'function iniciarSincronizacionOperadores');
   const listeners = {};
-  const storage = new Map();
   const status = { textContent: '', hidden: true };
   const auth = { currentUser: null };
   let notificarAuth;
@@ -29,7 +28,7 @@ function preparar(consultar) {
     console: { error() {} }
   });
   vm.runInContext(`${source}\nglobalThis.iniciar = iniciarSincronizacionOperadores;`, context);
-  context.iniciar({ options: { projectId: 'apptolva-staging' } }, auth);
+  context.iniciar({ options: { projectId } }, auth);
   return {
     window, status, storage,
     cambiar(user) { auth.currentUser = user; notificarAuth(user); }
@@ -45,6 +44,20 @@ test('sincroniza y conserva una copia por cuenta, sin perder la semilla', async 
   assert.ok(env.storage.has('apptolva_operadores_apptolva-staging_a'));
   env.cambiar(null);
   assert.equal(env.window.CATALOGO_OPERADORES['2'], undefined);
+});
+
+test('producción no reutiliza la copia de staging y guarda su propio catálogo', async () => {
+  const storage = new Map();
+  const staging = preparar(async () => ({ data: { operadores: { '2': { nombre: 'STAGING', depto: 'TRANSPORTES' } } } }), 'apptolva-staging', storage);
+  staging.cambiar({ uid: 'a', isAnonymous: false });
+  await new Promise(resolve => setImmediate(resolve));
+  const produccion = preparar(async () => ({ data: { operadores: { '3': { nombre: 'PRODUCCION', depto: 'TRANSPORTES' } } } }), 'gen-lang-client-0015118308', storage);
+  produccion.cambiar({ uid: 'a', isAnonymous: false });
+  assert.equal(produccion.window.CATALOGO_OPERADORES['2'], undefined);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(produccion.window.CATALOGO_OPERADORES['3'].nombre, 'PRODUCCION');
+  assert.ok(storage.has('apptolva_operadores_apptolva-staging_a'));
+  assert.ok(storage.has('apptolva_operadores_gen-lang-client-0015118308_a'));
 });
 
 test('ignora respuestas de otra sesión e informa si falla la sincronización', async () => {

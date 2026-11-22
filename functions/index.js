@@ -46,10 +46,13 @@ exports.asignarFolioNOM087 = onDocumentCreated({
   if (folio) logger.info("Folio NOM-087 asignado.", { id: registroRef.id, folio });
 });
 
-function exigirStaging() {
-  if (process.env.GCLOUD_PROJECT !== "apptolva-staging" &&
-      !(process.env.GCLOUD_PROJECT === "demo-apptolva" && process.env.FIRESTORE_EMULATOR_HOST)) {
-    throw new HttpsError("failed-precondition", "La gestión de operadores solo está habilitada en staging.");
+const PROYECTOS_PERMITIDOS = new Set(["apptolva-staging", "gen-lang-client-0015118308"]);
+
+function exigirProyectoPermitido() {
+  const proyecto = process.env.GCLOUD_PROJECT;
+  if (!PROYECTOS_PERMITIDOS.has(proyecto) &&
+      !(proyecto === "demo-apptolva" && process.env.FIRESTORE_EMULATOR_HOST)) {
+    throw new HttpsError("failed-precondition", "La gestión de operadores no está habilitada en este proyecto.");
   }
 }
 
@@ -68,7 +71,7 @@ async function verificarSesion(request) {
 exports.gestionarOperador = onCall({
   region: "us-central1", memory: "256MiB", maxInstances: 5, timeoutSeconds: 60,
 }, async (request) => {
-  exigirStaging();
+  exigirProyectoPermitido();
   await verificarSesion(request);
   const correos = new Set((process.env.DEPURACION_MASIVA_EMAILS || "")
     .split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
@@ -78,7 +81,7 @@ exports.gestionarOperador = onCall({
 exports.catalogoOperadores = onCall({
   region: "us-central1", memory: "256MiB", maxInstances: 5, timeoutSeconds: 60,
 }, async (request) => {
-  exigirStaging();
+  exigirProyectoPermitido();
   await verificarSesion(request);
   return obtenerCatalogo({ request, db: getFirestore() });
 });

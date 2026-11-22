@@ -77,7 +77,7 @@
 
     <section id="dashboard" class="hidden space-y-5">
       <section id="gestion-operadores" class="panel-card hidden rounded-lg p-4" aria-labelledby="gestion-operadores-titulo">
-        <h2 id="gestion-operadores-titulo" class="text-lg font-black text-[#7c2d12]">Gestión de operadores · staging</h2>
+        <h2 id="gestion-operadores-titulo" class="text-lg font-black text-[#7c2d12]">Gestión de operadores</h2>
         <p class="mt-1 text-sm text-slate-600">Requiere conexión. Entrega la contraseña al operador por un medio seguro.</p>
         <form id="form-gestion-operadores" method="post" class="mt-4 grid gap-3 md:grid-cols-2" aria-labelledby="gestion-operadores-titulo">
           <label class="block text-sm font-bold text-slate-700">Acción
@@ -724,7 +724,7 @@
     $('form-gestion-operadores').addEventListener('submit', async (event) => {
       event.preventDefault();
       const estado = $('operador-estado');
-      if (state.role !== 'admin' || !state.operacionesSensibles || firebaseConfig.projectId !== 'apptolva-staging') {
+      if (state.role !== 'admin' || !state.operacionesSensibles || !['apptolva-staging', 'gen-lang-client-0015118308'].includes(firebaseConfig.projectId)) {
         estado.textContent = 'No tienes autorización para esta operación.';
         return;
       }
@@ -1472,7 +1472,7 @@
         element.classList.toggle('hidden', !esAdmin);
       });
       $('depurarFallasBtn').classList.toggle('hidden', !esResponsable);
-      $('gestion-operadores').classList.toggle('hidden', !esResponsable || firebaseConfig.projectId !== 'apptolva-staging');
+      $('gestion-operadores').classList.toggle('hidden', !esResponsable || !['apptolva-staging', 'gen-lang-client-0015118308'].includes(firebaseConfig.projectId));
       document.querySelectorAll('#segForm input, #segForm textarea').forEach((element) => {
         element.disabled = !esAdmin;
       });

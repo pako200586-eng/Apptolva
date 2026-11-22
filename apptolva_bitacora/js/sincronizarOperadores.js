@@ -14,7 +14,7 @@ function validarCatalogo(operadores) {
 }
 
 export function iniciarSincronizacionOperadores(app, auth) {
-  if (app.options.projectId !== "apptolva-staging") return;
+  if (!["apptolva-staging", "gen-lang-client-0015118308"].includes(app.options.projectId)) return;
   const semilla = { ...window.CATALOGO_OPERADORES };
   const catalogo = window.CATALOGO_OPERADORES;
   const consultar = httpsCallable(getFunctions(app, "us-central1"), "catalogoOperadores");

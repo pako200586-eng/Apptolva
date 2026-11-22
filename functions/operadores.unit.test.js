@@ -123,18 +123,33 @@ test("un correo existente ajeno nunca se modifica", async () => {
   assert.equal(docs.has("usuarios/123@apptolva.com"), false);
 });
 
-test("las funciones se exportan y rechazan otros proyectos antes de acceder a datos", async () => {
+test("las funciones solo aceptan los proyectos previstos y el emulador", async () => {
   const functions = require("./index");
   assert.equal(typeof functions.asignarFolioNOM087, "function");
   assert.equal(typeof functions.gestionarOperador, "function");
   assert.equal(typeof functions.catalogoOperadores, "function");
   const project = process.env.GCLOUD_PROJECT;
-  process.env.GCLOUD_PROJECT = "otro-proyecto";
+  const emulator = process.env.FIRESTORE_EMULATOR_HOST;
+  const request = { rawRequest: { get: () => undefined } };
   try {
-    await assert.rejects(functions.gestionarOperador.run({}), { code: "failed-precondition" });
-    await assert.rejects(functions.catalogoOperadores.run({}), { code: "failed-precondition" });
+    delete process.env.FIRESTORE_EMULATOR_HOST;
+    for (const id of ["apptolva-staging", "gen-lang-client-0015118308"]) {
+      process.env.GCLOUD_PROJECT = id;
+      await assert.rejects(functions.gestionarOperador.run(request), { code: "unauthenticated" });
+      await assert.rejects(functions.catalogoOperadores.run(request), { code: "unauthenticated" });
+    }
+    for (const id of ["otro-proyecto", "demo-apptolva"]) {
+      process.env.GCLOUD_PROJECT = id;
+      await assert.rejects(functions.gestionarOperador.run(request), { code: "failed-precondition" });
+      await assert.rejects(functions.catalogoOperadores.run(request), { code: "failed-precondition" });
+    }
+    process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+    await assert.rejects(functions.gestionarOperador.run(request), { code: "unauthenticated" });
+    await assert.rejects(functions.catalogoOperadores.run(request), { code: "unauthenticated" });
   } finally {
     if (project === undefined) delete process.env.GCLOUD_PROJECT;
     else process.env.GCLOUD_PROJECT = project;
+    if (emulator === undefined) delete process.env.FIRESTORE_EMULATOR_HOST;
+    else process.env.FIRESTORE_EMULATOR_HOST = emulator;
   }
 });
