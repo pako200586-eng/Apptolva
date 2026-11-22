@@ -46,7 +46,7 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
       click() {}
     };
   }
-  const ids = ['depurarFallasBtn', 'auditFirestoreBtn', 'backupFirestoreBtn', 'btn-vista-catalogo',
+  const ids = ['gestion-operadores', 'depurarFallasBtn', 'auditFirestoreBtn', 'backupFirestoreBtn', 'btn-vista-catalogo',
     'vista-catalogo', 'btn-vista-ranking', 'vista-ranking', 'btn-vista-reportes', 'cargarMasAntiguos',
     'firestoreAudit', 'downloadFirestoreAudit'];
   const elements = Object.fromEntries(ids.map(id => [id, element(id === 'vista-catalogo' || id === 'vista-ranking' || id === 'btn-vista-ranking')]));
@@ -54,7 +54,7 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
   const input = {};
   const state = { role: 'admin', user: { email: 'frank@apptolva.com' }, operacionesSensibles: false, rankingSemanal: false, windowDays: 30 };
   const context = vm.createContext({
-    catalogoEquipos, state, $: id => elements[id], VENTANA_PASO_DIAS: 7,
+    catalogoEquipos, state, firebaseConfig: { projectId: 'apptolva-staging' }, $: id => elements[id], VENTANA_PASO_DIAS: 7,
     document: { querySelectorAll: selector => selector === '.btn-accion-admin' ? [adminButton] : [input] }
   });
   vm.runInContext(
@@ -70,6 +70,7 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
   assert.equal(hidden('auditFirestoreBtn'), true);
   assert.equal(hidden('backupFirestoreBtn'), true);
   assert.equal(hidden('btn-vista-ranking'), true);
+  assert.equal(hidden('gestion-operadores'), true);
   assert.equal(input.disabled, false);
 
   state.operacionesSensibles = true;
@@ -79,6 +80,11 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
   assert.equal(hidden('auditFirestoreBtn'), false);
   assert.equal(hidden('backupFirestoreBtn'), false);
   assert.equal(hidden('btn-vista-ranking'), false);
+  assert.equal(hidden('gestion-operadores'), false);
+  context.firebaseConfig.projectId = 'production';
+  context.aplicarPermisosDeInterfaz();
+  assert.equal(hidden('gestion-operadores'), true);
+  context.firebaseConfig.projectId = 'apptolva-staging';
 
   state.user.email = 'otro@example.test';
   state.operacionesSensibles = false;

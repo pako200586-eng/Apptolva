@@ -18,6 +18,7 @@ export {
   setPersistence,
   signOut,
 } from "firebase/auth";
+export { getFunctions, httpsCallable } from "firebase/functions";
 export {
   collection,
   deleteDoc,

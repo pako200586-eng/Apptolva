@@ -61,6 +61,7 @@
   </header>
 
   <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+    <p id="estado-catalogo-operadores" role="status" hidden class="mb-4 rounded-md bg-amber-100 px-4 py-3 text-sm text-amber-900"></p>
     <section id="loginPanel" class="panel-card mx-auto max-w-md rounded-lg p-5">
       <h2 class="text-lg font-black text-[#7c2d12]">Acceso de supervisor</h2>
       <p class="mt-1 text-sm text-slate-600">Ingresa con la cuenta de supervisor autorizada en Firebase Authentication.</p>
@@ -75,6 +76,34 @@
     </section>
 
     <section id="dashboard" class="hidden space-y-5">
+      <section id="gestion-operadores" class="panel-card hidden rounded-lg p-4" aria-labelledby="gestion-operadores-titulo">
+        <h2 id="gestion-operadores-titulo" class="text-lg font-black text-[#7c2d12]">Gestión de operadores · staging</h2>
+        <p class="mt-1 text-sm text-slate-600">Requiere conexión. Entrega la contraseña al operador por un medio seguro.</p>
+        <form id="form-gestion-operadores" method="post" class="mt-4 grid gap-3 md:grid-cols-2" aria-labelledby="gestion-operadores-titulo">
+          <label class="block text-sm font-bold text-slate-700">Acción
+            <select id="operador-accion" name="accion" class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
+              <option value="alta">Dar de alta</option>
+              <option value="reset_password">Restablecer contraseña</option>
+            </select>
+          </label>
+          <label class="block text-sm font-bold text-slate-700">Número de empleado
+            <input id="operador-numero" name="numeroEmpleado" type="text" inputmode="numeric" pattern="[0-9]{1,20}" maxlength="20" required class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
+          </label>
+          <label id="operador-nombre-label" class="block text-sm font-bold text-slate-700">Nombre completo
+            <input id="operador-nombre" name="nombre" type="text" maxlength="120" required class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
+          </label>
+          <label class="block text-sm font-bold text-slate-700">Contraseña nueva (mínimo 8 caracteres)
+            <input id="operador-password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
+          </label>
+          <label class="block text-sm font-bold text-slate-700">Confirmar contraseña
+            <input id="operador-password-confirmar" type="password" minlength="8" maxlength="128" autocomplete="new-password" required class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
+          </label>
+          <div class="md:col-span-2">
+            <button id="operador-enviar" type="submit" class="min-h-12 rounded-md bg-[#294936] px-5 py-3 font-black text-white hover:bg-[#203b2b] disabled:opacity-60">Guardar operador</button>
+            <p id="operador-estado" role="status" class="mt-2 text-sm font-bold text-slate-700"></p>
+          </div>
+        </form>
+      </section>
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Reportes</p><strong id="statTotal" class="text-3xl text-[#7c2d12]">0</strong></div>
         <div class="panel-card rounded-lg p-4"><p class="text-xs font-bold uppercase text-slate-500">Checklist</p><strong id="statChecklist" class="text-3xl text-[#294936]">0</strong></div>
@@ -606,7 +635,7 @@
 
   <script type="module">
     import { getFirebaseConfig, initializeApp } from "./js/firebase-sdk.js";
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "./js/firebase-sdk.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, getFunctions, httpsCallable } from "./js/firebase-sdk.js";
     import {
       getFirestore,
       collection,
@@ -629,6 +658,7 @@
     import { calcularAlertasSeguridad } from "./js/alertasSeguridad.js";
     import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, puedeAdministrarCatalogo, validarCatalogo } from "./js/catalogoEquipos.js";
     import * as rankingOperadores from "./js/rankingOperadores.js";
+    import { iniciarSincronizacionOperadores } from "./js/sincronizarOperadores.js";
 
     const {
       PESOS_INICIALES,
@@ -651,6 +681,8 @@
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
+    iniciarSincronizacionOperadores(firebaseApp, auth);
+    const gestionarOperador = httpsCallable(getFunctions(firebaseApp, "us-central1"), "gestionarOperador");
 
     async function enviarAlertaTelegram(mensaje) {
       try {
@@ -677,6 +709,52 @@
     let cancelarEmergencias = null;
     let emergencias = [];
     const $ = (id) => document.getElementById(id);
+    $('operador-accion').addEventListener('change', () => {
+      const esAlta = $('operador-accion').value === 'alta';
+      $('operador-nombre-label').classList.toggle('hidden', !esAlta);
+      $('operador-nombre').required = esAlta;
+      $('operador-estado').textContent = '';
+    });
+    $('operador-password-confirmar').addEventListener('input', () => {
+      $('operador-password-confirmar').setCustomValidity('');
+    });
+    $('operador-password').addEventListener('input', () => {
+      $('operador-password-confirmar').setCustomValidity('');
+    });
+    $('form-gestion-operadores').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const estado = $('operador-estado');
+      if (state.role !== 'admin' || !state.operacionesSensibles || firebaseConfig.projectId !== 'apptolva-staging') {
+        estado.textContent = 'No tienes autorización para esta operación.';
+        return;
+      }
+      const password = $('operador-password').value;
+      if (password !== $('operador-password-confirmar').value) {
+        $('operador-password-confirmar').setCustomValidity('Las contraseñas no coinciden.');
+        $('operador-password-confirmar').reportValidity();
+        return;
+      }
+      const accion = $('operador-accion').value;
+      const numeroEmpleado = $('operador-numero').value.trim();
+      if (accion === 'reset_password' && !confirm(`Se cambiará la contraseña de ${numeroEmpleado}@apptolva.com. ¿Continuar?`)) return;
+      $('operador-enviar').disabled = true;
+      estado.textContent = 'Procesando; espera la respuesta del servidor...';
+      try {
+        const { data } = await gestionarOperador({
+          accion, numeroEmpleado, nombre: $('operador-nombre').value, password
+        });
+        if (!data?.email || data.accion !== accion) throw new Error('La respuesta del servidor no es válida; verifica la cuenta.');
+        $('operador-password').value = '';
+        $('operador-password-confirmar').value = '';
+        estado.textContent = `${accion === 'alta' ? 'Cuenta creada' : 'Contraseña actualizada'}: ${data.email}. Entrega la clave por un medio seguro.`;
+        window.dispatchEvent(new Event('apptolva-actualizar-operadores'));
+      } catch (error) {
+        console.error('No se pudo completar la gestión del operador:', error.code);
+        estado.textContent = `${error.message || 'No se pudo completar la operación.'} Verifica la cuenta antes de reintentar.`;
+      } finally {
+        $('operador-enviar').disabled = false;
+      }
+    });
     const COLECCIONES_AUDITORIA_FIRESTORE = [
       'bitacora_reports',
       'ordenes_trabajo',
@@ -1394,6 +1472,7 @@
         element.classList.toggle('hidden', !esAdmin);
       });
       $('depurarFallasBtn').classList.toggle('hidden', !esResponsable);
+      $('gestion-operadores').classList.toggle('hidden', !esResponsable || firebaseConfig.projectId !== 'apptolva-staging');
       document.querySelectorAll('#segForm input, #segForm textarea').forEach((element) => {
         element.disabled = !esAdmin;
       });
@@ -2221,6 +2300,12 @@
 
     onAuthStateChanged(auth, async (user) => {
       const currentAuthStateVersion = ++authStateVersion;
+      if (state.user?.uid !== user?.uid) {
+        $('operador-password').value = '';
+        $('operador-password-confirmar').value = '';
+        $('operador-password-confirmar').setCustomValidity('');
+        $('operador-estado').textContent = '';
+      }
       if (cancelarEmergencias) cancelarEmergencias();
       cancelarEmergencias = null;
       emergencias = [];

@@ -1,7 +1,10 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const logger = require("firebase-functions/logger");
+const { gestionar, obtenerCatalogo } = require("./operadores");
 
 initializeApp();
 
@@ -41,4 +44,41 @@ exports.asignarFolioNOM087 = onDocumentCreated({
   });
 
   if (folio) logger.info("Folio NOM-087 asignado.", { id: registroRef.id, folio });
+});
+
+function exigirStaging() {
+  if (process.env.GCLOUD_PROJECT !== "apptolva-staging" &&
+      !(process.env.GCLOUD_PROJECT === "demo-apptolva" && process.env.FIRESTORE_EMULATOR_HOST)) {
+    throw new HttpsError("failed-precondition", "La gestión de operadores solo está habilitada en staging.");
+  }
+}
+
+async function verificarSesion(request) {
+  const bearer = request.rawRequest.get("authorization")?.match(/^Bearer\s+(.+)$/i);
+  if (!request.auth || !bearer) throw new HttpsError("unauthenticated", "Inicia sesión nuevamente.");
+  try {
+    const identidad = await getAuth().verifyIdToken(bearer[1], true);
+    if (identidad.uid !== request.auth.uid) throw new Error("La identidad no coincide.");
+  } catch (error) {
+    logger.warn("No se pudo validar la sesión para gestionar operadores.", { code: error.code });
+    throw new HttpsError("unauthenticated", "La sesión no es válida o fue revocada.");
+  }
+}
+
+exports.gestionarOperador = onCall({
+  region: "us-central1", memory: "256MiB", maxInstances: 5, timeoutSeconds: 60,
+}, async (request) => {
+  exigirStaging();
+  await verificarSesion(request);
+  const correos = new Set((process.env.DEPURACION_MASIVA_EMAILS || "")
+    .split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
+  return gestionar({ request, db: getFirestore(), auth: getAuth(), fieldValue: FieldValue, correos });
+});
+
+exports.catalogoOperadores = onCall({
+  region: "us-central1", memory: "256MiB", maxInstances: 5, timeoutSeconds: 60,
+}, async (request) => {
+  exigirStaging();
+  await verificarSesion(request);
+  return obtenerCatalogo({ request, db: getFirestore() });
 });

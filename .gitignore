@@ -1,4 +1,6 @@
 .env
+functions/.env*
+.netlify/
 apptolva_bitacora/js/firebase-sdk.js
 apptolva_bitacora/js/firebase-config.js
 node_modules/

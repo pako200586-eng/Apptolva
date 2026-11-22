@@ -4,6 +4,18 @@ La herramienta solo prepara cuentas y perfiles. No ejecutar hasta comprobar que 
 
 El catálogo se lee de `apptolva_bitacora/js/catalogoOperadores.js`. El perfil usa `usuarios/{correo-en-minúsculas}` para conservar la estructura existente. La cuenta 221417 es operador y 221948 es master con `rol_evaluaciones: evaluador`.
 
+## Gestión desde el panel: preparación para staging
+
+La gestión de altas y contraseñas está limitada en código al proyecto `apptolva-staging`. La tarjeta aparece únicamente a un administrador autorizado para operaciones sensibles en Netlify. Las funciones vuelven a comprobar la identidad y el rol en el servidor; para gestionar cuentas también se requiere una lista de correos autorizados configurada en Firebase.
+
+Antes de desplegar, configurar en un archivo local ignorado `functions/.env.apptolva-staging` la variable `DEPURACION_MASIVA_EMAILS` con la lista autorizada para staging, separada por comas. Debe mantenerse coherente con la variable de Netlify: son entornos distintos y no se sincronizan automáticamente. Una lista vacía niega la gestión. No guardar contraseñas en ese archivo ni en el repositorio.
+
+Las funciones pueden desplegarse selectivamente con `firebase deploy --only functions:gestionarOperador,functions:catalogoOperadores --project apptolva-staging`. El panel y sus recursos requieren además un despliegue de Netlify en contexto de rama o preview; publicar las funciones por sí solo no actualiza la interfaz. Verificar primero las pruebas de Auth y Firestore Emulator: `firebase emulators:exec --project demo-apptolva --only auth,firestore "node --test functions/operadores.test.js"`.
+
+El alta crea una identidad de Firebase Authentication con el formato `numero@apptolva.com`: **no crea un buzón de correo electrónico**. La contraseña debe tener entre 8 y 128 caracteres y entregarse por un canal seguro; nunca se guarda en Firestore. El perfil y la entrada del catálogo se crean juntos; si Auth se creó pero Firestore falló, esperar cinco minutos y repetir el alta con el mismo número y nombre. Un perfil existente o una cuenta ajena se rechazan y requieren revisión manual.
+
+Las entradas nuevas se sincronizan con el catálogo incluido en el cliente mediante una función autenticada. La última copia disponible se guarda por proyecto y usuario para su uso offline; el dispositivo debe haberla recibido al menos una vez con conexión. Las sesiones anónimas antiguas conservan solo el catálogo incluido. El restablecimiento conserva el UID y no reactiva cuentas deshabilitadas ni modifica perfiles con roles especiales. Revoca los refresh tokens, pero los ID tokens existentes pueden seguir siendo válidos hasta que expiren si el servicio no comprueba su revocación.
+
 ## Antes de aplicar
 
 1. Verificar el proyecto de staging, la base `(default)`, los permisos de la identidad de Application Default Credentials y que el proveedor correo/contraseña esté habilitado.

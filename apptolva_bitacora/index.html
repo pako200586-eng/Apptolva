@@ -69,6 +69,7 @@
 </head>
 <body class="text-slate-800">
 
+    <p id="estado-catalogo-operadores" role="status" hidden class="bg-amber-100 px-4 py-3 text-sm text-amber-900"></p>
     <div id="save-indicator"><i class="fas fa-save mr-1"></i> Guardado</div>
 
     <div id="login-overlay">
@@ -1470,6 +1471,7 @@
             where
         } from "./js/firebase-sdk.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "./js/firebase-sdk.js";
+        import { iniciarSincronizacionOperadores } from "./js/sincronizarOperadores.js";
         import { borrarPerfil, borrarRespaldoReporte, guardarPerfil, guardarRespaldoReporte, hayTrabajoAnterior, intervaloHistorial, leerPerfil, listarRespaldosReportes, normalizarUsuarioAcceso, perfilValido, permisosMenu, puedeVerHistorial, registrarEspacio, validarEntrada } from "./js/controlSesion.js";
        
         const firebaseConfig = getFirebaseConfig();
@@ -1483,6 +1485,7 @@
                 localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
             });
             const auth = getAuth(app);
+            iniciarSincronizacionOperadores(app, auth);
             const projectId = firebaseConfig.projectId;
             const form = document.getElementById('form-login');
             const passwordInput = document.getElementById('login-password');
@@ -2025,13 +2028,18 @@
             if (!dl) {
                 dl = document.createElement('datalist');
                 dl.id = 'listaOperadoresBachoco';
+                document.body.appendChild(dl);
+            }
+            function actualizarListaOperadores() {
+                dl.replaceChildren();
                 for (const [num, op] of Object.entries(catalogo)) {
                     const opt = document.createElement('option');
                     opt.value = num + " - " + op.nombre;
                     dl.appendChild(opt);
                 }
-                document.body.appendChild(dl);
             }
+            actualizarListaOperadores();
+            window.addEventListener('apptolva-catalogo-operadores', actualizarListaOperadores);
 
             const inputNum = document.getElementById('revEmpleado');
             const inputNombre = document.getElementById('revOperador');

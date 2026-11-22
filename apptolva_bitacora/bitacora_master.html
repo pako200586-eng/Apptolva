@@ -60,6 +60,7 @@
 </head>
 <body class="font-sans text-gray-800 auth-pending">
 
+    <p id="estado-catalogo-operadores" role="status" hidden class="bg-amber-100 px-4 py-3 text-sm text-amber-900"></p>
     <!-- Navbar con Estado de Sincronización Integrado -->
     <nav class="bg-gradient-to-r from-orange-600 to-[#F28B00] text-white p-2 shadow-lg sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
@@ -2219,6 +2220,7 @@
             setDoc
         } from "./js/firebase-sdk.js";
         import { getAuth, onAuthStateChanged } from "./js/firebase-sdk.js";
+        import { iniciarSincronizacionOperadores } from "./js/sincronizarOperadores.js";
         import { crearObservadorFolio } from "./js/observadorFolio.js";
         import { leerPerfil, validarEspacio } from "./js/controlSesion.js";
       
@@ -2245,6 +2247,7 @@
                 localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
             });
             const auth = getAuth(app);
+            iniciarSincronizacionOperadores(app, auth);
             let uidObservado = null;
             let uidAutorizado = null;
             const estadoFolio = document.getElementById("folioNubeEstado");
