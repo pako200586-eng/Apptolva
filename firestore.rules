@@ -336,8 +336,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // El borrador del martes es privado; los operadores solo leen cortes publicados.
     match /ranking_semanal/{semanaId} {
-      allow read: if isRouteUser();
+      allow read: if semanaId == 'borrador' ? isRankingOwner() : isRouteUser();
       allow write: if isRankingOwner();
     }
 
