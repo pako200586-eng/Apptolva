@@ -388,6 +388,9 @@
               </label>
             </div>
             <div class="mt-4 flex flex-wrap gap-2">
+              <button id="ranking-guardar-borrador" type="button" class="rounded-md border border-[#7c2d12] bg-white px-4 py-2 text-sm font-black text-[#7c2d12] hover:bg-orange-50 disabled:cursor-wait disabled:opacity-60">
+                Guardar Borrador (Martes)
+              </button>
               <button id="ranking-calcular" type="button" class="rounded-md bg-[#7c2d12] px-4 py-2 text-sm font-black text-white disabled:cursor-wait disabled:opacity-60">
                 Calcular Vista Previa
               </button>
@@ -395,7 +398,7 @@
                 Publicar Semana
               </button>
             </div>
-            <p id="ranking-preview-estado" role="status" class="mt-3 text-xs text-slate-500">Sube el CSV de alertas y calcula la vista previa; el reporte de velocidad es opcional.</p>
+            <p id="ranking-preview-estado" role="status" class="mt-3 text-xs text-slate-500">Sube el CSV de alertas y guárdalo como borrador el martes, o calcula la vista previa con ambos CSV.</p>
           </div>
 
           <div id="ranking-resumen" class="hidden grid gap-4 lg:grid-cols-2"></div>
@@ -767,6 +770,7 @@
     const rankingState = {
       configCargada: false,
       configuracion: null,
+      borradorActivo: null,
       datosSemana: null,
       excluidosSemana: {},
       preview: null
@@ -858,8 +862,88 @@
           </tr>`).join('');
     }
 
+    async function cargarBorradorRanking() {
+      if (!state.user || state.rankingSemanal !== true) return;
+      try {
+        const snap = await getDoc(doc(db, 'ranking_semanal', 'borrador'));
+        const data = snap.exists() ? snap.data() : null;
+        if (!data || data.estado !== 'en_borrador' || !data.alertas) {
+          rankingState.borradorActivo = null;
+          return;
+        }
+        rankingState.borradorActivo = data;
+        if (data.inicio) $('ranking-fecha-inicio').value = data.inicio;
+        if (data.fin) $('ranking-fecha-fin').value = data.fin;
+        $('ranking-panel-estado').textContent = `Borrador activo: ${data.etiquetaSemana || data.semanaId}`;
+        const a = data.alertas;
+        $('ranking-preview-estado').textContent =
+          `Borrador del martes cargado (${data.archivoAlertas || 'CSV Samsara'}: ${a.aplican ?? 0} aplican, ${a.noAplican ?? 0} no aplican, ${a.sinRevisar ?? 0} sin revisar). Sube el CSV de Exceso de Velocidad y pulsa Calcular Vista Previa.`;
+      } catch (error) {
+        console.error('No se pudo cargar el borrador del ranking:', error);
+      }
+    }
+
+    async function guardarBorradorRanking() {
+      if (state.rankingSemanal !== true) {
+        showToast('El Ranking Semanal está reservado al responsable autorizado.');
+        return;
+      }
+      const archivo = $('ranking-csv').files?.[0];
+      if (!archivo) {
+        showToast('Selecciona el archivo CSV de Alertas Samsara para guardar el borrador.');
+        return;
+      }
+      if (!archivo.name.toLowerCase().endsWith('.csv')) {
+        showToast('El archivo de Samsara debe tener formato .csv.');
+        return;
+      }
+      const boton = $('ranking-guardar-borrador');
+      boton.disabled = true;
+      $('ranking-preview-estado').textContent = 'Validando CSV de Alertas y guardando borrador en Firestore...';
+      try {
+        const semana = validarSemanaRanking();
+        const samsara = parsearCsvSamsara(await archivo.text(), window.CATALOGO_OPERADORES || {});
+        const etiquetaSemana = `${semana.inicio.toLocaleDateString('es-MX')} – ${semana.fin.toLocaleDateString('es-MX')}`;
+        const borrador = {
+          semanaId: `${semana.inicioTexto}_${semana.finTexto}`,
+          inicio: semana.inicioTexto,
+          fin: semana.finTexto,
+          etiquetaSemana,
+          estado: 'en_borrador',
+          archivoAlertas: archivo.name,
+          alertas: {
+            totalEventos: Number(samsara.totalEventos ?? 0),
+            aplican: Number(samsara.aplican ?? 0),
+            noAplican: Number(samsara.noAplican ?? 0),
+            sinRevisar: Number(samsara.sinRevisar ?? 0),
+            sinEmpatar: Array.isArray(samsara.sinEmpatar) ? samsara.sinEmpatar : [],
+            eventosAplicables: Array.isArray(samsara.eventosAplicables) ? samsara.eventosAplicables : []
+          },
+          actualizadoEn: new Date().toISOString(),
+          actualizadoPor: state.user?.email ?? ''
+        };
+        await setDoc(doc(db, 'ranking_semanal', 'borrador'), borrador);
+        rankingState.borradorActivo = borrador;
+        $('ranking-panel-estado').textContent = `Borrador activo: ${etiquetaSemana}`;
+        const sinEmpatar = borrador.alertas.sinEmpatar.length
+          ? ` · ${borrador.alertas.sinEmpatar.length} nombre(s) sin empatar`
+          : '';
+        $('ranking-preview-estado').textContent =
+          `Borrador guardado (${archivo.name}: ${borrador.alertas.aplican} aplican, ${borrador.alertas.noAplican} no aplican, ${borrador.alertas.sinRevisar} sin revisar${sinEmpatar}). El jueves solo sube Exceso de Velocidad.`;
+        showToast('Borrador del martes guardado en Firestore.');
+      } catch (error) {
+        console.error('No se pudo guardar el borrador del ranking:', error);
+        $('ranking-preview-estado').textContent = error.message;
+        showToast(error.message || 'No se pudo guardar el borrador.');
+      } finally {
+        boton.disabled = false;
+      }
+    }
+
     async function cargarConfiguracionRanking() {
-      if (!state.user || state.rankingSemanal !== true || rankingState.configCargada) return;
+      if (!state.user || state.rankingSemanal !== true) return;
+      await cargarBorradorRanking();
+      if (rankingState.configCargada) return;
       $('ranking-config-estado').textContent = 'Leyendo configuración de Firestore...';
       try {
         const snapshot = await getDoc(doc(db, 'metadata', 'ranking_config'));
@@ -1067,13 +1151,9 @@
         return;
       }
       const boton = $('ranking-calcular');
-      const archivo = $('ranking-csv').files?.[0];
+      const archivo = $('ranking-csv').files?.[0] || null;
       const archivoVelocidad = $('ranking-csv-velocidad').files?.[0] || null;
-      if (!archivo) {
-        showToast('Selecciona el archivo CSV semanal de Samsara.');
-        return;
-      }
-      if (!archivo.name.toLowerCase().endsWith('.csv')) {
+      if (archivo && !archivo.name.toLowerCase().endsWith('.csv')) {
         showToast('El archivo de Samsara debe tener formato .csv.');
         return;
       }
@@ -1087,9 +1167,16 @@
       $('ranking-preview-estado').textContent = 'Leyendo CSV y consultando exclusivamente la semana seleccionada...';
       try {
         const semana = validarSemanaRanking();
+        const borrador = rankingState.borradorActivo;
+        const usaBorrador = !archivo && borrador?.estado === 'en_borrador'
+          && borrador.semanaId === `${semana.inicioTexto}_${semana.finTexto}` && borrador.alertas;
+        if (!archivo && !usaBorrador) {
+          throw new Error('Selecciona el archivo CSV semanal de Alertas Samsara (no hay borrador activo para este rango).');
+        }
         const configuracion = configuracionRankingFormulario();
-        const csv = await archivo.text();
-        const samsara = parsearCsvSamsara(csv, window.CATALOGO_OPERADORES || {});
+        const samsara = archivo
+          ? parsearCsvSamsara(await archivo.text(), window.CATALOGO_OPERADORES || {})
+          : { ...borrador.alertas, sinEmpatar: borrador.alertas.sinEmpatar || [], eventosAplicables: borrador.alertas.eventosAplicables || [] };
         let velocidad = {
           totalRegistros: 0,
           filtradosFueraDeRango: 0,
@@ -1205,7 +1292,16 @@
         await runTransaction(db, async (transaction) => {
           transaction.set(doc(db, 'ranking_semanal', datos.semanaId), publicado);
           transaction.set(doc(db, 'ranking_semanal', 'actual'), publicado);
+          if (rankingState.borradorActivo?.semanaId === datos.semanaId) {
+            transaction.set(doc(db, 'ranking_semanal', 'borrador'), {
+              estado: 'publicado',
+              semanaId: publicado.semanaId,
+              publicadoEn: publicado.publicadoEn,
+              publicadoPor: publicado.publicadoPor
+            });
+          }
         });
+        if (rankingState.borradorActivo?.semanaId === datos.semanaId) rankingState.borradorActivo = null;
         $('ranking-preview-estado').textContent = `Semana ${datos.etiquetaSemana} publicada correctamente.`;
         showToast('Ranking semanal publicado.');
       } catch (error) {
@@ -4255,6 +4351,7 @@
     $('ranking-peso-bitacoras').addEventListener('change', invalidarPreviewRanking);
     $('ranking-peso-checklists').addEventListener('change', invalidarPreviewRanking);
     $('ranking-guardar-config').addEventListener('click', guardarConfiguracionRanking);
+    $('ranking-guardar-borrador').addEventListener('click', guardarBorradorRanking);
     $('ranking-calcular').addEventListener('click', calcularPreviewRanking);
     $('ranking-publicar').addEventListener('click', publicarSemanaRanking);
     $('ranking-preview-body').addEventListener('change', (evento) => {
