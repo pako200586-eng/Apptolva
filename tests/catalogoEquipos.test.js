@@ -46,7 +46,7 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
       click() {}
     };
   }
-  const ids = ['gestion-operadores', 'depurarFallasBtn', 'auditFirestoreBtn', 'backupFirestoreBtn', 'btn-vista-catalogo',
+  const ids = ['gestion-operadores', 'gestionOperadoresBtn', 'depurarFallasBtn', 'auditFirestoreBtn', 'backupFirestoreBtn', 'btn-vista-catalogo',
     'vista-catalogo', 'btn-vista-ranking', 'vista-ranking', 'btn-vista-reportes', 'cargarMasAntiguos',
     'firestoreAudit', 'downloadFirestoreAudit'];
   const elements = Object.fromEntries(ids.map(id => [id, element(id === 'vista-catalogo' || id === 'vista-ranking' || id === 'btn-vista-ranking')]));
@@ -71,6 +71,7 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
   assert.equal(hidden('backupFirestoreBtn'), true);
   assert.equal(hidden('btn-vista-ranking'), true);
   assert.equal(hidden('gestion-operadores'), true);
+  assert.equal(hidden('gestionOperadoresBtn'), true);
   assert.equal(input.disabled, false);
 
   state.operacionesSensibles = true;
@@ -80,6 +81,10 @@ test('el panel aplica los permisos de catálogo y operaciones sensibles por sepa
   assert.equal(hidden('auditFirestoreBtn'), false);
   assert.equal(hidden('backupFirestoreBtn'), false);
   assert.equal(hidden('btn-vista-ranking'), false);
+  assert.equal(hidden('gestionOperadoresBtn'), false);
+  assert.equal(hidden('gestion-operadores'), true);
+  state.gestionOperadoresAbierta = true;
+  context.aplicarPermisosDeInterfaz();
   assert.equal(hidden('gestion-operadores'), false);
   context.firebaseConfig.projectId = 'gen-lang-client-0015118308';
   context.aplicarPermisosDeInterfaz();

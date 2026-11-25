@@ -7,8 +7,12 @@ const ROLES_RUTA = new Set(["operador", "master", "admin", "lectura"]);
 function validarDatos(data) {
   const accion = data?.accion;
   const numero = typeof data?.numeroEmpleado === "string" ? data.numeroEmpleado.trim() : "";
-  if (!["alta", "reset_password"].includes(accion) || !/^\d{1,20}$/.test(numero)) {
+  if (!["alta", "reset_password", "baja", "reactivar"].includes(accion) || !/^\d{1,20}$/.test(numero)) {
     throw new HttpsError("invalid-argument", "Indica una acción y un número de empleado válidos.");
+  }
+  const email = `${numero}@apptolva.com`;
+  if (accion === "baja" || accion === "reactivar") {
+    return { accion, numero, nombre: "", password: "", email };
   }
   if (typeof data.password !== "string" || data.password.length < 8 || data.password.length > 128) {
     throw new HttpsError("invalid-argument", "La contraseña debe tener entre 8 y 128 caracteres.");
@@ -17,7 +21,7 @@ function validarDatos(data) {
   if (accion === "alta" && (!nombre || nombre.length > 120)) {
     throw new HttpsError("invalid-argument", "Indica un nombre de hasta 120 caracteres.");
   }
-  return { accion, numero, nombre, password: data.password, email: `${numero}@apptolva.com` };
+  return { accion, numero, nombre, password: data.password, email };
 }
 
 async function usuarioPorCorreo(auth, email) {
@@ -50,6 +54,38 @@ async function gestionar({ request, db, auth, fieldValue, correos }) {
   const responsable = await autorizar(request, db, correos, true);
   const { accion, numero, nombre, password, email } = validarDatos(request.data);
   const perfilRef = db.collection("usuarios").doc(email);
+
+  if (accion === "baja" || accion === "reactivar") {
+    const activar = accion === "reactivar";
+    const perfil = await perfilRef.get();
+    const data = perfil.data();
+    if (!perfil.exists || data.rol !== "operador" || data.numero_empleado !== numero ||
+        typeof data.uid !== "string" || data.rol_evaluaciones) {
+      throw new HttpsError("failed-precondition", "El perfil no es un operador válido o tiene permisos especiales.");
+    }
+    const usuario = await usuarioPorCorreo(auth, email);
+    if (!usuario || usuario.uid !== data.uid) {
+      throw new HttpsError("failed-precondition", "La cuenta no coincide con el perfil.");
+    }
+    try {
+      await auth.updateUser(usuario.uid, { disabled: !activar });
+      if (!activar) await auth.revokeRefreshTokens(usuario.uid);
+      await perfilRef.update({
+        activo: activar,
+        estatus: activar ? "activo" : "baja",
+        [activar ? "reactivado_en" : "baja_en"]: fieldValue.serverTimestamp(),
+        [activar ? "reactivado_por" : "baja_por"]: responsable,
+      });
+      await db.collection("sistema").doc("catalogo_operadores").set({
+        operadores: { [numero]: activar ? { nombre: data.nombre, depto: "TRANSPORTES" } : fieldValue.delete() },
+        actualizado_en: fieldValue.serverTimestamp(),
+      }, { merge: true });
+    } catch (error) {
+      console.error("No se completó el cambio de estado del operador.", { numero, accion, code: error.code });
+      throw new HttpsError("internal", "El cambio pudo aplicarse parcialmente. Reintenta la misma acción para completarlo.");
+    }
+    return { accion, email, uid: usuario.uid };
+  }
 
   if (accion === "reset_password") {
     const perfil = await perfilRef.get();
@@ -115,7 +151,7 @@ async function gestionar({ request, db, auth, fieldValue, correos }) {
       }
       tx.create(perfilRef, {
         uid: reserva.uid, numero_empleado: numero, nombre, rol: "operador",
-        creado_en: fieldValue.serverTimestamp(),
+        activo: true, estatus: "activo", creado_en: fieldValue.serverTimestamp(),
       });
       tx.set(catalogoRef, {
         operadores: { [numero]: { nombre, depto: "TRANSPORTES" } },
