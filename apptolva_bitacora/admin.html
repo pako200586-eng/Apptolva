@@ -50,6 +50,9 @@
         <button id="depurarFallasBtn" class="btn-accion-admin hidden rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
           Depurar fallas repetidas
         </button>
+        <button id="gestionOperadoresBtn" type="button" aria-expanded="false" aria-controls="gestion-operadores" class="hidden min-h-11 rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
+          <i class="fas fa-users-gear mr-2"></i>Gestión de operadores
+        </button>
         <button id="logoutBtn" class="hidden rounded-md border border-orange-200 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
           <i class="fas fa-right-from-bracket mr-2"></i>Cerrar sesión
         </button>
@@ -84,6 +87,8 @@
             <select id="operador-accion" name="accion" class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
               <option value="alta">Dar de alta</option>
               <option value="reset_password">Restablecer contraseña</option>
+              <option value="baja">Dar de baja</option>
+              <option value="reactivar">Reactivar</option>
             </select>
           </label>
           <label class="block text-sm font-bold text-slate-700">Número de empleado
@@ -92,10 +97,10 @@
           <label id="operador-nombre-label" class="block text-sm font-bold text-slate-700">Nombre completo
             <input id="operador-nombre" name="nombre" type="text" maxlength="120" required class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
           </label>
-          <label class="block text-sm font-bold text-slate-700">Contraseña nueva (mínimo 8 caracteres)
+          <label id="operador-password-label" class="block text-sm font-bold text-slate-700">Contraseña nueva (mínimo 8 caracteres)
             <input id="operador-password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
           </label>
-          <label class="block text-sm font-bold text-slate-700">Confirmar contraseña
+          <label id="operador-password-confirmar-label" class="block text-sm font-bold text-slate-700">Confirmar contraseña
             <input id="operador-password-confirmar" type="password" minlength="8" maxlength="128" autocomplete="new-password" required class="mt-1 w-full rounded-md border border-slate-400 px-3 py-3 text-base">
           </label>
           <div class="md:col-span-2">
@@ -712,10 +717,21 @@
     let cancelarEmergencias = null;
     let emergencias = [];
     const $ = (id) => document.getElementById(id);
+    $('gestionOperadoresBtn').addEventListener('click', () => {
+      const abierta = !state.gestionOperadoresAbierta;
+      state.gestionOperadoresAbierta = abierta;
+      $('gestionOperadoresBtn').setAttribute('aria-expanded', String(abierta));
+      $('gestion-operadores').classList.toggle('hidden', !abierta);
+    });
     $('operador-accion').addEventListener('change', () => {
-      const esAlta = $('operador-accion').value === 'alta';
+      const accionSel = $('operador-accion').value;
+      const esAlta = accionSel === 'alta';
+      const pideClave = accionSel === 'alta' || accionSel === 'reset_password';
       $('operador-nombre-label').classList.toggle('hidden', !esAlta);
       $('operador-nombre').required = esAlta;
+      ['operador-password-label', 'operador-password-confirmar-label'].forEach((id) => $(id).classList.toggle('hidden', !pideClave));
+      $('operador-password').required = pideClave;
+      $('operador-password-confirmar').required = pideClave;
       $('operador-estado').textContent = '';
     });
     $('operador-password-confirmar').addEventListener('input', () => {
@@ -732,7 +748,8 @@
         return;
       }
       const password = $('operador-password').value;
-      if (password !== $('operador-password-confirmar').value) {
+      const pideClave = ['alta', 'reset_password'].includes($('operador-accion').value);
+      if (pideClave && password !== $('operador-password-confirmar').value) {
         $('operador-password-confirmar').setCustomValidity('Las contraseñas no coinciden.');
         $('operador-password-confirmar').reportValidity();
         return;
@@ -740,6 +757,8 @@
       const accion = $('operador-accion').value;
       const numeroEmpleado = $('operador-numero').value.trim();
       if (accion === 'reset_password' && !confirm(`Se cambiará la contraseña de ${numeroEmpleado}@apptolva.com. ¿Continuar?`)) return;
+      if (accion === 'baja' && !confirm(`Se deshabilitará el acceso de ${numeroEmpleado}@apptolva.com y saldrá del catálogo. El historial se conserva. ¿Continuar?`)) return;
+      if (accion === 'reactivar' && !confirm(`Se reactivará la cuenta ${numeroEmpleado}@apptolva.com. ¿Continuar?`)) return;
       $('operador-enviar').disabled = true;
       estado.textContent = 'Procesando; espera la respuesta del servidor...';
       try {
@@ -749,7 +768,8 @@
         if (!data?.email || data.accion !== accion) throw new Error('La respuesta del servidor no es válida; verifica la cuenta.');
         $('operador-password').value = '';
         $('operador-password-confirmar').value = '';
-        estado.textContent = `${accion === 'alta' ? 'Cuenta creada' : 'Contraseña actualizada'}: ${data.email}. Entrega la clave por un medio seguro.`;
+        const mensajes = { alta: 'Cuenta creada', reset_password: 'Contraseña actualizada', baja: 'Operador dado de baja', reactivar: 'Operador reactivado' };
+        estado.textContent = `${mensajes[accion]}: ${data.email}.${pideClave ? ' Entrega la clave por un medio seguro.' : ''}`;
         window.dispatchEvent(new Event('apptolva-actualizar-operadores'));
       } catch (error) {
         console.error('No se pudo completar la gestión del operador:', error.code);
@@ -1568,7 +1588,9 @@
         element.classList.toggle('hidden', !esAdmin);
       });
       $('depurarFallasBtn').classList.toggle('hidden', !esResponsable);
-      $('gestion-operadores').classList.toggle('hidden', !esResponsable || !['apptolva-staging', 'gen-lang-client-0015118308'].includes(firebaseConfig.projectId));
+      const puedeGestionarOperadores = esResponsable && ['apptolva-staging', 'gen-lang-client-0015118308'].includes(firebaseConfig.projectId);
+      $('gestionOperadoresBtn').classList.toggle('hidden', !puedeGestionarOperadores);
+      $('gestion-operadores').classList.toggle('hidden', !puedeGestionarOperadores || !state.gestionOperadoresAbierta);
       document.querySelectorAll('#segForm input, #segForm textarea').forEach((element) => {
         element.disabled = !esAdmin;
       });
