@@ -711,6 +711,7 @@
     const VENTANA_PASO_DIAS = 30;
     const LIMITE_PAGINA_REPORTES = 250;
     const LIMITE_VENTANA_REPORTES = 1500;
+    const LIMITE_ORDENES_TRABAJO = 500;
     const INTERVALO_SINCRONIZACION_REPORTES = 3 * 60 * 1000;
     let sincronizacionReportesActiva = false;
     let temporizadorSincronizacion = null;
@@ -1665,9 +1666,11 @@
       state.lastTotal = total;
       state.reports = data.reports || [];
       if (!data.filtered) state.allReports = state.reports;
-      dashState.coberturas = null;
-      $('alertas-seguridad-conteo').textContent = '--';
-      $('alertas-seguridad-lista').textContent = 'Actualizando estado de las fallas...';
+      if (!options.preservarCoberturas) {
+        dashState.coberturas = null;
+        $('alertas-seguridad-conteo').textContent = '--';
+        $('alertas-seguridad-lista').textContent = 'Actualizando estado de las fallas...';
+      }
 
       if (!options.loadOlder && !options.silent) state.page = 1;
       renderTablaReportes();
@@ -1870,7 +1873,7 @@
       try {
         if (!state.syncWatermark) state.syncWatermark = new Date().toISOString();
         const reportsCol = collection(db, 'bitacora_reports');
-        const constraints = [];
+        const constraints = [fsWhere('report_type', 'in', ['checklist', 'bitacora'])];
         let fechaCorte = null;
         if (!options.loadOlder) {
           fechaCorte = new Date(Date.now() - state.windowDays * 86400000).toISOString();
@@ -1890,6 +1893,7 @@
             const cursor = snapshot.docs[snapshot.docs.length - 1];
             const siguiente = await getDocsFromServer(fsQuery(
               reportsCol,
+              fsWhere('report_type', 'in', ['checklist', 'bitacora']),
               fsWhere('created_at', '>=', fechaCorte),
               fsOrderBy('created_at', 'desc'),
               fsStartAfter(cursor),
@@ -1975,14 +1979,15 @@
         const corteVentana = Date.now() - state.windowDays * 86400000;
         const reportesActualizados = documentos
           .map(convertirSnapshotReporte)
+          .filter((reporte) => reporte.type !== 'emergencia')
           .filter((reporte) => state.historyLoaded || new Date(reporte.createdAt).getTime() >= corteVentana);
         if (!reportesActualizados.length) {
           $('statHoy').textContent = resumenReportes(state.reports).hoy;
           $('syncState').textContent = `Firebase ${firebaseConfig.projectId} · servidor · ${formatDate(new Date().toISOString())}`;
-          renderDashboard();
           return;
         }
 
+        const hayChecklistsActualizados = reportesActualizados.some((reporte) => !reporte.type || reporte.type === 'checklist');
         const reportesPorId = new Map(state.allReports.map((reporte) => [String(reporte.id), reporte]));
         reportesActualizados.forEach((reporte) => reportesPorId.set(String(reporte.id), reporte));
         let reportes = [...reportesPorId.values()]
@@ -2001,10 +2006,12 @@
           generatedAt: new Date().toISOString(),
           filtered: Boolean(state.appliedFilters.from || state.appliedFilters.to || state.appliedFilters.unit
             || state.appliedFilters.operator || (state.appliedFilters.type && state.appliedFilters.type !== 'todos'))
-        }, { silent: true });
+        }, { silent: true, preservarCoberturas: !hayChecklistsActualizados });
 
-        if (!$('vista-fallas').classList.contains('hidden')) await cargarFallas();
-        if ($('vista-fallas').classList.contains('hidden')) await cargarDashboard();
+        if (hayChecklistsActualizados) {
+          if (!$('vista-fallas').classList.contains('hidden')) await cargarFallas();
+          if ($('vista-fallas').classList.contains('hidden')) await cargarDashboard();
+        }
       } catch (error) {
         $('syncState').textContent = `Firebase ${firebaseConfig.projectId} · error de sincronización`;
         throw error;
@@ -2768,7 +2775,8 @@
         ordenesLoadPromise = (async () => {
           const snapshot = await getDocsFromServer(fsQuery(
             collection(db, 'ordenes_trabajo'),
-            fsOrderBy('fecha_apertura', 'desc')
+            fsOrderBy('fecha_apertura', 'desc'),
+            fsLimit(LIMITE_ORDENES_TRABAJO)
           ));
           const ordenes = [];
           snapshot.forEach((documento) => ordenes.push({ id: documento.id, ...documento.data() }));

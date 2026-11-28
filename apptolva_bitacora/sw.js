@@ -1,11 +1,6 @@
-const CACHE_VERSION = "v141"; // Incremento de versión para forzar actualización
+const CACHE_VERSION = "v144"; // Incremento de versión para forzar actualización
 const CACHE_NAME = `apptolva-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `apptolva-runtime-${CACHE_VERSION}`;
-const DB_NAME = "apptolva-offline-db";
-const DB_VERSION = 1;
-const PENDING_STORE = "pending-reportes";
-const SYNC_TAG = "sync-reportes";
-const GAS_DOPOST_URL = "https://script.google.com/macros/s/AKfycbxD5hAzmHXWCXXvcTHkmBGccJWgcUW4FMtmf_OWHxzzYAG6Dm7FmafjqYFqb6CBu9v68g/exec";
 
 const OFFLINE_URLS = [
   "./",
@@ -17,7 +12,6 @@ const OFFLINE_URLS = [
   "./ranking.html",
   "./admin.html",
   "./viewer.html",
-  "./sw.js",
   "./manifest.json",
   "./icon-192x192.png",
   "./icon-512x512.png",
@@ -28,7 +22,6 @@ const OFFLINE_URLS = [
   "./screenshot-desktop.png",
   "./css/fontawesome.min.css",
   "./js/tailwindcss.js",
-  "./js/signature_pad.min.js",
   "./js/jspdf.min.js",
   "./js/checklistPdf.js",
   "./js/firebase-sdk.js",
@@ -47,7 +40,6 @@ const OFFLINE_URLS = [
   "./js/normalizadorFallas.js",
   "./js/alertasSeguridad.js",
   "./js/firmaFalla.js",
-  "./js/procesadorInspeccion.js",
   "./js/etiquetasOT.js",
   "./js/generarPDF_OT.js",
   "./img/ot/logo.jpg",
@@ -61,94 +53,6 @@ const OFFLINE_URLS = [
   "./webfonts/fa-brands-400.woff2",
   "./webfonts/fa-regular-400.woff2"
 ];
-
-function generateSafeUUID() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return "offline-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9);
-}
-
-function openOfflineDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(PENDING_STORE)) {
-        db.createObjectStore(PENDING_STORE, { keyPath: "id" });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function withPendingStore(mode, callback) {
-  const db = await openOfflineDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(PENDING_STORE, mode);
-    const store = tx.objectStore(PENDING_STORE);
-    const result = callback(store);
-    tx.oncomplete = () => {
-      db.close();
-      resolve(result);
-    };
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-  });
-}
-
-async function savePendingReport(payload, type = "bitacora") {
-  const id = payload.offlineQueueId || generateSafeUUID();
-  const record = {
-    id,
-    type,
-    payload,
-    createdAt: new Date().toISOString(),
-    attempts: 0
-  };
-  await withPendingStore("readwrite", (store) => store.put(record));
-  return record;
-}
-
-async function getPendingReports() {
-  const db = await openOfflineDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(PENDING_STORE, "readonly");
-    const request = tx.objectStore(PENDING_STORE).getAll();
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => db.close();
-    tx.onerror = () => db.close();
-  });
-}
-
-async function deletePendingReport(id) {
-  return withPendingStore("readwrite", (store) => store.delete(id));
-}
-
-async function notifyClients(message) {
-  const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
-  clientsList.forEach((client) => client.postMessage(message));
-}
-
-function normalizarTipoReporte(tipo) {
-  const valor = String(tipo || "").trim().toLowerCase();
-  return valor === "emergencia" || valor === "emergencia en ruta" ? "emergencia" : "bitacora";
-}
-
-async function requestBackgroundSync() {
-  if (!self.registration.sync) return false;
-  try {
-    await self.registration.sync.register(SYNC_TAG);
-    return true;
-  } catch (error) {
-    console.warn("No se pudo registrar Background Sync:", error);
-    return false;
-  }
-}
 
 async function precacheOfflineUrls() {
   const cache = await caches.open(CACHE_NAME);
@@ -233,118 +137,6 @@ async function offlineNavigationFallback(request) {
   return caches.match(new URL("./index.html", self.location.href));
 }
 
-async function queueBitacoraRequest(request) {
-  try {
-    const response = await fetch(request.clone());
-    // Si el servidor responde con 500+, forzamos el guardado local para no perder la bitácora
-    if (response && response.ok) return response;
-    if (response && response.status >= 500) {
-      throw new Error(`Fallo de servidor remoto (${response.status})`);
-    }
-    return response;
-  } catch (error) {
-    const payload = await request.clone().json();
-    const record = await savePendingReport(payload, "bitacora");
-    await requestBackgroundSync();
-    await notifyClients({
-      type: "REPORT_QUEUED",
-      id: record.id,
-      folio: payload.folio || "",
-      operator: payload.driverName || "",
-      unitId: payload.unitId || ""
-    });
-    return new Response(JSON.stringify({
-      offline: true,
-      queued: true,
-      localId: record.id,
-      message: "Bitácora guardada en almacenamiento local. Se sincronizará al detectar conexión."
-    }), {
-      status: 202,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-}
-
-async function queueAppScriptRequest(request) {
-  try {
-    const response = await fetch(request.clone());
-    if (response && response.ok) return response;
-    if (response && response.status >= 500) {
-      throw new Error(`Fallo en servicio Apps Script (${response.status})`);
-    }
-    return response;
-  } catch (error) {
-    const payload = await request.clone().json();
-    const type = normalizarTipoReporte(payload.tipo);
-    const record = await savePendingReport(payload, type);
-    await requestBackgroundSync();
-    await notifyClients({ type: "REPORT_QUEUED", id: record.id, kind: type });
-    return new Response(JSON.stringify({
-      offline: true,
-      queued: true,
-      localId: record.id,
-      message: "Reporte guardado offline. Se sincronizará automáticamente."
-    }), {
-      status: 202,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-}
-
-async function enviarReportesPendientes() {
-  const pendientes = await getPendingReports();
-  if (!pendientes.length) return;
-
-  for (const reporte of pendientes) {
-    if (reporte.type === "emergencia") continue;
-    const payload = { ...reporte.payload };
-    delete payload.offlineQueueId;
-    const isEmergency = reporte.type === "emergencia";
-    const url = isEmergency ? GAS_DOPOST_URL : "/api/store-bitacora";
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": isEmergency ? "text/plain;charset=utf-8" : "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const responseText = await response.text();
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (error) {
-        result = {};
-      }
-
-      // Validación flexible de éxito (soporta success: true, status: "ok" o existencia de id)
-      const esExitoso = response.ok && (
-        result.success === true || 
-        result.status === "ok" || 
-        result.status === "synced" ||
-        Boolean(result.id) ||
-        Boolean(result.folio)
-      );
-
-      if (esExitoso) {
-        await deletePendingReport(reporte.id);
-        await notifyClients({
-          type: "REPORT_SYNCED",
-          id: reporte.id,
-          folio: payload.folio,
-          operator: payload.driverName || payload.operador || "",
-          unitId: payload.unitId || payload.unidad || "",
-          kind: reporte.type
-        });
-      } else {
-        await notifyClients({ type: "REPORT_SYNC_WAITING", id: reporte.id, kind: reporte.type });
-      }
-    } catch (error) {
-      await notifyClients({ type: "REPORT_SYNC_WAITING", id: reporte.id, kind: reporte.type });
-    }
-  }
-}
-
 self.addEventListener("install", (event) => {
   event.waitUntil(precacheOfflineUrls());
   self.skipWaiting();
@@ -366,23 +158,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   const isSameOrigin = url.origin === self.location.origin;
-  const isBitacoraApi = isSameOrigin && (
-    url.pathname === "/api/store-bitacora" ||
-    url.pathname === "/.netlify/functions/store-bitacora"
+  const isFunctionApi = isSameOrigin && (
+    url.pathname.includes("/.netlify/functions/") ||
+    url.pathname.startsWith("/api/")
   );
-  const isAdminApi = isSameOrigin && url.pathname === "/api/admin-reports";
-  const isFunctionApi = isSameOrigin && url.pathname.includes("/.netlify/functions/");
-  const isGasDoPost = url.href === GAS_DOPOST_URL;
-
-  if (isBitacoraApi && event.request.method === "POST") {
-    event.respondWith(queueBitacoraRequest(event.request));
-    return;
-  }
-
-  if (isGasDoPost && event.request.method === "POST") {
-    event.respondWith(queueAppScriptRequest(event.request));
-    return;
-  }
 
   if (event.request.method !== "GET") {
     if (isFunctionApi) {
@@ -398,17 +177,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isAdminApi) {
-    event.respondWith(fetch(event.request).catch(() => new Response(JSON.stringify({
-      error: "Sin conexión. El panel administrativo requiere una sesión en línea."
-    }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" }
-    })));
-    return;
-  }
-
-  if (isBitacoraApi || isFunctionApi) {
+  if (isFunctionApi) {
     event.respondWith(networkFirstRequest(event.request).catch(() => new Response(JSON.stringify({
       error: "Sin conexión y sin datos guardados para esta solicitud."
     }), {
@@ -427,18 +196,6 @@ self.addEventListener("fetch", (event) => {
 
   if (["image", "script", "style", "font", "manifest"].includes(event.request.destination)) {
     event.respondWith(cacheStaticRequest(event.request));
-  }
-});
-
-self.addEventListener("sync", (event) => {
-  if (event.tag === SYNC_TAG) {
-    event.waitUntil(enviarReportesPendientes());
-  }
-});
-
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SYNC_NOW") {
-    event.waitUntil(enviarReportesPendientes());
   }
 });
 

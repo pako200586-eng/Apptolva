@@ -721,3 +721,105 @@ test('coverage document IDs are stable and scoped to the report', async () => {
   assert.equal(await idCoberturaFalla('reporte-1', firma), await idCoberturaFalla('reporte-1', firma));
   assert.notEqual(await idCoberturaFalla('reporte-1', firma), await idCoberturaFalla('reporte-2', firma));
 });
+
+test('differential synchronization preserves coberturas for bitacora-only updates and ignores emergencias', async () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  const inicio = html.indexOf('    async function sincronizarReportesNuevos() {');
+  const fin = html.indexOf('    function loginErrorMessage(', inicio);
+  assert.ok(inicio >= 0 && fin > inicio);
+  const createdAt = new Date().toISOString();
+
+  async function ejecutarConDocs(docs, vistaFallasOculta = true) {
+    const state = {
+      user: {}, syncWatermark: createdAt, windowDays: 30, historyLoaded: false,
+      allReports: [], reports: [], appliedFilters: { type: 'todos' }
+    };
+    const renderCalls = [];
+    let dashboardCalls = 0;
+    let fallasCalls = 0;
+    const sincronizar = runInNewContext(`let sincronizacionReportesActiva = false; ${html.slice(inicio, fin)}; sincronizarReportesNuevos`, {
+      state, db: {}, firebaseConfig: { projectId: 'demo-apptolva' }, LIMITE_PAGINA_REPORTES: 250, LIMITE_VENTANA_REPORTES: 1500,
+      collection: () => ({}), fsWhere: () => ({}), fsOrderBy: () => ({}),
+      fsLimit: () => ({}), fsQuery: () => ({}),
+      getDocsFromServer: async () => ({ docs, size: docs.length }),
+      convertirSnapshotReporte: (doc) => doc, coincideFiltroGlobal: () => true,
+      resumenReportes: (reportes) => ({ total: reportes.length }),
+      render: (data, options) => { renderCalls.push({ data, options }); },
+      cargarDashboard: async () => { dashboardCalls++; },
+      cargarFallas: async () => { fallasCalls++; },
+      formatDate: (value) => String(value),
+      $: () => ({ classList: { contains: () => vistaFallasOculta }, textContent: '' })
+    });
+    await sincronizar();
+    return { state, renderCalls, dashboardCalls, fallasCalls };
+  }
+
+  const soloEmergencia = await ejecutarConDocs([{ id: 'emg-1', type: 'emergencia', createdAt }]);
+  assert.equal(soloEmergencia.state.allReports.length, 0);
+  assert.equal(soloEmergencia.renderCalls.length, 0);
+  assert.equal(soloEmergencia.dashboardCalls, 0);
+
+  const soloBitacora = await ejecutarConDocs([{ id: 'bit-1', type: 'bitacora', createdAt }]);
+  assert.equal(soloBitacora.state.allReports.length, 1);
+  assert.equal(soloBitacora.renderCalls.length, 1);
+  assert.equal(soloBitacora.renderCalls[0].options.silent, true);
+  assert.equal(soloBitacora.renderCalls[0].options.preservarCoberturas, true);
+  assert.equal(soloBitacora.dashboardCalls, 0);
+  assert.equal(soloBitacora.fallasCalls, 0);
+
+  const conChecklist = await ejecutarConDocs([{ id: 'chk-1', type: 'checklist', createdAt }], true);
+  assert.equal(conChecklist.renderCalls.length, 1);
+  assert.equal(conChecklist.renderCalls[0].options.silent, true);
+  assert.equal(conChecklist.renderCalls[0].options.preservarCoberturas, false);
+  assert.equal(conChecklist.dashboardCalls, 1);
+  assert.equal(conChecklist.fallasCalls, 0);
+
+  const conChecklistEnFallas = await ejecutarConDocs([{ id: 'chk-2', type: 'checklist', createdAt }], false);
+  assert.equal(conChecklistEnFallas.dashboardCalls, 0);
+  assert.equal(conChecklistEnFallas.fallasCalls, 1);
+});
+
+test('admin.html bounds ordenes_trabajo reads and avoids duplicating emergencias in cargarDatos', () => {
+  const html = readFileSync(new URL('../apptolva_bitacora/admin.html', import.meta.url), 'utf8');
+  assert.match(html, /const LIMITE_ORDENES_TRABAJO = 500;/);
+  const inicioOrdenes = html.indexOf('    async function obtenerOrdenes(forzar = false) {');
+  const finOrdenes = html.indexOf('    async function obtenerCoberturas(', inicioOrdenes);
+  assert.ok(inicioOrdenes >= 0 && finOrdenes > inicioOrdenes);
+  assert.match(html.slice(inicioOrdenes, finOrdenes), /fsLimit\(LIMITE_ORDENES_TRABAJO\)/);
+
+  const inicioCarga = html.indexOf('    async function cargarDatos(');
+  const finCarga = html.indexOf('    async function sincronizarReportesNuevos()', inicioCarga);
+  assert.ok(inicioCarga >= 0 && finCarga > inicioCarga);
+  const bloqueCarga = html.slice(inicioCarga, finCarga);
+  const coincidenciasFiltro = bloqueCarga.match(/fsWhere\('report_type', 'in', \['checklist', 'bitacora'\]\)/g) || [];
+  assert.equal(coincidenciasFiltro.length, 2);
+});
+
+test('firestore.indexes.json preserves composite indexes and excludes heavy payload subfields', () => {
+  const config = JSON.parse(readFileSync(new URL('../firestore.indexes.json', import.meta.url), 'utf8'));
+  assert.equal(config.indexes.length, 2);
+  const compositos = config.indexes.map((idx) => `${idx.collectionGroup}:${idx.fields.map((f) => `${f.fieldPath}:${f.order}`).join(',')}`);
+  assert.ok(compositos.includes('bitacora_reports:owner_uid:ASCENDING,created_at:DESCENDING'));
+  assert.ok(compositos.includes('bitacora_reports:report_type:ASCENDING,created_at:DESCENDING'));
+
+  const overrides = new Set(
+    (config.fieldOverrides || [])
+      .filter((entry) => Array.isArray(entry.indexes) && entry.indexes.length === 0)
+      .map((entry) => `${entry.collectionGroup}:${entry.fieldPath}`)
+  );
+  for (const expected of [
+    'bitacora_reports:payload.fotoBase64',
+    'bitacora_reports:payload.firmaOp',
+    'bitacora_reports:payload.firmaOp2',
+    'bitacora_reports:payload.firmaSup',
+    'bitacora_reports:payload.signatureOp',
+    'bitacora_reports:payload.signatureSup',
+    'bitacora_reports:payload.checklist',
+    'bitacora_reports:payload.checklistData',
+    'bitacora_reports:payload.ticketsFallas',
+    'bitacora_reports:payload.logs',
+    'ordenes_trabajo:payload'
+  ]) {
+    assert.ok(overrides.has(expected), `Falta fieldOverride sin índices para ${expected}`);
+  }
+});

@@ -2682,7 +2682,7 @@ body.auth-pending { visibility: hidden; }
 <script type="module">
   import {
     browserLocalPersistence, collection, doc, getAuth, getDoc, getFirebaseConfig,
-    initializeApp, initializeFirestore, onAuthStateChanged, onSnapshot, orderBy,
+    initializeApp, initializeFirestore, limit, onAuthStateChanged, onSnapshot, orderBy,
     persistentLocalCache, persistentMultipleTabManager, query, setDoc,
     setPersistence, signInWithEmailAndPassword
   } from "./js/firebase-sdk.js";
@@ -2700,7 +2700,11 @@ body.auth-pending { visibility: hidden; }
   const adminAuthButton = document.getElementById('adminAuthButton');
   const adminAuthError = document.getElementById('adminAuthError');
   let authVerificationVersion = 0;
+  const LIMITE_HISTORIAL_EVALUACIONES = 300;
   let historySyncStarted = false;
+  let historySyncUid = null;
+  let unsubConduccion = null;
+  let unsubDescarga = null;
 
   function showAdminAuthError(message) {
     adminAuthError.textContent = message;
@@ -2713,11 +2717,28 @@ body.auth-pending { visibility: hidden; }
     status.hidden = false;
   }
 
-  function startHistorySync() {
-    if (historySyncStarted) return;
-    historySyncStarted = true;
+  function stopHistorySync() {
+    if (unsubConduccion) {
+      unsubConduccion();
+      unsubConduccion = null;
+    }
+    if (unsubDescarga) {
+      unsubDescarga();
+      unsubDescarga = null;
+    }
+    historySyncStarted = false;
+    historySyncUid = null;
+  }
 
-    onSnapshot(query(collection(db, "evaluaciones_conduccion"), orderBy("timestamp", "desc")), snapshot => {
+  function startHistorySync(uid) {
+    if (historySyncStarted && historySyncUid === uid) return;
+    stopHistorySync();
+    historySyncStarted = true;
+    historySyncUid = uid || null;
+
+    unsubConduccion = onSnapshot(
+      query(collection(db, "evaluaciones_conduccion"), orderBy("timestamp", "desc"), limit(LIMITE_HISTORIAL_EVALUACIONES)),
+      snapshot => {
       const listaConduccion = [];
       snapshot.forEach(doc => {
         const data = doc.data();
@@ -2734,7 +2755,9 @@ body.auth-pending { visibility: hidden; }
       showHistorySyncError("No se pudieron cargar las evaluaciones de conducción. Verifica los permisos de Firestore.");
     });
 
-    onSnapshot(query(collection(db, "evaluaciones_descarga"), orderBy("timestamp", "desc")), snapshot => {
+    unsubDescarga = onSnapshot(
+      query(collection(db, "evaluaciones_descarga"), orderBy("timestamp", "desc"), limit(LIMITE_HISTORIAL_EVALUACIONES)),
+      snapshot => {
       const listaDescarga = [];
       snapshot.forEach(doc => {
         const data = doc.data();
@@ -2760,6 +2783,7 @@ body.auth-pending { visibility: hidden; }
 
   onAuthStateChanged(auth, user => {
     if (!ADMIN_PANEL_MODE) {
+      stopHistorySync();
       window.apptolvaEvaluacionActiva = false;
       document.body.classList.add('auth-pending');
       try {
@@ -2781,14 +2805,17 @@ body.auth-pending { visibility: hidden; }
     document.body.classList.remove('auth-pending');
     const stateVersion = ++authVerificationVersion;
     if (!user) {
+      stopHistorySync();
       adminAuthOverlay.hidden = false;
       return;
     }
 
+    if (historySyncUid && historySyncUid !== user.uid) stopHistorySync();
     adminAuthOverlay.hidden = false;
     const isPasswordUser = user.email
       && user.providerData.some(provider => provider.providerId === 'password');
     if (!isPasswordUser) {
+      stopHistorySync();
       showAdminAuthError("Inicia sesión con una cuenta de Evaluaciones autorizada.");
       return;
     }
@@ -2799,12 +2826,14 @@ body.auth-pending { visibility: hidden; }
       if (role === 'admin' || role === 'evaluador') {
         adminAuthError.textContent = "";
         adminAuthOverlay.hidden = true;
-        startHistorySync();
+        startHistorySync(user.uid);
       } else {
+        stopHistorySync();
         showAdminAuthError("Acceso denegado. Se requiere el rol de administrador o evaluador.");
       }
     }).catch(err => {
       if (stateVersion !== authVerificationVersion) return;
+      stopHistorySync();
       console.error("No se pudo comprobar el permiso del Mini Panel:", err);
       showAdminAuthError("No se pudo comprobar tu permiso. Verifica la conexión e inténtalo de nuevo.");
     });

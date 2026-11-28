@@ -22,6 +22,56 @@
       "collectionGroup": "bitacora_reports",
       "fieldPath": "payload.fotoBase64",
       "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.firmaOp",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.firmaOp2",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.firmaSup",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.signatureOp",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.signatureSup",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.checklist",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.checklistData",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.ticketsFallas",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "bitacora_reports",
+      "fieldPath": "payload.logs",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "ordenes_trabajo",
+      "fieldPath": "payload",
+      "indexes": []
     }
   ]
 }

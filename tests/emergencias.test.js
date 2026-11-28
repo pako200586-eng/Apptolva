@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../apptolva_bitacora/js/emergencias.js', import.meta.url), 'utf8')
@@ -81,6 +81,8 @@ test('registra una sola foto y muestra pendiente hasta la confirmación real', a
   ]);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(env.escritos.length, 1);
+  assert.equal(typeof env.escritos[0].synced_at, 'string');
+  assert.ok(env.escritos[0].synced_at.length <= 40);
   assert.equal(env.escritos[0].payload.gps.lat, 0);
   assert.equal(env.escritos[0].payload.fotoBase64, 'YWJj');
   assert.equal(env.escritos[0].payload.fotos, undefined);
@@ -106,6 +108,10 @@ test('registra una sola foto y muestra pendiente hasta la confirmación real', a
   env.callbacks[0].next(instantanea({ hasPendingWrites: false, fromCache: false }));
   assert.equal(env.respaldos.size, 0);
   assert.match(env.elementos.fallaSaveStatus.textContent, /confirmada por el servidor/);
+  assert.equal(env.escritos.length, 2);
+  assert.deepEqual(Object.keys(env.escritos[1]), ['synced_at']);
+  assert.equal(typeof env.escritos[1].synced_at, 'string');
+  assert.ok(env.escritos[1].synced_at.length <= 40);
 });
 
 test('autocompleta desde las claves anteriores o el perfil vinculado', () => {
@@ -484,28 +490,30 @@ test('la escucha actualiza emergencias, respeta la sesión y cancela el listener
   assert.ok(renders >= 3);
 });
 
-test('la cola anterior conserva emergencias y sigue sincronizando bitácoras', async () => {
+test('sw.js y evaluaciones.html eliminan residuos de migración y conservan Web Push NOM-087', () => {
   const worker = readFileSync(new URL('../apptolva_bitacora/sw.js', import.meta.url), 'utf8');
-  const start = worker.indexOf('async function enviarReportesPendientes()');
-  const end = worker.indexOf('self.addEventListener("install"', start);
-  assert.ok(start >= 0 && end > start);
-  const peticiones = [];
-  const eliminados = [];
-  const context = vm.createContext({
-    GAS_DOPOST_URL: 'https://example.test/legacy',
-    getPendingReports: async () => [
-      { id: 'emg', type: 'emergencia', payload: { descripcion: 'Falla' } },
-      { id: 'bit', type: 'bitacora', payload: { folio: 'F1' } }
-    ],
-    fetch: async (url) => {
-      peticiones.push(url);
-      return { ok: true, text: async () => '{"success":true}' };
-    },
-    deletePendingReport: async (id) => eliminados.push(id),
-    notifyClients: async () => {}
-  });
-  vm.runInContext(worker.slice(start, end), context);
-  await context.enviarReportesPendientes();
-  assert.deepEqual(peticiones, ['/api/store-bitacora']);
-  assert.deepEqual(eliminados, ['bit']);
+  assert.match(worker, /const CACHE_VERSION = "v144";/);
+  assert.doesNotMatch(worker, /\/api\/store-bitacora/);
+  assert.doesNotMatch(worker, /\/api\/admin-reports/);
+  assert.doesNotMatch(worker, /GAS_DOPOST_URL/);
+  assert.doesNotMatch(worker, /signature_pad\.min\.js/);
+  assert.doesNotMatch(worker, /procesadorInspeccion\.js/);
+  assert.doesNotMatch(worker, /"\.\/sw\.js"/);
+  assert.match(worker, /function pushVigenteSegunEstadoLocal/);
+  assert.match(worker, /self\.addEventListener\("push"/);
+  assert.match(worker, /self\.addEventListener\("notificationclick"/);
+
+  const evaluacionesHtml = readFileSync(new URL('../apptolva_bitacora/evaluaciones.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(evaluacionesHtml, /firebase-app-compat\.js/);
+  assert.doesNotMatch(evaluacionesHtml, /firebase-firestore-compat\.js/);
+
+  for (const relPath of [
+    '../db/index.ts',
+    '../db/schema.ts',
+    '../apptolva_bitacora/migrador.html',
+    '../apptolva_bitacora/js/procesadorInspeccion.js',
+    '../apptolva_bitacora/js/signature_pad.min.js'
+  ]) {
+    assert.equal(existsSync(new URL(relPath, import.meta.url)), false, `Archivo obsoleto aún existe: ${relPath}`);
+  }
 });

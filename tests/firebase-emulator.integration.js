@@ -145,14 +145,21 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
     users.push(user);
     await adminDb.collection('usuarios').doc(emails[i]).set({
       rol: i === 2 ? 'master' : (i === 3 ? 'lectura' : 'operador'),
+      uid: user.uid,
+      activo: true,
+      estatus: 'activo',
+      ...(i < 2 ? { numero_empleado: i === 0 ? '221417' : '221418' } : {}),
       ...(i === 2 ? { rol_evaluaciones: 'evaluador' } : {})
     });
   }
   const reference = clients.map(({ db }) => doc(db, 'bitacora_reports', id));
   const report = {
     id, owner_uid: users[0].uid, report_type: 'checklist',
-    created_at: new Date().toISOString(), payload: {}
+    employee_number: '221417',
+    created_at: new Date().toISOString(), payload: { employeeNumber: '221417' }
   };
+  await assert.rejects(setDoc(reference[0], { ...report, employee_number: '221418' }), { code: 'permission-denied' });
+  await assert.rejects(setDoc(reference[0], { ...report, payload: { employeeNumber: '221418' } }), { code: 'permission-denied' });
   await setDoc(reference[0], report);
   assert.equal((await getDoc(reference[0])).exists(), true);
   await assert.rejects(getDoc(reference[1]), { code: 'permission-denied' });
@@ -188,6 +195,111 @@ test('operadores autenticados solo consultan y modifican sus propios reportes', 
   assert.equal((await getDoc(refLectura)).data().owner_uid, users[3].uid);
   await setDoc(refLectura, { synced_at: new Date().toISOString() }, { merge: true });
   await assert.rejects(setDoc(reference[3], { synced_at: new Date().toISOString() }, { merge: true }), { code: 'permission-denied' });
+
+  // Baja inmediata: activo: false revoca acceso de inmediato aunque el ID token siga vigente
+  await adminDb.collection('usuarios').doc(emails[0]).update({ activo: false, estatus: 'baja' });
+  await assert.rejects(getDoc(reference[0]), { code: 'permission-denied' });
+  await assert.rejects(setDoc(reference[0], { synced_at: new Date().toISOString() }, { merge: true }), { code: 'permission-denied' });
+});
+
+test('reglas blindan bitacoras_087, ranking_semanal, acceso anónimo y edición en evaluaciones', async (t) => {
+  const apps = ['eval1', 'eval2', 'evalAdmin', 'operador', 'anon'].map((suffix) =>
+    initializeClientApp({ apiKey: 'demo-api-key', projectId: proyecto }, `sec-${suffix}-${appId}`));
+  const clients = apps.map((app) => {
+    const auth = getAuth(app);
+    connectAuthEmulator(auth, `http://${authEmulatorHost}`, { disableWarnings: true });
+    const db = getFirestore(app);
+    connectFirestoreEmulator(db, firestoreAddress.hostname, firestoreAddress.port);
+    return { auth, db };
+  });
+  const emails = ['eval1', 'eval2', 'evaladmin', 'op'].map((n) => `sec-${n}-${appId}@example.test`);
+  const users = [];
+  const docLegacy = `legado-${appId}`;
+  const docDescarga = `DESC-${appId}`;
+  const docConduccion = `BACH-${appId}`;
+  const docReporte = `rep-anon-${appId}`;
+  t.after(async () => {
+    await adminDb.collection('bitacoras_087').doc(docLegacy).delete();
+    await adminDb.collection('ranking_semanal').doc('actual').delete();
+    await adminDb.collection('evaluaciones_descarga').doc(docDescarga).delete();
+    await adminDb.collection('evaluaciones_conduccion').doc(docConduccion).delete();
+    await adminDb.collection('bitacora_reports').doc(docReporte).delete();
+    for (const email of emails) await adminDb.collection('usuarios').doc(email).delete();
+    for (const user of users) await adminAuth.deleteUser(user.uid);
+    for (const client of clients) await terminate(client.db);
+    for (const app of apps) await deleteClientApp(app);
+  });
+
+  const roles = [
+    { rol: 'master', rol_evaluaciones: 'evaluador' },
+    { rol: 'master', rol_evaluaciones: 'evaluador' },
+    { rol: 'admin', rol_evaluaciones: 'admin' },
+    { rol: 'operador', numero_empleado: '221419' }
+  ];
+  for (let i = 0; i < 4; i++) {
+    const { user } = await createUserWithEmailAndPassword(clients[i].auth, emails[i], 'Emulator123!');
+    users.push(user);
+    await adminDb.collection('usuarios').doc(emails[i]).set({ ...roles[i], uid: user.uid, activo: true, estatus: 'activo' });
+  }
+  users.push((await signInAnonymously(clients[4].auth)).user);
+
+  await adminDb.collection('bitacoras_087').doc(docLegacy).set({ folio: docLegacy, created_at: new Date().toISOString() });
+  await adminDb.collection('ranking_semanal').doc('actual').set({ semanaId: '2026-W48' });
+  await adminDb.collection('bitacora_reports').doc(docReporte).set({
+    id: docReporte, owner_uid: users[3].uid, report_type: 'checklist', employee_number: '221419',
+    created_at: new Date().toISOString(), payload: {}
+  });
+
+  // bitacoras_087: solo lectura de panel; nadie puede crear; operador y anónimo bloqueados
+  assert.equal((await getDoc(doc(clients[2].db, 'bitacoras_087', docLegacy))).exists(), true);
+  await assert.rejects(getDoc(doc(clients[3].db, 'bitacoras_087', docLegacy)), { code: 'permission-denied' });
+  await assert.rejects(getDoc(doc(clients[4].db, 'bitacoras_087', docLegacy)), { code: 'permission-denied' });
+  await assert.rejects(setDoc(doc(clients[2].db, 'bitacoras_087', `nuevo-${appId}`), { folio: 'x' }), { code: 'permission-denied' });
+  await assert.rejects(setDoc(doc(clients[4].db, 'bitacoras_087', `anon-${appId}`), { folio: 'x' }), { code: 'permission-denied' });
+
+  // ranking_semanal/actual: cuentas con contraseña leen, anónimo bloqueado
+  assert.equal((await getDoc(doc(clients[3].db, 'ranking_semanal', 'actual'))).exists(), true);
+  await assert.rejects(getDoc(doc(clients[4].db, 'ranking_semanal', 'actual')), { code: 'permission-denied' });
+
+  // bitacora_reports: anónimo NO puede leer reporte ajeno ni crear sin owner_uid
+  await assert.rejects(getDoc(doc(clients[4].db, 'bitacora_reports', docReporte)), { code: 'permission-denied' });
+  await assert.rejects(setDoc(doc(clients[4].db, 'bitacora_reports', `sin-owner-${appId}`), {
+    id: `sin-owner-${appId}`, report_type: 'checklist', created_at: new Date().toISOString(), payload: {}
+  }), { code: 'permission-denied' });
+
+  // evaluaciones_conduccion: anónimo bloqueado; evaluador crea/edita propia; admin edita cualquiera
+  const evalCond = {
+    id: docConduccion, tipoEvaluacion: 'Conducción', creadoPor: users[0].uid,
+    timestamp: new Date().toISOString(), fecha: '2026-11-28', aspirante: 'ASP', master: 'MASTER',
+    centro: 'PA CHAPO', unidad_neg: 'PA CHAPO', configuracion: 'Full', motor: 'DD16', transmision: 'Manual',
+    score: 90, apto: true, fullState: {}
+  };
+  await assert.rejects(setDoc(doc(clients[4].db, 'evaluaciones_conduccion', docConduccion), {
+    ...evalCond, creadoPor: users[4].uid
+  }), { code: 'permission-denied' });
+  await setDoc(doc(clients[0].db, 'evaluaciones_conduccion', docConduccion), evalCond);
+  await setDoc(doc(clients[0].db, 'evaluaciones_conduccion', docConduccion), { ...evalCond, score: 95 });
+  await assert.rejects(setDoc(doc(clients[1].db, 'evaluaciones_conduccion', docConduccion), {
+    ...evalCond, creadoPor: users[1].uid, score: 80
+  }), { code: 'permission-denied' });
+  await setDoc(doc(clients[2].db, 'evaluaciones_conduccion', docConduccion), {
+    ...evalCond, creadoPor: users[2].uid, score: 98
+  });
+
+  // evaluaciones_descarga: evaluador crea y actualiza la suya; otro evaluador bloqueado; admin puede actualizar
+  const evalDesc = {
+    folio: docDescarga, operador: 'OP', fecha: '2026-11-28', granja: 'G1', economico: '14120',
+    calificacion: 85, resultado: 'APTO (APROBADO)', observaciones: 'OK', respuestas: { s1_1: 'SI' },
+    evaluador: 'Master 1', evaluadorEmail: emails[0], timestamp: new Date().toISOString()
+  };
+  await setDoc(doc(clients[0].db, 'evaluaciones_descarga', docDescarga), evalDesc);
+  await setDoc(doc(clients[0].db, 'evaluaciones_descarga', docDescarga), { ...evalDesc, calificacion: 92 });
+  await assert.rejects(setDoc(doc(clients[1].db, 'evaluaciones_descarga', docDescarga), {
+    ...evalDesc, evaluadorEmail: emails[1], calificacion: 70
+  }), { code: 'permission-denied' });
+  await setDoc(doc(clients[2].db, 'evaluaciones_descarga', docDescarga), {
+    ...evalDesc, evaluadorEmail: emails[2], calificacion: 96
+  });
 });
 
 test('emergencias exigen propietario y esquema válido sin alterar otros reportes', async (t) => {

@@ -26,7 +26,6 @@
     
     <script src="./js/tailwindcss.js"></script>
     <script src="./js/confetti.min.js"></script>
-    <script src="./js/signature_pad.min.js"></script>
     <script src="./js/jspdf.min.js"></script>
     <script src="./js/checklistPdf.js"></script>
     <link rel="stylesheet" href="./css/fontawesome.min.css">
@@ -1242,17 +1241,6 @@
             msg.classList.add('hidden');
         }
 
-        async function solicitarSincronizacionPendiente() {
-            if (!('serviceWorker' in navigator)) return;
-            try {
-                const reg = await navigator.serviceWorker.ready;
-                const worker = navigator.serviceWorker.controller || reg.active;
-                worker?.postMessage({ type: "SYNC_NOW" });
-            } catch (error) {}
-        }
-
-        window.addEventListener('online', solicitarSincronizacionPendiente);
-
         window.addEventListener('firestore-report-synced', (event) => {
             const { id } = event.detail || {};
             if (!id) return;
@@ -1367,8 +1355,18 @@
             box.scrollTop = box.scrollHeight;
 
             try {
+                const token = typeof window.obtenerTokenAuth === 'function'
+                    ? await window.obtenerTokenAuth()
+                    : null;
+                if (!token) {
+                    throw new Error('Inicia sesión con tu cuenta de AppTolva para consultar el asistente.');
+                }
                 const r = await fetch(`/.netlify/functions/gemini`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({ mensaje: q })
                 });
 
@@ -1535,6 +1533,13 @@
                 return Promise.reject(new Error("Inicia sesión antes de guardar o sincronizar."));
             }
 
+            window.obtenerTokenAuth = async function() {
+                if (!usuarioActivo || usuarioActivo.isAnonymous || auth.currentUser?.uid !== usuarioActivo.uid) {
+                    return null;
+                }
+                return auth.currentUser.getIdToken();
+            };
+
             function botonOficina(texto, destino, trazado) {
                 const button = document.createElement('button');
                 button.type = 'button';
@@ -1669,7 +1674,7 @@
                 }
                 if (!yaActivo) nav('menu');
                 const pending = localStorage.getItem('apptolva_pending_firestore_report_id');
-                if (pending) observarSincronizacionReporte(pending);
+                if (pending) observarSincronizacionReporte(pending, undefined, undefined, true);
                 mostrarRespaldos();
                 if (!yaActivo) {
                     if (puedeVerHistorial(user, profile)) cargarHistorial();
@@ -1812,7 +1817,7 @@
                 return user.isAnonymous ? snapshot : snapshot.docs.find((report) => report.id === id);
             }
 
-            function observarSincronizacionReporte(id, onPending, onError) {
+            function observarSincronizacionReporte(id, onPending, onError, forzarActualizacionSyncedAt = false) {
                 if (observersByReportId.has(id)) {
                     if (onError) onError(new Error("Este reporte ya se está sincronizando."));
                     return;
@@ -1820,16 +1825,22 @@
                 const user = usuarioActivo;
                 if (!user) return;
                 const reportRef = doc(db, "bitacora_reports", id);
+                let estuvoPendiente = forzarActualizacionSyncedAt;
                 const unsubscribe = onSnapshot(consultaReporte(id, user), { includeMetadataChanges: true }, (snapshot) => {
                     const report = documentoObservado(snapshot, user, id);
                     if (!report || !report.exists()) return;
                     if (snapshot.metadata.hasPendingWrites) {
+                        estuvoPendiente = true;
                         if (onPending) onPending();
                         return;
                     }
                     if (snapshot.metadata.fromCache) return;
                     unsubscribe();
                     observersByReportId.delete(id);
+                    if (!estuvoPendiente) {
+                        window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
+                        return;
+                    }
                     setDoc(reportRef, { synced_at: new Date().toISOString() }, { merge: true })
                         .then(() => {
                             window.dispatchEvent(new CustomEvent("firestore-report-synced", { detail: { id } }));
@@ -1878,6 +1889,7 @@
                     report_type: reportePayload.reportType || "checklist",
                     unit_id: reportePayload.unitId || "",
                     driver_name: reportePayload.driverName || "",
+                    employee_number: reportePayload.employeeNumber || "",
                     license: reportePayload.license || "",
                     priority: reportePayload.priority || "baja",
                     payload: reportePayload,
@@ -1939,6 +1951,8 @@
 
         const CLAVE_CACHE = "apptolva_catalogo_equipos_v1";
         const DIAS_ANTES_DE_AVISAR = 7;
+        const TTL_SYNC_CATALOGO_MS = 6 * 60 * 60 * 1000;
+        let sincronizandoCatalogo = false;
         const LISTAS = [
             { id: "listaEquiposTracto", tipo: TIPOS_EQUIPO.TRACTO },
             { id: "listaEquiposTolva", tipo: TIPOS_EQUIPO.TOLVA },
@@ -1993,8 +2007,12 @@
             };
         };
 
-        async function sincronizarCatalogo() {
-            if (typeof window.leerCatalogoEquiposCloud !== "function") return;
+        async function sincronizarCatalogo(forzar = false) {
+            if (!window.apptolvaAccesoActivo || typeof window.leerCatalogoEquiposCloud !== "function" || sincronizandoCatalogo) return;
+            const vigente = catalogoVigente();
+            const ultimaSyncMs = vigente.sincronizado_at ? Date.parse(vigente.sincronizado_at) : NaN;
+            if (!forzar && Number.isFinite(ultimaSyncMs) && Date.now() - ultimaSyncMs < TTL_SYNC_CATALOGO_MS) return;
+            sincronizandoCatalogo = true;
             try {
                 const equipos = await window.leerCatalogoEquiposCloud();
                 // Un catálogo vacío (aún no cargado por admin) o inconsistente no reemplaza al vigente.
@@ -2007,13 +2025,14 @@
                 poblarListas();
             } catch (error) {
                 console.warn("No se pudo sincronizar el catálogo de equipos:", error);
+            } finally {
+                sincronizandoCatalogo = false;
             }
         }
 
         poblarListas();
-        sincronizarCatalogo();
-        window.addEventListener("online", sincronizarCatalogo);
-        window.addEventListener("apptolva-auth-ready", sincronizarCatalogo);
+        window.addEventListener("online", () => sincronizarCatalogo(false));
+        window.addEventListener("apptolva-auth-ready", () => sincronizarCatalogo(false));
     </script>
 
     <!-- AUTOCOMPLETADO MAESTRO DE OPERADORES -->

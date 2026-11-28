@@ -20,14 +20,16 @@ function mostrarEstado(texto, color) {
   status.textContent = texto;
 }
 
-function observarReporte(data, user, alPendiente = () => {}, alError = () => {}) {
+function observarReporte(data, user, alPendiente = () => {}, alError = () => {}, actualizarSyncedAlConfirmar = false) {
   if (observadores.has(data.id)) return;
+  let estuvoPendiente = actualizarSyncedAlConfirmar;
   const ref = user.isAnonymous ? doc(db, 'bitacora_reports', data.id) :
     query(collection(db, 'bitacora_reports'), where('owner_uid', '==', user.uid), where('id', '==', data.id));
   const unsubscribe = onSnapshot(ref, { includeMetadataChanges: true }, (snap) => {
     const reporte = user.isAnonymous ? snap : snap.docs.find((entry) => entry.id === data.id);
     if (!reporte?.exists() || usuario?.uid !== user.uid) return;
     if (reporte.metadata.hasPendingWrites) {
+      estuvoPendiente = true;
       mostrarEstado('Guardado en este dispositivo; pendiente de sincronización con el servidor.', 'bg-amber-100 text-amber-700');
       alPendiente();
     } else if (!reporte.metadata.fromCache) {
@@ -35,6 +37,10 @@ function observarReporte(data, user, alPendiente = () => {}, alError = () => {})
       mostrarEstado(`Emergencia ${data.folio} confirmada por el servidor.`, 'bg-green-100 text-green-700');
       observadores.get(data.id)?.();
       observadores.delete(data.id);
+      if (estuvoPendiente) {
+        setDoc(doc(db, 'bitacora_reports', data.id), { synced_at: new Date().toISOString() }, { merge: true })
+          .catch((error) => console.warn('No se pudo actualizar synced_at de la emergencia:', error));
+      }
     }
   }, (error) => {
     console.error('Error al comprobar la emergencia:', error);
@@ -81,7 +87,7 @@ try {
       }
       const pendientes = listarRespaldosReportes(localStorage, projectId, user.uid)
         .filter((data) => data.report_type === 'emergencia');
-      pendientes.forEach((data) => observarReporte(data, user));
+      pendientes.forEach((data) => observarReporte(data, user, undefined, undefined, true));
       mostrarEstado(pendientes.length
         ? `Hay ${pendientes.length} emergencia(s) pendiente(s). Para reintentar un respaldo, vuelve al menú.`
         : 'Sesión lista para registrar.', 'bg-blue-100 text-blue-700');
@@ -128,6 +134,7 @@ try {
         driver_name: payload.operador,
         priority: 'maxima',
         created_at: payload.fecha,
+        synced_at: new Date().toISOString(),
         payload: {
           descripcion,
           tolva1: payload.tolva1,

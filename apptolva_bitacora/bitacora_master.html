@@ -949,6 +949,8 @@
         // Cola local de cierres de turno: sobrevive a recargas y a la falta de red.
         const CIERRES_PENDIENTES_KEY = 'nom087_cierres_pendientes';
         let turnoEnProceso = false;
+        let sincronizandoCierres = false;
+        let reintentarCierresAlTerminar = false;
 
         function leerCierresPendientes() {
             try { return JSON.parse(localStorage.getItem(CIERRES_PENDIENTES_KEY)) || []; } catch (e) { return []; }
@@ -959,7 +961,7 @@
         }
 
         // Envía a la nube los cierres pendientes. Si no hay red, se quedan en la cola y se reintentan.
-        function sincronizarCierresPendientes() {
+        async function sincronizarCierresPendientes() {
             if (!navigator.onLine) {
                 if (leerCierresPendientes().length) setCloudStatus("offline");
                 return;
@@ -970,17 +972,41 @@
                 }
                 return;
             }
-            leerCierresPendientes().forEach((cierre) => {
-                window.guardarBitacoraEnFirestore(cierre.payload)
-                    .then(() => {
+            if (sincronizandoCierres) {
+                reintentarCierresAlTerminar = true;
+                return;
+            }
+            const pendientes = leerCierresPendientes();
+            if (!pendientes.length) return;
+
+            sincronizandoCierres = true;
+            let huboError = false;
+            try {
+                for (const cierre of pendientes) {
+                    if (!navigator.onLine) break;
+                    try {
+                        await window.guardarBitacoraEnFirestore(cierre.payload);
                         guardarCierresPendientes(leerCierresPendientes().filter(c => c.id !== cierre.id));
-                        setCloudStatus(leerCierresPendientes().length ? "offline" : "synced");
-                    })
-                    .catch((error) => {
+                    } catch (error) {
+                        huboError = true;
                         console.error("No se pudo sincronizar el cierre de bitácora:", error);
-                        setCloudStatus("error");
-                    });
-            });
+                    }
+                }
+                const restantes = leerCierresPendientes().length;
+                if (huboError) {
+                    setCloudStatus(navigator.onLine ? "error" : "offline");
+                } else {
+                    setCloudStatus(restantes ? "offline" : "synced");
+                }
+            } finally {
+                sincronizandoCierres = false;
+                if (reintentarCierresAlTerminar) {
+                    reintentarCierresAlTerminar = false;
+                    if (navigator.onLine && leerCierresPendientes().length) {
+                        sincronizarCierresPendientes();
+                    }
+                }
+            }
         }
 
         document.getElementById('reintentarCierres').addEventListener('click', () => {
@@ -2211,6 +2237,7 @@
         import {
             deleteDoc,
             doc,
+            getDocFromServer,
             initializeFirestore,
             onSnapshot,
             persistentLocalCache,
@@ -2270,19 +2297,31 @@
             };
 
             // Asigna el folio FB secuencial. Si ya existe un OFF- ya resuelto, reutiliza el mismo FB (idempotente).
+            // El mapa en vuelo evita carreras cuando coinciden reconexión, guardado y reintentos sobre el mismo folio.
+            const foliosEnVuelo = new Map();
             window.resolverFolioDefinitivo = async function(folioProvisional = "") {
                 const mapKey = folioProvisional ? 'nom087_folio_map_' + folioProvisional : null;
                 if (mapKey && localStorage.getItem(mapKey)) return localStorage.getItem(mapKey);
-                const folio = await runTransaction(db, async (transaction) => {
-                    const counterRef = doc(db, "sistema", "contadores");
-                    const sfDoc = await transaction.get(counterRef);
-                    let newSeq = 1001;
-                    if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
-                    transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
-                    return `FB${newSeq}`;
+                const claveVuelo = folioProvisional || "__sin_folio__";
+                if (foliosEnVuelo.has(claveVuelo)) return foliosEnVuelo.get(claveVuelo);
+
+                const promesa = (async () => {
+                    const folio = await runTransaction(db, async (transaction) => {
+                        const counterRef = doc(db, "sistema", "contadores");
+                        const sfDoc = await transaction.get(counterRef);
+                        let newSeq = 1001;
+                        if (sfDoc.exists()) newSeq = (sfDoc.data().folio_bitacora || 1000) + 1;
+                        transaction.set(counterRef, { folio_bitacora: newSeq }, { merge: true });
+                        return `FB${newSeq}`;
+                    });
+                    if (mapKey) localStorage.setItem(mapKey, folio);
+                    return folio;
+                })().finally(() => {
+                    foliosEnVuelo.delete(claveVuelo);
                 });
-                if (mapKey) localStorage.setItem(mapKey, folio);
-                return folio;
+
+                foliosEnVuelo.set(claveVuelo, promesa);
+                return promesa;
             };
 
             window.generarFolioFirebase = async function() {
@@ -2326,7 +2365,13 @@
 
                 const folioOriginal = payload.folio || "";
                 if (esFolioProvisional(folioOriginal)) {
-                    payload = { ...payload, folio: await window.resolverFolioDefinitivo(folioOriginal) };
+                    const folioResuelto = await window.resolverFolioDefinitivo(folioOriginal);
+                    payload = { ...payload, folio: folioResuelto };
+                    const inputFolio = document.getElementById('folio');
+                    if (inputFolio && inputFolio.value.trim() === folioOriginal) {
+                        inputFolio.value = folioResuelto;
+                        localStorage.setItem('nom087_folio', folioResuelto);
+                    }
                 } else if (!folioOriginal || folioOriginal === "S/F") {
                     const asignado = await window.generarFolioFirebase();
                     if (asignado) payload.folio = asignado;
@@ -2353,7 +2398,8 @@
 
                 const ahoraIso = new Date().toISOString();
                 const reportRef = doc(db, "bitacora_reports", reportId);
-                if (document.getElementById("folio").value.trim() === folioOriginal) {
+                const folioEnPantalla = document.getElementById("folio")?.value.trim() || "";
+                if (folioEnPantalla === folioOriginal || (payload.folio && folioEnPantalla === payload.folio)) {
                     observadorFolio.observar(reportId, reportRef);
                 }
                 const serverCreatedKey = `nom087_server_created_${reportId}`;
@@ -2379,12 +2425,39 @@
                     payload,
                     created_at: createdAt,
                     updated_at: ahoraIso,
+                    synced_at: ahoraIso,
                     device_id: obtenerDeviceId(),
                     server_updated_at: serverTimestamp(),
                     ...(localStorage.getItem(serverCreatedKey) ? {} : { server_created_at: serverTimestamp() })
                 };
 
-                await setDoc(reportRef, data, { merge: true });
+                try {
+                    await setDoc(reportRef, data, { merge: true });
+                } catch (error) {
+                    if (error?.code === "permission-denied" && data.turnoCerrado === true) {
+                        let existente = null;
+                        try {
+                            existente = await getDocFromServer(reportRef);
+                        } catch (_) {
+                            throw error;
+                        }
+                        if (
+                            existente.exists()
+                            && existente.get("owner_uid") === ownerUid
+                            && existente.get("report_type") === "bitacora"
+                            && existente.get("turnoCerrado") === true
+                        ) {
+                            localStorage.setItem(serverCreatedKey, "1");
+                            return {
+                                id: reportId,
+                                url: new URL(`./viewer.html?id=${reportId}`, window.location.href).href,
+                                status: "synced",
+                                yaCerradoEnNube: true
+                            };
+                        }
+                    }
+                    throw error;
+                }
                 localStorage.setItem(serverCreatedKey, "1");
                 return {
                     id: reportId,

@@ -10,8 +10,19 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
+    function userDocPath() {
+      return /databases/$(database)/documents/usuarios/$(request.auth.token.email.lower());
+    }
+
+    function hasActiveUserDoc() {
+      return exists(userDocPath())
+        && get(userDocPath()).data.get('activo', true) != false
+        && get(userDocPath()).data.get('estatus', 'activo') != 'baja'
+        && (!('uid' in get(userDocPath()).data) || get(userDocPath()).data.uid == request.auth.uid);
+    }
+
     function getUserRole() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email.lower())).data.rol;
+      return hasActiveUserDoc() ? get(userDocPath()).data.get('rol', '') : '';
     }
 
     function isPanelUser() {
@@ -51,7 +62,9 @@ service cloud.firestore {
     }
 
     function getEvaluationRole() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email.lower())).data.get('rol_evaluaciones', 'sin_acceso');
+      return hasActiveUserDoc()
+        ? get(userDocPath()).data.get('rol_evaluaciones', 'sin_acceso')
+        : 'sin_acceso';
     }
 
     function isEvaluationUser() {
@@ -124,7 +137,8 @@ service cloud.firestore {
         && request.resource.data.id == evaluationId
         && (!request.resource.data.keys().hasAny(['tipoEvaluacion'])
           || request.resource.data.tipoEvaluacion == 'Conducción')
-        && request.resource.data.creadoPor == request.auth.uid
+        && (request.resource.data.creadoPor == request.auth.uid
+          || (isEvaluationAdmin() && resource != null && request.resource.data.creadoPor == resource.data.creadoPor))
         && request.resource.data.timestamp is string
         && request.resource.data.fecha is string
         && request.resource.data.aspirante is string
@@ -166,33 +180,39 @@ service cloud.firestore {
           ));
     }
 
+    // Colección legada: solo lectura histórica para el panel; bloqueada toda escritura o acceso anónimo/operador.
     match /bitacoras_087/{folio} {
-      allow read, create: if signedIn();
-      allow update, delete: if false;
+      allow read: if isPanelUser();
+      allow create, update, delete: if false;
+    }
+
+    function validOperatorEmployeeNumber(d) {
+      let u = get(userDocPath()).data;
+      let emp = u.get('numero_empleado', '');
+      return u.get('rol', '') != 'operador'
+        || (emp is string && emp != ''
+          && d.get('employee_number', '') == emp
+          && (!('employeeNumber' in d.payload) || d.payload.employeeNumber == emp));
     }
 
     match /bitacora_reports/{reportId} {
-      // Los clientes anónimos conservan temporalmente los enlaces QR anteriores.
-      allow get: if (isAnonymousOperator()
-          && (resource.data.get('report_type', '') != 'emergencia'
-            || resource.data.owner_uid == request.auth.uid)) || isPanelUser()
-        || (isPasswordRouteUser() && resource.data.owner_uid == request.auth.uid);
+      allow get: if isPanelUser()
+        || ((isAnonymousOperator() || isPasswordRouteUser())
+          && resource.data.owner_uid == request.auth.uid);
       allow list: if isPanelUser()
         || (isPasswordRouteUser() && resource.data.owner_uid == request.auth.uid);
-      // Checklist: permite create aunque aún no envíe owner_uid (compatibilidad).
-      // Bitácora: conserva la protección por owner_uid.
       allow create: if request.resource.data.get('report_type', '') == 'emergencia'
         ? (isRouteUser() && request.resource.data.owner_uid == request.auth.uid
           && validEmergencyReport(reportId))
         : (isAdmin()
         || (isAnonymousOperator()
-          && (
-            request.resource.data.get('report_type', '') == 'checklist'
-            || request.resource.data.owner_uid == request.auth.uid
-          ))
+          && request.resource.data.owner_uid == request.auth.uid
+          && !request.resource.data.keys().hasAny(['folio_definitivo', 'fecha_recepcion_nube'])
+          && validPasswordReport(reportId))
         || (isPasswordRouteUser() && request.resource.data.owner_uid == request.auth.uid
           && !request.resource.data.keys().hasAny(['folio_definitivo', 'fecha_recepcion_nube'])
-          && validPasswordReport(reportId)));
+          && validPasswordReport(reportId)
+          && validOperatorEmployeeNumber(request.resource.data)));
 
       allow update: if resource.data.get('report_type', '') == 'emergencia'
         ? (isRouteUser() && resource.data.owner_uid == request.auth.uid
@@ -200,14 +220,16 @@ service cloud.firestore {
           && validEmergencyReport(reportId))
         : (isRouteUser()
         && request.resource.data.get('report_type', '') != 'emergencia'
+        && request.resource.data.report_type == resource.data.report_type
         && resource.data.owner_uid == request.auth.uid
         && resource.data.get('turnoCerrado', false) != true
         && request.resource.data.owner_uid == resource.data.owner_uid
         && request.resource.data.created_at == resource.data.created_at
         && request.resource.data.get('auditoria', []).size() >= resource.data.get('auditoria', []).size()
-        && (isAnonymousOperator() || (validPasswordReport(reportId)
-          && request.resource.data.get('folio_definitivo', null) == resource.data.get('folio_definitivo', null)
-          && request.resource.data.get('fecha_recepcion_nube', null) == resource.data.get('fecha_recepcion_nube', null))));
+        && validPasswordReport(reportId)
+        && request.resource.data.get('folio_definitivo', null) == resource.data.get('folio_definitivo', null)
+        && request.resource.data.get('fecha_recepcion_nube', null) == resource.data.get('fecha_recepcion_nube', null)
+        && (isAnonymousOperator() || validOperatorEmployeeNumber(request.resource.data)));
       allow delete: if false;
     }
 
@@ -336,9 +358,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // El borrador del martes es privado; los operadores solo leen cortes publicados.
+    // El borrador del martes es privado; los cortes publicados solo los leen cuentas autenticadas activas.
     match /ranking_semanal/{semanaId} {
-      allow read: if semanaId == 'borrador' ? isRankingOwner() : isRouteUser();
+      allow read: if semanaId == 'borrador' ? isRankingOwner() : isPasswordRouteUser();
       allow write: if isRankingOwner();
     }
 
@@ -360,16 +382,21 @@ service cloud.firestore {
 
     match /evaluaciones_conduccion/{evaluationId} {
       allow get, list: if isEvaluationUser();
-      allow create: if (isAnonymousOperator() || isEvaluationUser())
+      allow create: if isEvaluationUser()
         && validConduccionEvaluation(evaluationId);
-      allow update: if (isAnonymousOperator() || isEvaluationUser())
-        && resource.data.creadoPor == request.auth.uid
+      allow update: if isEvaluationUser()
+        && (resource.data.creadoPor == request.auth.uid || isEvaluationAdmin())
         && validConduccionEvaluation(evaluationId);
     }
 
     match /evaluaciones_descarga/{evaluationId} {
       allow get, list: if isEvaluationUser();
       allow create: if isEvaluationUser() && validDescargaEvaluation(evaluationId);
+      allow update: if isEvaluationUser()
+        && (isEvaluationAdmin()
+          || !('evaluadorEmail' in resource.data)
+          || resource.data.evaluadorEmail == request.auth.token.email.lower())
+        && validDescargaEvaluation(evaluationId);
     }
 
     function validAlertaPush(uid) {
