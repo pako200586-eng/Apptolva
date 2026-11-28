@@ -250,7 +250,8 @@
         });
 
         if (!destinos.size && !categoriasCatalogo.length) {
-          const general = soloNota.get(CATEGORIA_GENERAL) || {
+          const claveGeneral = `${CATEGORIA_GENERAL}|${normalizarTokensNota(frase) || normalizarTexto(frase)}`;
+          const general = soloNota.get(claveGeneral) || {
             componente: comp.nombre,
             componenteKey: comp.key,
             sistema: CATEGORIA_GENERAL,
@@ -261,7 +262,7 @@
             origen: 'OBSERVACIÓN OPERADOR'
           };
           agregarDetalle(general, frase);
-          soloNota.set(CATEGORIA_GENERAL, general);
+          soloNota.set(claveGeneral, general);
         }
 
         destinos.forEach((falla) => {

@@ -492,7 +492,7 @@ test('la escucha actualiza emergencias, respeta la sesión y cancela el listener
 
 test('sw.js y evaluaciones.html eliminan residuos de migración y conservan Web Push NOM-087', () => {
   const worker = readFileSync(new URL('../apptolva_bitacora/sw.js', import.meta.url), 'utf8');
-  assert.match(worker, /const CACHE_VERSION = "v144";/);
+  assert.match(worker, /const CACHE_VERSION = "v145";/);
   assert.doesNotMatch(worker, /\/api\/store-bitacora/);
   assert.doesNotMatch(worker, /\/api\/admin-reports/);
   assert.doesNotMatch(worker, /GAS_DOPOST_URL/);

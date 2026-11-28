@@ -664,6 +664,7 @@
     } from "./js/firebase-sdk.js";
     import { claveAgrupacionEquipo, clavePosibleDuplicado, coberturaFallaReporte, crearFirmaFalla, crearFirmasFalla, detalleFallaReporte, estadoFallaReporte, firmasEquivalentesPosicion, idCoberturaFalla, indexarCoberturasFalla, indiceOrdenesFalla, separarSistemasFalla } from "./js/firmaFalla.js";
     import { calcularAlertasSeguridad } from "./js/alertasSeguridad.js";
+    import * as pendientesFallas from "./js/pendientesFallas.js";
     import { ESTADOS_EQUIPO, equiposFaltantes, idEquipo, normalizarEconomico, puedeAdministrarCatalogo, validarCatalogo } from "./js/catalogoEquipos.js";
     import * as rankingOperadores from "./js/rankingOperadores.js";
     import { iniciarSincronizacionOperadores } from "./js/sincronizarOperadores.js";
@@ -3167,14 +3168,38 @@
     }
 
     function tarjetaUnidadHtml(unidad) {
-      const reciente = unidad.reciente;
-      const fecha = reciente.createdAt ? new Date(reciente.createdAt).toLocaleDateString('es-MX') : 'Sin fecha';
+      const reciente = unidad.reciente || {};
+      const fecha = typeof pendientesFallas !== 'undefined'
+        ? pendientesFallas.formatearFechaLocal(reciente.createdAt)
+        : (reciente.createdAt ? new Date(reciente.createdAt).toLocaleDateString('es-MX') : 'Sin fecha');
       const folios = unidad.reportes.map((reporte) => String(reporte.folio || reporte.payload?.folio || reporte.id));
       const mostrados = folios.slice(0, 6);
       const adicionales = folios.length - mostrados.length;
       const esAdmin = state.role === 'admin';
+      const enganche = unidad.enganche || {
+        cambioEnganche: false,
+        textoReportado: unidad.tipoEquipo === 'Tracto'
+          ? `Tracto ${unidad.unitId} · ${fecha} · ${reciente.driverName || 'N/A'}`
+          : `Tracto ${reciente.unitId || reciente.payload?.unitId || 'S/N'} (${unidad.posicion}) · ${fecha} · ${reciente.driverName || 'N/A'}`,
+        textoEngancheActual: unidad.tipoEquipo === 'Tracto'
+          ? `Último check · ${fecha}`
+          : `Con Tracto ${reciente.unitId || reciente.payload?.unitId || 'S/N'} (${unidad.posicion}) · ${fecha}`
+      };
+      const diasAbierta = Number.isFinite(unidad.diasAbierta) ? unidad.diasAbierta : null;
+      const clasesEdad = diasAbierta !== null && diasAbierta >= 7
+        ? 'border border-red-200 bg-red-50 text-red-700'
+        : (diasAbierta !== null && diasAbierta >= 3
+          ? 'border border-amber-200 bg-amber-50 text-amber-800'
+          : 'border border-slate-200 bg-slate-100 text-slate-600');
+      const hayGeneralIndividual = unidad.filas.some((fila) => fila.esGeneral);
 
       const filas = unidad.filas.map((fila, indice) => {
+        const criticidad = fila.criticidad || {
+          etiqueta: 'Operativa / Hidráulica',
+          clasesBadge: 'bg-amber-100 text-amber-800 border border-amber-200',
+          clasesBorde: 'border-l-4 border-l-amber-500 bg-slate-50'
+        };
+        const limpio = fila.checkPosteriorLimpio;
         const items = fila.grupos.map((grupo) => {
           const notas = new Map();
           grupo.reportes.forEach(({ reporte, falla }) => {
@@ -3185,38 +3210,52 @@
           return `
             <li class="text-xs text-slate-700">
               • ${escapeHtml(grupo.item)}
-              ${grupo.reportes.length > 1 ? `<span class="ml-1 rounded bg-orange-100 px-1 py-0.5 text-[9px] font-black text-orange-700">×${grupo.reportes.length}</span>` : ''}
+              ${grupo.reportes.length > 1 ? `<span class="ml-1 inline-block whitespace-nowrap rounded bg-orange-100 px-1 py-0.5 text-[9px] font-black text-orange-700">×${grupo.reportes.length}</span>` : ''}
               ${lista.slice(0, 2).map(([texto, folio]) => `<p class="ml-3 text-[11px] italic text-slate-500">${escapeHtml(texto)} <span class="not-italic text-slate-400">(${escapeHtml(folio)})</span></p>`).join('')}
               ${lista.length > 2 ? `<p class="ml-3 text-[10px] text-slate-400">y ${lista.length - 2} nota(s) más</p>` : ''}
             </li>`;
         }).join('');
+        const avisoLimpio = limpio && limpio.conteo > 0 ? `
+          <p class="mt-1.5 inline-flex flex-wrap items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+            <i class="fas fa-circle-check text-emerald-600" aria-hidden="true"></i>
+            <span>Posiblemente resuelta · ${limpio.conteo} check${limpio.conteo === 1 ? '' : 's'} limpio${limpio.conteo === 1 ? '' : 's'} · último check limpio: ${escapeHtml(limpio.fechaTexto)}</span>
+          </p>` : '';
+        const sugerencia = sugerenciaGeneral(fila);
         return `
-        <li class="rounded-md border border-slate-100 bg-slate-50 p-2">
-          <div class="flex items-start gap-2">
-            <input type="checkbox" class="chk-falla mt-0.5 h-4 w-4 accent-[#294936]" data-indice="${indice}" checked ${esAdmin ? '' : 'disabled'}>
+        <li class="rounded-md border border-slate-200 p-2.5 ${criticidad.clasesBorde}">
+          <label class="flex items-start gap-2.5 ${esAdmin ? 'cursor-pointer' : 'cursor-default'}">
+            <input type="checkbox" class="chk-falla mt-0.5 h-5 w-5 shrink-0 accent-[#294936] disabled:cursor-not-allowed disabled:opacity-50" data-indice="${indice}" checked ${esAdmin ? '' : 'disabled'}>
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-black text-slate-700">${escapeHtml(fila.componente)} · ${escapeHtml(fila.sistema)}
-                <span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">${fila.folios.size} folio${fila.folios.size === 1 ? '' : 's'}</span>
-              </p>
-              ${sugerenciaGeneral(fila) ? `<p class="text-[10px] font-black uppercase text-sky-700">Probable: ${escapeHtml(sugerenciaGeneral(fila))}</p>` : ''}
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-sm font-black text-slate-800">${escapeHtml(fila.componente)} · ${escapeHtml(fila.sistema)}</span>
+                <span class="inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-black ${criticidad.clasesBadge}">${escapeHtml(criticidad.etiqueta)}</span>
+                <span class="inline-block whitespace-nowrap rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">${fila.folios.size} folio${fila.folios.size === 1 ? '' : 's'}</span>
+              </div>
+              ${sugerencia ? `<p class="mt-0.5 text-[10px] font-black uppercase text-sky-700">Probable: ${escapeHtml(sugerencia)}</p>` : ''}
+              ${avisoLimpio}
               <ul class="mt-1 space-y-0.5">${items}</ul>
-              ${esAdmin ? `<button type="button" class="btn-descartar mt-1 text-[10px] font-black uppercase text-slate-400 underline hover:text-red-700" data-indice="${indice}">Descartar con motivo</button>` : ''}
             </div>
-          </div>
+          </label>
+          ${esAdmin ? `<div class="mt-1.5 pl-7"><button type="button" class="btn-descartar inline-flex min-h-[32px] items-center px-1 py-1 text-[10px] font-black uppercase text-slate-500 underline hover:text-red-700" data-indice="${indice}">Descartar con motivo</button></div>` : ''}
         </li>`;
       }).join('');
 
       return `
         <div class="flex items-start justify-between gap-2">
-          <div>
+          <div class="min-w-0 flex-1">
             <p class="text-xs font-black text-slate-400">${unidad.reportes.length} checklist${unidad.reportes.length === 1 ? '' : 's'} · ${escapeHtml(mostrados.join(', '))}${adicionales > 0 ? ` y ${adicionales} más` : ''}</p>
             <h3 class="text-lg font-black text-[#7c2d12]">${escapeHtml(unidad.tipoEquipo)} ${escapeHtml(unidad.unitId)}</h3>
-            <p class="text-xs font-bold text-slate-600">${unidad.tipoEquipo === 'Tracto' ? 'Último reporte' : `Último enganche con Tracto ${escapeHtml(reciente.unitId || reciente.payload?.unitId || 'S/N')}`} · Posición: ${escapeHtml(unidad.posicion)}</p>
-            <p class="text-xs font-bold text-slate-500">Último operador: ${escapeHtml(reciente.driverName || 'N/A')} · ${escapeHtml(fecha)}</p>
+            <div class="mt-1 space-y-0.5 text-xs">
+              <p class="font-bold text-slate-600"><span class="text-[10px] font-black uppercase text-slate-400">Reportado con:</span> ${escapeHtml(enganche.textoReportado)}</p>
+              <p class="font-bold ${enganche.cambioEnganche ? 'text-sky-800' : 'text-slate-600'}"><span class="text-[10px] font-black uppercase text-slate-400">Enganche actual:</span> ${escapeHtml(enganche.textoEngancheActual)}</p>
+            </div>
           </div>
-          <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>
+          <div class="flex shrink-0 flex-col items-end gap-1">
+            <span class="whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-[10px] font-black uppercase text-red-700">Sin OT</span>
+            ${unidad.etiquetaAntiguedad ? `<span class="whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-black ${clasesEdad}">${escapeHtml(unidad.etiquetaAntiguedad)}</span>` : ''}
+          </div>
         </div>
-        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Sistemas con falla (${unidad.filas.length})</p>
+        <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">${hayGeneralIndividual ? 'Fallas pendientes' : 'Sistemas con falla'} (${unidad.filas.length})</p>
         <ul class="space-y-2">${filas}</ul>
         <button class="btn-generar-ot btn-accion-admin w-full rounded-md bg-[#294936] px-3 py-2 text-sm font-black text-white shadow hover:bg-[#203b2b] disabled:cursor-wait disabled:opacity-60 ${esAdmin ? '' : 'hidden'}"></button>`;
     }
@@ -3224,14 +3263,18 @@
     function enlazarTarjetaUnidad(tarjeta, unidad) {
       const boton = tarjeta.querySelector('.btn-generar-ot');
       const casillas = [...tarjeta.querySelectorAll('.chk-falla')];
-      const seleccionadas = () => casillas.filter((c) => c.checked).flatMap((c) => unidad.filas[Number(c.dataset.indice)].grupos);
+      const filasSeleccionadas = () => casillas.filter((c) => c.checked).map((c) => unidad.filas[Number(c.dataset.indice)]);
+      const seleccionadas = () => filasSeleccionadas().flatMap((fila) => fila.grupos);
       const actualizar = () => {
-        const grupos = seleccionadas();
-        const sistemas = casillas.filter((c) => c.checked).length;
+        const filasSel = filasSeleccionadas();
+        const grupos = filasSel.flatMap((fila) => fila.grupos);
+        const totalSel = filasSel.length;
+        const usaEtiquetaFalla = filasSel.some((fila) => fila.esGeneral);
+        const unidadEtiqueta = usaEtiquetaFalla ? 'FALLA' : 'SISTEMA';
         const folios = new Set(grupos.flatMap((grupo) => grupo.reportes.map((item) => String(item.reporte.id))));
         boton.disabled = !grupos.length;
         boton.textContent = grupos.length
-          ? `GENERAR OT (${sistemas} SISTEMA${sistemas === 1 ? '' : 'S'} · ${folios.size} FOLIO${folios.size === 1 ? '' : 'S'})`
+          ? `GENERAR OT (${totalSel} ${unidadEtiqueta}${totalSel === 1 ? '' : 'S'} · ${folios.size} FOLIO${folios.size === 1 ? '' : 'S'})`
           : 'SELECCIONA AL MENOS UNA FALLA';
       };
       casillas.forEach((casilla) => casilla.addEventListener('change', actualizar));
@@ -3254,7 +3297,10 @@
       tarjeta.querySelectorAll('.btn-descartar').forEach((enlace) => {
         enlace.addEventListener('click', async () => {
           const fila = unidad.filas[Number(enlace.dataset.indice)];
-          const motivo = (window.prompt(`Motivo para descartar "${fila.componente} · ${fila.sistema}" (${fila.folios.size} folio(s)). Podrás consultarlo y restaurarlo en la pestaña "Descartadas":`) || '').trim();
+          const etiquetaFalla = fila.esGeneral && fila.grupos[0]?.item
+            ? `${fila.componente} · ${fila.sistema}: ${fila.grupos[0].item}`
+            : `${fila.componente} · ${fila.sistema}`;
+          const motivo = (window.prompt(`Motivo para descartar "${etiquetaFalla}" (${fila.folios.size} folio(s)). Podrás consultarlo y restaurarlo en la pestaña "Descartadas":`) || '').trim();
           if (!motivo) return;
           enlace.disabled = true;
           try {
@@ -3390,8 +3436,19 @@
           );
           const filas = new Map();
           unidad.grupos.forEach((grupo) => {
-            const clave = `${grupo.componenteKey}|${normalizarSistema(grupo.sistema)}`;
-            const fila = filas.get(clave) || { componente: grupo.componente, sistema: grupo.sistema, grupos: [], folios: new Set() };
+            const sistemaNorm = normalizarSistema(grupo.sistema);
+            const esGeneral = /^general\b/.test(sistemaNorm);
+            const clave = esGeneral
+              ? `${grupo.componenteKey}|${sistemaNorm}|${claveAgrupacionEquipo(grupo.firma, Boolean(grupo.componenteKeyId))}`
+              : `${grupo.componenteKey}|${sistemaNorm}`;
+            const fila = filas.get(clave) || {
+              componenteKey: grupo.componenteKey,
+              componente: grupo.componente,
+              sistema: grupo.sistema,
+              esGeneral,
+              grupos: [],
+              folios: new Set()
+            };
             fila.grupos.push(grupo);
             grupo.reportes.forEach(({ reporte }) => fila.folios.add(String(reporte.id)));
             filas.set(clave, fila);
@@ -3399,10 +3456,23 @@
           unidad.filas = [...filas.values()];
         });
 
-        const lista = [...unidades.values()].sort((a, b) =>
-          b.filas.length - a.filas.length
-          || new Date(b.reciente.createdAt) - new Date(a.reciente.createdAt)
-        );
+        let lista = [...unidades.values()];
+        if (typeof pendientesFallas !== 'undefined' && typeof numerosEconomicos === 'function') {
+          const checklistsContexto = (Array.isArray(state.allReports) && state.allReports.length ? state.allReports : reportes)
+            .filter((reporte) => reporte.type === 'checklist');
+          lista = pendientesFallas.enriquecerUnidadesPendientes(lista, {
+            checklistsContexto,
+            obtenerEconomicos: numerosEconomicos,
+            obtenerFallasDeReporte: fallasFirmablesDeReporte,
+            ordenComponentes: ORDEN_COMPONENTES,
+            componentes: COMPONENTES
+          });
+        } else {
+          lista.sort((a, b) =>
+            b.filas.length - a.filas.length
+            || new Date(b.reciente.createdAt) - new Date(a.reciente.createdAt)
+          );
+        }
         contenedor.innerHTML = '';
         lista.forEach((unidad) => {
           const tarjeta = document.createElement('article');
